@@ -4,6 +4,11 @@ import { formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import Link from "next/link";
+import BlurFade from "@/components/magicui/blur-fade";
+import { Clock } from "lucide-react";
+import TableOfContents from "@/components/toc";
+import CodeBlockEnhancer from "@/components/code-block";
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts();
@@ -13,10 +18,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: {
+    slug: string;
+  };
 }): Promise<Metadata | undefined> {
-  const { slug } = await params;
-  const post = await getPost(slug);
+  const post = await getPost(params.slug);
 
   const {
     title,
@@ -53,17 +59,31 @@ export async function generateMetadata({
 export default async function Blog({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: {
+    slug: string;
+  };
 }) {
-  const { slug } = await params;
-  const post = await getPost(slug);
+  const post = await getPost(params.slug);
 
   if (!post) {
     notFound();
   }
 
+  // Get all posts for adjacent post navigation
+  const allPosts = await getBlogPosts();
+  const sortedPosts = allPosts.sort((a, b) => {
+    if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {
+      return -1;
+    }
+    return 1;
+  });
+
+  const currentPostIndex = sortedPosts.findIndex(p => p.slug === post.slug);
+  const previousPost = currentPostIndex < sortedPosts.length - 1 ? sortedPosts[currentPostIndex + 1] : null;
+  const nextPost = currentPostIndex > 0 ? sortedPosts[currentPostIndex - 1] : null;
+
   return (
-    <section id="blog">
+    <>
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -86,20 +106,140 @@ export default async function Blog({
           }),
         }}
       />
-      <h1 className="title font-medium text-2xl tracking-tighter max-w-[650px]">
-        {post.metadata.title}
-      </h1>
-      <div className="flex justify-between items-center mt-2 mb-8 text-sm max-w-[650px]">
-        <Suspense fallback={<p className="h-5" />}>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            {formatDate(post.metadata.publishedAt)}
-          </p>
-        </Suspense>
-      </div>
-      <article
-        className="prose dark:prose-invert"
-        dangerouslySetInnerHTML={{ __html: post.source }}
-      ></article>
-    </section>
+      
+      <CodeBlockEnhancer />
+
+      <BlurFade>
+        <div className="mb-8">
+          <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+            <span>Back to all posts</span>
+          </Link>
+        </div>
+      </BlurFade>
+
+      <article className="max-w-2xl mx-auto">
+        <BlurFade delay={0.1}>
+          <header className="mb-10">
+            <h1 className="title font-medium text-3xl md:text-4xl tracking-tighter mb-4">
+              {post.metadata.title}
+            </h1>
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                  <line x1="16" x2="16" y1="2" y2="6" />
+                  <line x1="8" x2="8" y1="2" y2="6" />
+                  <line x1="3" x2="21" y1="10" y2="10" />
+                </svg>
+                <Suspense fallback={<span className="h-5" />}>
+                  <time dateTime={post.metadata.publishedAt}>
+                    {formatDate(post.metadata.publishedAt)}
+                  </time>
+                </Suspense>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                <span>{post.readingTime} min read</span>
+              </div>
+            </div>
+          </header>
+        </BlurFade>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-8">
+          <BlurFade delay={0.2}>
+            <div className="prose dark:prose-invert">
+              <div dangerouslySetInnerHTML={{ __html: post.source }} />
+            </div>
+          </BlurFade>
+          
+          <BlurFade delay={0.2}>
+            <div className="lg:sticky lg:top-20 lg:self-start">
+              <TableOfContents html={post.source} />
+            </div>
+          </BlurFade>
+        </div>
+
+        <BlurFade delay={0.3}>
+          <div className="mt-16 grid gap-4 md:grid-cols-2 border-t pt-6">
+            {previousPost && (
+              <Link href={`/blog/${previousPost.slug}`} className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  <span>Previous post</span>
+                </div>
+                <div className="font-medium group-hover:text-foreground transition-colors">
+                  {previousPost.metadata.title}
+                </div>
+              </Link>
+            )}
+            {nextPost && (
+              <Link href={`/blog/${nextPost.slug}`} className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors text-right">
+                <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mb-2">
+                  <span>Next post</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </div>
+                <div className="font-medium group-hover:text-foreground transition-colors">
+                  {nextPost.metadata.title}
+                </div>
+              </Link>
+            )}
+          </div>
+        </BlurFade>
+      </article>
+    </>
   );
 }

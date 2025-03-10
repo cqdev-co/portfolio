@@ -11,7 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${baseUrl}/blog/${post.slug}`,
       lastModified: new Date(post.metadata.publishedAt),
       changeFrequency: 'monthly' as const,
-      priority: 0.7,
+      priority: post.metadata.featured ? 0.9 : 0.7, // Higher priority for featured posts
     }));
 
     // Static routes
@@ -23,19 +23,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 1.0,
       },
       {
+        url: `${baseUrl}/about`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.9,
+      },
+      {
         url: `${baseUrl}/blog`,
         lastModified: new Date(),
         changeFrequency: 'weekly' as const,
         priority: 0.8,
       },
-      // Add any other static routes your site has
-      // Example:
-      // {
-      //   url: `${baseUrl}/projects`,
-      //   lastModified: new Date(),
-      //   changeFrequency: 'monthly' as const,
-      //   priority: 0.8,
-      // },
+      {
+        url: `${baseUrl}/blog/about`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.8,
+      },
     ];
 
     return [...routes, ...blogUrls];
@@ -50,9 +54,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 1.0,
       },
       {
+        url: `${baseUrl}/about`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.9,
+      },
+      {
         url: `${baseUrl}/blog`,
         lastModified: new Date(),
         changeFrequency: 'weekly' as const,
+        priority: 0.8,
+      },
+      {
+        url: `${baseUrl}/blog/about`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
         priority: 0.8,
       },
     ];

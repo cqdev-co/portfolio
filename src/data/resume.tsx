@@ -82,13 +82,15 @@ export const DATA = {
       start: "September 2024",
       end: "Present",
       description:
-        "Architected and implemented a secure full-stack NextJS platform with hardened authorization controls and encrypted data flows. Key accomplishments:",
+        "Worked on securing the Cyera Infrastructure and Application using various open-source tools and technologies.  Key accomplishments:",
       highlights: [
+        "Built and containerized a security bot on GCR to automate security tasks and detections, significantly reducing routine manual work for engineers and saving money",
+        "Designed and implemented an AWS RDS PostgreSQL database with encryption at rest and in transit to protect sensitive data, ensuring compliance with best data protection standards",
+        "Developed and maintained tools, scripts, and platforms for enhanced security observability and control",
+        "Proactively fortified container security by systematically updating Docker images to the latest stable versions and remediating critical/high/moderate CVEs in alignment with CIS Benchmarks and OWASP best practices",
+        "Strengthened application security posture and ensured compliance with stringent security frameworks across repositories and infrastructure",
         "Developed secure authentication patterns using TypeScript, TailwindCSS and ShishCN",
-        "Containerized applications with Docker ensuring consistent security controls across environments",
-        "Implemented least-privilege principle for security automation using GitHub Actions",
-        "Designed secure data storage with encrypted AWS RDS PostgreSQL database",
-        "Created containerized security monitoring system on Google Cloud Run for automated threat detection",
+        "Implemented least-privilege principle for security automation using GitHub Actions"
       ]
     },
     {
@@ -103,11 +105,11 @@ export const DATA = {
       description:
         "Contributed security-focused improvements to open source projects. Key accomplishments:",
       highlights: [
+        "Developed a CI/CD pipeline for an open-source application, ensuring builds are tested across Linux, Mac, and Windows platforms, enhancing efficiency and reliability",
+        "Contributed to PearAI's Server and Submodule, integrating key features like Anthropic support, Gemini support, and applying Secure Software Engineering practices. Integrated ML fail-safe measures to ensure sleek user experience",
+        "Performed code reviews and maintained best practices for managing a large GitHub repository, ensuring robust and secure coding standards",
         "Integrated secure Terraform deployment patterns for AWS infrastructure",
-        "Implemented secure API integrations for Google Gemini",
-        "Created VMWare fail-safe deployment mechanisms",
-        "Conducted security-focused code reviews applying OWASP best practices",
-        "Established security testing practices for large GitHub repositories"
+        "Implemented secure API integrations for Google Gemini"
       ]
     },
     {
@@ -122,11 +124,12 @@ export const DATA = {
       description:
         "Implemented secure infrastructure automation practices for AWS deployments. Key accomplishments:",
       highlights: [
-        "Built secure IaC templates using Ansible and Terraform with embedded security controls",
-        "Designed AWS Security Groups following zero-trust principles",
-        "Secured GitLab Actions workflows with proper secret management",
-        "Migrated Flask applications to production with security-focused configurations",
-        "Created security monitoring dashboards using Python and Looker Studio"
+        "Automated end-to-end deployment utilizing Ansible and Terraform to deploy AWS infrastructure using GitHub Actions, implementing robust security through AWS Security Groups and using GitHub Actions secrets management",
+        "Led the migration of a Hack app from development to production using IaC, ensuring optimal performance, scalability, and security that showcases production-ready configurations",
+        "Implemented Security Stack monitoring dashboard utilizing scheduled GitHub Actions workflows that refreshed Docker Soaker dashboard using Python scripts",
+        "Deployed OpenCTI using Docker, GCP, and Ansible, with seamless integration of CI/CD pipelines",
+        "Expert in sourcegraph, shared components, file cryptography and Ready to enhance threat intelligence",
+        "Proven ability to design scalable, reliable, and secure cloud infrastructure while automating deployment processes for optimal efficiency"
       ]
     },
   ],
@@ -135,7 +138,7 @@ export const DATA = {
       school: "University of Denver",
       href: "https://du.edu",
       degree: "B.S. in Computer Science; Minor: Mathematics, Business Analytics",
-      logoUrl: "/du.png",
+      logoUrl: "/logos/du.svg",
       start: "September 2020",
       end: "June 2024",
     },
@@ -143,11 +146,11 @@ export const DATA = {
   projects: [
     {
       title: "Portfolio",
-      href: "https://magicui.design",
+      href: "https://www.conorq.com",
       dates: "March 2025 - Present",
       active: true,
       description:
-        "Develoepd a portfolio website.",
+        "Developed a portfolio website to demonstrate my skills and system design capabilities.",
       technologies: [
         "NextJS",
         "TypeScript",
