@@ -4,6 +4,7 @@ import { DATA } from "@/data/resume";
 import { ProjectCard } from "@/components/project-card";
 import { Separator } from "@/components/ui/separator";
 import { ResumeCard } from "@/components/resume-card";
+import { PersonSchema, WebsiteSchema } from "@/components/schema";
 
 // Use the data directly to avoid type issues with readonly arrays
 const data = DATA;
@@ -11,6 +12,10 @@ const data = DATA;
 export default function Home() {
   return (
     <div className="flex flex-col gap-12">
+      {/* Add structured data for SEO */}
+      <PersonSchema />
+      <WebsiteSchema />
+      
       {/* About Section */}
       <section>
         <h2 className="text-lg font-semibold mb-3">About</h2>

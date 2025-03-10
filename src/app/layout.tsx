@@ -8,6 +8,7 @@ import Navbar from "@/components/navbar";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Particles } from "@/components/magicui/particles";
+import { Analytics } from "@vercel/analytics/react"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,8 +21,36 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = { 
-  title: "My Portfolio",
+  title: "portfolio",
   description: "Professional portfolio showcasing my work and skills",
+  keywords: ["portfolio", "web development", "developer", "projects"],
+  authors: [{ name: "Conor Quinlan" }],
+  creator: "Conor Quinlan",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://conorq.com",
+    title: "My Portfolio",
+    description: "Professional portfolio showcasing my work and skills",
+    siteName: "Conor Quinlan's Portfolio",
+    images: [{
+      url: "https://conorq.com/og-image.jpg", // Replace with an actual OG image path
+      width: 1200,
+      height: 630,
+      alt: "Conor Quinlan - Portfolio"
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "My Portfolio",
+    description: "Professional portfolio showcasing my work and skills",
+    creator: "@realconorcodes", // Replace with your Twitter handle if applicable
+    images: ["https://conorq.com/og-image.jpg"], // Same as OG image
+  },
+  robots: {
+    index: true,
+    follow: true,
+  }
 };
 
 export default function RootLayout({
@@ -38,6 +67,7 @@ export default function RootLayout({
           "min-h-screen flex flex-col antialiased bg-white dark:bg-gray-950"
         )}
       >
+        <Analytics />
         {/* Particles background */}
         <Particles 
           className="fixed inset-0 -z-10" 
