@@ -17,12 +17,12 @@ jobs:
         with:
           bun-version: latest
       
-      # Use Vercel CLI with Bun
+      # Use Vercel CLI
       - name: Deploy to Vercel
         id: deploy
         run: |
           bun install -g vercel
-          DEPLOYMENT_URL=$(bun vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --scope me --yes)
+          DEPLOYMENT_URL=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes)
           echo "VERCEL_DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
           echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
       
