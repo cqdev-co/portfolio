@@ -1,0 +1,39 @@
+name: Auto-merge Dependabot PRs
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    # We'll use a different approach to wait for CI and approval
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Wait for CI checks to pass
+      - name: Wait for CI checks
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'build-and-test' # This should match the job name in your CI workflow
+          wait-interval: 20
+      
+      # Wait for approval - you could also wait for the approval check
+      - name: Wait for approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.repository_owner }}
+          minimum-approvals: 1
+          issue-title: "Approval required for Dependabot PR"
+          issue-body: "Please approve this Dependabot PR"
+          exclude-workflow-initiator-as-approver: false
+      
+      - name: Merge
+        uses: pascalgn/automerge-action@v0.15.6
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          MERGE_METHOD: "squash" 
