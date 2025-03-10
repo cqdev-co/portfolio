@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Configure updates for npm dependencies
+  - package-ecosystem: "npm" # or "yarn" if you use yarn
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+    # Set reviewers for pull requests
+    reviewers:
+      - "your-github-username"
+    # Open pull requests for version updates
+    open-pull-requests-limit: 10
+    # Configure auto-merge behavior (optional)
+    # auto-merge will respect your branch protection rules
+    # so CI must pass before merging
+    allow:
+      - dependency-type: "all" 
