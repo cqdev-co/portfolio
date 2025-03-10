@@ -45,9 +45,9 @@ export function ProjectCard({
   return (
     <motion.div 
       className={cn(
-        "group flex flex-col overflow-hidden h-full rounded-md border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900",
+        "group flex flex-col overflow-hidden h-full rounded-md border border-border bg-card",
         "transition-all duration-200 shadow-sm",
-        isHovered ? "shadow-md border-gray-200 dark:border-gray-700 scale-[1.01]" : "",
+        isHovered ? "shadow-md scale-[1.01]" : "",
         className
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -57,7 +57,7 @@ export function ProjectCard({
       transition={{ duration: 0.3 }}
     >
       {/* Media Section - Video or Image */}
-      <div className="relative w-full h-48 overflow-hidden bg-gray-50 dark:bg-gray-800">
+      <div className="relative w-full h-48 overflow-hidden bg-muted">
         <Link href={href || "#"} className="block w-full h-full">
           {video && (
             <video
@@ -79,8 +79,8 @@ export function ProjectCard({
             />
           )}
           {!image && !video && (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
-              <span className="text-lg font-semibold text-gray-400">{title.substring(0, 1)}</span>
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <span className="text-lg font-semibold text-muted-foreground">{title.substring(0, 1)}</span>
             </div>
           )}
         </Link>
@@ -97,32 +97,32 @@ export function ProjectCard({
 
       {/* Content Section */}
       <div className="flex flex-col flex-grow p-4">
-        <div className="space-y-2 mb-4">
+        <div className="space-y-1.5 mb-3">
           {/* Title with optional link */}
           <div className="flex items-start justify-between">
-            <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+            <h3 className="font-medium text-foreground text-sm">{title}</h3>
             {href && (
-              <Link href={href} target="_blank" rel="noopener noreferrer" className="ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                <ExternalLinkIcon className="size-4" />
+              <Link href={href} target="_blank" rel="noopener noreferrer" className="ml-2 text-muted-foreground hover:text-foreground transition-colors">
+                <ExternalLinkIcon className="size-3.5" />
               </Link>
             )}
           </div>
           
           {/* Date */}
-          <time className="text-xs font-medium text-gray-500 dark:text-gray-400">{dates}</time>
+          <time className="text-caption text-muted-foreground">{dates}</time>
           
           {/* Description */}
-          <div className="prose prose-sm max-w-full text-pretty text-xs text-gray-600 dark:text-gray-400 dark:prose-invert">
+          <div className="mt-2 prose-sm max-w-full text-compact text-muted-foreground dark:prose-invert">
             <Markdown>{description}</Markdown>
           </div>
           
           {/* Security Features Section */}
           {securityFeatures && securityFeatures.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-              <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Security Features</h4>
-              <ul className="list-disc pl-4 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+            <div className="mt-2.5 pt-2.5 border-t border-border">
+              <h4 className="text-caption font-medium text-foreground mb-1.5">Security Features</h4>
+              <ul className="list-disc pl-4 text-caption text-muted-foreground space-y-1">
                 {securityFeatures.map((feature, idx) => (
-                  <li key={idx} className="leading-relaxed">{feature}</li>
+                  <li key={idx} className="leading-tight">{feature}</li>
                 ))}
               </ul>
             </div>
@@ -135,7 +135,7 @@ export function ProjectCard({
             <div className="flex flex-wrap gap-1 mb-2">
               {tags.map((tag) => (
                 <Badge
-                  className="px-1.5 py-0 text-[10px] font-normal bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
+                  className="px-1.5 py-0 text-caption font-normal bg-secondary text-secondary-foreground border-border hover:bg-secondary/80 transition-colors"
                   variant="outline"
                   key={tag}
                 >
@@ -147,17 +147,17 @@ export function ProjectCard({
           
           {/* Links Section */}
           {links && links.length > 0 && (
-            <div className="flex flex-row flex-wrap items-start gap-1 mt-2">
+            <div className="flex flex-wrap gap-1">
               {links.map((link, idx) => (
-                <Link href={link?.href} key={idx} target="_blank" rel="noopener noreferrer">
-                  <Badge 
-                    key={idx} 
-                    className="flex gap-1.5 items-center px-2 py-0.5 text-[10px] border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200" 
-                    variant="outline"
-                  >
-                    {link.icon}
-                    {link.type}
-                  </Badge>
+                <Link
+                  key={idx}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex gap-1 items-center px-1.5 py-0.5 text-caption border-border bg-card text-muted-foreground hover:bg-secondary transition-colors duration-200"
+                >
+                  {link.icon}
+                  <span>{link.type}</span>
                 </Link>
               ))}
             </div>

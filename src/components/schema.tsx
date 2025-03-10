@@ -2,7 +2,7 @@ import React from 'react';
 import { DATA } from '@/data/resume';
 
 export function PersonSchema() {
-  // Access DATA properties safely
+  // Access DATA properties safely and add more identity-focused attributes
   const person = {
     name: DATA.name,
     url: DATA.url,
@@ -10,13 +10,38 @@ export function PersonSchema() {
     description: DATA.about,
     image: DATA.avatarUrl && `${DATA.url}${DATA.avatarUrl}`,
     location: DATA.location,
+    sameAs: [
+      'https://conorq.com',
+      'https://github.com/conorquinlan',
+      'https://linkedin.com/in/conorquinlan',
+      'https://twitter.com/realconorcodes',
+      // Add any other profiles you have
+    ],
+    alumniOf: {
+      '@type': 'EducationalOrganization',
+      name: 'Your University Name', // Replace with your actual university
+    },
+    knowsAbout: [
+      'Cloud Security (AWS/GCP)',
+      'CI/CD Security',
+      'Docker Containerization',
+      'Infrastructure as Code',
+      'Zero-Trust Architecture',
+      'Security Engineering',
+      'Application Security',
+    ],
   };
 
-  // Create schema without social links for now
+  // Create schema with enhanced identity information
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'Person',
+    '@id': 'https://conorq.com/#person',
     ...person,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': 'https://conorq.com',
+    },
     worksFor: DATA.work && DATA.work.length > 0
       ? {
           '@type': 'Organization',
@@ -39,13 +64,45 @@ export function WebsiteSchema() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    '@id': 'https://conorq.com/#website',
     name: `${DATA.name}'s Portfolio`,
     url: DATA.url,
-    description: DATA.description || 'Professional portfolio showcasing my work and skills',
+    description: DATA.description || `${DATA.name} - Security Engineer Portfolio`,
     author: {
       '@type': 'Person',
+      '@id': 'https://conorq.com/#person',
       name: DATA.name,
     },
+    publisher: {
+      '@type': 'Person',
+      '@id': 'https://conorq.com/#person',
+      name: DATA.name,
+    },
+    inLanguage: 'en-US'
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
+// BreadcrumbList Schema for structured navigation
+export function BreadcrumbSchema({ items }: { items: {name: string, url: string}[] }) {
+  const itemListElement = items.map((item, index) => ({
+    '@type': 'ListItem',
+    position: index + 1,
+    name: item.name,
+    item: item.url,
+  }));
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement,
   };
 
   return (
