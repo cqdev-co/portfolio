@@ -2,11 +2,12 @@ name: CI/CD Pipeline
 
 # Workflow temporarily disabled until Vercel project is set up
 # Uncomment the following section after setting up Vercel integration
-# on:
+on:
 #   push:
 #     branches: [ main ]
 #   pull_request:
 #     branches: [ main ]
+    workflow_dispatch:
 
 jobs:
   build-and-test:

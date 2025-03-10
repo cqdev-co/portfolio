@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useRef } from "react";
 import { AnimatePresence, motion, useInView, Variants } from "framer-motion";
-import { useRef } from "react";
 
 interface BlurFadeProps {
   children: React.ReactNode;
@@ -29,6 +29,7 @@ const BlurFade = ({
   blur = "6px",
 }: BlurFadeProps) => {
   const ref = useRef(null);
+  // @ts-expect-error: Type 'string' is not assignable to type 'MarginType | undefined'
   const inViewResult = useInView(ref, { once: true, margin: inViewMargin });
   const isInView = !inView || inViewResult;
   const defaultVariants: Variants = {
