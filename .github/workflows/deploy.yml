@@ -1,0 +1,28 @@
+name: Deploy to Vercel
+
+# Workflow temporarily disabled until Vercel project is set up
+# Uncomment the following section after setting up Vercel integration
+on:
+#   push:
+#     branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Vercel CLI deployment is an alternative approach
+      # that doesn't require building in the workflow
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          vercel-args: '--prod'
+      
+      # For other hosting options, you'll need to add specific deploy steps 

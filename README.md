@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Modern Portfolio Website
+
+A sleek, minimal, and professional portfolio website built with Next.js, TypeScript, Tailwind CSS, Bun, and Shadcn/UI.
+
+![Portfolio Screenshot](screenshot.png)
+
+## Features
+
+- 🚀 **Modern Stack**: Built with Next.js 14, TypeScript, and Tailwind CSS
+- 🧩 **Component Library**: Uses Shadcn/UI for beautiful UI components
+- 📱 **Responsive Design**: Looks great on all devices
+- 🔍 **SEO Optimized**: Proper metadata for better search engine visibility
+- 🌗 **Dark Mode Ready**: Supports light and dark themes
+- ⚡ **Fast Performance**: Quick loading times with Next.js App Router
+- 💼 **Professional Layout**: LinkedIn-style header with Dillion-inspired content sections
+
+## Pages
+
+- **Home**: Introduction with skills, work experience, and featured projects
+- **About**: Detailed information about background, skills, and experience
+- **Projects**: Showcase of portfolio projects with descriptions and technologies used
+- **Contact**: Contact form and information
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Bun](https://bun.sh/) (>= 1.0.0)
+- Node.js (>= 18.0.0)
+
+### Installation
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/yourusername/portfolio.git
+   cd portfolio
+   ```
+
+2. Install dependencies
+   ```bash
+   bun install
+   ```
+
+3. Run the development server
+   ```bash
+   bun dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## Customization
+
+### Personal Information
+
+1. Update your name, title, and description in `src/app/page.tsx`
+2. Add your work experience and skills
+3. Update the project information in `src/app/projects/page.tsx`
+4. Edit contact information in `src/app/contact/page.tsx`
+
+### Styling
+
+- The theme can be customized in the `components.json` file
+- Global CSS can be modified in `src/app/globals.css`
+- Component styles use Tailwind CSS classes
+
+### Images
+
+- Replace the placeholder images with your own:
+  - Add a banner image to the header component
+  - Add a profile photo
+  - Add project screenshots
+
+## Deployment
+
+This project can be easily deployed to Vercel:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+vercel
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Built With
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- [Next.js](https://nextjs.org/) - The React framework
+- [TypeScript](https://www.typescriptlang.org/) - Type-safe JavaScript
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Shadcn/UI](https://ui.shadcn.com/) - UI component library
+- [Bun](https://bun.sh/) - JavaScript runtime and package manager
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## License
 
-## Learn More
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-To learn more about Next.js, take a look at the following resources:
+## Acknowledgments
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Inspired by [Dillion's Portfolio](https://github.com/dillionmegida)
+- LinkedIn for the header design inspiration
