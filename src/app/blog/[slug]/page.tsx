@@ -23,8 +23,7 @@ export async function generateMetadata({
     slug: string;
   };
 }): Promise<Metadata | undefined> {
-  const resolvedParams = await params;
-  const post = await getPost(resolvedParams.slug);
+  const post = await getPost(params.slug);
 
   const {
     title,

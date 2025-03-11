@@ -313,8 +313,9 @@
   @apply text-[0.7rem] leading-none mb-0 transition-all duration-200;
 }
 
+/* Original styles for TOC links */
 .toc-container nav a {
-  @apply text-muted-foreground/90 hover:text-foreground transition-colors no-underline flex py-1.5 border-l border-border/30 pl-2 -ml-2 truncate;
+  @apply text-muted-foreground/90 hover:text-foreground transition-colors no-underline flex py-1.5 border-l border-border/30 pl-2 -ml-2 truncate relative;
 }
 
 .toc-container nav a.active {
@@ -347,10 +348,6 @@
 }
 
 /* Add a nice transition when sections become active */
-.toc-container nav a {
-  @apply relative;
-}
-
 .toc-container nav a::before {
   content: "";
   @apply absolute left-0 top-0 bottom-0 w-0 opacity-0 -z-10 transition-all duration-200 ease-out rounded-r;
