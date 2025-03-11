@@ -248,11 +248,11 @@
 }
 
 .prose h2 {
-  @apply text-xl mt-10 mb-4 lg:text-2xl;
+  @apply text-xl mt-6 mb-4 lg:text-2xl;
 }
 
 .prose h3 {
-  @apply text-lg mt-8 mb-4 lg:text-xl;
+  @apply text-lg mt-5 mb-4 lg:text-xl;
 }
 
 .prose p {
@@ -298,35 +298,63 @@
 
 /* Table of contents styling */
 .toc-container {
-  @apply my-8 p-4 border rounded-lg bg-secondary/30 sticky top-20;
+  @apply my-6 px-3.5 py-2.5 border border-border/40 rounded-md bg-card/30 backdrop-blur-sm sticky top-20 shadow-[0_1px_3px_rgba(0,0,0,0.05)];
 }
 
 .toc-container h2 {
-  @apply text-xs font-medium mb-4;
+  @apply text-[0.65rem] uppercase font-medium mb-2 pb-1.5 border-b border-border/30 tracking-wider text-muted-foreground whitespace-nowrap;
 }
 
 .toc-container nav ul {
-  @apply space-y-2 ml-0;
+  @apply ml-0 max-h-[60vh] overflow-y-auto pr-1 -mx-1 px-1;
 }
 
 .toc-container nav li {
-  @apply text-xs mb-0;
+  @apply text-[0.7rem] leading-none mb-0 transition-all duration-200;
 }
 
+/* Original styles for TOC links */
 .toc-container nav a {
-  @apply text-muted-foreground hover:text-foreground transition-colors no-underline;
+  @apply text-muted-foreground/90 hover:text-foreground transition-colors no-underline flex py-1.5 border-l border-border/30 pl-2 -ml-2 truncate relative;
 }
 
 .toc-container nav a.active {
-  @apply font-medium text-foreground;
+  @apply font-medium text-foreground border-l-2 border-primary/70 pl-[7px] -ml-2 bg-gradient-to-r from-primary/[0.08] to-transparent;
 }
 
 .toc-container nav li.depth-3 {
-  @apply ml-4;
+  @apply ml-2;
 }
 
 .toc-container nav li.depth-4 {
-  @apply ml-6;
+  @apply ml-3;
+}
+
+.toc-container nav ul > li + li {
+  @apply mt-0.5;
+}
+
+/* Style scrollbar for the TOC */
+.toc-container nav ul::-webkit-scrollbar {
+  @apply w-1;
+}
+
+.toc-container nav ul::-webkit-scrollbar-track {
+  @apply bg-transparent rounded-full;
+}
+
+.toc-container nav ul::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/10 rounded-full hover:bg-muted-foreground/20;
+}
+
+/* Add a nice transition when sections become active */
+.toc-container nav a::before {
+  content: "";
+  @apply absolute left-0 top-0 bottom-0 w-0 opacity-0 -z-10 transition-all duration-200 ease-out rounded-r;
+}
+
+.toc-container nav a.active::before {
+  @apply w-full opacity-100;
 }
 
 /* Code highlight */

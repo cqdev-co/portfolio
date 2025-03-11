@@ -9,6 +9,7 @@ import BlurFade from "@/components/magicui/blur-fade";
 import { Clock } from "lucide-react";
 import TableOfContents from "@/components/toc";
 import CodeBlockEnhancer from "@/components/code-block";
+import Script from "next/script";
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts();
@@ -84,26 +85,33 @@ export default async function Blog({
 
   return (
     <>
-      <script
+      <Script
+        id="schema-article"
         type="application/ld+json"
-        suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "BlogPosting",
             headline: post.metadata.title,
-            datePublished: post.metadata.publishedAt,
-            dateModified: post.metadata.publishedAt,
             description: post.metadata.summary,
-            image: post.metadata.image
-              ? `${DATA.url}${post.metadata.image}`
-              : `${DATA.url}/og?title=${post.metadata.title}`,
-            url: `${DATA.url}/blog/${post.slug}`,
+            image: post.metadata.image ? `${DATA.url}${post.metadata.image}` : `${DATA.url}/og?title=${post.metadata.title}`,
+            datePublished: post.metadata.publishedAt,
+            dateModified: post.metadata.updatedAt || post.metadata.publishedAt,
             author: {
               "@type": "Person",
-              name: DATA.name,
+              name: "Conor Quinlan",
+              url: DATA.url
             },
-          }),
+            publisher: {
+              "@type": "Person",
+              name: "Conor Quinlan",
+              url: DATA.url
+            },
+            mainEntityOfPage: {
+              "@type": "WebPage",
+              "@id": `${DATA.url}/blog/${post.slug}`
+            }
+          })
         }}
       />
       
@@ -134,7 +142,7 @@ export default async function Blog({
 
       <article className="max-w-2xl mx-auto">
         <BlurFade delay={0.1}>
-          <header className="mb-10">
+          <header className="mb-6">
             <h1 className="title font-medium text-3xl md:text-4xl tracking-tighter mb-4">
               {post.metadata.title}
             </h1>
@@ -171,7 +179,12 @@ export default async function Blog({
           </header>
         </BlurFade>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-8">
+        {/* Mobile Table of Contents - only visible on small screens */}
+        <BlurFade delay={0.15} className="lg:hidden mb-3">
+          <TableOfContents html={post.source} />
+        </BlurFade>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_240px] gap-10">
           <BlurFade delay={0.2}>
             <div className="prose dark:prose-invert">
               <div dangerouslySetInnerHTML={{ __html: post.source }} />
@@ -179,7 +192,7 @@ export default async function Blog({
           </BlurFade>
           
           <BlurFade delay={0.2}>
-            <div className="lg:sticky lg:top-20 lg:self-start">
+            <div className="hidden lg:block lg:sticky lg:top-24 lg:self-start">
               <TableOfContents html={post.source} />
             </div>
           </BlurFade>
