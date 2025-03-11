@@ -1,13 +1,13 @@
 version: 2
 updates:
   # Configure updates for npm dependencies
-  - package-ecosystem: "npm" # or "yarn" if you use yarn
+  - package-ecosystem: "bun"
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
     # Set reviewers for pull requests
     reviewers:
-      - "your-github-username"
+      - "cqdev-co"
     # Open pull requests for version updates
     open-pull-requests-limit: 10
     # Configure auto-merge behavior (optional)
