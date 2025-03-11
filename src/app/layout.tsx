@@ -10,7 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Particles } from "@/components/magicui/particles";
 import { DATA } from "@/data/resume";
 import Script from "next/script";
-
+import { Analytics } from "@vercel/analytics/react";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -99,6 +99,7 @@ export default function RootLayout({
         >
           <TooltipProvider>
             <Header />
+            <Analytics />
             <main className="flex-1 pt-6 pb-28 px-4 sm:px-6 md:px-8 max-w-4xl mx-auto w-full text-sm sm:text-base">
               {children}
             </main>
