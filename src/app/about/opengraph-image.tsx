@@ -8,9 +8,5 @@ export default async function AboutOGImage() {
   return createOGImage({
     title: 'About Me',
     subtitle: 'Security Engineer specializing in cloud security, DevSecOps, and secure infrastructure',
-    backgroundPattern: true,
-    showUrl: true,
-    gradientTitle: true,
-    alignment: 'center',
   });
 }

@@ -9,9 +9,5 @@ export default async function OGImage() {
   return createOGImage({
     title: DATA.name,
     subtitle: DATA.title,
-    backgroundPattern: true,
-    showUrl: true,
-    gradientTitle: true,
-    alignment: 'center',
   });
 }
