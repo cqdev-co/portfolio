@@ -6,8 +6,8 @@ on:
 
 # Add permissions block
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
   issues: write
 
 jobs:
@@ -28,17 +28,18 @@ jobs:
           check-name: 'build-and-test'
           wait-interval: 20
       
-      # Use a simpler approval approach
+      # Use PAT for approval
       - name: Approve PR
         run: |
+          gh auth login --with-token <<< "${{ secrets.PAT_FOR_APPROVAL }}"
           gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
+      # Use PAT for merging
       - name: Merge
         run: |
           gh pr merge --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GH_TOKEN: ${{ secrets.PAT_FOR_APPROVAL }} 
