@@ -8,6 +8,8 @@ import Navbar from "@/components/navbar";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Particles } from "@/components/magicui/particles";
+import { DATA } from "@/data/resume";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,8 +22,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = { 
-  title: "cgq | portfolio",
-  description: "Professional portfolio showcasing my work and skills",
+  title: {
+    default: "cgq | portfolio",
+    template: "%s | cgq",
+  },
+  description: "Professional portfolio showcasing my work and skills as a Security Engineer specializing in cloud security and DevSecOps",
+  metadataBase: new URL(DATA.url || "https://conorq.com"),
+  authors: [
+    {
+      name: "Conor Quinlan",
+      url: DATA.url || "https://conorq.com",
+    },
+  ],
+  generator: "Next.js",
+  applicationName: "Conor Quinlan Portfolio",
+  referrer: "origin-when-cross-origin",
+  keywords: ["portfolio", "security engineer", "developer", "cloud security", "DevSecOps"],
+  creator: "Conor Quinlan",
+  publisher: "Conor Quinlan",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
@@ -31,6 +54,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          id="schema-org-person"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Person",
+              name: "Conor Quinlan",
+              url: DATA.url || "https://conorq.com",
+              jobTitle: "Security Engineer",
+              worksFor: {
+                "@type": "Organization",
+                name: "Cyera",
+              },
+              description: "Security Engineer specializing in cloud security, DevSecOps, and building secure, resilient systems and infrastructure."
+            })
+          }}
+        />
+      </head>
       <body
         className={cn(
           geistSans.variable,

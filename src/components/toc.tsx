@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp, ListFilter } from "lucide-react";
 
 interface TableOfContentsProps {
   html: string;
@@ -19,6 +20,7 @@ interface Heading {
 export default function TableOfContents({ html }: TableOfContentsProps) {
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Extract headings from the HTML content
   useEffect(() => {
@@ -81,31 +83,58 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
     return null; // Don't show the TOC if there are fewer than 2 headings
   }
 
+  // Count the number of visible sections
+  const sectionCount = headings.filter(h => h.level === 2).length;
+
   return (
     <div className="toc-container">
-      <h2>Table of Contents</h2>
-      <nav>
-        <ul>
-          {headings.map((heading) => (
-            <li
-              key={heading.id}
-              className={cn(
-                heading.level === 3 && "depth-3",
-                heading.level === 4 && "depth-4"
-              )}
-            >
-              <a
-                href={`#${heading.id}`}
+      <div className="flex items-center justify-between pb-2">
+        <h2 className="flex items-center gap-1 m-0">
+          <ListFilter className="size-3" />
+          <span>CONTENTS</span>
+          {sectionCount > 0 && <span className="text-[0.6rem] opacity-60">{sectionCount}</span>}
+        </h2>
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="text-muted-foreground/70 hover:text-foreground size-4 flex items-center justify-center rounded-sm hover:bg-secondary/50 transition-colors -mr-0.5"
+          aria-label={isCollapsed ? "Expand table of contents" : "Collapse table of contents"}
+        >
+          {isCollapsed ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+        </button>
+      </div>
+      {!isCollapsed && (
+        <nav aria-label="Table of contents" className="mt-1">
+          <ul className="pt-0.5">
+            {headings.map((heading) => (
+              <li
+                key={heading.id}
                 className={cn(
-                  activeId === heading.id && "active"
+                  heading.level === 3 && "depth-3",
+                  heading.level === 4 && "depth-4"
                 )}
               >
-                {heading.text}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+                <a
+                  href={`#${heading.id}`}
+                  className={cn(
+                    activeId === heading.id && "active"
+                  )}
+                  aria-current={activeId === heading.id ? "location" : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.querySelector(`#${heading.id}`)?.scrollIntoView({
+                      behavior: "smooth",
+                    });
+                    // Update URL hash without jumping
+                    window.history.pushState(null, "", `#${heading.id}`);
+                  }}
+                >
+                  {heading.text}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
     </div>
   );
 } 

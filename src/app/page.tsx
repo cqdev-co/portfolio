@@ -2,9 +2,32 @@ import { Separator } from "@/components/ui/separator";
 import { ResumeCard } from "@/components/resume-card";
 import { ProjectCard } from "@/components/project-card";
 import { DATA } from "@/data/resume";
+import type { Metadata } from "next";
 
 // Use the data directly to avoid type issues with readonly arrays
 const data = DATA;
+
+export const metadata: Metadata = {
+  title: "Conor Quinlan | Security Engineer & Software Developer",
+  description: "Security Engineer specializing in cloud security, DevSecOps, and building secure, resilient systems and infrastructure.",
+  keywords: ["security engineer", "cloud security", "DevSecOps", "AWS", "containerization", "infrastructure as code"],
+  openGraph: {
+    title: "Conor Quinlan | Security Engineer & Software Developer",
+    description: "Security Engineer specializing in cloud security, DevSecOps, and building secure, resilient systems and infrastructure.",
+    url: DATA.url,
+    siteName: "Conor Quinlan's Portfolio",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Conor Quinlan | Security Engineer & Software Developer",
+    description: "Security Engineer specializing in cloud security, DevSecOps, and building secure, resilient systems and infrastructure.",
+  },
+  alternates: {
+    canonical: DATA.url,
+  },
+};
 
 export default function Home() {
   return (

@@ -3,10 +3,25 @@ import { getBlogPosts } from "@/data/blog";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import CodeBlockEnhancer from "@/components/code-block";
+import { DATA } from "@/data/resume";
 
 export const metadata = {
   title: "Blog",
   description: "My thoughts on software development, life, and more.",
+  openGraph: {
+    title: "Blog | Conor Quinlan",
+    description: "My thoughts on software development, life, and more.",
+    url: `${DATA.url}/blog`,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Blog | Conor Quinlan",
+    description: "My thoughts on software development, life, and more.",
+  },
+  alternates: {
+    canonical: `${DATA.url}/blog`,
+  },
 };
 
 const BLUR_FADE_DELAY = 0.04;
