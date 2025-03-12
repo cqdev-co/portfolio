@@ -1,24 +1,14 @@
 import { Separator } from "@/components/ui/separator";
-import { DATA } from "@/data/resume";
 import type { Metadata } from "next";
 import BlurFade from "@/components/magicui/blur-fade";
+import { createMetadata } from "@/lib/utils";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createMetadata({
   title: "About Me",
   description: "Learn more about my background, experience, and expertise as a Security Engineer.",
-  keywords: ["about", "security engineer", "cloud security", "DevSecOps", "background"],
-  openGraph: {
-    title: "About Conor Quinlan | Security Engineer",
-    description: "Learn more about my background, experience, and expertise as a Security Engineer.",
-    url: `${DATA.url}/about`,
-    type: "profile",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "About Conor Quinlan | Security Engineer",
-    description: "Learn more about my background, experience, and expertise as a Security Engineer.",
-  },
-};
+  pageUrl: "/about",
+  type: "profile",
+});
 
 export default function AboutPage() {
   return (

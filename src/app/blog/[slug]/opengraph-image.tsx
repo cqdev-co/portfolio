@@ -1,6 +1,7 @@
 import { DEFAULT_OG_SIZE, createOGImage } from '@/lib/og-image';
 import { getPost } from '@/data/blog';
 import { ImageResponse } from 'next/og';
+import { DATA } from '@/data/resume';
 
 export const alt = 'Blog post by Conor Quinlan';
 export const size = DEFAULT_OG_SIZE;
@@ -33,7 +34,8 @@ export default async function BlogOGImage({ params }: { params: { slug: string }
   }
 
   return createOGImage({
-    title: post.metadata.title,
-    subtitle: post.metadata.summary,
+    title: post.metadata.title as string,
+    subtitle: post.metadata.summary as string,
+    logoText: DATA.initials,
   });
 } 

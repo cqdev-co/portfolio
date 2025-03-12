@@ -1,5 +1,23 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { DATA } from "@/data/resume";
+import { Metadata } from "next";
+
+// Better typing for blog posts
+export interface BlogPost {
+  metadata: {
+    publishedAt: string;
+    title?: string;
+    summary?: string;
+    image?: string;
+    updatedAt?: string;
+    [key: string]: unknown;
+  };
+  slug: string;
+  source?: string;
+  readingTime?: number;
+  [key: string]: unknown;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,4 +52,65 @@ export function formatDate(date: string) {
     const yearsAgo = Math.floor(daysAgo / 365);
     return `${fullDate} (${yearsAgo}y ago)`;
   }
+}
+
+/**
+ * Sort blog posts by date (newest first)
+ */
+export function sortPostsByDate<T extends { metadata: { publishedAt?: string } }>(posts: T[]): T[] {
+  return [...posts].sort((a, b) => {
+    const dateA = a.metadata.publishedAt ? new Date(a.metadata.publishedAt).getTime() : 0;
+    const dateB = b.metadata.publishedAt ? new Date(b.metadata.publishedAt).getTime() : 0;
+    return dateB - dateA; // Sort in descending order (newest first)
+  });
+}
+
+/**
+ * Creates consistent OpenGraph metadata for pages
+ */
+export function createMetadata({
+  title,
+  description,
+  pageUrl,
+  type = "website",
+  imagePath = "/logos/cgq.png",
+}: {
+  title: string;
+  description: string;
+  pageUrl?: string;
+  type?: "website" | "article" | "profile";
+  imagePath?: string;
+}): Metadata {
+  const url = pageUrl ? `${DATA.url}${pageUrl}` : DATA.url;
+  
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: "Conor Quinlan's Portfolio",
+      locale: "en_US",
+      type,
+      images: [
+        {
+          url: imagePath,
+          width: 800,
+          height: 600,
+          alt: "Conor Quinlan's logo",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imagePath],
+      creator: "@cqdev_co",
+    },
+    alternates: {
+      canonical: url,
+    },
+  };
 }

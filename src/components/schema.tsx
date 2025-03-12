@@ -90,6 +90,55 @@ export function WebsiteSchema() {
   );
 }
 
+// BlogPostSchema for blog post structured data
+export function BlogPostSchema({ 
+  title, 
+  description, 
+  image, 
+  slug, 
+  publishedAt, 
+  updatedAt 
+}: { 
+  title: string; 
+  description: string; 
+  image?: string; 
+  slug: string; 
+  publishedAt: string; 
+  updatedAt?: string; 
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: title,
+    description: description,
+    image: image ? `${DATA.url}${image}` : `${DATA.url}/og?title=${title}`,
+    datePublished: publishedAt,
+    dateModified: updatedAt || publishedAt,
+    author: {
+      "@type": "Person",
+      name: DATA.name,
+      url: DATA.url
+    },
+    publisher: {
+      "@type": "Person",
+      name: DATA.name,
+      url: DATA.url
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${DATA.url}/blog/${slug}`
+    }
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
 // BreadcrumbList Schema for structured navigation
 export function BreadcrumbSchema({ items }: { items: {name: string, url: string}[] }) {
   const itemListElement = items.map((item, index) => ({

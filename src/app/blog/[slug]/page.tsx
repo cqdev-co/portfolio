@@ -1,6 +1,5 @@
 import { getBlogPosts, getPost } from "@/data/blog";
-import { DATA } from "@/data/resume";
-import { formatDate } from "@/lib/utils";
+import { formatDate, createMetadata, sortPostsByDate } from "@/lib/utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -9,7 +8,7 @@ import BlurFade from "@/components/magicui/blur-fade";
 import { Clock } from "lucide-react";
 import TableOfContents from "@/components/toc";
 import CodeBlockEnhancer from "@/components/code-block";
-import Script from "next/script";
+import { BlogPostSchema } from "@/components/schema";
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts();
@@ -24,37 +23,27 @@ export async function generateMetadata({
   };
 }): Promise<Metadata | undefined> {
   const post = await getPost(params.slug);
-
+  
+  if (!post) {
+    return {
+      title: 'Post Not Found',
+      description: 'The requested blog post could not be found'
+    };
+  }
+  
   const {
     title,
-    publishedAt: publishedTime,
     summary: description,
     image,
   } = post.metadata;
-  const ogImage = image ? `${DATA.url}${image}` : `${DATA.url}/og?title=${title}`;
-
-  return {
+  
+  return createMetadata({
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      publishedTime,
-      url: `${DATA.url}/blog/${post.slug}`,
-      images: [
-        {
-          url: ogImage,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImage],
-    },
-  };
+    pageUrl: `/blog/${post.slug}`,
+    type: "article",
+    imagePath: image ? `${image}` : undefined,
+  });
 }
 
 export default async function Blog({
@@ -72,12 +61,9 @@ export default async function Blog({
 
   // Get all posts for adjacent post navigation
   const allPosts = await getBlogPosts();
-  const sortedPosts = allPosts.sort((a, b) => {
-    if (new Date(a.metadata.publishedAt) > new Date(b.metadata.publishedAt)) {
-      return -1;
-    }
-    return 1;
-  });
+  
+  // Sort all posts by date
+  const sortedPosts = sortPostsByDate(allPosts);
 
   const currentPostIndex = sortedPosts.findIndex(p => p.slug === post.slug);
   const previousPost = currentPostIndex < sortedPosts.length - 1 ? sortedPosts[currentPostIndex + 1] : null;
@@ -85,34 +71,13 @@ export default async function Blog({
 
   return (
     <>
-      <Script
-        id="schema-article"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "BlogPosting",
-            headline: post.metadata.title,
-            description: post.metadata.summary,
-            image: post.metadata.image ? `${DATA.url}${post.metadata.image}` : `${DATA.url}/og?title=${post.metadata.title}`,
-            datePublished: post.metadata.publishedAt,
-            dateModified: post.metadata.updatedAt || post.metadata.publishedAt,
-            author: {
-              "@type": "Person",
-              name: "Conor Quinlan",
-              url: DATA.url
-            },
-            publisher: {
-              "@type": "Person",
-              name: "Conor Quinlan",
-              url: DATA.url
-            },
-            mainEntityOfPage: {
-              "@type": "WebPage",
-              "@id": `${DATA.url}/blog/${post.slug}`
-            }
-          })
-        }}
+      <BlogPostSchema
+        title={post.metadata.title as string}
+        description={post.metadata.summary as string}
+        image={post.metadata.image as string | undefined}
+        slug={post.slug}
+        publishedAt={post.metadata.publishedAt as string}
+        updatedAt={post.metadata.updatedAt as string | undefined}
       />
       
       <CodeBlockEnhancer />
@@ -144,7 +109,7 @@ export default async function Blog({
         <BlurFade delay={0.1}>
           <header className="mb-6">
             <h1 className="title font-medium text-3xl md:text-4xl tracking-tighter mb-4">
-              {post.metadata.title}
+              {post.metadata.title as string}
             </h1>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
@@ -166,8 +131,8 @@ export default async function Blog({
                   <line x1="3" x2="21" y1="10" y2="10" />
                 </svg>
                 <Suspense fallback={<span className="h-5" />}>
-                  <time dateTime={post.metadata.publishedAt}>
-                    {formatDate(post.metadata.publishedAt)}
+                  <time dateTime={post.metadata.publishedAt as string}>
+                    {formatDate(post.metadata.publishedAt as string)}
                   </time>
                 </Suspense>
               </div>
@@ -221,7 +186,7 @@ export default async function Blog({
                   <span>Previous post</span>
                 </div>
                 <div className="font-medium group-hover:text-foreground transition-colors">
-                  {previousPost.metadata.title}
+                  {previousPost.metadata.title as string}
                 </div>
               </Link>
             )}
@@ -246,7 +211,7 @@ export default async function Blog({
                   </svg>
                 </div>
                 <div className="font-medium group-hover:text-foreground transition-colors">
-                  {nextPost.metadata.title}
+                  {nextPost.metadata.title as string}
                 </div>
               </Link>
             )}
