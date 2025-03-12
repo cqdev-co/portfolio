@@ -9,6 +9,7 @@ export const DEFAULT_OG_SIZE = {
 type OGImageProps = {
   title: string;
   subtitle?: string;
+  logoText?: string;
 };
 
 /**
@@ -18,6 +19,7 @@ type OGImageProps = {
 export function createOGImage({
   title,
   subtitle,
+  logoText = 'CQ',
 }: OGImageProps) {
   return new ImageResponse(
     (
@@ -36,6 +38,24 @@ export function createOGImage({
           fontFamily: 'sans-serif',
         }}
       >
+        {/* Logo Circle */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '120px',
+            height: '120px',
+            borderRadius: '60px',
+            backgroundColor: '#7c3aed',
+            marginBottom: '30px',
+            fontWeight: 'bold',
+            fontSize: '48px',
+          }}
+        >
+          {logoText}
+        </div>
+        
         <h1
           style={{
             fontSize: 64,

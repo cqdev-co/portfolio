@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Particles } from "@/components/magicui/particles";
 import { DATA } from "@/data/resume";
-import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
+import { PersonSchema, WebsiteSchema } from "@/components/schema";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -45,6 +46,33 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+  openGraph: {
+    type: "website",
+    siteName: "Conor Quinlan's Portfolio",
+    title: {
+      default: "cgq | portfolio",
+      template: "%s | cgq",
+    },
+    description: "Professional portfolio showcasing my work and skills as a Security Engineer specializing in cloud security and DevSecOps",
+    images: [
+      {
+        url: "/logos/cgq.png",
+        width: 800,
+        height: 600,
+        alt: "Conor Quinlan's logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: {
+      default: "cgq | portfolio",
+      template: "%s | cgq", 
+    },
+    description: "Professional portfolio showcasing my work and skills as a Security Engineer specializing in cloud security and DevSecOps",
+    images: ["/logos/cgq.png"],
+    creator: "@cqdev_co",
+  },
 };
 
 export default function RootLayout({
@@ -55,24 +83,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <Script
-          id="schema-org-person"
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Person",
-              name: "Conor Quinlan",
-              url: DATA.url || "https://conorq.com",
-              jobTitle: "Security Engineer",
-              worksFor: {
-                "@type": "Organization",
-                name: "Cyera",
-              },
-              description: "Security Engineer specializing in cloud security, DevSecOps, and building secure, resilient systems and infrastructure."
-            })
-          }}
-        />
+        <PersonSchema />
+        <WebsiteSchema />
       </head>
       <body
         className={cn(
