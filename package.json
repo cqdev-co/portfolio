@@ -42,7 +42,7 @@
     "@eslint/eslintrc": "^3",
     "@shadcn/ui": "^0.0.4",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
