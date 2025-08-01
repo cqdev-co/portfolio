@@ -44,3 +44,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 bun.lockb
+
+# wp-service generated files
+wp-service/outputs/
+wp-service/__pycache__/
+wp-service/src/__pycache__/
+wp-service/src/**/__pycache__/
+*.pyc
+*.pyo

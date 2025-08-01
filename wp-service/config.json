@@ -1,0 +1,8 @@
+{
+  "settings": {
+    "output_dir": "outputs",
+    "default_resolution": "1080p",
+    "default_format": "PNG",
+    "jpeg_quality": 95
+  }
+}
