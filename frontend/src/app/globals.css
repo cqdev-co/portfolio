@@ -1,0 +1,432 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Light mode: Off-white theme */
+:root {
+  --background: rgb(252, 252, 250); /* Softer off-white background */
+  --foreground: rgb(34, 34, 37); /* Darker text (almost black) for better contrast */
+  --card: rgb(252, 252, 250);
+  --card-foreground: rgb(34, 34, 37);
+  --popover: rgb(252, 252, 250);
+  --popover-foreground: rgb(34, 34, 37);
+  --primary: rgb(53, 53, 60); /* Slightly darker primary for better contrast */
+  --primary-foreground: rgb(252, 252, 250);
+  --secondary: rgb(244, 244, 245); /* Zinc-100 */
+  --secondary-foreground: rgb(53, 53, 60);
+  --muted: rgb(244, 244, 245); /* Zinc-100 */
+  --muted-foreground: rgb(87, 87, 95); /* Darker muted text for better readability */
+  --accent: rgb(244, 244, 245); /* Zinc-100 */
+  --accent-foreground: rgb(53, 53, 60);
+  --destructive: rgb(220, 38, 38); /* Slightly darker red for better contrast */
+  --destructive-foreground: rgb(252, 252, 250);
+  --border: rgb(228, 228, 231); /* Zinc-200 */
+  --input: rgb(228, 228, 231); /* Zinc-200 */
+  --ring: rgb(161, 161, 170); /* Zinc-400 */
+  
+  /* Keep original chart colors */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  
+  --radius: 0.5rem; /* Slightly smaller radius for a more elegant look */
+  
+  /* Sidebar variables */
+  --sidebar: rgb(252, 252, 250); 
+  --sidebar-foreground: rgb(34, 34, 37);
+  --sidebar-primary: rgb(53, 53, 60);
+  --sidebar-primary-foreground: rgb(252, 252, 250);
+  --sidebar-accent: rgb(244, 244, 245);
+  --sidebar-accent-foreground: rgb(53, 53, 60);
+  --sidebar-border: rgb(228, 228, 231);
+  --sidebar-ring: rgb(161, 161, 170);
+}
+
+/* Dark mode: Zinc theme */
+.dark {
+  --background: rgb(24, 24, 27); /* Zinc-900 */
+  --foreground: rgb(245, 245, 244); /* Off-white text, slightly warmer */
+  --card: rgb(24, 24, 27); /* Zinc-900 */
+  --card-foreground: rgb(245, 245, 244);
+  --popover: rgb(24, 24, 27); /* Zinc-900 */
+  --popover-foreground: rgb(245, 245, 244);
+  --primary: rgb(245, 245, 244); /* Off-white */
+  --primary-foreground: rgb(24, 24, 27); /* Zinc-900 */
+  --secondary: rgb(39, 39, 42); /* Zinc-800 */
+  --secondary-foreground: rgb(245, 245, 244);
+  --muted: rgb(39, 39, 42); /* Zinc-800 */
+  --muted-foreground: rgb(180, 180, 186); /* Lighter gray for better contrast in dark mode */
+  --accent: rgb(39, 39, 42); /* Zinc-800 */
+  --accent-foreground: rgb(245, 245, 244);
+  --destructive: rgb(248, 113, 113); /* Red-400 */
+  --destructive-foreground: rgb(127, 29, 29); /* Red-900 */
+  --border: rgb(63, 63, 70); /* Zinc-700 */
+  --input: rgb(63, 63, 70); /* Zinc-700 */
+  --ring: rgb(113, 113, 122); /* Zinc-500 */
+  
+  /* Keep original chart colors */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  
+  /* Sidebar variables */
+  --sidebar: rgb(24, 24, 27); /* Zinc-900 */
+  --sidebar-foreground: rgb(245, 245, 244);
+  --sidebar-primary: rgb(245, 245, 244);
+  --sidebar-primary-foreground: rgb(24, 24, 27);
+  --sidebar-accent: rgb(39, 39, 42); /* Zinc-800 */
+  --sidebar-accent-foreground: rgb(245, 245, 244);
+  --sidebar-border: rgb(63, 63, 70); /* Zinc-700 */
+  --sidebar-ring: rgb(113, 113, 122); /* Zinc-500 */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss03", "cv01", "cv02", "cv03", "cv04";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Ensure text is selectable by default */
+  p, h1, h2, h3, h4, h5, h6, li, span, div {
+    @apply select-text;
+  }
+  /* Enhanced typography for better readability */
+  p {
+    @apply text-[13px] sm:text-sm leading-relaxed tracking-tight;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-medium;
+  }
+}
+
+/* Global utility classes for consistent theming */
+@layer utilities {
+  /* Text size utilities */
+  .text-compact {
+    @apply text-[13px] leading-[1.4] tracking-tight;
+  }
+  .text-caption {
+    @apply text-[11px] leading-tight;
+  }
+  
+  /* Background colors */
+  .bg-app {
+    @apply bg-background;
+  }
+  .bg-card {
+    @apply bg-card;
+  }
+  .bg-secondary {
+    @apply bg-secondary;
+  }
+  .bg-muted {
+    @apply bg-muted;
+  }
+  .bg-accent {
+    @apply bg-accent;
+  }
+  
+  /* Text colors */
+  .text-app {
+    @apply text-foreground;
+  }
+  .text-muted {
+    @apply text-muted-foreground;
+  }
+  .text-primary {
+    @apply text-primary;
+  }
+  .text-primary-contrast {
+    @apply text-primary-foreground;
+  }
+  .text-secondary {
+    @apply text-secondary-foreground;
+  }
+  
+  /* Border colors */
+  .border-app {
+    @apply border-border;
+  }
+  .border-input {
+    @apply border-input;
+  }
+  .border-muted {
+    @apply border-muted;
+  }
+  .border-accent {
+    @apply border-accent;
+  }
+  
+  /* Ring colors */
+  .ring-app {
+    @apply ring-ring;
+  }
+}
+
+/* Blog content styling */
+.prose {
+  @apply text-foreground;
+  max-width: 100%;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.prose pre {
+  @apply bg-secondary text-secondary-foreground p-4 rounded-lg overflow-x-auto my-6 border;
+}
+
+.prose code {
+  @apply bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded-md font-mono text-xs;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+
+.prose a {
+  @apply text-primary underline underline-offset-4 font-medium hover:text-primary/80 transition-colors;
+}
+
+.prose h1, 
+.prose h2, 
+.prose h3, 
+.prose h4, 
+.prose h5, 
+.prose h6 {
+  @apply font-medium tracking-tighter scroll-mt-20;
+}
+
+.prose h2 {
+  @apply text-xl mt-6 mb-4 lg:text-2xl;
+}
+
+.prose h3 {
+  @apply text-lg mt-5 mb-4 lg:text-xl;
+}
+
+.prose p {
+  @apply leading-relaxed mb-5 text-[13px] sm:text-sm;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary pl-6 italic text-muted-foreground;
+}
+
+.prose ul, 
+.prose ol {
+  @apply my-5 ml-6;
+}
+
+.prose li {
+  @apply mb-1.5 text-[13px] sm:text-sm;
+}
+
+.prose img {
+  @apply rounded-lg my-8 border w-full h-auto max-w-full;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: contain !important;
+}
+
+.prose {
+  overflow-x: hidden;
+}
+
+.prose > * {
+  max-width: 100%;
+}
+
+.prose hr {
+  @apply my-8 border-border;
+}
+
+.prose table {
+  @apply w-full border-collapse my-6 overflow-hidden rounded-md;
+}
+
+.prose table th {
+  @apply bg-secondary font-medium text-left p-4 border-b;
+}
+
+.prose table tr:nth-child(even) {
+  @apply bg-secondary/50;
+}
+
+.prose table td {
+  @apply p-4 border-b;
+}
+
+/* Table of contents styling */
+.toc-container {
+  @apply my-6 px-3.5 py-2.5 border border-border/40 rounded-md bg-card/30 backdrop-blur-sm sticky top-20 shadow-[0_1px_3px_rgba(0,0,0,0.05)];
+}
+
+.toc-container h2 {
+  @apply text-[0.65rem] uppercase font-medium mb-2 pb-1.5 border-b border-border/30 tracking-wider text-muted-foreground whitespace-nowrap;
+}
+
+.toc-container nav ul {
+  @apply ml-0 max-h-[60vh] overflow-y-auto pr-1 -mx-1 px-1;
+}
+
+.toc-container nav li {
+  @apply text-[0.7rem] leading-none mb-0 transition-all duration-200;
+}
+
+/* Original styles for TOC links */
+.toc-container nav a {
+  @apply text-muted-foreground/90 hover:text-foreground transition-colors no-underline flex py-1.5 border-l border-border/30 pl-2 -ml-2 truncate relative;
+}
+
+.toc-container nav a.active {
+  @apply font-medium text-foreground border-l-2 border-primary/70 pl-[7px] -ml-2 bg-gradient-to-r from-primary/[0.08] to-transparent;
+}
+
+.toc-container nav li.depth-3 {
+  @apply ml-2;
+}
+
+.toc-container nav li.depth-4 {
+  @apply ml-3;
+}
+
+.toc-container nav ul > li + li {
+  @apply mt-0.5;
+}
+
+/* Style scrollbar for the TOC */
+.toc-container nav ul::-webkit-scrollbar {
+  @apply w-1;
+}
+
+.toc-container nav ul::-webkit-scrollbar-track {
+  @apply bg-transparent rounded-full;
+}
+
+.toc-container nav ul::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/10 rounded-full hover:bg-muted-foreground/20;
+}
+
+/* Add a nice transition when sections become active */
+.toc-container nav a::before {
+  content: "";
+  @apply absolute left-0 top-0 bottom-0 w-0 opacity-0 -z-10 transition-all duration-200 ease-out rounded-r;
+}
+
+.toc-container nav a.active::before {
+  @apply w-full opacity-100;
+}
+
+/* Code highlight */
+.highlighted {
+  @apply bg-primary/10 border-l-2 border-primary -ml-4 pl-2;
+}
+
+/* Anchors for headings */
+.anchor-icon {
+  @apply ml-2 text-muted-foreground opacity-0 hover:opacity-100 transition-opacity;
+}
+
+h2:hover .anchor-icon,
+h3:hover .anchor-icon,
+h4:hover .anchor-icon {
+  @apply opacity-100;
+}
+
+/* Styles for copy button */
+.code-block-with-copy {
+  @apply relative;
+}
+
+.copy-button {
+  @apply absolute top-2 right-2 p-2 rounded-md bg-secondary hover:bg-secondary/80 text-muted-foreground;
+}
+
+/* Project card description styles */
+.prose-sm p {
+  @apply mb-2 text-[13px] leading-relaxed; /* Smaller compact text */
+}
+
+.prose-sm p:last-child {
+  @apply mb-0; /* Remove margin on the last paragraph */
+}
+
+/* Tighter line height for project descriptions */
+.leading-snug p {
+  line-height: 1.4; /* Tighter line height */
+}
+
+/* Fix floating punctuation and typography issues */
+.prose p, 
+.prose li, 
+.prose h1, 
+.prose h2, 
+.prose h3, 
+.prose h4, 
+.prose h5, 
+.prose h6 {
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1;
+}
+
+/* Prevent orphaned punctuation */
+.prose p {
+  orphans: 2;
+  widows: 2;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+}

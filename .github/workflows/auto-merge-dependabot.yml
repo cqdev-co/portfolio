@@ -1,0 +1,45 @@
+name: Auto-merge Dependabot PRs
+
+on:
+  pull_request_target:
+    branches: [ main ]
+
+# Add permissions block
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      
+      # Wait for CI checks to pass
+      - name: Wait for CI checks
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'build-and-test'
+          wait-interval: 20
+      
+      # Use PAT for approval
+      - name: Approve PR
+        run: |
+          gh auth login --with-token <<< "${{ secrets.PAT_FOR_APPROVAL }}"
+          gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+      
+      # Use PAT for merging
+      - name: Merge
+        run: |
+          gh pr merge --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.PAT_FOR_APPROVAL }} 
