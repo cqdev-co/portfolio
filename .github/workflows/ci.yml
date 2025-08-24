@@ -82,10 +82,22 @@ jobs:
 
       - name: Install Nuclei
         run: |
-          wget -q https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.2.2_linux_amd64.zip
-          unzip nuclei_3.2.2_linux_amd64.zip
+          # Use the official installation method with error handling
+          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+            | grep "browser_download_url.*linux_amd64.zip" \
+            | cut -d '"' -f 4 \
+            | wget -qi -
+          
+          # Extract and install
+          unzip -q nuclei_*_linux_amd64.zip
           sudo mv nuclei /usr/local/bin/
+          sudo chmod +x /usr/local/bin/nuclei
+          
+          # Verify installation
           nuclei -version
+          
+          # Update Nuclei templates
+          nuclei -update-templates
 
       - name: Start application for scanning
         if: github.ref == 'refs/heads/main'

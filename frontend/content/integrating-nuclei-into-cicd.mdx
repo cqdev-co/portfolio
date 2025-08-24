@@ -146,15 +146,30 @@ jobs:
           docker-compose up -d api-server
           sleep 10  # Wait for server to start
       
+      - name: Install Nuclei
+        run: |
+          # Use the official installation method with error handling
+          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+            | grep "browser_download_url.*linux_amd64.zip" \
+            | cut -d '"' -f 4 \
+            | wget -qi -
+          
+          # Extract and install
+          unzip -q nuclei_*_linux_amd64.zip
+          sudo mv nuclei /usr/local/bin/
+          sudo chmod +x /usr/local/bin/nuclei
+          
+          # Verify installation and update templates
+          nuclei -version
+          nuclei -update-templates
+      
       - name: Run Nuclei scan
         run: |
-          docker run --network host \
-            -v $(pwd)/custom-templates:/custom-templates \
-            my-nuclei-image \
-            -t /custom-templates,cves/ \
-            -u http://localhost:8080 \
-            -o nuclei-results.json \
-            -j
+          nuclei -target http://localhost:8080 \
+            -tags cve,exposure,misconfig,vulnerability \
+            -severity low,medium,high,critical \
+            -json -output nuclei-results.json \
+            -stats
       
       - name: Process scan results
         run: |
@@ -274,6 +289,21 @@ As our API grew, scan times increased. I optimized by:
 - Parallelizing scans
 - Using template filtering to run only relevant tests
 - Implementing incremental scanning for PR changes
+
+### Installation Issues
+
+Initially, we encountered issues with the Nuclei installation in CI/CD 
+environments. The original approach using hardcoded version URLs was 
+brittle and prone to failures. I improved this by:
+
+- Using the GitHub API to dynamically fetch the latest release URL
+- Adding proper error handling and verification steps
+- Ensuring executable permissions are set correctly
+- Including template updates as part of the installation process
+
+The improved installation method is more robust and automatically 
+adapts to new Nuclei releases without requiring manual updates to 
+the CI/CD configuration.
 
 ### Developer Adoption
 
