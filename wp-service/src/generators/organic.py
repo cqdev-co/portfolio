@@ -45,26 +45,302 @@ class OrganicGradientGenerator(BaseGenerator):
         return gradient_final
     
     def _create_flow_field(self, strength: float) -> np.ndarray:
-        """Create organic flow field for natural movement."""
+        """Create organic flow field for natural movement with multiple focal points."""
         
-        # Create multiple noise layers for organic flow
-        x = np.linspace(0, 4, self.width)
-        y = np.linspace(0, 4, self.height)
+        # Create coordinate arrays
+        x = np.linspace(0, 1, self.width)
+        y = np.linspace(0, 1, self.height)
         X, Y = np.meshgrid(x, y)
         
-        # Base flow - large scale movement
-        flow1 = np.sin(X * 0.8) * np.cos(Y * 0.6)
-        flow2 = np.cos(X * 0.5) * np.sin(Y * 0.9)
+        # Get composition style for dynamic flow patterns
+        composition = self.params.get('composition', 'balanced')
         
-        # Secondary flow - medium scale detail
-        flow3 = np.sin(X * 1.5 + np.pi/3) * np.cos(Y * 1.2 + np.pi/4)
-        flow4 = np.cos(X * 1.8 + np.pi/6) * np.sin(Y * 1.4 + np.pi/2)
-        
-        # Combine flows with different weights
-        combined_flow = (
-            0.4 * flow1 + 0.3 * flow2 + 
-            0.2 * flow3 + 0.1 * flow4
-        )
+        if composition == 'flowing':
+            # Create multiple flow centers for natural, non-linear movement
+            center1_x, center1_y = 0.3, 0.7  # Off-center focal point
+            center2_x, center2_y = 0.8, 0.2  # Secondary focal point
+            
+            # Distance from focal points
+            dist1 = np.sqrt((X - center1_x)**2 + (Y - center1_y)**2)
+            dist2 = np.sqrt((X - center2_x)**2 + (Y - center2_y)**2)
+            
+            # Create radial flows from multiple centers
+            flow1 = np.sin(dist1 * 8 * np.pi) * np.exp(-dist1 * 2)
+            flow2 = np.cos(dist2 * 6 * np.pi) * np.exp(-dist2 * 1.5)
+            
+            # Add swirling motion
+            angle1 = np.arctan2(Y - center1_y, X - center1_x)
+            angle2 = np.arctan2(Y - center2_y, X - center2_x)
+            swirl1 = np.sin(angle1 * 3 + dist1 * 10) * np.exp(-dist1 * 1.5)
+            swirl2 = np.cos(angle2 * 2 + dist2 * 8) * np.exp(-dist2 * 2)
+            
+            combined_flow = 0.3 * flow1 + 0.3 * flow2 + 0.2 * swirl1 + 0.2 * swirl2
+            
+        elif composition == 'dynamic':
+            # Create turbulent, energetic flow patterns
+            # Multiple frequency layers for complexity
+            flow1 = np.sin(X * 12 + Y * 8) * np.cos(Y * 10 - X * 6)
+            flow2 = np.cos(X * 15 - Y * 12) * np.sin(X * 8 + Y * 14)
+            flow3 = np.sin((X + Y) * 20) * np.cos((X - Y) * 16)
+            
+            # Add diagonal energy
+            diagonal1 = np.sin((X + Y) * 8) * np.exp(-np.abs(X + Y - 1) * 2)
+            diagonal2 = np.cos((X - Y) * 6) * np.exp(-np.abs(X - Y) * 3)
+            
+            combined_flow = 0.25 * flow1 + 0.25 * flow2 + 0.2 * flow3 + 0.15 * diagonal1 + 0.15 * diagonal2
+            
+        elif composition == 'organic':
+            # Create truly organic, non-linear patterns using multiple techniques
+            
+            # 1. Pure Random Walk Field
+            num_walks = 50  # Many random walks for complexity
+            walk_field = np.zeros_like(X)
+            
+            for _ in range(num_walks):
+                # Start from random position
+                pos_x = np.random.rand()
+                pos_y = np.random.rand()
+                strength = np.random.rand() * 0.4 + 0.1  # Random strength
+                
+                # Create random walk path
+                path_length = 100
+                walk_x = []
+                walk_y = []
+                
+                for _ in range(path_length):
+                    # Add point to path
+                    walk_x.append(pos_x)
+                    walk_y.append(pos_y)
+                    
+                    # Random direction change
+                    angle = np.random.rand() * 2 * np.pi
+                    step = 0.02 * np.random.rand()  # Variable step size
+                    pos_x = (pos_x + np.cos(angle) * step) % 1.0  # Wrap around
+                    pos_y = (pos_y + np.sin(angle) * step) % 1.0
+                
+                # Convert walk to field influence
+                walk_x = np.array(walk_x)
+                walk_y = np.array(walk_y)
+                
+                # Calculate influence on each point
+                for i in range(path_length):
+                    dx = X - walk_x[i]
+                    dy = Y - walk_y[i]
+                    dist = np.sqrt(dx**2 + dy**2)
+                    influence = np.exp(-dist * 20) * strength * (1 - i/path_length)  # Fade along path
+                    walk_field += influence
+            
+            cellular = walk_field / walk_field.max()  # Normalize
+            
+            # 2. Perlin Noise with Random Transforms
+            from noise import snoise3  # Using 3D noise for more variation
+            
+            turbulence = np.zeros_like(X)
+            num_layers = 6  # More noise layers
+            
+            for i in range(num_layers):
+                # Random transformation matrix for this layer
+                scale = 2 ** (i + 2)  # Increasing scales
+                angle = np.random.rand() * np.pi
+                offset_x = np.random.rand() * 100
+                offset_y = np.random.rand() * 100
+                offset_z = np.random.rand() * 100
+                
+                # Create transformed coordinates
+                X_trans = X * np.cos(angle) - Y * np.sin(angle)
+                Y_trans = X * np.sin(angle) + Y * np.cos(angle)
+                
+                # Generate 3D noise with time variation
+                layer = np.zeros_like(X)
+                for ix in range(X.shape[1]):
+                    for iy in range(X.shape[0]):
+                        x = X_trans[iy, ix] * scale + offset_x
+                        y = Y_trans[iy, ix] * scale + offset_y
+                        z = offset_z
+                        layer[iy, ix] = snoise3(x, y, z, octaves=1)
+                
+                # Add non-linear transformation
+                layer = np.tanh(layer * 2)  # Non-linear contrast
+                turbulence += layer / (i + 1)  # Weight by layer
+            
+            # Normalize
+            turbulence = (turbulence - turbulence.min()) / (turbulence.max() - turbulence.min())
+            
+            # 3. Enhanced Fluid Dynamics with Multiple Force Fields
+            reaction = np.zeros_like(X)
+            
+            # Initialize multiple velocity fields at different scales
+            num_fields = 4
+            velocity_fields = []
+            for i in range(num_fields):
+                scale = 2.0 ** i  # Different scales for each field
+                vx = np.random.randn(*X.shape) * 0.1 * scale
+                vy = np.random.randn(*X.shape) * 0.1 * scale
+                velocity_fields.append((vx, vy))
+            
+            # Simulate fluid movement with multiple interacting fields
+            steps = 15  # More simulation steps
+            for step in range(steps):
+                # Dynamic force fields
+                for i, (vx, vy) in enumerate(velocity_fields):
+                    # Create swirling forces
+                    angle = np.arctan2(Y - 0.5, X - 0.5) + step * 0.2
+                    dist = np.sqrt((X - 0.5)**2 + (Y - 0.5)**2)
+                    swirl_x = np.cos(angle + dist * 5) * (1 - dist)
+                    swirl_y = np.sin(angle + dist * 5) * (1 - dist)
+                    
+                    # Random turbulent forces
+                    turb_scale = 0.1 / (i + 1)  # Scale decreases with field size
+                    force_x = (np.random.randn(*X.shape) + swirl_x) * turb_scale
+                    force_y = (np.random.randn(*X.shape) + swirl_y) * turb_scale
+                    
+                    # Add time-varying forces
+                    time_factor = np.sin(step * 0.4 + i * np.pi/2)
+                    force_x *= (1 + time_factor * 0.5)
+                    force_y *= (1 + time_factor * 0.5)
+                    
+                    # Update velocities with non-linear effects
+                    vx += force_x + np.sign(vx) * (np.abs(vx) ** 1.5) * 0.1
+                    vy += force_y + np.sign(vy) * (np.abs(vy) ** 1.5) * 0.1
+                    
+                    # Apply advanced diffusion
+                    from scipy.ndimage import gaussian_filter
+                    sigma = 1.0 + i * 0.5  # Different diffusion rates
+                    vx = gaussian_filter(vx, sigma=sigma)
+                    vy = gaussian_filter(vy, sigma=sigma)
+                    
+                    # Update field
+                    velocity_fields[i] = (vx, vy)
+                
+                # Combine all fields with varying weights
+                total_field_x = np.zeros_like(X)
+                total_field_y = np.zeros_like(Y)
+                for i, (vx, vy) in enumerate(velocity_fields):
+                    weight = 1.0 / (2 ** i)  # Exponential weight decay
+                    total_field_x += vx * weight
+                    total_field_y += vy * weight
+                
+                # Calculate enhanced vorticity
+                dx_vy = np.gradient(total_field_y, axis=1)
+                dy_vx = np.gradient(total_field_x, axis=0)
+                curl = dx_vy - dy_vx
+                
+                # Add non-linear response
+                curl_intensity = np.abs(curl)
+                enhanced_curl = np.sign(curl) * (curl_intensity ** 1.2)
+                
+                # Add to reaction field with temporal weighting
+                time_weight = 1.0 - step/steps  # Decay over time
+                reaction += enhanced_curl * time_weight
+            
+            # Normalize
+            reaction = (reaction - reaction.min()) / (reaction.max() - reaction.min())
+            
+            # 4. Enhanced Non-linear Distortion
+            # Create vortex-like distortion fields
+            vortex_centers = [(0.3, 0.7), (0.7, 0.3), (0.5, 0.5)]
+            distort_x = np.zeros_like(X)
+            distort_y = np.zeros_like(Y)
+            
+            for cx, cy in vortex_centers:
+                dx = X - cx
+                dy = Y - cy
+                dist = np.sqrt(dx**2 + dy**2)
+                angle = np.arctan2(dy, dx)
+                
+                # Create spiral distortion
+                strength = np.exp(-dist * 3)  # Distance-based strength
+                distort_x += strength * (np.cos(angle + dist * 10) * 0.2)
+                distort_y += strength * (np.sin(angle + dist * 10) * 0.2)
+            
+            # Add turbulent distortion
+            distort_x += 0.1 * np.sin(X * 8 + Y * 6 + cellular * 3 + turbulence * 2)
+            distort_y += 0.1 * np.cos(X * 6 + Y * 8 + cellular * 2 + turbulence * 3)
+            
+            X_distorted = X + distort_x
+            Y_distorted = Y + distort_y
+            
+            # 5. Enhanced Spiral Formations
+            # Create multiple interacting spiral fields
+            spiral = np.zeros_like(X)
+            for i in range(3):  # Multiple spiral layers
+                center_x = 0.3 + i * 0.2
+                center_y = 0.3 + i * 0.2
+                
+                dx = X_distorted - center_x
+                dy = Y_distorted - center_y
+                angle = np.arctan2(dy, dx)
+                radius = np.sqrt(dx**2 + dy**2)
+                
+                # Create complex spiral pattern
+                spiral_layer = np.sin(angle * (2 + i) + radius * (10 + i * 5))
+                spiral_layer *= np.exp(-radius * (2 + i))  # Distance-based falloff
+                
+                spiral += spiral_layer * (0.5 ** i)  # Weight by layer
+            
+            # Enhanced Pattern Combination with Non-linear Blending
+            
+            # Calculate flow characteristics
+            flow_direction = np.arctan2(reaction, turbulence)
+            flow_strength = np.sqrt(reaction**2 + turbulence**2)
+            
+            # Create dynamic masks
+            from scipy.ndimage import gaussian_filter
+            
+            # Base complexity field
+            complexity = gaussian_filter(flow_strength, sigma=2.0)
+            complexity = np.tanh(complexity * 3)  # Non-linear contrast
+            
+            # Create masks with varying smoothness
+            turb_mask = gaussian_filter(turbulence, sigma=2.0)
+            react_mask = gaussian_filter(reaction, sigma=1.5)
+            cell_mask = gaussian_filter(cellular, sigma=1.0)
+            
+            # Apply non-linear transformations
+            turb_mask = np.tanh(turb_mask * 3)
+            react_mask = react_mask ** 1.5
+            cell_mask = 1 / (1 + np.exp(-cell_mask * 4))
+            
+            # Spatial variation
+            x_var = np.sin(X * np.pi * 2 + flow_direction)
+            y_var = np.cos(Y * np.pi * 2 + flow_direction)
+            spatial_var = gaussian_filter((x_var + y_var) * 0.5, sigma=1.0)
+            
+            # Dynamic weights
+            w1 = turb_mask * (1 + spatial_var * 0.3)
+            w2 = react_mask * (1 - spatial_var * 0.2)
+            w3 = cell_mask * (1 + complexity * 0.4)
+            
+            # Normalize weights with smoothing
+            total_weight = gaussian_filter(w1 + w2 + w3, sigma=0.5)
+            w1 = gaussian_filter(w1 / total_weight, sigma=0.5)
+            w2 = gaussian_filter(w2 / total_weight, sigma=0.5)
+            w3 = gaussian_filter(w3 / total_weight, sigma=0.5)
+            
+            # Combine patterns with non-linear interactions
+            combined_flow = (
+                w1 * turbulence * (1 + reaction * 0.2) +  # Turbulence affected by reaction
+                w2 * reaction * (1 + cellular * 0.3) +    # Reaction affected by cellular
+                w3 * cellular * (1 + turbulence * 0.2)    # Cellular affected by turbulence
+            )
+            
+        else:
+            # Default: improved balanced composition with subtle asymmetry
+            # Create gentle, off-center flow
+            center_x, center_y = 0.4, 0.6  # Slightly off-center
+            
+            # Radial component
+            dist = np.sqrt((X - center_x)**2 + (Y - center_y)**2)
+            radial = np.sin(dist * 6 * np.pi) * np.exp(-dist * 1.5)
+            
+            # Directional flows with variation
+            flow1 = np.sin(X * 3 + Y * 2) * np.cos(Y * 4 - X * 1.5)
+            flow2 = np.cos(X * 2.5 - Y * 3.5) * np.sin(X * 3.5 + Y * 2.5)
+            
+            # Add subtle asymmetric element
+            asymmetric = np.sin(X * 5 + Y * 3 + np.pi/3) * np.exp(-((X - 0.7)**2 + (Y - 0.3)**2) * 3)
+            
+            combined_flow = 0.4 * radial + 0.3 * flow1 + 0.2 * flow2 + 0.1 * asymmetric
         
         # Apply strength and normalize
         flow_field = strength * combined_flow
