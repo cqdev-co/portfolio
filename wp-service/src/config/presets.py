@@ -338,7 +338,7 @@ class GradientPreset:
                 "distortion": 0.08,
                 "highlights": 0.3,
                 "angle": 135,
-                "grain_intensity": 0.04,
+                "grain_intensity": 0.025,
                 "grain_type": "photographic"
             }
         },
@@ -351,7 +351,7 @@ class GradientPreset:
             "params": {
                 "smoothness": 6.0,
                 "flow_strength": 0.25,
-                "grain_intensity": 0.035,
+                "grain_intensity": 0.022,
                 "grain_type": "film",
                 "angle": 90
             }
@@ -412,7 +412,7 @@ class GradientPreset:
                 "distortion": 0.1,
                 "highlights": 0.35,
                 "angle": 110,
-                "grain_intensity": 0.04,
+                "grain_intensity": 0.025,
                 "grain_type": "film"
             }
         },
@@ -425,7 +425,7 @@ class GradientPreset:
             "params": {
                 "smoothness": 5.5,
                 "flow_strength": 0.22,
-                "grain_intensity": 0.038,
+                "grain_intensity": 0.024,
                 "grain_type": "artistic",
                 "angle": 125
             }
@@ -456,7 +456,7 @@ class GradientPreset:
                 "complexity": 2.8,
                 "smoothness": 6.5,
                 "bleeding": 0.25,
-                "grain_intensity": 0.032,
+                "grain_intensity": 0.020,
                 "grain_type": "film"
             }
         },

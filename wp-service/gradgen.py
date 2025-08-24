@@ -12,6 +12,7 @@ from src.core.base import GradientType, Resolution
 from src.generators import *
 from src.utils.color_utils import ColorPalette
 from src.utils.ai_color_gen import AIColorGenerator
+from src.utils.quality_validator import validate_generation_quality
 from src.config.presets import GradientPreset
 from src.config.settings import load_config, save_config, create_default_config
 
@@ -76,6 +77,19 @@ class GradientGeneratorCLI:
             print(f"📐 Resolution: {width}x{height}")
             print(f"🎯 Colors: {len(grad_colors)} colors")
             
+            # Generate the gradient array for quality validation
+            gradient_array = generator.generate()
+            
+            # Validate quality if this is an AI-enhanced generation
+            if 'ai_enhanced' in name.lower() or grad_params.get('grain_intensity', 0) > 0:
+                quality_results = validate_generation_quality(
+                    gradient_array, grad_params, verbose=True
+                )
+                
+                # Suggest regeneration if quality is poor
+                if not quality_results['passes_validation']:
+                    print(f"⚠️  Quality below threshold. Consider adjusting parameters.")
+            
             # Save to specific resolution folder with specified format
             file_extension = output_format.lower()
             if file_extension not in ['png', 'jpg', 'jpeg']:
@@ -83,11 +97,15 @@ class GradientGeneratorCLI:
             
             output_path = Path(self.config.settings.output_dir) / resolution / f"{name.lower().replace(' ', '_')}.{file_extension}"
             
+            # Save the generated array
+            from PIL import Image
+            image = Image.fromarray(gradient_array.astype('uint8'))
+            
             # Pass quality for JPEG
             if file_extension in ['jpg', 'jpeg']:
-                generator.save(str(output_path), quality=self.config.settings.jpeg_quality)
+                image.save(str(output_path), quality=self.config.settings.jpeg_quality)
             else:
-                generator.save(str(output_path))
+                image.save(str(output_path))
             
             # Save metadata
             metadata = {
@@ -145,7 +163,7 @@ class GradientGeneratorCLI:
 @click.group()
 @click.version_option("1.0.0")
 def cli():
-    """Mathematical Gradient Generator - Create beautiful gradient wallpapers using algorithms."""
+    """AI Wallpaper Engine - Create beautiful gradient wallpapers using AI-powered algorithms (OpenAI required)."""
     pass
 
 
@@ -365,7 +383,7 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
             'distortion': 0.15 + complexity * 0.1,       # Realistic distortion
             'highlights': 0.6 + complexity * 0.3,        # Prominent highlights
             'angle': random.randint(15, 165),             # Avoid harsh angles
-            'grain_intensity': 0.045 + complexity * 0.01, # Professional grain
+            'grain_intensity': 0.028 + complexity * 0.008, # Professional grain (reduced)
             'grain_type': 'photographic',
             'grain_quality': 'professional',
             'holographic': True,                          # Always enable holographic
@@ -377,7 +395,7 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
         params = {
             'smoothness': 8.0 + complexity * 4.0,        # Ultra-smooth
             'flow_strength': 0.2 + complexity * 0.2,
-            'grain_intensity': 0.04 + complexity * 0.01,
+            'grain_intensity': 0.025 + complexity * 0.008,
             'grain_type': 'photographic',
             'grain_quality': 'professional',
             'angle': random.randint(15, 165),
@@ -389,7 +407,7 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
             'complexity': 4.0 + complexity * 4.0,        # Maximum fluidity
             'smoothness': 10.0 + complexity * 6.0,       # Paint-like smoothness
             'bleeding': 0.3 + complexity * 0.3,
-            'grain_intensity': 0.04 + complexity * 0.01,
+            'grain_intensity': 0.025 + complexity * 0.008,
             'grain_type': 'photographic',
             'grain_quality': 'professional',
             'gamma_correct': True,
@@ -433,45 +451,27 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
 @click.option('--holographic', is_flag=True, help='Enable holographic effects for glass gradients')
 @click.option('--grain-quality', default='standard', help='Grain quality: standard, professional')
 @click.option('--complexity', type=float, default=0.6, help='Complexity level (0.0-1.0)')
-@click.option('--use-openai', is_flag=True, help='Use OpenAI GPT for true AI color generation')
+
 @click.option('--prompt', help='Custom prompt for OpenAI color generation')
 @click.option('--format', default='png', help='Output format: png, jpg, jpeg')
 @click.option('--web-optimized', is_flag=True, help='Optimize for web display (based on real-world testing)')
-def ai_generate(style, type, resolution, output, seed, professional, holographic, grain_quality, complexity, use_openai, prompt, format, web_optimized):
-    """Generate a gradient using AI-powered color generation."""
+def ai_generate(style, type, resolution, output, seed, professional, holographic, grain_quality, complexity, prompt, format, web_optimized):
+    """Generate a gradient using AI-only color generation (OpenAI required)."""
     generator = GradientGeneratorCLI()
-    ai_gen = AIColorGenerator(seed=int(seed) if seed else None, use_openai=use_openai)
+    ai_gen = AIColorGenerator(seed=int(seed) if seed else None, use_openai=True)  # Always use AI
     
-    # Generate AI colors - OpenAI or local AI-inspired
-    if use_openai and prompt:
-        # Custom prompt mode
+    # Generate AI colors - AI-only, no fallbacks
+    if prompt:
+        # Custom prompt mode - use OpenAI with the prompt
         colors = ai_gen.generate_openai_palette(prompt, 4, style)
-        style_name = f"OpenAI: {prompt[:30]}..."
-    elif use_openai:
-        # Style-based OpenAI generation
-        colors = ai_gen.generate_openai_style_palette(style, 4)
-        style_name = f"OpenAI {style.title()}"
-    elif professional and style in ['glass', 'rich', 'vibrant', 'sophisticated']:
-        colors = ai_gen.generate_professional_palette(style, 4)
-        style_name = f"Professional {style.title()}"
-    elif style in ['modern', 'vintage', 'neon', 'pastel', 'earthy']:
-        colors = ai_gen.generate_trend_palette(style, 4)
-        style_name = f"AI {style.title()} Trend"
-    elif style in ['spring', 'summer', 'autumn', 'winter', 'ocean', 'forest', 'desert']:
-        colors = ai_gen.generate_nature_palette(style, 4)
-        style_name = f"AI {style.title()} Nature"
-    elif style in ['calm', 'energetic', 'mysterious', 'joyful', 'elegant', 'fresh']:
-        colors = ai_gen.generate_emotion_palette(style, 4)
-        style_name = f"AI {style.title()} Emotion"
-    elif style == 'fusion':
-        colors = ai_gen.generate_ai_fusion_palette(4, complexity)
-        style_name = "AI Fusion"
+        style_name = f"AI: {prompt[:30]}..."
     else:
-        colors = ai_gen.generate_trend_palette('modern', 4)
-        style_name = "AI Modern"
+        # Style-based AI generation - use OpenAI style palette
+        colors = ai_gen.generate_openai_style_palette(style, 4)
+        style_name = f"AI {style.title()}"
     
     # Set parameters based on type with professional enhancements
-    base_grain = 0.04 if professional else 0.03
+    base_grain = 0.025 if professional else 0.018  # Reduced grain intensity
     
     if type == 'glass':
         params = {
@@ -525,7 +525,16 @@ def ai_generate(style, type, resolution, output, seed, professional, holographic
     
     # Handle output format
     file_extension = 'jpg' if format.lower() in ['jpg', 'jpeg'] else 'png'
-    output_name = output or f"ai_{style}_{type}_{random.randint(1000, 9999)}"
+    # Generate descriptive filename
+    if output:
+        output_name = output
+    elif prompt:
+        # Use prompt + style for custom prompts
+        prompt_words = "_".join(prompt.lower().split()[:2])
+        output_name = f"{prompt_words}_{style}_{type}_{random.randint(1000, 9999)}"
+    else:
+        # Use style and type as descriptors
+        output_name = f"{style}_{type}_{random.randint(1000, 9999)}"
     
     print(f"🤖 Generating AI-powered gradient: {style_name}")
     print(f"🎨 Colors: {colors}")
@@ -555,14 +564,14 @@ def ai_generate(style, type, resolution, output, seed, professional, holographic
 @click.option('--color-temperature', default='neutral', help='Color temperature: warm, cool, neutral, golden, blue, violet')
 @click.option('--depth', type=float, default=0.5, help='Depth perception (0.0-1.0)')
 @click.option('--complexity', type=float, default=0.6, help='Overall complexity (0.0-1.0)')
-@click.option('--use-openai', is_flag=True, help='Use OpenAI for advanced AI generation')
+
 @click.option('--resolution', '-r', default='1080p', help='Output resolution')
 @click.option('--output', '-o', help='Output filename')
 @click.option('--format', default='png', help='Output format: png, jpg, jpeg')
-def ai_enhanced(prompt, mood, lighting, composition, texture_style, atmosphere, color_temperature, depth, complexity, use_openai, resolution, output, format):
-    """Generate wallpapers with enhanced AI control over mood, lighting, composition, and atmosphere."""
+def ai_enhanced(prompt, mood, lighting, composition, texture_style, atmosphere, color_temperature, depth, complexity, resolution, output, format):
+    """Generate wallpapers with AI-only control over mood, lighting, composition, and atmosphere (OpenAI required)."""
     generator = GradientGeneratorCLI()
-    ai_gen = AIColorGenerator(use_openai=use_openai)
+    ai_gen = AIColorGenerator(use_openai=True)  # Always use AI
     
     print(f"🤖 AI Enhanced Generation")
     print(f"💭 Prompt: {prompt or 'Auto-generated based on parameters'}")
@@ -572,11 +581,11 @@ def ai_enhanced(prompt, mood, lighting, composition, texture_style, atmosphere, 
     # Generate AI-influenced parameters
     ai_params = _generate_ai_influenced_parameters(
         prompt, mood, lighting, composition, texture_style, 
-        atmosphere, color_temperature, depth, complexity, ai_gen, use_openai
+        atmosphere, color_temperature, depth, complexity, ai_gen, True
     )
     
     # Generate colors based on enhanced AI understanding
-    if use_openai and prompt:
+    if prompt:
         enhanced_prompt = _create_enhanced_color_prompt(prompt, mood, lighting, atmosphere, color_temperature)
         colors = ai_gen.generate_openai_palette(enhanced_prompt, 4, mood)
     else:
@@ -587,7 +596,17 @@ def ai_enhanced(prompt, mood, lighting, composition, texture_style, atmosphere, 
     
     # Handle output format
     file_extension = 'jpg' if format.lower() in ['jpg', 'jpeg'] else 'png'
-    output_name = output or f"ai_enhanced_{mood}_{lighting}_{random.randint(1000, 9999)}"
+    
+    # Generate descriptive filename based on content, not command type
+    if output:
+        output_name = output
+    elif prompt:
+        # Use first few words of prompt + mood/lighting
+        prompt_words = "_".join(prompt.lower().split()[:3])
+        output_name = f"{prompt_words}_{mood}_{lighting}_{random.randint(1000, 9999)}"
+    else:
+        # Use mood and lighting as primary descriptors
+        output_name = f"{mood}_{lighting}_{atmosphere}_{random.randint(1000, 9999)}"
     
     print(f"⚙️  AI Parameters: {gradient_type} with {len(ai_params)} enhanced controls")
     print(f"🎨 AI Colors: {colors}")
@@ -610,10 +629,10 @@ def ai_enhanced(prompt, mood, lighting, composition, texture_style, atmosphere, 
 @click.option('--count', '-n', default=8, help='Number of AI gradients to generate')
 @click.option('--theme', default='emotions', help='Batch theme: emotions, lighting, atmosphere, temperature, mixed')
 @click.option('--resolution', '-r', default='1080p', help='Output resolution')
-@click.option('--use-openai', is_flag=True, help='Use OpenAI for enhanced generation')
+
 @click.option('--complexity', type=float, default=0.7, help='Overall complexity (0.0-1.0)')
-def ai_mood_batch(count, theme, resolution, use_openai, complexity):
-    """Generate a batch of AI wallpapers exploring different moods, lighting, and atmospheres."""
+def ai_mood_batch(count, theme, resolution, complexity):
+    """Generate a batch of AI wallpapers exploring different moods, lighting, and atmospheres (OpenAI required)."""
     generator = GradientGeneratorCLI()
     
     # Define theme collections
@@ -688,7 +707,7 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
     configs = selected_theme['configs']
     
     print(f"🎨 Generating {count} AI wallpapers with '{theme}' theme")
-    print(f"🤖 OpenAI: {'Enabled' if use_openai else 'Local AI'} | Complexity: {complexity}")
+    print(f"🤖 AI-Only Engine | Complexity: {complexity}")
     print("─" * 50)
     
     successful_generations = 0
@@ -708,12 +727,12 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
         print(f"   Composition: {composition} | Texture: {texture_style} | Depth: {depth:.1f}")
         
         # Generate using enhanced AI
-        ai_gen = AIColorGenerator(use_openai=use_openai)
+        ai_gen = AIColorGenerator(use_openai=True)  # Always use AI
         
         # Generate AI-influenced parameters
         ai_params = _generate_ai_influenced_parameters(
             None, config['mood'], config['lighting'], composition, texture_style,
-            config['atmosphere'], config['color_temperature'], depth, complexity, ai_gen, use_openai
+            config['atmosphere'], config['color_temperature'], depth, complexity, ai_gen, True
         )
         
         # Generate contextual colors
@@ -725,8 +744,8 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
         # Select gradient type
         gradient_type = _select_gradient_type_for_composition(composition, ai_params['surface_style'])
         
-        # Create descriptive output name
-        output_name = f"ai_mood_{theme}_{i+1:02d}_{config['mood']}_{config['lighting']}_{composition}"
+        # Create descriptive output name based on content
+        output_name = f"{theme}_{i+1:02d}_{config['mood']}_{config['lighting']}_{composition}"
         
         # Generate the wallpaper
         success = generator.generate_gradient(
@@ -807,7 +826,7 @@ def ai_batch(count, resolution, mix_styles):
                 'grain_type': random.choice(['photographic', 'film'])
             }
         
-        output_name = f"ai_batch_{i+1}_{style}_{gradient_type}_{seed}"
+        output_name = f"batch_{i+1}_{style}_{gradient_type}_{seed}"
         
         print(f"Generating {i+1}/{count}: {style} {gradient_type} (seed: {seed})")
         
@@ -823,6 +842,44 @@ def ai_batch(count, resolution, mix_styles):
             print(f"Failed to generate gradient {i+1}")
     
     print("🎉 AI batch generation complete!")
+
+
+@cli.command(name='validate-quality')
+@click.option('--image-path', '-i', required=True, help='Path to image file to validate')
+@click.option('--grain-intensity', type=float, default=0.025, help='Grain intensity used (for validation)')
+def validate_quality(image_path, grain_intensity):
+    """Validate the quality of a generated gradient image."""
+    
+    try:
+        from PIL import Image
+        import numpy as np
+        
+        # Load image
+        image = Image.open(image_path)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Convert to numpy array
+        image_array = np.array(image)
+        
+        # Create mock parameters for validation
+        params = {
+            'grain_intensity': grain_intensity,
+            'type': 'unknown'
+        }
+        
+        # Validate quality
+        print(f"🔍 Analyzing quality of: {image_path}")
+        quality_results = validate_generation_quality(image_array, params, verbose=True)
+        
+        # Additional feedback
+        if quality_results['passes_validation']:
+            print(f"\n✅ Image passes quality validation!")
+        else:
+            print(f"\n❌ Image quality needs improvement.")
+            
+    except Exception as e:
+        print(f"❌ Error validating image: {e}")
 
 
 @cli.command(name='premium-demo')
@@ -893,13 +950,13 @@ def _generate_ai_influenced_parameters(prompt, mood, lighting, composition, text
     
     # Texture-influenced parameters
     texture_configs = {
-        'smooth': {'grain_intensity': 0.02, 'grain_type': 'photographic'},
-        'grainy': {'grain_intensity': 0.06, 'grain_type': 'film'},
-        'silky': {'grain_intensity': 0.01, 'grain_type': 'artistic'},
-        'rough': {'grain_intensity': 0.08, 'grain_type': 'digital'},
-        'metallic': {'grain_intensity': 0.04, 'grain_type': 'photographic'},
-        'glassy': {'grain_intensity': 0.03, 'grain_type': 'photographic'},
-        'organic': {'grain_intensity': 0.05, 'grain_type': 'film'}
+        'smooth': {'grain_intensity': 0.012, 'grain_type': 'photographic'},
+        'grainy': {'grain_intensity': 0.038, 'grain_type': 'film'},
+        'silky': {'grain_intensity': 0.008, 'grain_type': 'artistic'},
+        'rough': {'grain_intensity': 0.050, 'grain_type': 'digital'},
+        'metallic': {'grain_intensity': 0.025, 'grain_type': 'photographic'},
+        'glassy': {'grain_intensity': 0.018, 'grain_type': 'photographic'},
+        'organic': {'grain_intensity': 0.032, 'grain_type': 'film'}
     }
     texture_config = texture_configs.get(texture_style, texture_configs['smooth'])
     
@@ -951,7 +1008,8 @@ def _generate_ai_influenced_parameters(prompt, mood, lighting, composition, text
         'flow_strength': 0.2 + depth * 0.2,
         'complexity': depth_complexity * complexity,
         'bleeding': 0.2 + atmosphere_config['blur_mod'] * 0.2,
-        'angle': random.randint(15, 165)
+        'angle': random.randint(15, 165),
+        'composition': composition  # Pass composition to generators for dynamic flow patterns
     })
     
     return params
