@@ -165,9 +165,34 @@ releases/latest \
           nuclei -version
           nuclei -update-templates
       
+      - name: Start application for scanning
+        working-directory: ./frontend
+        run: |
+          # Start the development server locally for security scanning
+          bun run dev &
+          echo "APPLICATION_PID=$!" >> $GITHUB_ENV
+          
+          # Wait for application to start
+          echo "Waiting for application to start..."
+          for i in {1..30}; do
+            if curl -f -s http://localhost:3000 > /dev/null; then
+              echo "Application is ready!"
+              break
+            fi
+            echo "Waiting for application... (attempt $i/30)"
+            sleep 2
+          done
+          
+          # Final check
+          curl -f http://localhost:3000 || \
+            (echo "Application failed to start" && exit 1)
+      
       - name: Run Nuclei scan
         run: |
-          nuclei -target http://localhost:8080 \
+          TARGET_URL="http://localhost:3000"
+          echo "Running Nuclei scan against: $TARGET_URL"
+          
+          nuclei -target "$TARGET_URL" \
             -tags cve,exposure,misconfig,vulnerability \
             -severity low,medium,high,critical \
             -json -output nuclei-results.json \
@@ -307,6 +332,21 @@ brittle and prone to failures. I improved this by:
 The improved installation method is more robust and automatically 
 adapts to new Nuclei releases without requiring manual updates to 
 the CI/CD configuration.
+
+### Local vs Remote Testing
+
+Initially, I attempted to scan Vercel preview deployments directly, 
+but this introduced complexity around URL detection and deployment 
+timing. I simplified the approach by:
+
+- Starting the application locally with `bun run dev`
+- Scanning against `localhost:3000` consistently
+- Eliminating dependency on external deployment URLs
+- Reducing wait times and potential network issues
+
+This local testing approach is more reliable, faster, and tests the 
+same code that will be deployed, making it an ideal solution for 
+CI/CD security scanning.
 
 ### Developer Adoption
 

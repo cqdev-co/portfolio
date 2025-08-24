@@ -100,50 +100,29 @@ jobs:
           nuclei -update-templates
 
       - name: Start application for scanning
-        if: github.ref == 'refs/heads/main'
         working-directory: ./frontend
         run: |
-          bun run start &
+          # Start the development server locally for security scanning
+          bun run dev &
           echo "APPLICATION_PID=$!" >> $GITHUB_ENV
+          
           # Wait for application to start
-          sleep 30
-          curl -f http://localhost:3000 || (echo "Application failed to start" && exit 1)
-
-      - name: Get Vercel preview URL
-        if: github.event_name == 'pull_request'
-        id: vercel-url
-        run: |
-          # For Vercel, the preview URL follows a pattern
-          # You might need to adjust this based on your Vercel configuration
-          BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          VERCEL_URL="https://portfolio-${BRANCH_NAME//\//-}-$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]').vercel.app"
-          echo "url=$VERCEL_URL" >> $GITHUB_OUTPUT
-          echo "Vercel preview URL: $VERCEL_URL"
-
-      - name: Wait for Vercel deployment
-        if: github.event_name == 'pull_request'
-        run: |
-          URL="${{ steps.vercel-url.outputs.url }}"
-          echo "Waiting for Vercel deployment at $URL"
+          echo "Waiting for application to start..."
           for i in {1..30}; do
-            if curl -f -s "$URL" > /dev/null; then
-              echo "Deployment is ready!"
+            if curl -f -s http://localhost:3000 > /dev/null; then
+              echo "Application is ready!"
               break
             fi
-            echo "Waiting for deployment... (attempt $i/30)"
-            sleep 10
+            echo "Waiting for application... (attempt $i/30)"
+            sleep 2
           done
+          
           # Final check
-          curl -f "$URL" || (echo "Vercel deployment not accessible" && exit 1)
+          curl -f http://localhost:3000 || (echo "Application failed to start" && exit 1)
 
       - name: Run Nuclei security scan
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            TARGET_URL="${{ steps.vercel-url.outputs.url }}"
-          else
-            TARGET_URL="http://localhost:3000"
-          fi
-          
+          TARGET_URL="http://localhost:3000"
           echo "Running Nuclei scan against: $TARGET_URL"
           
           # Run Nuclei scan with commonly used templates
@@ -194,7 +173,7 @@ jobs:
           retention-days: 30
 
       - name: Stop application
-        if: always() && github.ref == 'refs/heads/main'
+        if: always()
         run: |
           if [ ! -z "$APPLICATION_PID" ]; then
             kill $APPLICATION_PID || true
