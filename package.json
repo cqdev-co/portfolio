@@ -1,0 +1,19 @@
+{
+  "name": "portfolio-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "wp-service"
+  ],
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm run test"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
