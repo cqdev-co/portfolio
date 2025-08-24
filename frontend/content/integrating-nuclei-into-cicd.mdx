@@ -149,7 +149,9 @@ jobs:
       - name: Install Nuclei
         run: |
           # Use the official installation method with error handling
-          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+          curl -s \
+            https://api.github.com/repos/projectdiscovery/nuclei/\
+releases/latest \
             | grep "browser_download_url.*linux_amd64.zip" \
             | cut -d '"' -f 4 \
             | wget -qi -
