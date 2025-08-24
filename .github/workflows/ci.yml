@@ -89,7 +89,7 @@ jobs:
             | wget -qi -
           
           # Extract and install
-          unzip -q nuclei_*_linux_amd64.zip
+          unzip -o -q nuclei_*_linux_amd64.zip
           sudo mv nuclei /usr/local/bin/
           sudo chmod +x /usr/local/bin/nuclei
           

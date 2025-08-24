@@ -157,7 +157,7 @@ releases/latest \
             | wget -qi -
           
           # Extract and install
-          unzip -q nuclei_*_linux_amd64.zip
+          unzip -o -q nuclei_*_linux_amd64.zip
           sudo mv nuclei /usr/local/bin/
           sudo chmod +x /usr/local/bin/nuclei
           
@@ -302,6 +302,7 @@ brittle and prone to failures. I improved this by:
 - Adding proper error handling and verification steps
 - Ensuring executable permissions are set correctly
 - Including template updates as part of the installation process
+- Using non-interactive unzip flags to avoid prompts in CI/CD environments
 
 The improved installation method is more robust and automatically 
 adapts to new Nuclei releases without requiring manual updates to 
