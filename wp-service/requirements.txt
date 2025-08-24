@@ -1,0 +1,21 @@
+# Mathematical computation
+numpy>=1.26.0
+scipy>=1.11.1
+
+# Image processing
+Pillow>=10.0.0
+
+# CLI interface
+click>=8.0.0
+
+# Progress bars
+tqdm>=4.60.0
+
+# AI Integration
+openai>=1.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Optional: For enhanced functionality
+# requests>=2.32.0  # If needed for future web features
