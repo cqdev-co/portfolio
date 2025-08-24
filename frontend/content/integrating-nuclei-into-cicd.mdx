@@ -192,10 +192,17 @@ releases/latest \
           TARGET_URL="http://localhost:3000"
           echo "Running Nuclei scan against: $TARGET_URL"
           
+          # Run comprehensive security scan
           nuclei -target "$TARGET_URL" \
             -tags cve,exposure,misconfig,vulnerability \
             -severity low,medium,high,critical \
-            -json -output nuclei-results.json \
+            -jsonl -output nuclei-results.jsonl \
+            -stats
+          
+          # Run web-specific scan
+          nuclei -target "$TARGET_URL" \
+            -tags tech,default-logins,web \
+            -jsonl -output nuclei-web-results.jsonl \
             -stats
       
       - name: Process scan results
@@ -235,8 +242,11 @@ import sys
 from datetime import datetime
 
 def process_results(input_file, output_file):
+    results = []
     with open(input_file, 'r') as f:
-        results = [json.loads(line) for line in f]
+        for line in f:
+            if line.strip():  # Skip empty lines
+                results.append(json.loads(line))
     
     # Group by severity
     grouped = {
@@ -280,7 +290,7 @@ def process_results(input_file, output_file):
     return 0
 
 if __name__ == "__main__":
-    input_file = "nuclei-results.json"
+    input_file = "nuclei-results.jsonl"
     output_file = "nuclei-summary.json"
     sys.exit(process_results(input_file, output_file))
 ```
@@ -328,6 +338,7 @@ brittle and prone to failures. I improved this by:
 - Ensuring executable permissions are set correctly
 - Including template updates as part of the installation process
 - Using non-interactive unzip flags to avoid prompts in CI/CD environments
+- Using correct output format flags (`-jsonl` instead of `-json`)
 
 The improved installation method is more robust and automatically 
 adapts to new Nuclei releases without requiring manual updates to 
