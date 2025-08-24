@@ -32,8 +32,8 @@ A sleek, minimal, and professional portfolio website built with Next.js, TypeScr
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/portfolio.git
-   cd portfolio
+   git clone https://github.com/cqdev-co/portfolio.git
+   cd portfolio/frontend
    ```
 
 2. Install dependencies
@@ -72,11 +72,18 @@ A sleek, minimal, and professional portfolio website built with Next.js, TypeScr
 
 ## Deployment
 
-This project can be easily deployed to Vercel:
+This project is configured for deployment to Vercel with a monorepo structure. The `vercel.json` file in the root directory configures Vercel to build from the `frontend/` directory.
 
-```bash
-vercel
-```
+To deploy:
+
+1. Connect your GitHub repository to Vercel
+2. Vercel will automatically detect the configuration and deploy from the frontend directory
+3. Or deploy manually:
+   ```bash
+   vercel --prod
+   ```
+
+The deployment configuration is handled by the root-level `vercel.json` file.
 
 ## Built With
 
