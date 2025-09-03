@@ -14,7 +14,7 @@ export function PersonSchema() {
       'https://conorq.com',
       'https://github.com/conorquinlan',
       'https://linkedin.com/in/conorquinlan',
-      'https://twitter.com/realconorcodes',
+      'https://twitter.com/con_0r',
       // Add any other profiles you have
     ],
     alumniOf: {

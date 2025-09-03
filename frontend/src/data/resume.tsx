@@ -51,7 +51,7 @@ export const DATA = {
       },
       X: {
         name: "X",
-        url: "https://x.com/realconorcodes",
+        url: "https://x.com/con_0r",
         icon: Icons.x,
         navbar: true,
       },
@@ -102,7 +102,7 @@ export const DATA = {
       title: "Open-Source Contributor",
       logoUrl: "/logos/pearai.jpeg",
       start: "June 2024",
-      end: "Present",
+      end: "October 2024",
       companyTag: "PearAI",
       description:
         "Contributed security-focused improvements to open source projects. Key accomplishments:",

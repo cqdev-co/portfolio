@@ -131,11 +131,27 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Modern browsers: Reserve space for scrollbar */
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "ss03", "cv01", "cv02", "cv03", "cv04";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+  
+  /* Fallback for browsers that don't support scrollbar-gutter */
+  @supports not (scrollbar-gutter: stable) {
+    html {
+      overflow-y: scroll;
+    }
+  }
+  
+  /* Compensate for scrollbar when body overflow is hidden (modals open) */
+  body[style*="overflow: hidden"] {
+    padding-right: var(--scrollbar-width, 0px);
   }
   /* Ensure text is selectable by default */
   p, h1, h2, h3, h4, h5, h6, li, span, div {
