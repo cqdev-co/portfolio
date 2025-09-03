@@ -21,17 +21,6 @@ jobs:
         with:
           bun-version: latest
 
-      # Add caching for Bun dependencies
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
       - name: Install dependencies
         working-directory: ./frontend
         run: bun install

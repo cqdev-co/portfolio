@@ -8,19 +8,22 @@ describe('Dock Scrollbar Consistency', () => {
     document.documentElement.innerHTML = '<html><head></head><body></body></html>'
   })
 
-  test('html element forces consistent scrollbar with overflow-y scroll', () => {
+  test('html element reserves space for scrollbar to prevent layout shifts', () => {
     // Test by reading the CSS file directly since the rule is applied via CSS
     const fs = require('fs')
     const path = require('path')
     const cssPath = path.resolve(__dirname, '../src/app/globals.css')
     const cssContent = fs.readFileSync(cssPath, 'utf8')
     
-    // Check that overflow-y: scroll is applied to html in CSS
-    const htmlRuleMatch = cssContent.match(/html\s*{[^}]*overflow-y:\s*scroll[^}]*}/s)
-    expect(htmlRuleMatch).toBeTruthy()
+    // Check for modern scrollbar-gutter approach
+    expect(cssContent).toMatch(/scrollbar-gutter:\s*stable/)
     
-    // Verify the comment explaining the purpose is present
-    expect(cssContent).toMatch(/Force consistent scrollbar to prevent layout shifts/)
+    // Check for fallback overflow-y: scroll for older browsers
+    expect(cssContent).toMatch(/@supports not \(scrollbar-gutter: stable\)/)
+    expect(cssContent).toMatch(/overflow-y:\s*scroll/)
+    
+    // Verify scrollbar compensation for modals
+    expect(cssContent).toMatch(/body\[style\*="overflow: hidden"\]/)
   })
 
   test('body maintains consistent width regardless of content height', () => {
@@ -53,26 +56,29 @@ describe('Dock Scrollbar Consistency', () => {
     const longPageWidth = bodyWidth
 
     // Both pages should have the same effective width
-    // because overflow-y: scroll reserves space for scrollbar
+    // because scrollbar-gutter: stable reserves space for scrollbar
     expect(shortPageWidth).toBe(longPageWidth)
   })
 
-  test('dock positioning remains consistent with forced scrollbar', () => {
+  test('dock positioning remains consistent with scrollbar compensation', () => {
     // Read the CSS file to verify the fix is in place
     const fs = require('fs')
     const path = require('path')
     const cssPath = path.resolve(__dirname, '../src/app/globals.css')
     const cssContent = fs.readFileSync(cssPath, 'utf8')
     
-    // Check that overflow-y: scroll is applied to html
-    expect(cssContent).toMatch(/html\s*{[^}]*overflow-y:\s*scroll/)
+    // Check for modern scrollbar reservation
+    expect(cssContent).toMatch(/scrollbar-gutter:\s*stable/)
     
-    // Verify the comment explaining the purpose
-    expect(cssContent).toMatch(/Force consistent scrollbar to prevent layout shifts/)
+    // Check for modal scrollbar compensation
+    expect(cssContent).toMatch(/padding-right:\s*var\(--scrollbar-width/)
+    
+    // Verify fallback for older browsers
+    expect(cssContent).toMatch(/@supports not \(scrollbar-gutter: stable\)/)
   })
 
   test('main content centering is not affected by scrollbar changes', () => {
-    // Test that mx-auto centering works consistently with forced scrollbar
+    // Test that mx-auto centering works consistently with scrollbar reservation
     const mockViewportWidth = 1024
     
     // Mock getBoundingClientRect for consistent testing
@@ -90,7 +96,7 @@ describe('Dock Scrollbar Consistency', () => {
 
     const rect = mainElement.getBoundingClientRect()
     
-    // With overflow-y: scroll, the width should be consistent
+    // With scrollbar-gutter: stable, the width should be consistent
     expect(rect.width).toBe(mockViewportWidth)
   })
 
@@ -104,7 +110,7 @@ describe('Dock Scrollbar Consistency', () => {
     // Verify fixed positioning that's independent of content
     expect(navbarSource).toMatch(/fixed inset-x-0 bottom-0/)
     
-    // Verify flexbox centering that works with forced scrollbar
+    // Verify flexbox centering that works with scrollbar reservation
     expect(navbarSource).toMatch(/justify-center/)
     
     // Ensure no relative positioning that could be affected by scrollbars
