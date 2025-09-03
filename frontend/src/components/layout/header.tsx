@@ -1,17 +1,8 @@
 import { DATA } from "@/data/resume";
 import Image from "next/image";
+import { LoginButton } from "@/components/auth/login-button";
 
 export function Header() {
-  const education = DATA.education && DATA.education.length > 0 ? DATA.education[0] : null;
-  
-  // Split degree and minors if possible
-  let degree = "";
-  let minors = "";
-  if (education && education.degree) {
-    const parts = education.degree.split(';');
-    degree = parts[0].trim();
-    minors = parts.length > 1 ? parts[1].trim() : "";
-  }
 
   return (
     <header className="w-full py-6 mt-3">
@@ -47,38 +38,10 @@ export function Header() {
             </div>
           </div>
 
-          {/* Right side: Education info */}
-          {education && (
-            <div className="hidden sm:flex flex-col items-end text-right">
-              <div className="flex items-center gap-2">
-                {education.logoUrl && (
-                  <div className="w-8 h-8 relative overflow-hidden rounded-sm">
-                    <Image
-                      src={education.logoUrl}
-                      alt={education.school}
-                      width={32}
-                      height={32}
-                      className="object-contain"
-                    />
-                  </div>
-                )}
-                <h2 className="text-sm font-medium text-foreground tracking-tight">
-                  {education.school}
-                </h2>
-              </div>
-              <p className="text-caption text-muted-foreground mt-0.5">
-                {degree}
-              </p>
-              {minors && (
-                <p className="text-caption text-muted-foreground mt-0.5">
-                  {minors}
-                </p>
-              )}
-              <p className="text-caption text-muted-foreground mt-0.5">
-                {education.start} - {education.end}
-              </p>
-            </div>
-          )}
+          {/* Right side: Login button */}
+          <div className="flex items-center">
+            <LoginButton />
+          </div>
         </div>
       </div>
     </header>

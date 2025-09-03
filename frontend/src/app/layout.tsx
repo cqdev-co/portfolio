@@ -11,6 +11,8 @@ import { Particles } from "@/components/magicui/particles";
 import { DATA } from "@/data/resume";
 import { Analytics } from "@vercel/analytics/react";
 import { PersonSchema, WebsiteSchema } from "@/components/schema";
+import { AuthProvider } from "@/components/auth/auth-provider";
+import { PortalProvider } from "@/components/portal-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -85,6 +87,17 @@ export default function RootLayout({
       <head>
         <PersonSchema />
         <WebsiteSchema />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Calculate scrollbar width and set as CSS variable
+              (function() {
+                const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+                document.documentElement.style.setProperty('--scrollbar-width', scrollbarWidth + 'px');
+              })();
+            `,
+          }}
+        />
       </head>
       <body
         className={cn(
@@ -103,22 +116,26 @@ export default function RootLayout({
           staticity={50}
         />
         
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TooltipProvider>
-            <Header />
-            <Analytics />
-            <main className="flex-1 pt-6 pb-28 px-4 sm:px-6 md:px-8 max-w-4xl mx-auto w-full text-sm sm:text-base">
-              {children}
-            </main>
-            <Navbar />
-            <Footer />
-          </TooltipProvider>
-        </ThemeProvider>
+        <PortalProvider>
+          <AuthProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <TooltipProvider>
+                <Header />
+                <Analytics />
+                <main className="flex-1 pt-6 pb-28 px-4 sm:px-6 md:px-8 max-w-4xl mx-auto w-full text-sm sm:text-base">
+                  {children}
+                </main>
+                <Navbar />
+                <Footer />
+              </TooltipProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </PortalProvider>
       </body>
     </html>
   );

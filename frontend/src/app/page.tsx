@@ -60,6 +60,28 @@ export default function Home() {
             }
         </div>
       </section>
+
+      {/* Education Section */}
+      <section>
+        <h2 className="text-base font-medium mb-3">Education</h2>
+        <Separator className="mb-4" />
+        <div className="space-y-4">
+          {data.education && data.education.length > 0 
+            ? data.education.map((edu, index) => (
+                <ResumeCard
+                  key={index}
+                  logoUrl={edu.logoUrl || ""}
+                  altText={edu.school}
+                  title={edu.school}
+                  subtitle={edu.degree}
+                  period={`${edu.start} - ${edu.end}`}
+                  href={edu.href}
+                />
+              ))
+            : <p className="text-compact text-muted-foreground">No education data available</p>
+          }
+        </div>
+      </section>
       
       {/* Skills Section */}
       <section>
