@@ -71,93 +71,84 @@ jobs:
 
       - name: Install Nuclei
         run: |
-          wget -q https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.2.2_linux_amd64.zip
-          unzip nuclei_3.2.2_linux_amd64.zip
+          # Use the official installation method with error handling
+          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+            | grep "browser_download_url.*linux_amd64.zip" \
+            | cut -d '"' -f 4 \
+            | wget -qi -
+          
+          # Extract and install
+          unzip -o -q nuclei_*_linux_amd64.zip
           sudo mv nuclei /usr/local/bin/
+          sudo chmod +x /usr/local/bin/nuclei
+          
+          # Verify installation
           nuclei -version
+          
+          # Update Nuclei templates
+          nuclei -update-templates
 
       - name: Start application for scanning
-        if: github.ref == 'refs/heads/main'
         working-directory: ./frontend
         run: |
-          bun run start &
+          # Start the development server locally for security scanning
+          bun run dev &
           echo "APPLICATION_PID=$!" >> $GITHUB_ENV
+          
           # Wait for application to start
-          sleep 30
-          curl -f http://localhost:3000 || (echo "Application failed to start" && exit 1)
-
-      - name: Get Vercel preview URL
-        if: github.event_name == 'pull_request'
-        id: vercel-url
-        run: |
-          # For Vercel, the preview URL follows a pattern
-          # You might need to adjust this based on your Vercel configuration
-          BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          VERCEL_URL="https://portfolio-${BRANCH_NAME//\//-}-$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]').vercel.app"
-          echo "url=$VERCEL_URL" >> $GITHUB_OUTPUT
-          echo "Vercel preview URL: $VERCEL_URL"
-
-      - name: Wait for Vercel deployment
-        if: github.event_name == 'pull_request'
-        run: |
-          URL="${{ steps.vercel-url.outputs.url }}"
-          echo "Waiting for Vercel deployment at $URL"
+          echo "Waiting for application to start..."
           for i in {1..30}; do
-            if curl -f -s "$URL" > /dev/null; then
-              echo "Deployment is ready!"
+            if curl -f -s http://localhost:3000 > /dev/null; then
+              echo "Application is ready!"
               break
             fi
-            echo "Waiting for deployment... (attempt $i/30)"
-            sleep 10
+            echo "Waiting for application... (attempt $i/30)"
+            sleep 2
           done
+          
           # Final check
-          curl -f "$URL" || (echo "Vercel deployment not accessible" && exit 1)
+          curl -f http://localhost:3000 || (echo "Application failed to start" && exit 1)
 
       - name: Run Nuclei security scan
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            TARGET_URL="${{ steps.vercel-url.outputs.url }}"
-          else
-            TARGET_URL="http://localhost:3000"
-          fi
-          
+          TARGET_URL="http://localhost:3000"
           echo "Running Nuclei scan against: $TARGET_URL"
           
           # Run Nuclei scan with commonly used templates
           nuclei -target "$TARGET_URL" \
             -tags cve,exposure,misconfig,vulnerability \
             -severity low,medium,high,critical \
-            -json -output nuclei-results.json \
+            -jsonl -output nuclei-results.jsonl \
             -stats || true
           
           # Also run with a more focused web app template set
           nuclei -target "$TARGET_URL" \
             -tags tech,default-logins,web \
-            -json -output nuclei-web-results.json \
+            -jsonl -output nuclei-web-results.jsonl \
             -stats || true
 
       - name: Process Nuclei results
         if: always()
         run: |
-          if [ -f nuclei-results.json ]; then
+          if [ -f nuclei-results.jsonl ]; then
             echo "=== Nuclei Security Scan Results ==="
-            cat nuclei-results.json | jq -r '.info.severity + " - " + .info.name + " - " + .matched_at' || cat nuclei-results.json
+            cat nuclei-results.jsonl | jq -r '.info.severity + " - " + .info.name + " - " + .matched_at' || cat nuclei-results.jsonl
             
             # Count findings by severity
-            if [ -s nuclei-results.json ]; then
+            if [ -s nuclei-results.jsonl ]; then
               echo "=== Summary ==="
-              echo "Critical: $(jq -r 'select(.info.severity=="critical")' nuclei-results.json | wc -l)"
-              echo "High: $(jq -r 'select(.info.severity=="high")' nuclei-results.json | wc -l)"
-              echo "Medium: $(jq -r 'select(.info.severity=="medium")' nuclei-results.json | wc -l)"
-              echo "Low: $(jq -r 'select(.info.severity=="low")' nuclei-results.json | wc -l)"
+              echo "Critical: $(cat nuclei-results.jsonl | jq -r 'select(.info.severity=="critical")' | wc -l)"
+              echo "High: $(cat nuclei-results.jsonl | jq -r 'select(.info.severity=="high")' | wc -l)"
+              echo "Medium: $(cat nuclei-results.jsonl | jq -r 'select(.info.severity=="medium")' | wc -l)"
+              echo "Low: $(cat nuclei-results.jsonl | jq -r 'select(.info.severity=="low")' | wc -l)"
             else
               echo "No security issues found!"
             fi
           fi
           
-          if [ -f nuclei-web-results.json ]; then
+          if [ -f nuclei-web-results.jsonl ]; then
             echo "=== Web-specific scan results ==="
-            cat nuclei-web-results.json | jq -r '.info.severity + " - " + .info.name + " - " + .matched_at' || cat nuclei-web-results.json
+            cat nuclei-web-results.jsonl | jq -r '.info.severity + " - " + .info.name + " - " + .matched_at' || cat nuclei-web-results.jsonl
           fi
 
       - name: Upload Nuclei results
@@ -166,12 +157,12 @@ jobs:
         with:
           name: nuclei-security-scan-results
           path: |
-            nuclei-results.json
-            nuclei-web-results.json
+            nuclei-results.jsonl
+            nuclei-web-results.jsonl
           retention-days: 30
 
       - name: Stop application
-        if: always() && github.ref == 'refs/heads/main'
+        if: always()
         run: |
           if [ ! -z "$APPLICATION_PID" ]; then
             kill $APPLICATION_PID || true
