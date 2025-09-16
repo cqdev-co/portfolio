@@ -20,6 +20,12 @@ from volatility_scanner.services.backtest_service import BacktestService
 from volatility_scanner.services.paper_trading_service import PaperTradingService
 from volatility_scanner.services.database_service import DatabaseService
 
+# Try to import SimpleTickerService for paper trading
+try:
+    from volatility_scanner.services.simple_ticker_service import SimpleTickerService
+except ImportError:
+    SimpleTickerService = None
+
 # Initialize console first
 console = Console()
 
@@ -28,8 +34,7 @@ try:
     from volatility_scanner.services.ticker_service import TickerService
     REAL_TICKER_SERVICE_AVAILABLE = True
 except ImportError as e:
-    console.print(f"[yellow]⚠️  Database ticker service unavailable: {e}[/yellow]")
-    console.print("[yellow]   CLI will use basic symbol lists[/yellow]")
+    # Don't print error during import - only when actually using the CLI
     TickerService = None
     REAL_TICKER_SERVICE_AVAILABLE = False
 from volatility_scanner.models.backtest import BacktestConfig
@@ -42,33 +47,41 @@ app = typer.Typer(
 
 def get_services():
     """Initialize and return service instances."""
-    settings = get_settings()
-    
-    data_service = DataService(settings)
-    analysis_service = AnalysisService(settings)
-    ai_service = AIService(settings)
-    backtest_service = BacktestService(settings, data_service, analysis_service)
-    database_service = DatabaseService(settings)
-    
-    # Use real database ticker service if available, otherwise use basic symbols
-    if REAL_TICKER_SERVICE_AVAILABLE and TickerService:
-        try:
-            ticker_service = TickerService(settings)
-            console.print("[green]✅ Using database ticker service with full symbol coverage[/green]")
-        except Exception as e:
-            console.print(f"[yellow]⚠️  Database ticker service failed: {e}[/yellow]")
-            console.print("[yellow]   CLI will use basic symbol lists for scanning[/yellow]")
+    try:
+        settings = get_settings()
+        
+        data_service = DataService(settings)
+        analysis_service = AnalysisService(settings)
+        ai_service = AIService(settings)
+        backtest_service = BacktestService(settings, data_service, analysis_service)
+        database_service = DatabaseService(settings)
+        
+        # Use real database ticker service if available, otherwise use basic symbols
+        if REAL_TICKER_SERVICE_AVAILABLE and TickerService:
+            try:
+                ticker_service = TickerService(settings)
+                console.print("[green]✅ Using database ticker service with full symbol coverage[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Database ticker service failed: {e}[/yellow]")
+                console.print("[yellow]   CLI will use basic symbol lists for scanning[/yellow]")
+                ticker_service = None
+        else:
+            if not REAL_TICKER_SERVICE_AVAILABLE:
+                console.print("[yellow]⚠️  Database ticker service unavailable (import failed)[/yellow]")
+                console.print("[yellow]   CLI will use basic symbol lists[/yellow]")
             ticker_service = None
-    else:
-        ticker_service = None
-    
-    # Show database service status
-    if database_service.is_available():
-        console.print("[green]✅ Database service ready for signal storage[/green]")
-    else:
-        console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
-    
-    return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service
+        
+        # Show database service status
+        if database_service.is_available():
+            console.print("[green]✅ Database service ready for signal storage[/green]")
+        else:
+            console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
+        
+        return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service
+        
+    except Exception as e:
+        console.print(f"[red]❌ Failed to initialize services: {e}[/red]")
+        raise
 
 
 @app.command()
@@ -935,17 +948,31 @@ def paper_scan(
     async def _scan_signals():
         settings = get_settings()
         paper_service = PaperTradingService(settings)
-        ticker_service = SimpleTickerService(settings)
+        
+        if SimpleTickerService:
+            ticker_service = SimpleTickerService(settings)
+        else:
+            console.print("[yellow]⚠️  SimpleTickerService not available, using fallback symbols[/yellow]")
+            ticker_service = None
         
         # Parse symbols
         if symbols in ['popular', 'tech', 'volatile']:
-            symbol_sets = ticker_service.get_curated_symbol_sets()
-            if symbols == 'popular':
-                scan_symbols = symbol_sets['popular'][:20]
-            elif symbols == 'tech':
-                scan_symbols = symbol_sets['technology'][:20]
-            elif symbols == 'volatile':
-                scan_symbols = symbol_sets['volatile'][:15]
+            if ticker_service:
+                symbol_sets = ticker_service.get_curated_symbol_sets()
+                if symbols == 'popular':
+                    scan_symbols = symbol_sets['popular'][:20]
+                elif symbols == 'tech':
+                    scan_symbols = symbol_sets['technology'][:20]
+                elif symbols == 'volatile':
+                    scan_symbols = symbol_sets['volatile'][:15]
+            else:
+                # Fallback symbol sets
+                fallback_sets = {
+                    'popular': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'],
+                    'tech': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'CRM'],
+                    'volatile': ['TSLA', 'GME', 'AMC', 'PLTR', 'COIN', 'RBLX', 'SNOW', 'ZOOM']
+                }
+                scan_symbols = fallback_sets.get(symbols, fallback_sets['popular'])
         else:
             scan_symbols = [s.strip().upper() for s in symbols.split(',')]
         
@@ -1020,7 +1047,12 @@ def paper_demo(
     async def _run_demo():
         settings = get_settings()
         paper_service = PaperTradingService(settings)
-        ticker_service = SimpleTickerService(settings)
+        
+        if SimpleTickerService:
+            ticker_service = SimpleTickerService(settings)
+        else:
+            console.print("[yellow]⚠️  SimpleTickerService not available, using fallback symbols[/yellow]")
+            ticker_service = None
         
         console.print(Panel.fit(
             "[bold blue]🚀 Paper Trading Demo[/bold blue]\n\n"
@@ -1041,13 +1073,27 @@ def paper_demo(
             progress.update(task, description="Scanning for signals...", completed=False)
             
             # Get symbols
-            symbol_sets = ticker_service.get_curated_symbol_sets()
-            if symbols == 'popular':
-                scan_symbols = symbol_sets['popular'][:15]
-            elif symbols == 'tech':
-                scan_symbols = symbol_sets['technology'][:15]
+            if ticker_service:
+                symbol_sets = ticker_service.get_curated_symbol_sets()
+                if symbols == 'popular':
+                    scan_symbols = symbol_sets['popular'][:15]
+                elif symbols == 'tech':
+                    scan_symbols = symbol_sets['technology'][:15]
+                else:
+                    scan_symbols = symbol_sets['volatile'][:10]
             else:
-                scan_symbols = symbol_sets['volatile'][:10]
+                # Fallback symbol sets
+                fallback_sets = {
+                    'popular': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'],
+                    'tech': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'CRM'],
+                    'volatile': ['TSLA', 'GME', 'AMC', 'PLTR', 'COIN', 'RBLX', 'SNOW', 'ZOOM']
+                }
+                if symbols == 'popular':
+                    scan_symbols = fallback_sets['popular'][:15]
+                elif symbols == 'tech':
+                    scan_symbols = fallback_sets['tech'][:15]
+                else:
+                    scan_symbols = fallback_sets['volatile'][:10]
             
             # Scan for signals
             signals = await paper_service.scan_for_signals(scan_symbols, min_score=0.6)
