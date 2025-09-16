@@ -221,6 +221,7 @@ The volatility squeeze scanner includes a comprehensive GitHub Actions workflow 
 #### Technical Implementation
 - **Latest Actions**: Uses updated GitHub Actions (v4/v5) for reliability
 - **Environment Setup**: Python 3.11 with Poetry dependency management (modern `--only=main` syntax)
+- **CLI Command**: Uses Poetry script entry point (`volatility-scanner`) for reliable execution
 - **Caching**: Optimized dependency caching for faster execution
 - **Security**: Secure environment variable handling for Supabase credentials
 - **Monitoring**: Detailed logging and summary generation

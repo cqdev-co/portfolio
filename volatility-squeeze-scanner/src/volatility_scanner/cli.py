@@ -20,6 +20,9 @@ from volatility_scanner.services.backtest_service import BacktestService
 from volatility_scanner.services.paper_trading_service import PaperTradingService
 from volatility_scanner.services.database_service import DatabaseService
 
+# Initialize console first
+console = Console()
+
 # Try to import the real TickerService
 try:
     from volatility_scanner.services.ticker_service import TickerService
@@ -35,7 +38,6 @@ app = typer.Typer(
     name="volatility-scanner",
     help="Enterprise-grade volatility squeeze scanner CLI"
 )
-console = Console()
 
 
 def get_services():

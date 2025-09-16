@@ -65,7 +65,7 @@ jobs:
         MAX_SYMBOLS="${{ github.event.inputs.max_symbols }}"
         
         # Build command with optional parameters
-        SCAN_CMD="poetry run python -m volatility_scanner.cli scan-all --min-score $MIN_SCORE --fast"
+        SCAN_CMD="poetry run volatility-scanner scan-all --min-score $MIN_SCORE --fast"
         
         if [ ! -z "$MAX_SYMBOLS" ]; then
           SCAN_CMD="$SCAN_CMD --max-symbols $MAX_SYMBOLS"
