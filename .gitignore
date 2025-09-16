@@ -38,6 +38,10 @@ yarn-error.log*
 .env
 .env.local
 
+# Python virtual environment
+venv/
+env/
+
 # vercel
 .vercel
 

@@ -1,0 +1,89 @@
+name: Fetch Global Market Tickers
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (after markets close)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no database writes)'
+        required: false
+        default: false
+        type: boolean
+      verbose:
+        description: 'Enable verbose logging'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  fetch-tickers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('.github/scripts/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r .github/scripts/requirements.txt
+        
+    - name: Create .env file
+      run: |
+        echo "SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env
+        echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+        echo "ALPHA_VANTAGE_API_KEY=${{ secrets.ALPHA_VANTAGE_API_KEY }}" >> .env
+        echo "FMP_API_KEY=${{ secrets.FMP_API_KEY }}" >> .env
+        
+    - name: Run ticker fetch (dry-run)
+      if: github.event.inputs.dry_run == 'true'
+      run: |
+        cd .github/scripts
+        python fetch_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
+        
+    - name: Run ticker fetch (production)
+      if: github.event.inputs.dry_run != 'true'
+      run: |
+        cd .github/scripts
+        python fetch_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
+        
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: ticker-fetch-logs
+        path: .github/scripts/ticker_fetch.log
+        retention-days: 7
+        
+    - name: Notify on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Ticker Fetch Failed',
+            body: `The scheduled ticker fetch job failed on ${new Date().toISOString()}.
+            
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Please check the logs and investigate the issue.`,
+            labels: ['bug', 'automation']
+          })

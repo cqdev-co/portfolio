@@ -1,0 +1,1 @@
+# Documentation around Volatility Squeeze Scanner Strategy
