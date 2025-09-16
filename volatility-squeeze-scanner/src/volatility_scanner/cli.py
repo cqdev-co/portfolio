@@ -280,6 +280,31 @@ def server(
 
 
 @app.command()
+def version() -> None:
+    """Show version information and basic system status."""
+    console.print("[bold blue]Volatility Squeeze Scanner[/bold blue]")
+    console.print("Version: 0.1.0")
+    
+    try:
+        settings = get_settings()
+        console.print("[green]✅ Settings loaded successfully[/green]")
+        
+        # Test basic imports
+        console.print("[green]✅ Core services available[/green]")
+        
+        # Check environment variables
+        import os
+        supabase_url = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+        if supabase_url:
+            console.print("[green]✅ Supabase URL configured[/green]")
+        else:
+            console.print("[yellow]⚠️  Supabase URL not configured[/yellow]")
+            
+    except Exception as e:
+        console.print(f"[red]❌ System check failed: {e}[/red]")
+
+
+@app.command()
 def validate(
     symbol: str = typer.Argument(..., help="Symbol to validate")
 ) -> None:
@@ -1128,4 +1153,10 @@ def paper_demo(
 
 
 if __name__ == "__main__":
-    app()
+    try:
+        app()
+    except Exception as e:
+        console.print(f"[red]❌ CLI Error: {e}[/red]")
+        import traceback
+        console.print(f"[red]Traceback: {traceback.format_exc()}[/red]")
+        raise

@@ -73,12 +73,43 @@ jobs:
         
         echo "🚀 Running: $SCAN_CMD"
         
-        # Run the scanner and capture output
-        $SCAN_CMD > scan_output.log 2>&1
+        # First, test if the CLI is accessible
+        echo "🔍 Testing CLI accessibility..."
+        poetry run volatility-scanner --help > cli_test.log 2>&1 || {
+          echo "❌ CLI not accessible, showing error:"
+          cat cli_test.log
+          exit 1
+        }
+        echo "✅ CLI is accessible"
         
-        # Show the results
-        echo "📊 Scan Results:"
-        tail -20 scan_output.log
+        # Test version and system status
+        echo "🔍 Testing system status..."
+        poetry run volatility-scanner version > version_test.log 2>&1 || {
+          echo "❌ Version command failed, showing error:"
+          cat version_test.log
+          exit 1
+        }
+        echo "✅ System status check passed"
+        cat version_test.log
+        
+        # Run the scanner and capture output
+        echo "🚀 Starting volatility scan..."
+        $SCAN_CMD > scan_output.log 2>&1
+        SCAN_EXIT_CODE=$?
+        
+        # Show the results regardless of exit code
+        echo "📊 Scan Results (Exit Code: $SCAN_EXIT_CODE):"
+        echo "--- Last 30 lines of output ---"
+        tail -30 scan_output.log
+        
+        # If scan failed, show more context
+        if [ $SCAN_EXIT_CODE -ne 0 ]; then
+          echo ""
+          echo "❌ Scan failed with exit code $SCAN_EXIT_CODE"
+          echo "--- Full error output ---"
+          cat scan_output.log
+          exit $SCAN_EXIT_CODE
+        fi
         
     - name: Upload scan logs
       if: always()  # Upload logs even if scan fails
