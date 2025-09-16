@@ -51,7 +51,7 @@ jobs:
           
     - name: Install dependencies
       working-directory: volatility-squeeze-scanner
-      run: poetry install --no-dev
+      run: poetry install --only=main
         
     - name: Run Volatility Squeeze Scanner
       env:

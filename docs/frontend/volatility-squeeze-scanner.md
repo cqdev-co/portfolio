@@ -220,7 +220,7 @@ The volatility squeeze scanner includes a comprehensive GitHub Actions workflow 
 
 #### Technical Implementation
 - **Latest Actions**: Uses updated GitHub Actions (v4/v5) for reliability
-- **Environment Setup**: Python 3.11 with Poetry dependency management
+- **Environment Setup**: Python 3.11 with Poetry dependency management (modern `--only=main` syntax)
 - **Caching**: Optimized dependency caching for faster execution
 - **Security**: Secure environment variable handling for Supabase credentials
 - **Monitoring**: Detailed logging and summary generation
