@@ -10,11 +10,11 @@
   ```json
   {
     "buildCommand": "cd frontend && bun run build",
-    "installCommand": "cd frontend && bun install",
-    "framework": "nextjs",
-    "rootDirectory": "frontend"
+    "outputDirectory": "frontend/.next",
+    "installCommand": "cd frontend && bun install"
   }
   ```
+- Note: Removed `rootDirectory` and `framework` properties as they caused schema validation errors
 
 ### 2. Conflicting Next.js Configuration Files
 **Problem**: Both `next.config.js` and `next.config.ts` existed, causing configuration conflicts.
@@ -65,5 +65,8 @@
 - All 14 pages generated successfully
 - No build errors or critical warnings
 
+## Vercel Configuration Update
+**Additional Fix**: Removed invalid `rootDirectory` and `framework` properties from `vercel.json` that were causing schema validation errors.
+
 ## Next Steps
-The frontend should now build successfully on Vercel using bun as the package manager with the updated Supabase SSR integration.
+The frontend should now build successfully on Vercel using bun as the package manager with the updated Supabase SSR integration and valid Vercel configuration.
