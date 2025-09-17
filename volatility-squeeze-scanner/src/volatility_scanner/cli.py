@@ -6,6 +6,7 @@ from typing import List, Optional
 import json
 
 import typer
+from typer import Typer
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
@@ -139,7 +140,7 @@ def analyze(
 
 @app.command()
 def batch(
-    symbols: List[str] = typer.Argument(..., help="Symbols to analyze"),
+    symbols: str = typer.Argument(..., help="Comma-separated symbols to analyze"),
     period: str = typer.Option("1y", "--period", help="Data period"),
     ai: bool = typer.Option(True, "--ai/--no-ai", help="Include AI analysis"),
     output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)")
@@ -149,16 +150,19 @@ def batch(
     async def _batch_analyze():
         data_service, analysis_service, ai_service, _ = get_services()
         
+        # Parse comma-separated symbols
+        symbol_list = [s.strip().upper() for s in symbols.split(',')]
+        
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console
         ) as progress:
             
-            task = progress.add_task("Fetching data...", total=len(symbols))
+            task = progress.add_task("Fetching data...", total=len(symbol_list))
             
             # Fetch data for all symbols
-            symbol_data = await data_service.get_multiple_symbols(symbols, period)
+            symbol_data = await data_service.get_multiple_symbols(symbol_list, period)
             progress.update(task, advance=len(symbol_data))
             
             # Analyze each symbol
@@ -199,7 +203,7 @@ def batch(
 
 @app.command()
 def backtest(
-    symbols: List[str] = typer.Argument(..., help="Symbols to backtest"),
+    symbols: str = typer.Argument(..., help="Comma-separated symbols to backtest"),
     start_date: str = typer.Option("2023-01-01", "--start-date", help="Start date (YYYY-MM-DD)"),
     end_date: str = typer.Option("2023-12-31", "--end-date", help="End date (YYYY-MM-DD)"),
     capital: float = typer.Option(100000.0, "--capital", help="Initial capital"),
@@ -217,11 +221,14 @@ def backtest(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         
+        # Parse comma-separated symbols
+        symbol_list = [s.strip().upper() for s in symbols.split(',')]
+        
         # Create config
         config = BacktestConfig(
             start_date=start_dt,
             end_date=end_dt,
-            symbols=symbols,
+            symbols=symbol_list,
             initial_capital=capital,
             max_position_size=max_position,
             stop_loss_pct=stop_loss,
