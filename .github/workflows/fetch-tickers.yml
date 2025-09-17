@@ -17,6 +17,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   fetch-tickers:
     runs-on: ubuntu-latest
@@ -46,8 +50,8 @@ jobs:
         
     - name: Create .env file
       run: |
-        echo "SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env
-        echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+        echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env
+        echo "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}" >> .env
         echo "ALPHA_VANTAGE_API_KEY=${{ secrets.ALPHA_VANTAGE_API_KEY }}" >> .env
         echo "FMP_API_KEY=${{ secrets.FMP_API_KEY }}" >> .env
         
