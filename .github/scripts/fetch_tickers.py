@@ -28,6 +28,14 @@ import requests
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+# Import quality filtering utilities
+try:
+    from utils.master_filter import MasterTickerFilter, FilteringResults
+    QUALITY_FILTERING_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Quality filtering not available: {e}")
+    QUALITY_FILTERING_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -47,12 +55,21 @@ class TickerInfo:
 class TickerFetcher:
     """Main class for fetching and storing ticker data"""
     
-    def __init__(self, dry_run: bool = False, verbose: bool = False):
+    def __init__(self, 
+                 dry_run: bool = False, 
+                 verbose: bool = False,
+                 enable_quality_filtering: bool = True,
+                 quality_filter_config: str = 'moderate',
+                 max_quality_tickers: Optional[int] = None):
         self.dry_run = dry_run
         self.verbose = verbose
+        self.enable_quality_filtering = enable_quality_filtering and QUALITY_FILTERING_AVAILABLE
+        self.quality_filter_config = quality_filter_config
+        self.max_quality_tickers = max_quality_tickers
         self.setup_logging()
         self.setup_supabase()
         self.setup_api_keys()
+        self.setup_quality_filter()
         
     def setup_logging(self):
         """Configure logging"""
@@ -66,6 +83,47 @@ class TickerFetcher:
             ]
         )
         self.logger = logging.getLogger(__name__)
+        
+    def setup_quality_filter(self):
+        """Initialize quality filtering system"""
+        if self.enable_quality_filtering:
+            try:
+                # Configure quality filter based on use case
+                filter_configs = {
+                    'conservative': {
+                        'exchange_filter_config': 'us_only',
+                        'fundamental_filter_config': 'moderate',
+                        'enable_fundamental_filtering': True,
+                        'min_overall_score': 0.6,
+                        'max_tickers': self.max_quality_tickers or 2000
+                    },
+                    'moderate': {
+                        'exchange_filter_config': 'us_only',
+                        'fundamental_filter_config': 'liberal',
+                        'enable_fundamental_filtering': False,  # Skip fundamental filtering for broader coverage
+                        'min_overall_score': 0.5,
+                        'max_tickers': self.max_quality_tickers or 4000
+                    },
+                    'liberal': {
+                        'exchange_filter_config': 'us_only',
+                        'fundamental_filter_config': 'liberal',
+                        'enable_fundamental_filtering': False,  # Skip fundamental filtering
+                        'min_overall_score': 0.4,
+                        'max_tickers': self.max_quality_tickers or 6000
+                    }
+                }
+                
+                config = filter_configs.get(self.quality_filter_config, filter_configs['moderate'])
+                self.quality_filter = MasterTickerFilter(**config)
+                
+                self.logger.info(f"Quality filtering enabled with '{self.quality_filter_config}' configuration")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to initialize quality filtering: {e}")
+                self.enable_quality_filtering = False
+        else:
+            self.quality_filter = None
+            self.logger.info("Quality filtering disabled")
         
     def setup_supabase(self):
         """Initialize Supabase client"""
@@ -250,6 +308,90 @@ class TickerFetcher:
         
         return unique_tickers
     
+    def apply_quality_filtering(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+        """Apply quality filtering to ticker list"""
+        if not self.enable_quality_filtering or not self.quality_filter:
+            self.logger.info("Skipping quality filtering")
+            return tickers
+            
+        self.logger.info(f"Applying quality filtering to {len(tickers)} tickers...")
+        
+        try:
+            # Convert TickerInfo objects to dictionaries for filtering
+            ticker_dicts = []
+            for ticker in tickers:
+                ticker_dict = {
+                    'symbol': ticker.symbol,
+                    'name': ticker.name,
+                    'exchange': ticker.exchange,
+                    'country': ticker.country,
+                    'currency': ticker.currency,
+                    'sector': ticker.sector,
+                    'industry': ticker.industry,
+                    'market_cap': ticker.market_cap,
+                    'ticker_type': ticker.ticker_type
+                }
+                ticker_dicts.append(ticker_dict)
+            
+            # Apply quality filtering
+            filtering_results = self.quality_filter.filter_all_tickers(ticker_dicts)
+            
+            # Convert back to TickerInfo objects with quality attributes
+            quality_tickers = []
+            for ticker_dict in filtering_results.filtered_tickers:
+                quality_ticker = TickerInfo(
+                    symbol=ticker_dict['symbol'],
+                    name=ticker_dict['name'],
+                    exchange=ticker_dict.get('normalized_exchange') or ticker_dict.get('exchange'),
+                    country=ticker_dict.get('country'),
+                    currency=ticker_dict.get('currency'),
+                    sector=ticker_dict.get('sector'),
+                    industry=ticker_dict.get('industry'),
+                    market_cap=ticker_dict.get('market_cap'),
+                    ticker_type=ticker_dict.get('ticker_type', 'stock')
+                )
+                
+                # Add quality attributes to the ticker object
+                quality_ticker.quality_score = ticker_dict.get('final_quality_score')
+                quality_ticker.quality_tier = ticker_dict.get('quality_tier')
+                quality_ticker.exchange_quality_score = ticker_dict.get('exchange_quality_score')
+                quality_ticker.is_high_quality = ticker_dict.get('final_quality_score', 0) >= 0.6
+                quality_ticker.current_price = ticker_dict.get('current_price')
+                quality_ticker.avg_volume = ticker_dict.get('avg_volume')
+                
+                quality_tickers.append(quality_ticker)
+            
+            # Log filtering results
+            self.logger.info(f"Quality filtering results:")
+            self.logger.info(f"  Original tickers: {filtering_results.original_count}")
+            self.logger.info(f"  Exchange filtered: {filtering_results.exchange_filtered_count}")
+            self.logger.info(f"  Quality filtered: {filtering_results.quality_filtered_count}")
+            self.logger.info(f"  Fundamental filtered: {filtering_results.fundamental_filtered_count}")
+            self.logger.info(f"  Final high-quality tickers: {filtering_results.final_count}")
+            self.logger.info(f"  Overall pass rate: {filtering_results.pass_rates['overall']*100:.1f}%")
+            
+            # Log tier distribution
+            if filtering_results.summary_stats.get('tier_distribution'):
+                self.logger.info("Quality tier distribution:")
+                for tier, count in filtering_results.summary_stats['tier_distribution'].items():
+                    self.logger.info(f"  {tier}: {count}")
+            
+            # Save detailed filtering results for analysis
+            if not self.dry_run:
+                results_file = f"ticker_filtering_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                try:
+                    self.quality_filter.export_results(filtering_results, results_file)
+                    self.logger.info(f"Detailed filtering results saved to {results_file}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to save filtering results: {e}")
+            
+            return quality_tickers
+            
+        except Exception as e:
+            self.logger.error(f"Quality filtering failed: {e}")
+            self.logger.info("Falling back to original ticker list")
+            return tickers
+    
     def store_tickers(self, tickers: List[TickerInfo]) -> bool:
         """Store tickers in Supabase database"""
         if self.dry_run:
@@ -273,6 +415,21 @@ class TickerFetcher:
                     'is_active': True,
                     'last_fetched': datetime.now(timezone.utc).isoformat()
                 }
+                
+                # Add quality metrics if available (from quality filtering)
+                if hasattr(ticker, 'quality_score'):
+                    data['quality_score'] = getattr(ticker, 'quality_score', None)
+                if hasattr(ticker, 'quality_tier'):
+                    data['quality_tier'] = getattr(ticker, 'quality_tier', None)
+                if hasattr(ticker, 'exchange_quality_score'):
+                    data['exchange_quality_score'] = getattr(ticker, 'exchange_quality_score', None)
+                if hasattr(ticker, 'is_high_quality'):
+                    data['is_high_quality'] = getattr(ticker, 'is_high_quality', False)
+                if hasattr(ticker, 'current_price'):
+                    data['current_price'] = getattr(ticker, 'current_price', None)
+                if hasattr(ticker, 'avg_volume'):
+                    data['avg_volume'] = getattr(ticker, 'avg_volume', None)
+                
                 ticker_data.append(data)
             
             # Insert in batches to avoid timeouts
@@ -335,8 +492,11 @@ class TickerFetcher:
         # Deduplicate
         unique_tickers = self.deduplicate_tickers(all_tickers)
         
+        # Apply quality filtering
+        quality_tickers = self.apply_quality_filtering(unique_tickers)
+        
         # Store in database
-        success = self.store_tickers(unique_tickers)
+        success = self.store_tickers(quality_tickers)
         
         if success:
             self.logger.info("Ticker fetch process completed successfully")
@@ -360,11 +520,33 @@ def main():
         action='store_true',
         help='Enable verbose logging'
     )
+    parser.add_argument(
+        '--disable-quality-filtering',
+        action='store_true',
+        help='Disable quality filtering and store all tickers'
+    )
+    parser.add_argument(
+        '--quality-filter-config',
+        choices=['conservative', 'moderate', 'liberal'],
+        default='moderate',
+        help='Quality filtering configuration level'
+    )
+    parser.add_argument(
+        '--max-quality-tickers',
+        type=int,
+        help='Maximum number of high-quality tickers to keep'
+    )
     
     args = parser.parse_args()
     
     try:
-        fetcher = TickerFetcher(dry_run=args.dry_run, verbose=args.verbose)
+        fetcher = TickerFetcher(
+            dry_run=args.dry_run, 
+            verbose=args.verbose,
+            enable_quality_filtering=not args.disable_quality_filtering,
+            quality_filter_config=args.quality_filter_config,
+            max_quality_tickers=args.max_quality_tickers
+        )
         success = fetcher.run()
         sys.exit(0 if success else 1)
         
