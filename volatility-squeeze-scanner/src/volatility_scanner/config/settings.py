@@ -45,18 +45,38 @@ class Settings(BaseSettings):
         description="YFinance cache TTL in seconds"
     )
     max_concurrent_requests: int = Field(
-        default=25,
+        default=5,  # Reduced from 25 to be much more conservative
         description="Maximum concurrent API requests"
+    )
+    request_delay_seconds: float = Field(
+        default=0.2,  # 200ms delay between requests
+        description="Delay between individual API requests in seconds"
+    )
+    rate_limit_backoff_factor: float = Field(
+        default=2.0,
+        description="Exponential backoff factor for rate limiting"
+    )
+    max_retries: int = Field(
+        default=3,
+        description="Maximum number of retries for failed requests"
+    )
+    retry_delay_base: float = Field(
+        default=1.0,
+        description="Base delay for exponential backoff retries"
     )
     
     # Performance optimization settings
     bulk_scan_concurrency: int = Field(
-        default=100,
+        default=3,  # Reduced from 100 to be very conservative
         description="Concurrency for bulk scanning operations"
     )
     bulk_scan_batch_size: int = Field(
-        default=500,
+        default=100,  # Reduced from 500
         description="Batch size for bulk scanning operations"
+    )
+    chunk_delay_seconds: float = Field(
+        default=2.0,  # Increased from 0.1 to 2 seconds between chunks
+        description="Delay between processing chunks in bulk operations"
     )
     analysis_concurrency: int = Field(
         default=20,

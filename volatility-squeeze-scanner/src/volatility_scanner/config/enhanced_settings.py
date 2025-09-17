@@ -188,10 +188,16 @@ class EnhancedSettings(BaseSettings):
     log_retention_days: int = Field(30, description="Log retention in days")
     
     # Performance Configuration
-    max_concurrent_requests: int = Field(10, description="Maximum concurrent API requests")
+    max_concurrent_requests: int = Field(5, description="Maximum concurrent API requests")
     request_timeout_seconds: int = Field(30, description="Request timeout in seconds")
+    request_delay_seconds: float = Field(0.2, description="Delay between individual API requests")
+    rate_limit_backoff_factor: float = Field(2.0, description="Exponential backoff factor for rate limiting")
+    max_retries: int = Field(3, description="Maximum number of retries for failed requests")
+    retry_delay_base: float = Field(1.0, description="Base delay for exponential backoff retries")
     batch_size: int = Field(100, description="Default batch processing size")
     worker_threads: int = Field(4, description="Number of worker threads")
+    bulk_scan_concurrency: int = Field(3, description="Concurrency for bulk scanning operations")
+    chunk_delay_seconds: float = Field(2.0, description="Delay between processing chunks in bulk operations")
     
     # Server Configuration
     host: str = Field("0.0.0.0", description="Server host")

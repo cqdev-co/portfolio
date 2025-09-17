@@ -52,8 +52,8 @@ jobs:
     - name: Install dependencies
       working-directory: volatility-squeeze-scanner
       run: |
-        # Update lock file with new dependency versions
-        poetry lock
+        # Force update to specific Typer version
+        poetry add typer@0.9.4 --group=main
         poetry install --only=main
         
     - name: Run Volatility Squeeze Scanner

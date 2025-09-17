@@ -42,7 +42,10 @@ from volatility_scanner.models.backtest import BacktestConfig
 
 app = typer.Typer(
     name="volatility-scanner",
-    help="Enterprise-grade volatility squeeze scanner CLI"
+    help="Enterprise-grade volatility squeeze scanner CLI",
+    rich_markup_mode=None,
+    pretty_exceptions_enable=False,
+    add_completion=False
 )
 
 
