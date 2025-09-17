@@ -49,11 +49,11 @@ jobs:
         restore-keys: |
           venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
           
-    - name: Update dependencies and install
+    - name: Install dependencies
       working-directory: volatility-squeeze-scanner
       run: |
-        # Update lock file to ensure correct versions
-        poetry lock --no-update
+        # Update lock file with new dependency versions
+        poetry lock
         poetry install --only=main
         
     - name: Run Volatility Squeeze Scanner
