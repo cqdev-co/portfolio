@@ -49,9 +49,12 @@ jobs:
         restore-keys: |
           venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
           
-    - name: Install dependencies
+    - name: Update dependencies and install
       working-directory: volatility-squeeze-scanner
-      run: poetry install --only=main
+      run: |
+        # Update lock file to ensure correct versions
+        poetry lock --no-update
+        poetry install --only=main
         
     - name: Run Volatility Squeeze Scanner
       env:
@@ -70,7 +73,7 @@ jobs:
         MAX_SYMBOLS="${{ github.event.inputs.max_symbols }}"
         
         # Build command with optional parameters
-        SCAN_CMD="poetry run volatility-scanner scan-all --min-score $MIN_SCORE --fast"
+        SCAN_CMD="poetry run python -m volatility_scanner.cli scan-all --min-score $MIN_SCORE --fast"
         
         if [ ! -z "$MAX_SYMBOLS" ]; then
           SCAN_CMD="$SCAN_CMD --max-symbols $MAX_SYMBOLS"
@@ -80,7 +83,7 @@ jobs:
         
         # First, test if the CLI is accessible
         echo "🔍 Testing CLI accessibility..."
-        poetry run volatility-scanner --help > cli_test.log 2>&1 || {
+        poetry run python -m volatility_scanner.cli --help > cli_test.log 2>&1 || {
           echo "❌ CLI not accessible, showing error:"
           cat cli_test.log
           exit 1
@@ -89,7 +92,7 @@ jobs:
         
         # Test version and system status
         echo "🔍 Testing system status..."
-        poetry run volatility-scanner version > version_test.log 2>&1 || {
+        poetry run python -m volatility_scanner.cli version > version_test.log 2>&1 || {
           echo "❌ Version command failed, showing error:"
           cat version_test.log
           exit 1
