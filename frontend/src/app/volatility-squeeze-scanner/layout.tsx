@@ -3,7 +3,7 @@ import { createMetadata } from "@/lib/utils";
 
 export const metadata: Metadata = createMetadata({
   title: "Volatility Squeeze Scanner",
-  description: "Real-time analysis of volatility squeeze signals across market instruments. Identify potential breakout opportunities with technical indicators and AI-powered insights.",
+  description: "The volatility squeeze strategy identifies stocks experiencing unusually low price movement, which often precedes explosive breakouts. Deploy when markets are calm and consolidating. These compressed periods historically deliver 1.2-3.3% moves with high accuracy.",
 });
 
 export default function VolatilitySqueezeLayout({

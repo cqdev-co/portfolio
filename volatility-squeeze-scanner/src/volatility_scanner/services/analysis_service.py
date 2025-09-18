@@ -99,6 +99,19 @@ class AnalysisService:
                 previous_indicators
             )
             
+            # Apply enhanced expansion confirmation rules
+            if squeeze_signal.is_expansion:
+                # Enhanced expansion confirmation: require volume above average and price positioning
+                expansion_confirmed = (
+                    squeeze_signal.volume_ratio >= 1.0 and  # Above average volume
+                    squeeze_signal.bb_width_change > 0 and   # BB widening (already checked in expansion detection)
+                    self._check_bb_price_positioning(squeeze_signal, latest_indicators)  # Price outside BB middle
+                )
+                
+                # If expansion not confirmed, mark as non-expansion
+                if not expansion_confirmed:
+                    squeeze_signal.is_expansion = False
+            
             # Only proceed if we have a valid signal
             if not self._is_signal_valid(squeeze_signal):
                 return None
@@ -225,6 +238,14 @@ class AnalysisService:
             latest_indicators.volume_ratio or 1.0
         )
         
+        # Calculate liquidity metrics
+        dollar_volume = latest_ohlcv.close * latest_ohlcv.volume
+        
+        # Calculate average dollar volume over last 20 days
+        recent_ohlcv = market_data.ohlcv_data[-20:] if len(market_data.ohlcv_data) >= 20 else market_data.ohlcv_data
+        daily_dollar_volumes = [ohlcv.close * ohlcv.volume for ohlcv in recent_ohlcv]
+        avg_dollar_volume = sum(daily_dollar_volumes) / len(daily_dollar_volumes) if daily_dollar_volumes else None
+        
         return SqueezeSignal(
             timestamp=latest_ohlcv.timestamp,
             symbol=market_data.symbol,
@@ -253,6 +274,10 @@ class AnalysisService:
             volume=latest_ohlcv.volume,
             volume_ratio=latest_indicators.volume_ratio or 1.0,
             avg_volume=latest_indicators.volume_sma,
+            
+            # Liquidity metrics
+            dollar_volume=dollar_volume,
+            avg_dollar_volume=avg_dollar_volume,
             
             # OHLC Price data
             open_price=latest_ohlcv.open,
@@ -391,13 +416,40 @@ class AnalysisService:
             elif squeeze_signal.trend_direction == TrendDirection.BEARISH and not macd_bullish:
                 base_score += 0.03  # MACD confirms bearish trend (reduced from 0.06)
         
-        # ADX trend strength confirmation (reduced bonuses)
-        if hasattr(latest_indicators, 'adx') and latest_indicators.adx is not None:
+        # Enhanced DI/ADX confluence: promote signals with DI+ ≥ DI− and ADX rising; demote otherwise
+        if (hasattr(latest_indicators, 'adx') and latest_indicators.adx is not None and
+            hasattr(latest_indicators, 'di_plus') and latest_indicators.di_plus is not None and
+            hasattr(latest_indicators, 'di_minus') and latest_indicators.di_minus is not None):
+            
             adx = latest_indicators.adx
+            di_plus = latest_indicators.di_plus
+            di_minus = latest_indicators.di_minus
+            
+            # DI confluence check
+            di_bullish = di_plus > di_minus
+            di_bearish = di_minus > di_plus
+            
+            # Promote signals with proper DI/trend alignment
+            if squeeze_signal.trend_direction == TrendDirection.BULLISH and di_bullish:
+                if adx > 25:  # Strong trending environment
+                    base_score += 0.06  # Enhanced bonus for aligned signals
+                elif adx > 20:  # Moderate trending
+                    base_score += 0.04
+            elif squeeze_signal.trend_direction == TrendDirection.BEARISH and di_bearish:
+                if adx > 25:  # Strong trending environment
+                    base_score += 0.05  # Slightly lower bonus for bearish
+                elif adx > 20:  # Moderate trending
+                    base_score += 0.03
+            else:
+                # Demote signals with conflicting DI/trend direction
+                if adx > 20:  # Only penalize if there's actual trend strength
+                    base_score -= 0.03  # Penalty for misaligned signals
+            
+            # Additional ADX strength bonus (reduced from original)
             if adx > 25:  # Strong trend
-                base_score += 0.04  # Reduced from 0.08
+                base_score += 0.02  # Base strength bonus
             elif adx > 20:  # Moderate trend
-                base_score += 0.02  # Reduced from 0.04
+                base_score += 0.01  # Small strength bonus
         
         # Position scoring (reduced bonuses/penalties)
         if squeeze_signal.price_vs_20d_high > -3:  # Very near highs
@@ -538,14 +590,44 @@ class AnalysisService:
         squeeze_signal: SqueezeSignal,
         technical_score: float
     ) -> str:
-        """Generate trading recommendation with enhanced logic."""
+        """Generate trading recommendation with enhanced logic including RSI regime filters."""
         
-        # More aggressive thresholds for better signal generation
+        # Gap/high volatility day handling: downgrade if range_vs_atr > 3 (noisy/impulsive days)
+        if squeeze_signal.range_vs_atr > 3.0:
+            # High volatility day - downgrade to WATCH or require next-day confirmation
+            if technical_score >= 0.75:
+                return "WATCH"  # Downgrade from potential BUY/STRONG_BUY to avoid false breaks
+        
+        # RSI regime filter: auto-downgrade oversold/overbought conditions
+        if squeeze_signal.rsi is not None:
+            # Oversold condition (RSI < 30): downgrade to WATCH unless exceptional confluence
+            if squeeze_signal.rsi < 30:
+                # Only allow BUY/STRONG_BUY if we have exceptional volume and DI+ confirmation
+                exceptional_confluence = (
+                    squeeze_signal.volume_ratio > 2.0 and
+                    squeeze_signal.di_plus is not None and
+                    squeeze_signal.di_minus is not None and
+                    squeeze_signal.di_plus > squeeze_signal.di_minus and
+                    squeeze_signal.bb_width_percentile <= 5
+                )
+                if not exceptional_confluence and technical_score >= 0.75:
+                    return "WATCH"  # Downgrade from potential BUY/STRONG_BUY
+            
+            # Overbought condition (RSI > 80): prevent STRONG_BUY, prefer WATCH
+            elif squeeze_signal.rsi > 80:
+                if technical_score >= 0.75:
+                    return "WATCH"  # Avoid buying blow-offs
+        
+        # Standard recommendation logic with RSI filters applied
         if technical_score >= 0.75:
             if squeeze_signal.trend_direction == TrendDirection.BULLISH:
                 # Extra confirmation for bullish signals
                 if squeeze_signal.volume_ratio > 1.3 and squeeze_signal.bb_width_percentile <= 5:
-                    return "STRONG_BUY"
+                    # Check RSI isn't too overbought for STRONG_BUY
+                    if squeeze_signal.rsi is None or squeeze_signal.rsi <= 75:
+                        return "STRONG_BUY"
+                    else:
+                        return "BUY"
                 return "BUY"
             elif squeeze_signal.trend_direction == TrendDirection.BEARISH:
                 # More cautious with bearish signals
@@ -616,6 +698,17 @@ class AnalysisService:
             return 0.02  # 2% for weak signals
         else:
             return 0.01  # 1% for very weak signals
+    
+    def _check_bb_price_positioning(self, squeeze_signal: SqueezeSignal, indicators) -> bool:
+        """Check if price is positioned outside BB middle for expansion confirmation."""
+        if not indicators.bb_middle:
+            return True  # Default to true if BB middle not available
+        
+        # Price should be outside BB middle band for valid expansion
+        price_distance_from_middle = abs(squeeze_signal.close_price - indicators.bb_middle)
+        bb_middle_threshold = indicators.bb_middle * 0.005  # 0.5% threshold
+        
+        return price_distance_from_middle > bb_middle_threshold
     
     def _assess_data_quality(self, market_data: MarketData) -> float:
         """Assess the quality of the underlying data."""

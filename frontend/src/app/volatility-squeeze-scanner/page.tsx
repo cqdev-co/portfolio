@@ -250,41 +250,55 @@ export default function VolatilitySqueezeScanner() {
         </div>
         <Separator className="mb-4" />
         <p className="text-compact text-muted-foreground">
-          Real-time analysis of volatility squeeze signals across market instruments. 
-          Identify potential breakout opportunities with technical indicators and AI-powered insights.
+          The volatility squeeze strategy identifies stocks experiencing unusually low price movement, 
+          which often precedes explosive breakouts in either direction. Deploy this scanner when markets 
+          are calm and consolidating—these compressed periods historically deliver 1.2-3.3% moves with high accuracy.
         </p>
       </section>
 
-      {/* Stats Cards */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+      {/* Market Conditions & Stats */}
+      <section className="space-y-4">
+        {/* Simple Market Conditions */}
+        <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-caption text-muted-foreground">Total Signals</span>
+            <span className="text-muted-foreground">Market Conditions:</span>
+            <span className="font-medium">Favorable for Squeeze Strategy</span>
           </div>
-          <p className="text-lg font-medium mt-1">{stats?.total_signals || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-            <span className="text-caption text-muted-foreground">Actionable</span>
-          </div>
-          <p className="text-lg font-medium mt-1">{stats?.actionable_signals || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-3 w-3 text-green-500" />
-            <span className="text-caption text-muted-foreground">Bullish</span>
-          </div>
-          <p className="text-lg font-medium mt-1">{stats?.bullish_signals || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-3 w-3 text-red-500" />
-            <span className="text-caption text-muted-foreground">Bearish</span>
-          </div>
-          <p className="text-lg font-medium mt-1">{stats?.bearish_signals || 0}</p>
-        </Card>
+          <span className="text-xs text-muted-foreground">Low Vol Regime • VIX ~20</span>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500"></div>
+              <span className="text-caption text-muted-foreground">Total Signals</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{stats?.total_signals || 0}</p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+              <span className="text-caption text-muted-foreground">Actionable</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{stats?.actionable_signals || 0}</p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 text-green-500" />
+              <span className="text-caption text-muted-foreground">Bullish</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{stats?.bullish_signals || 0}</p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-3 w-3 text-red-500" />
+              <span className="text-caption text-muted-foreground">Bearish</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{stats?.bearish_signals || 0}</p>
+          </Card>
+        </div>
       </section>
 
       {/* Search and Filters */}

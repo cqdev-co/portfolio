@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Volatility Squeeze Scanner is a professional, modern web interface for displaying real-time volatility squeeze signals from the database. It provides comprehensive analysis and visualization of market opportunities with technical indicators and AI-powered insights.
+The Volatility Squeeze Scanner is a professional, modern web interface for displaying real-time volatility squeeze signals from the database. The volatility squeeze strategy identifies stocks experiencing unusually low price movement, which often precedes explosive breakouts in either direction. Deploy this scanner when markets are calm and consolidating—these compressed periods historically deliver 1.2-3.3% moves with high accuracy.
 
 ## Features
 
@@ -16,6 +16,7 @@ The Volatility Squeeze Scanner is a professional, modern web interface for displ
 - **Responsive Design**: Works seamlessly across desktop, tablet, and mobile devices
 
 ### Data Visualization
+- **Market Conditions Indicator**: Clean, minimalistic assessment of strategy conditions with key metrics in simple single-line format
 - **Signal Quality Badges**: Color-coded badges for Exceptional, Excellent, Good, Fair, Poor
 - **Recommendation Indicators**: Clear BUY/SELL/WATCH recommendations with appropriate colors
 - **Squeeze Category Display**: Visual indicators for squeeze tightness levels

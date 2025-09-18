@@ -40,7 +40,8 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 
 ## Documentation Index
 
-- **[Opportunity Ranking System](./opportunity-ranking-system.md)** - Multi-tier ranking for prioritizing signals *(New)*
+- **[Enhanced Filtering Improvements](./enhanced-filtering-improvements.md)** - Latest signal quality enhancements *(New)*
+- **[Opportunity Ranking System](./opportunity-ranking-system.md)** - Multi-tier ranking for prioritizing signals
 - **[Signal Continuity Tracking](./signal-continuity-tracking.md)** - Feature for tracking signal evolution
 - **[Frontend Integration](../frontend/volatility-squeeze-scanner.md)** - Web interface documentation
 - **[Database Schema](../db/README.md)** - Database structure and queries
