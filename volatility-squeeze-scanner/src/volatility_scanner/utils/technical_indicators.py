@@ -326,7 +326,7 @@ class TechnicalIndicatorCalculator:
         atr_20: float
     ) -> Tuple[bool, float, float]:
         """
-        Detect if expansion condition is met.
+        Detect if expansion condition is met with enhanced confirmation rules.
         
         Args:
             current_bb_width: Current BB width
@@ -349,10 +349,13 @@ class TechnicalIndicatorCalculator:
         else:
             range_vs_atr = 0.0
         
-        # Check expansion conditions
-        width_expansion = bb_width_change >= self.settings.expansion_threshold
+        # Enhanced expansion conditions per feedback:
+        # For is_expansion = true, also require bb_width_change > 0 and above-avg volume
+        # (volume check will be done in analysis service)
+        width_expansion = bb_width_change > 0  # Must be positive (widening)
         range_expansion = range_vs_atr >= self.settings.range_multiplier
         
+        # Basic expansion detection - additional volume/positioning checks in analysis service
         is_expansion = width_expansion and range_expansion
         
         return is_expansion, bb_width_change * 100, range_vs_atr

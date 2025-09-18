@@ -6,6 +6,7 @@ from typing import List, Optional
 import json
 
 import typer
+from typer import Typer
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
@@ -20,13 +21,21 @@ from volatility_scanner.services.backtest_service import BacktestService
 from volatility_scanner.services.paper_trading_service import PaperTradingService
 from volatility_scanner.services.database_service import DatabaseService
 
+# Try to import SimpleTickerService for paper trading
+try:
+    from volatility_scanner.services.simple_ticker_service import SimpleTickerService
+except ImportError:
+    SimpleTickerService = None
+
+# Initialize console first
+console = Console()
+
 # Try to import the real TickerService
 try:
     from volatility_scanner.services.ticker_service import TickerService
     REAL_TICKER_SERVICE_AVAILABLE = True
 except ImportError as e:
-    console.print(f"[yellow]⚠️  Database ticker service unavailable: {e}[/yellow]")
-    console.print("[yellow]   CLI will use basic symbol lists[/yellow]")
+    # Don't print error during import - only when actually using the CLI
     TickerService = None
     REAL_TICKER_SERVICE_AVAILABLE = False
 from volatility_scanner.models.backtest import BacktestConfig
@@ -35,38 +44,55 @@ app = typer.Typer(
     name="volatility-scanner",
     help="Enterprise-grade volatility squeeze scanner CLI"
 )
-console = Console()
 
 
 def get_services():
     """Initialize and return service instances."""
-    settings = get_settings()
-    
-    data_service = DataService(settings)
-    analysis_service = AnalysisService(settings)
-    ai_service = AIService(settings)
-    backtest_service = BacktestService(settings, data_service, analysis_service)
-    database_service = DatabaseService(settings)
-    
-    # Use real database ticker service if available, otherwise use basic symbols
-    if REAL_TICKER_SERVICE_AVAILABLE and TickerService:
-        try:
-            ticker_service = TickerService(settings)
-            console.print("[green]✅ Using database ticker service with full symbol coverage[/green]")
-        except Exception as e:
-            console.print(f"[yellow]⚠️  Database ticker service failed: {e}[/yellow]")
-            console.print("[yellow]   CLI will use basic symbol lists for scanning[/yellow]")
+    try:
+        settings = get_settings()
+        
+        data_service = DataService(settings)
+        analysis_service = AnalysisService(settings)
+        ai_service = AIService(settings)
+        backtest_service = BacktestService(settings, data_service, analysis_service)
+        database_service = DatabaseService(settings)
+        
+        # Use real database ticker service if available, otherwise use basic symbols
+        if REAL_TICKER_SERVICE_AVAILABLE and TickerService:
+            try:
+                ticker_service = TickerService(settings)
+                console.print("[green]✅ Using database ticker service with full symbol coverage[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Database ticker service failed: {e}[/yellow]")
+                console.print("[yellow]   CLI will use basic symbol lists for scanning[/yellow]")
+                ticker_service = None
+        else:
+            if not REAL_TICKER_SERVICE_AVAILABLE:
+                console.print("[yellow]⚠️  Database ticker service unavailable (import failed)[/yellow]")
+                console.print("[yellow]   CLI will use basic symbol lists[/yellow]")
             ticker_service = None
-    else:
-        ticker_service = None
-    
-    # Show database service status
-    if database_service.is_available():
-        console.print("[green]✅ Database service ready for signal storage[/green]")
-    else:
-        console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
-    
-    return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service
+        
+        # Show database service status
+        if database_service.is_available():
+            console.print("[green]✅ Database service ready for signal storage[/green]")
+        else:
+            console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
+        
+        # Signal continuity service (depends on database service)
+        continuity_service = None
+        if database_service and database_service.is_available():
+            try:
+                from volatility_scanner.services.signal_continuity_service import SignalContinuityService
+                continuity_service = SignalContinuityService(database_service)
+                console.print("[green]✅ Signal continuity tracking enabled[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Signal continuity service failed: {e}[/yellow]")
+        
+        return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service, continuity_service
+        
+    except Exception as e:
+        console.print(f"[red]❌ Failed to initialize services: {e}[/red]")
+        raise
 
 
 @app.command()
@@ -79,7 +105,7 @@ def analyze(
     """Analyze a symbol for volatility squeeze signals."""
     
     async def _analyze():
-        data_service, analysis_service, ai_service, _ = get_services()
+        data_service, analysis_service, ai_service, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -124,7 +150,7 @@ def analyze(
 
 @app.command()
 def batch(
-    symbols: List[str] = typer.Argument(..., help="Symbols to analyze"),
+    symbols: str = typer.Argument(..., help="Comma-separated symbols to analyze"),
     period: str = typer.Option("1y", "--period", help="Data period"),
     ai: bool = typer.Option(True, "--ai/--no-ai", help="Include AI analysis"),
     output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)")
@@ -132,7 +158,10 @@ def batch(
     """Analyze multiple symbols for volatility squeeze signals."""
     
     async def _batch_analyze():
-        data_service, analysis_service, ai_service, _ = get_services()
+        data_service, analysis_service, ai_service, _, _, _, _ = get_services()
+        
+        # Parse comma-separated symbols
+        symbol_list = [s.strip().upper() for s in symbols.split(',')]
         
         with Progress(
             SpinnerColumn(),
@@ -140,10 +169,10 @@ def batch(
             console=console
         ) as progress:
             
-            task = progress.add_task("Fetching data...", total=len(symbols))
+            task = progress.add_task("Fetching data...", total=len(symbol_list))
             
             # Fetch data for all symbols
-            symbol_data = await data_service.get_multiple_symbols(symbols, period)
+            symbol_data = await data_service.get_multiple_symbols(symbol_list, period)
             progress.update(task, advance=len(symbol_data))
             
             # Analyze each symbol
@@ -184,7 +213,7 @@ def batch(
 
 @app.command()
 def backtest(
-    symbols: List[str] = typer.Argument(..., help="Symbols to backtest"),
+    symbols: str = typer.Argument(..., help="Comma-separated symbols to backtest"),
     start_date: str = typer.Option("2023-01-01", "--start-date", help="Start date (YYYY-MM-DD)"),
     end_date: str = typer.Option("2023-12-31", "--end-date", help="End date (YYYY-MM-DD)"),
     capital: float = typer.Option(100000.0, "--capital", help="Initial capital"),
@@ -196,17 +225,20 @@ def backtest(
     """Run a backtest of the volatility squeeze strategy."""
     
     async def _backtest():
-        _, _, _, backtest_service = get_services()
+        _, _, _, backtest_service, _, _, _ = get_services()
         
         # Parse dates
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d")
         
+        # Parse comma-separated symbols
+        symbol_list = [s.strip().upper() for s in symbols.split(',')]
+        
         # Create config
         config = BacktestConfig(
             start_date=start_dt,
             end_date=end_dt,
-            symbols=symbols,
+            symbols=symbol_list,
             initial_capital=capital,
             max_position_size=max_position,
             stop_loss_pct=stop_loss,
@@ -265,13 +297,38 @@ def server(
 
 
 @app.command()
+def version() -> None:
+    """Show version information and basic system status."""
+    console.print("[bold blue]Volatility Squeeze Scanner[/bold blue]")
+    console.print("Version: 0.1.0")
+    
+    try:
+        settings = get_settings()
+        console.print("[green]✅ Settings loaded successfully[/green]")
+        
+        # Test basic imports
+        console.print("[green]✅ Core services available[/green]")
+        
+        # Check environment variables
+        import os
+        supabase_url = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+        if supabase_url:
+            console.print("[green]✅ Supabase URL configured[/green]")
+        else:
+            console.print("[yellow]⚠️  Supabase URL not configured[/yellow]")
+            
+    except Exception as e:
+        console.print(f"[red]❌ System check failed: {e}[/red]")
+
+
+@app.command()
 def validate(
     symbol: str = typer.Argument(..., help="Symbol to validate")
 ) -> None:
     """Validate if a symbol exists and has data."""
     
     async def _validate():
-        data_service, _, _, _ = get_services()
+        data_service, _, _, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -421,7 +478,7 @@ def scan_database(
     """Scan ticker database for volatility squeeze signals."""
     
     async def _scan_database():
-        data_service, analysis_service, ai_service, _, ticker_service, database_service = get_services()
+        data_service, analysis_service, ai_service, _, ticker_service, database_service, _ = get_services()
         
         try:
             # Get symbols based on filters
@@ -554,7 +611,7 @@ def scan_all(
     """Scan ALL available symbols for volatility squeeze signals."""
     
     async def _scan_all():
-        data_service, analysis_service, ai_service, _, ticker_service, database_service = get_services()
+        data_service, analysis_service, ai_service, _, ticker_service, database_service, continuity_service = get_services()
         
         try:
             # Get ALL symbols
@@ -644,6 +701,15 @@ def scan_all(
             analysis_time = asyncio.get_event_loop().time() - analysis_start_time
             data_fetch_time = analysis_start_time - start_time
             
+            # Process signals for continuity tracking
+            if signals and continuity_service:
+                try:
+                    console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
+                    signals = await continuity_service.process_signals_with_continuity(signals)
+                    console.print(f"[green]✅ Signal continuity processing complete[/green]")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
+            
             # Store signals in database
             if signals and database_service.is_available():
                 try:
@@ -655,14 +721,21 @@ def scan_all(
             
             # Display results
             if signals:
-                # Sort by score (highest first)
-                signals.sort(key=lambda x: x.overall_score, reverse=True)
+                # Sort by ranking tier first, then by score within tier
+                tier_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+                signals.sort(key=lambda x: (
+                    tier_order.get(x.opportunity_rank.value, 5),  # Rank tier first
+                    -x.overall_score  # Then by score (descending)
+                ))
                 
                 console.print(f"\n[bold green]🎯 Found {len(signals)} signals above threshold {min_score}[/bold green]\n")
                 
-                # Create results table
+                # Create results table with ranking and continuity information
                 table = Table(title="🔥 Top Volatility Squeeze Signals")
                 table.add_column("Symbol", style="cyan", no_wrap=True)
+                table.add_column("Rank", style="bold magenta", no_wrap=True, justify="center")
+                table.add_column("Status", style="blue", no_wrap=True)
+                table.add_column("Days", style="dim yellow", justify="right")
                 table.add_column("Score", style="magenta", justify="right")
                 table.add_column("Recommendation", style="green")
                 table.add_column("Trend", style="blue")
@@ -671,8 +744,30 @@ def scan_all(
                 
                 for signal in signals[:20]:  # Show top 20
                     squeeze = signal.squeeze_signal
+                    
+                    # Format status with emoji
+                    status_emoji = {
+                        'NEW': '🆕',
+                        'CONTINUING': '🔄',
+                        'ENDED': '🔚'
+                    }
+                    status_display = f"{status_emoji.get(squeeze.signal_status.value, '❓')} {squeeze.signal_status.value}"
+                    
+                    # Format ranking with styling
+                    rank_colors = {
+                        'S': '🏆 S',  # Gold trophy for S-tier
+                        'A': '🥇 A',  # Gold medal for A-tier
+                        'B': '🥈 B',  # Silver medal for B-tier
+                        'C': '🥉 C',  # Bronze medal for C-tier
+                        'D': '📉 D'   # Chart down for D-tier
+                    }
+                    rank_display = rank_colors.get(signal.opportunity_rank.value, f"❓ {signal.opportunity_rank.value}")
+                    
                     table.add_row(
                         signal.symbol,
+                        rank_display,
+                        status_display,
+                        str(squeeze.days_in_squeeze),
                         f"{signal.overall_score:.3f}",
                         signal.recommendation,
                         squeeze.trend_direction.value,
@@ -723,6 +818,33 @@ def scan_all(
             console.print(f"   📈 Signal rate: {len(signals)/len(symbol_data)*100:.1f}%" if symbol_data else "0%")
             console.print(f"   🔄 Data retrieval success: {len(symbol_data)/len(all_symbols)*100:.1f}%")
             
+            # Signal continuity summary
+            if signals and continuity_service:
+                new_count = len([s for s in signals if s.squeeze_signal.signal_status.value == 'NEW'])
+                continuing_count = len([s for s in signals if s.squeeze_signal.signal_status.value == 'CONTINUING'])
+                avg_days = sum(s.squeeze_signal.days_in_squeeze for s in signals) / len(signals) if signals else 0
+                max_days = max(s.squeeze_signal.days_in_squeeze for s in signals) if signals else 0
+                
+                console.print(f"\n[bold cyan]🔄 Signal Continuity Tracking:[/bold cyan]")
+                console.print(f"   🆕 New signals: {new_count}")
+                console.print(f"   🔄 Continuing signals: {continuing_count}")
+                console.print(f"   📅 Average days in squeeze: {avg_days:.1f}")
+                console.print(f"   🏆 Longest running squeeze: {max_days} days")
+                
+                # Opportunity ranking summary
+                rank_counts = {}
+                for rank in ['S', 'A', 'B', 'C', 'D']:
+                    count = len([s for s in signals if s.opportunity_rank.value == rank])
+                    if count > 0:
+                        rank_counts[rank] = count
+                
+                if rank_counts:
+                    console.print(f"\n[bold gold1]🏆 Opportunity Rankings:[/bold gold1]")
+                    rank_emojis = {'S': '🏆', 'A': '🥇', 'B': '🥈', 'C': '🥉', 'D': '📉'}
+                    for rank, count in rank_counts.items():
+                        emoji = rank_emojis.get(rank, '❓')
+                        console.print(f"   {emoji} {rank}-Tier: {count} signals")
+            
             # Performance metrics
             console.print(f"\n[bold green]⚡ Performance Metrics:[/bold green]")
             console.print(f"   📥 Data fetch time: {data_fetch_time:.1f}s")
@@ -765,7 +887,7 @@ def query_signals(
     """Query stored volatility squeeze signals from database."""
     
     async def _query_signals():
-        _, _, _, _, _, database_service = get_services()
+        _, _, _, _, _, database_service, _ = get_services()
         
         if not database_service.is_available():
             console.print("[red]❌ Database service not available[/red]")
@@ -825,7 +947,7 @@ def list_tickers(
     """List available tickers from the database."""
     
     def _list_tickers():
-        _, _, _, _, ticker_service = get_services()
+        _, _, _, _, ticker_service, _, _ = get_services()
         
         try:
             console.print("[bold blue]📊 Ticker Database Information[/bold blue]")
@@ -933,17 +1055,31 @@ def paper_scan(
     async def _scan_signals():
         settings = get_settings()
         paper_service = PaperTradingService(settings)
-        ticker_service = SimpleTickerService(settings)
+        
+        if SimpleTickerService:
+            ticker_service = SimpleTickerService(settings)
+        else:
+            console.print("[yellow]⚠️  SimpleTickerService not available, using fallback symbols[/yellow]")
+            ticker_service = None
         
         # Parse symbols
         if symbols in ['popular', 'tech', 'volatile']:
-            symbol_sets = ticker_service.get_curated_symbol_sets()
-            if symbols == 'popular':
-                scan_symbols = symbol_sets['popular'][:20]
-            elif symbols == 'tech':
-                scan_symbols = symbol_sets['technology'][:20]
-            elif symbols == 'volatile':
-                scan_symbols = symbol_sets['volatile'][:15]
+            if ticker_service:
+                symbol_sets = ticker_service.get_curated_symbol_sets()
+                if symbols == 'popular':
+                    scan_symbols = symbol_sets['popular'][:20]
+                elif symbols == 'tech':
+                    scan_symbols = symbol_sets['technology'][:20]
+                elif symbols == 'volatile':
+                    scan_symbols = symbol_sets['volatile'][:15]
+            else:
+                # Fallback symbol sets
+                fallback_sets = {
+                    'popular': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'],
+                    'tech': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'CRM'],
+                    'volatile': ['TSLA', 'GME', 'AMC', 'PLTR', 'COIN', 'RBLX', 'SNOW', 'ZOOM']
+                }
+                scan_symbols = fallback_sets.get(symbols, fallback_sets['popular'])
         else:
             scan_symbols = [s.strip().upper() for s in symbols.split(',')]
         
@@ -1018,7 +1154,12 @@ def paper_demo(
     async def _run_demo():
         settings = get_settings()
         paper_service = PaperTradingService(settings)
-        ticker_service = SimpleTickerService(settings)
+        
+        if SimpleTickerService:
+            ticker_service = SimpleTickerService(settings)
+        else:
+            console.print("[yellow]⚠️  SimpleTickerService not available, using fallback symbols[/yellow]")
+            ticker_service = None
         
         console.print(Panel.fit(
             "[bold blue]🚀 Paper Trading Demo[/bold blue]\n\n"
@@ -1039,13 +1180,27 @@ def paper_demo(
             progress.update(task, description="Scanning for signals...", completed=False)
             
             # Get symbols
-            symbol_sets = ticker_service.get_curated_symbol_sets()
-            if symbols == 'popular':
-                scan_symbols = symbol_sets['popular'][:15]
-            elif symbols == 'tech':
-                scan_symbols = symbol_sets['technology'][:15]
+            if ticker_service:
+                symbol_sets = ticker_service.get_curated_symbol_sets()
+                if symbols == 'popular':
+                    scan_symbols = symbol_sets['popular'][:15]
+                elif symbols == 'tech':
+                    scan_symbols = symbol_sets['technology'][:15]
+                else:
+                    scan_symbols = symbol_sets['volatile'][:10]
             else:
-                scan_symbols = symbol_sets['volatile'][:10]
+                # Fallback symbol sets
+                fallback_sets = {
+                    'popular': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'],
+                    'tech': ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'CRM'],
+                    'volatile': ['TSLA', 'GME', 'AMC', 'PLTR', 'COIN', 'RBLX', 'SNOW', 'ZOOM']
+                }
+                if symbols == 'popular':
+                    scan_symbols = fallback_sets['popular'][:15]
+                elif symbols == 'tech':
+                    scan_symbols = fallback_sets['tech'][:15]
+                else:
+                    scan_symbols = fallback_sets['volatile'][:10]
             
             # Scan for signals
             signals = await paper_service.scan_for_signals(scan_symbols, min_score=0.6)
@@ -1080,4 +1235,10 @@ def paper_demo(
 
 
 if __name__ == "__main__":
-    app()
+    try:
+        app()
+    except Exception as e:
+        console.print(f"[red]❌ CLI Error: {e}[/red]")
+        import traceback
+        console.print(f"[red]Traceback: {traceback.format_exc()}[/red]")
+        raise

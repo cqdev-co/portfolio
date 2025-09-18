@@ -61,8 +61,15 @@ class TickerClient:
         """Get the Supabase client instance"""
         return self._client
 
-# Global client instance
-_ticker_client = TickerClient()
+# Global client instance - initialize lazily
+_ticker_client = None
+
+def _get_ticker_client() -> TickerClient:
+    """Get or create the global ticker client instance."""
+    global _ticker_client
+    if _ticker_client is None:
+        _ticker_client = TickerClient()
+    return _ticker_client
 
 def get_all_tickers(
     active_only: bool = True,
@@ -87,7 +94,7 @@ def get_all_tickers(
     try:
         if limit:
             # Simple case: user specified a limit
-            query = _ticker_client.client.table('tickers').select('*')
+            query = _get_ticker_client().client.table('tickers').select('*')
             
             if active_only:
                 query = query.eq('is_active', True)
@@ -110,7 +117,7 @@ def get_all_tickers(
             current_offset = offset
             
             while True:
-                query = _ticker_client.client.table('tickers').select('*')
+                query = _get_ticker_client().client.table('tickers').select('*')
                 
                 if active_only:
                     query = query.eq('is_active', True)
@@ -153,7 +160,7 @@ def get_ticker_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
         ...     print(f"Company: {ticker['name']}")
     """
     try:
-        response = _ticker_client.client.table('tickers').select('*').eq(
+        response = _get_ticker_client().client.table('tickers').select('*').eq(
             'symbol', symbol.upper()
         ).execute()
         
@@ -188,7 +195,7 @@ def get_tickers_by_exchange(
         >>> nasdaq_tickers = get_tickers_by_exchange('NASDAQ', limit=50)
     """
     try:
-        query = _ticker_client.client.table('tickers').select('*').eq(
+        query = _get_ticker_client().client.table('tickers').select('*').eq(
             'exchange', exchange.upper()
         )
         
@@ -225,7 +232,7 @@ def get_tickers_by_country(
         List of ticker dictionaries
     """
     try:
-        query = _ticker_client.client.table('tickers').select('*').eq(
+        query = _get_ticker_client().client.table('tickers').select('*').eq(
             'country', country.upper()
         )
         
@@ -262,7 +269,7 @@ def get_tickers_by_sector(
         List of ticker dictionaries
     """
     try:
-        query = _ticker_client.client.table('tickers').select('*').ilike(
+        query = _get_ticker_client().client.table('tickers').select('*').ilike(
             'sector', f'%{sector}%'
         )
         
@@ -312,7 +319,7 @@ def search_tickers(
         
         or_condition = ','.join(conditions)
         
-        query_builder = _ticker_client.client.table('tickers').select('*').or_(
+        query_builder = _get_ticker_client().client.table('tickers').select('*').or_(
             or_condition
         )
         
@@ -340,7 +347,7 @@ def get_ticker_count(active_only: bool = True) -> int:
         Total number of tickers
     """
     try:
-        query = _ticker_client.client.table('tickers').select(
+        query = _get_ticker_client().client.table('tickers').select(
             'id', count='exact'
         )
         
@@ -365,7 +372,7 @@ def get_exchanges() -> List[str]:
         List of exchange names
     """
     try:
-        response = _ticker_client.client.table('tickers').select(
+        response = _get_ticker_client().client.table('tickers').select(
             'exchange'
         ).not_.is_('exchange', 'null').execute()
         
@@ -390,7 +397,7 @@ def get_countries() -> List[str]:
         List of country codes
     """
     try:
-        response = _ticker_client.client.table('tickers').select(
+        response = _get_ticker_client().client.table('tickers').select(
             'country'
         ).not_.is_('country', 'null').execute()
         
@@ -415,7 +422,7 @@ def get_sectors() -> List[str]:
         List of sector names
     """
     try:
-        response = _ticker_client.client.table('tickers').select(
+        response = _get_ticker_client().client.table('tickers').select(
             'sector'
         ).not_.is_('sector', 'null').execute()
         
@@ -454,7 +461,7 @@ def get_recently_updated_tickers(hours: int = 24) -> List[Dict[str, Any]]:
     try:
         cutoff_time = datetime.now() - timedelta(hours=hours)
         
-        response = _ticker_client.client.table('tickers').select('*').gte(
+        response = _get_ticker_client().client.table('tickers').select('*').gte(
             'updated_at', cutoff_time.isoformat()
         ).order('updated_at', desc=True).execute()
         

@@ -1,6 +1,7 @@
 """Database service for storing and retrieving volatility squeeze signals."""
 
 import os
+import time
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
@@ -95,7 +96,7 @@ class DatabaseService:
     
     async def store_signals_batch(self, analysis_results: List[AnalysisResult]) -> int:
         """
-        Store multiple signals in a batch operation.
+        Store multiple signals in a batch operation with retry logic.
         
         Args:
             analysis_results: List of analysis results to store
@@ -110,24 +111,73 @@ class DatabaseService:
         if not analysis_results:
             return 0
         
-        try:
-            # Prepare all signal data
-            signals_data = [
-                self._prepare_signal_data(result) 
-                for result in analysis_results
-            ]
+        # Use smaller batch sizes to avoid SSL timeout issues
+        batch_size = 10  # Reduced from potentially larger batches
+        total_stored = 0
+        
+        # Process in smaller batches
+        for i in range(0, len(analysis_results), batch_size):
+            batch = analysis_results[i:i + batch_size]
+            batch_stored = await self._store_batch_with_retry(batch, batch_num=i//batch_size + 1)
+            total_stored += batch_stored
             
-            # Insert in batch
-            response = self.client.table('volatility_squeeze_signals').insert(signals_data).execute()
-            
-            stored_count = len(response.data) if response.data else 0
-            logger.info(f"✅ Stored {stored_count}/{len(analysis_results)} signals in database")
-            
-            return stored_count
-            
-        except Exception as e:
-            logger.error(f"Error storing signals batch: {e}")
-            return 0
+            # Small delay between batches to avoid overwhelming the connection
+            if i + batch_size < len(analysis_results):
+                await asyncio.sleep(0.1)
+        
+        logger.info(f"✅ Stored {total_stored}/{len(analysis_results)} signals in database")
+        return total_stored
+    
+    async def _store_batch_with_retry(self, batch: List[AnalysisResult], batch_num: int, max_retries: int = 3) -> int:
+        """Store a batch with retry logic for SSL/network issues."""
+        for attempt in range(max_retries):
+            try:
+                # Prepare signal data
+                signals_data = [
+                    self._prepare_signal_data(result) 
+                    for result in batch
+                ]
+                
+                # Insert batch
+                response = self.client.table('volatility_squeeze_signals').insert(signals_data).execute()
+                
+                stored_count = len(response.data) if response.data else 0
+                logger.debug(f"✅ Batch {batch_num}: Stored {stored_count}/{len(batch)} signals")
+                
+                return stored_count
+                
+            except Exception as e:
+                logger.warning(f"Batch {batch_num} attempt {attempt + 1} failed: {e}")
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff: wait longer between retries
+                    wait_time = 2 ** attempt
+                    logger.info(f"Retrying batch {batch_num} in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Batch {batch_num} failed after {max_retries} attempts: {e}")
+                    
+                    # Try to store individual signals as fallback
+                    return await self._store_individual_fallback(batch, batch_num)
+        
+        return 0
+    
+    async def _store_individual_fallback(self, batch: List[AnalysisResult], batch_num: int) -> int:
+        """Fallback: try to store signals individually if batch fails."""
+        logger.info(f"Using individual storage fallback for batch {batch_num}")
+        stored_count = 0
+        
+        for result in batch:
+            try:
+                signal_id = await self.store_signal(result)
+                if signal_id:
+                    stored_count += 1
+                await asyncio.sleep(0.05)  # Small delay between individual inserts
+            except Exception as e:
+                logger.debug(f"Individual storage failed for {result.symbol}: {e}")
+        
+        logger.info(f"Fallback stored {stored_count}/{len(batch)} signals from batch {batch_num}")
+        return stored_count
     
     def _prepare_signal_data(self, analysis_result: AnalysisResult) -> Dict[str, Any]:
         """Prepare analysis result data for database storage."""
@@ -196,6 +246,7 @@ class DatabaseService:
             'signal_strength': float(squeeze_signal.signal_strength),
             'technical_score': float(analysis_result.overall_score),  # Use overall_score as technical_score
             'overall_score': float(analysis_result.overall_score),
+            'opportunity_rank': analysis_result.opportunity_rank.value if analysis_result.opportunity_rank else None,
             
             # Recommendations
             'recommendation': analysis_result.recommendation if analysis_result.recommendation else None,
@@ -207,6 +258,12 @@ class DatabaseService:
             # AI analysis
             'ai_analysis': analysis_result.ai_analysis.rationale if analysis_result.ai_analysis else None,
             'ai_confidence': float(analysis_result.ai_analysis.confidence) if analysis_result.ai_analysis else None,
+            
+            # Signal continuity tracking
+            'signal_status': squeeze_signal.signal_status.value if squeeze_signal.signal_status else 'NEW',
+            'days_in_squeeze': squeeze_signal.days_in_squeeze if squeeze_signal.days_in_squeeze else 1,
+            'first_detected_date': squeeze_signal.first_detected_date.isoformat() if squeeze_signal.first_detected_date else None,
+            'last_active_date': squeeze_signal.last_active_date.isoformat() if squeeze_signal.last_active_date else None,
             
             # Metadata
             'is_actionable': hasattr(analysis_result, 'is_actionable') and (

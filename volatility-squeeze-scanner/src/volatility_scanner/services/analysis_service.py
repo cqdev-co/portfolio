@@ -15,6 +15,7 @@ from volatility_scanner.models.analysis import (
     AnalysisResult,
     TrendDirection,
     SignalType,
+    OpportunityRank,
 )
 from volatility_scanner.utils.technical_indicators import TechnicalIndicatorCalculator
 from volatility_scanner.utils.helpers import safe_divide, calculate_true_range
@@ -98,12 +99,28 @@ class AnalysisService:
                 previous_indicators
             )
             
+            # Apply enhanced expansion confirmation rules
+            if squeeze_signal.is_expansion:
+                # Enhanced expansion confirmation: require volume above average and price positioning
+                expansion_confirmed = (
+                    squeeze_signal.volume_ratio >= 1.0 and  # Above average volume
+                    squeeze_signal.bb_width_change > 0 and   # BB widening (already checked in expansion detection)
+                    self._check_bb_price_positioning(squeeze_signal, latest_indicators)  # Price outside BB middle
+                )
+                
+                # If expansion not confirmed, mark as non-expansion
+                if not expansion_confirmed:
+                    squeeze_signal.is_expansion = False
+            
             # Only proceed if we have a valid signal
             if not self._is_signal_valid(squeeze_signal):
                 return None
             
             # Calculate overall technical score
             technical_score = self._calculate_technical_score(squeeze_signal, latest_indicators)
+            
+            # Calculate opportunity ranking
+            opportunity_rank = self._calculate_opportunity_rank(squeeze_signal, technical_score)
             
             # Generate analysis result
             analysis_id = str(uuid.uuid4())
@@ -117,6 +134,7 @@ class AnalysisService:
                 squeeze_signal=squeeze_signal,
                 ai_analysis=None,  # Will be populated by AI service if requested
                 overall_score=technical_score,
+                opportunity_rank=opportunity_rank,
                 recommendation=self._generate_recommendation(
                     squeeze_signal, 
                     technical_score
@@ -220,6 +238,14 @@ class AnalysisService:
             latest_indicators.volume_ratio or 1.0
         )
         
+        # Calculate liquidity metrics
+        dollar_volume = latest_ohlcv.close * latest_ohlcv.volume
+        
+        # Calculate average dollar volume over last 20 days
+        recent_ohlcv = market_data.ohlcv_data[-20:] if len(market_data.ohlcv_data) >= 20 else market_data.ohlcv_data
+        daily_dollar_volumes = [ohlcv.close * ohlcv.volume for ohlcv in recent_ohlcv]
+        avg_dollar_volume = sum(daily_dollar_volumes) / len(daily_dollar_volumes) if daily_dollar_volumes else None
+        
         return SqueezeSignal(
             timestamp=latest_ohlcv.timestamp,
             symbol=market_data.symbol,
@@ -248,6 +274,10 @@ class AnalysisService:
             volume=latest_ohlcv.volume,
             volume_ratio=latest_indicators.volume_ratio or 1.0,
             avg_volume=latest_indicators.volume_sma,
+            
+            # Liquidity metrics
+            dollar_volume=dollar_volume,
+            avg_dollar_volume=avg_dollar_volume,
             
             # OHLC Price data
             open_price=latest_ohlcv.open,
@@ -329,94 +359,275 @@ class AnalysisService:
         return True
     
     def _calculate_technical_score(self, squeeze_signal: SqueezeSignal, latest_indicators) -> float:
-        """Calculate overall technical analysis score with enhanced factors."""
+        """
+        Calculate overall technical analysis score with balanced factors.
         
-        base_score = squeeze_signal.signal_strength
+        Score Components:
+        - Signal Strength (60% base): Core squeeze detection quality
+        - Trend Alignment (5-8%): Bullish/bearish trend confirmation
+        - Volume (3-8%): Volume confirmation levels
+        - RSI (2-5%): Momentum confirmation
+        - MACD (3-4%): Trend momentum confirmation  
+        - ADX (2-4%): Trend strength confirmation
+        - Position (2-5%): Price relative to recent highs/lows
+        - Squeeze Depth (2-6%): Tighter squeezes get bonus
+        - Expansion (4%): Range expansion confirmation
         
-        # Enhanced trend alignment scoring
+        Maximum theoretical score: ~1.0 (balanced to avoid score inflation)
+        """
+        
+        # Start with signal strength as the foundation (60% weight)
+        base_score = squeeze_signal.signal_strength * 0.6
+        
+        # Trend alignment scoring (reduced bonuses for better distribution)
         if squeeze_signal.trend_direction == TrendDirection.BULLISH:
-            base_score += 0.15  # Increased bullish bonus
+            base_score += 0.08  # Reduced from 0.15
         elif squeeze_signal.trend_direction == TrendDirection.BEARISH:
-            base_score += 0.08  # Slightly increased bearish bonus
+            base_score += 0.05  # Reduced from 0.08
         
-        # Enhanced volume confirmation
+        # Volume confirmation (reduced bonuses)
         if squeeze_signal.volume_ratio > 2.0:
-            base_score += 0.15  # High volume confirmation
+            base_score += 0.08  # High volume confirmation (reduced from 0.15)
         elif squeeze_signal.volume_ratio > 1.5:
-            base_score += 0.10  # Medium volume confirmation
+            base_score += 0.06  # Medium volume confirmation (reduced from 0.10)
         elif squeeze_signal.volume_ratio > 1.2:
-            base_score += 0.05  # Low volume confirmation
+            base_score += 0.03  # Low volume confirmation (reduced from 0.05)
         
-        # Additional momentum confirmation using RSI and MACD
+        # RSI momentum confirmation (reduced bonuses)
         if hasattr(latest_indicators, 'rsi') and latest_indicators.rsi is not None:
             rsi = latest_indicators.rsi
             if squeeze_signal.trend_direction == TrendDirection.BULLISH:
                 if 30 <= rsi <= 70:  # Not overbought, good for bullish signals
-                    base_score += 0.06
+                    base_score += 0.03  # Reduced from 0.06
                 elif rsi < 30:  # Oversold, potential bounce
-                    base_score += 0.10
+                    base_score += 0.05  # Reduced from 0.10
             else:  # Bearish
                 if 30 <= rsi <= 70:  # Not oversold, good for bearish signals
-                    base_score += 0.04
+                    base_score += 0.02  # Reduced from 0.04
                 elif rsi > 70:  # Overbought, potential decline
-                    base_score += 0.08
+                    base_score += 0.04  # Reduced from 0.08
         
-        # MACD confirmation
+        # MACD confirmation (reduced bonuses)
         if (hasattr(latest_indicators, 'macd') and latest_indicators.macd is not None and
             hasattr(latest_indicators, 'macd_signal') and latest_indicators.macd_signal is not None):
             macd_bullish = latest_indicators.macd > latest_indicators.macd_signal
             if squeeze_signal.trend_direction == TrendDirection.BULLISH and macd_bullish:
-                base_score += 0.08  # MACD confirms bullish trend
+                base_score += 0.04  # MACD confirms bullish trend (reduced from 0.08)
             elif squeeze_signal.trend_direction == TrendDirection.BEARISH and not macd_bullish:
-                base_score += 0.06  # MACD confirms bearish trend
+                base_score += 0.03  # MACD confirms bearish trend (reduced from 0.06)
         
-        # Trend strength confirmation using ADX
-        if hasattr(latest_indicators, 'adx') and latest_indicators.adx is not None:
+        # Enhanced DI/ADX confluence: promote signals with DI+ ≥ DI− and ADX rising; demote otherwise
+        if (hasattr(latest_indicators, 'adx') and latest_indicators.adx is not None and
+            hasattr(latest_indicators, 'di_plus') and latest_indicators.di_plus is not None and
+            hasattr(latest_indicators, 'di_minus') and latest_indicators.di_minus is not None):
+            
             adx = latest_indicators.adx
+            di_plus = latest_indicators.di_plus
+            di_minus = latest_indicators.di_minus
+            
+            # DI confluence check
+            di_bullish = di_plus > di_minus
+            di_bearish = di_minus > di_plus
+            
+            # Promote signals with proper DI/trend alignment
+            if squeeze_signal.trend_direction == TrendDirection.BULLISH and di_bullish:
+                if adx > 25:  # Strong trending environment
+                    base_score += 0.06  # Enhanced bonus for aligned signals
+                elif adx > 20:  # Moderate trending
+                    base_score += 0.04
+            elif squeeze_signal.trend_direction == TrendDirection.BEARISH and di_bearish:
+                if adx > 25:  # Strong trending environment
+                    base_score += 0.05  # Slightly lower bonus for bearish
+                elif adx > 20:  # Moderate trending
+                    base_score += 0.03
+            else:
+                # Demote signals with conflicting DI/trend direction
+                if adx > 20:  # Only penalize if there's actual trend strength
+                    base_score -= 0.03  # Penalty for misaligned signals
+            
+            # Additional ADX strength bonus (reduced from original)
             if adx > 25:  # Strong trend
-                base_score += 0.08
+                base_score += 0.02  # Base strength bonus
             elif adx > 20:  # Moderate trend
-                base_score += 0.04
+                base_score += 0.01  # Small strength bonus
         
-        # Improved position scoring with momentum consideration
+        # Position scoring (reduced bonuses/penalties)
         if squeeze_signal.price_vs_20d_high > -3:  # Very near highs
             if squeeze_signal.trend_direction == TrendDirection.BULLISH:
-                base_score += 0.10  # Breakout potential
+                base_score += 0.05  # Breakout potential (reduced from 0.10)
             else:
-                base_score -= 0.05  # Resistance concern
+                base_score -= 0.02  # Resistance concern (reduced from 0.05)
         elif squeeze_signal.price_vs_20d_low < 3:  # Very near lows
             if squeeze_signal.trend_direction == TrendDirection.BEARISH:
-                base_score -= 0.10  # Breakdown risk
+                base_score -= 0.05  # Breakdown risk (reduced from 0.10)
             else:
-                base_score += 0.05  # Bounce potential
+                base_score += 0.03  # Bounce potential (reduced from 0.05)
         
-        # Squeeze depth bonus (tighter squeeze = higher potential)
+        # Squeeze depth bonus (reduced bonuses for better distribution)
         if squeeze_signal.bb_width_percentile <= 2:
-            base_score += 0.12  # Very tight squeeze
+            base_score += 0.06  # Very tight squeeze (reduced from 0.12)
         elif squeeze_signal.bb_width_percentile <= 5:
-            base_score += 0.08  # Tight squeeze
+            base_score += 0.04  # Tight squeeze (reduced from 0.08)
         elif squeeze_signal.bb_width_percentile <= 10:
-            base_score += 0.04  # Moderate squeeze
+            base_score += 0.02  # Moderate squeeze (reduced from 0.04)
         
-        # Range expansion quality
+        # Range expansion quality (reduced bonus)
         if squeeze_signal.is_expansion and squeeze_signal.range_vs_atr > 1.5:
-            base_score += 0.08  # Strong expansion confirmation
+            base_score += 0.04  # Strong expansion confirmation (reduced from 0.08)
         
         return min(1.0, max(0.0, base_score))
+    
+    def _calculate_opportunity_rank(
+        self,
+        squeeze_signal: SqueezeSignal,
+        technical_score: float
+    ) -> OpportunityRank:
+        """
+        Calculate opportunity ranking based on multiple factors.
+        
+        Ranking Criteria:
+        S-Tier: Score ≥0.90 + Premium conditions (tight squeeze, strong volume, etc.)
+        A-Tier: Score ≥0.80 + Strong conditions
+        B-Tier: Score ≥0.70 + Good conditions  
+        C-Tier: Score ≥0.60 + Acceptable conditions
+        D-Tier: Score <0.60 or poor conditions
+        """
+        
+        # Base tier from technical score
+        if technical_score >= 0.90:
+            base_tier = OpportunityRank.S_TIER
+        elif technical_score >= 0.80:
+            base_tier = OpportunityRank.A_TIER
+        elif technical_score >= 0.70:
+            base_tier = OpportunityRank.B_TIER
+        elif technical_score >= 0.60:
+            base_tier = OpportunityRank.C_TIER
+        else:
+            base_tier = OpportunityRank.D_TIER
+        
+        # Premium condition checks for tier upgrades
+        premium_conditions = 0
+        strong_conditions = 0
+        
+        # Ultra-tight squeeze (most important factor)
+        if squeeze_signal.bb_width_percentile <= 2:
+            premium_conditions += 2  # Extra weight for ultra-tight
+        elif squeeze_signal.bb_width_percentile <= 5:
+            premium_conditions += 1
+        elif squeeze_signal.bb_width_percentile <= 10:
+            strong_conditions += 1
+        
+        # Exceptional volume confirmation
+        if squeeze_signal.volume_ratio >= 3.0:
+            premium_conditions += 1
+        elif squeeze_signal.volume_ratio >= 2.0:
+            strong_conditions += 1
+        elif squeeze_signal.volume_ratio >= 1.5:
+            strong_conditions += 1
+        
+        # Strong trend alignment
+        if squeeze_signal.trend_direction == TrendDirection.BULLISH:
+            strong_conditions += 1
+        elif squeeze_signal.trend_direction == TrendDirection.BEARISH:
+            strong_conditions += 1  # Bearish signals also valuable
+        
+        # High signal strength
+        if squeeze_signal.signal_strength >= 0.8:
+            premium_conditions += 1
+        elif squeeze_signal.signal_strength >= 0.7:
+            strong_conditions += 1
+        
+        # Expansion confirmation
+        if squeeze_signal.is_expansion and squeeze_signal.range_vs_atr > 1.5:
+            strong_conditions += 1
+        
+        # Apply tier adjustments based on conditions
+        final_tier = base_tier
+        
+        # Upgrade logic
+        if premium_conditions >= 3:  # Exceptional conditions
+            if base_tier == OpportunityRank.A_TIER:
+                final_tier = OpportunityRank.S_TIER
+            elif base_tier == OpportunityRank.B_TIER:
+                final_tier = OpportunityRank.A_TIER
+        elif premium_conditions >= 2 or strong_conditions >= 4:  # Strong conditions
+            if base_tier == OpportunityRank.B_TIER:
+                final_tier = OpportunityRank.A_TIER
+            elif base_tier == OpportunityRank.C_TIER:
+                final_tier = OpportunityRank.B_TIER
+        elif strong_conditions >= 2:  # Good conditions
+            if base_tier == OpportunityRank.C_TIER:
+                final_tier = OpportunityRank.B_TIER
+            elif base_tier == OpportunityRank.D_TIER:
+                final_tier = OpportunityRank.C_TIER
+        
+        # Downgrade for poor conditions
+        poor_conditions = 0
+        
+        # Very wide squeeze (low priority)
+        if squeeze_signal.bb_width_percentile >= 80:
+            poor_conditions += 1
+        
+        # Low volume
+        if squeeze_signal.volume_ratio < 0.8:
+            poor_conditions += 2
+        
+        # Very weak signal strength
+        if squeeze_signal.signal_strength < 0.3:
+            poor_conditions += 1
+        
+        # Apply downgrades
+        if poor_conditions >= 2:
+            tier_values = list(OpportunityRank)
+            current_index = tier_values.index(final_tier)
+            if current_index < len(tier_values) - 1:
+                final_tier = tier_values[current_index + 1]
+        
+        return final_tier
     
     def _generate_recommendation(
         self,
         squeeze_signal: SqueezeSignal,
         technical_score: float
     ) -> str:
-        """Generate trading recommendation with enhanced logic."""
+        """Generate trading recommendation with enhanced logic including RSI regime filters."""
         
-        # More aggressive thresholds for better signal generation
+        # Gap/high volatility day handling: downgrade if range_vs_atr > 3 (noisy/impulsive days)
+        if squeeze_signal.range_vs_atr > 3.0:
+            # High volatility day - downgrade to WATCH or require next-day confirmation
+            if technical_score >= 0.75:
+                return "WATCH"  # Downgrade from potential BUY/STRONG_BUY to avoid false breaks
+        
+        # RSI regime filter: auto-downgrade oversold/overbought conditions
+        if squeeze_signal.rsi is not None:
+            # Oversold condition (RSI < 30): downgrade to WATCH unless exceptional confluence
+            if squeeze_signal.rsi < 30:
+                # Only allow BUY/STRONG_BUY if we have exceptional volume and DI+ confirmation
+                exceptional_confluence = (
+                    squeeze_signal.volume_ratio > 2.0 and
+                    squeeze_signal.di_plus is not None and
+                    squeeze_signal.di_minus is not None and
+                    squeeze_signal.di_plus > squeeze_signal.di_minus and
+                    squeeze_signal.bb_width_percentile <= 5
+                )
+                if not exceptional_confluence and technical_score >= 0.75:
+                    return "WATCH"  # Downgrade from potential BUY/STRONG_BUY
+            
+            # Overbought condition (RSI > 80): prevent STRONG_BUY, prefer WATCH
+            elif squeeze_signal.rsi > 80:
+                if technical_score >= 0.75:
+                    return "WATCH"  # Avoid buying blow-offs
+        
+        # Standard recommendation logic with RSI filters applied
         if technical_score >= 0.75:
             if squeeze_signal.trend_direction == TrendDirection.BULLISH:
                 # Extra confirmation for bullish signals
                 if squeeze_signal.volume_ratio > 1.3 and squeeze_signal.bb_width_percentile <= 5:
-                    return "STRONG_BUY"
+                    # Check RSI isn't too overbought for STRONG_BUY
+                    if squeeze_signal.rsi is None or squeeze_signal.rsi <= 75:
+                        return "STRONG_BUY"
+                    else:
+                        return "BUY"
                 return "BUY"
             elif squeeze_signal.trend_direction == TrendDirection.BEARISH:
                 # More cautious with bearish signals
@@ -487,6 +698,17 @@ class AnalysisService:
             return 0.02  # 2% for weak signals
         else:
             return 0.01  # 1% for very weak signals
+    
+    def _check_bb_price_positioning(self, squeeze_signal: SqueezeSignal, indicators) -> bool:
+        """Check if price is positioned outside BB middle for expansion confirmation."""
+        if not indicators.bb_middle:
+            return True  # Default to true if BB middle not available
+        
+        # Price should be outside BB middle band for valid expansion
+        price_distance_from_middle = abs(squeeze_signal.close_price - indicators.bb_middle)
+        bb_middle_threshold = indicators.bb_middle * 0.005  # 0.5% threshold
+        
+        return price_distance_from_middle > bb_middle_threshold
     
     def _assess_data_quality(self, market_data: MarketData) -> float:
         """Assess the quality of the underlying data."""

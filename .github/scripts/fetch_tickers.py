@@ -28,6 +28,10 @@ import requests
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+# Import quality filtering utilities
+sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
+from utils.efficient_ticker_filter import EfficientTickerFilter, EfficientTickerMetrics
+
 # Load environment variables
 load_dotenv()
 
@@ -47,12 +51,19 @@ class TickerInfo:
 class TickerFetcher:
     """Main class for fetching and storing ticker data"""
     
-    def __init__(self, dry_run: bool = False, verbose: bool = False):
+    def __init__(self, dry_run: bool = False, verbose: bool = False, 
+                 enable_quality_filter: bool = True, us_only: bool = True,
+                 min_quality_score: float = 60.0):
         self.dry_run = dry_run
         self.verbose = verbose
+        self.enable_quality_filter = enable_quality_filter
+        self.us_only = us_only
+        self.min_quality_score = min_quality_score
+        
         self.setup_logging()
         self.setup_supabase()
         self.setup_api_keys()
+        self.setup_quality_filter()
         
     def setup_logging(self):
         """Configure logging"""
@@ -91,6 +102,22 @@ class TickerFetcher:
                 "No API keys found. Will use free data sources only."
             )
     
+    def setup_quality_filter(self):
+        """Setup quality filtering components"""
+        if self.enable_quality_filter:
+            self.quality_filter = EfficientTickerFilter(
+                alpha_vantage_key=self.alpha_vantage_key,
+                fmp_key=self.fmp_key
+            )
+                
+            self.logger.info(
+                f"Efficient quality filtering enabled: US-only={self.us_only}, "
+                f"min_score={self.min_quality_score}"
+            )
+        else:
+            self.quality_filter = None
+            self.logger.info("Quality filtering disabled")
+    
     def fetch_alpha_vantage_tickers(self) -> List[TickerInfo]:
         """Fetch tickers from Alpha Vantage API"""
         if not self.alpha_vantage_key:
@@ -110,8 +137,23 @@ class TickerFetcher:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
             
+            # Check for API errors (empty response, JSON error messages, etc.)
+            response_text = response.text.strip()
+            if not response_text or response_text == '{}' or len(response_text) < 100:
+                self.logger.warning(f"Alpha Vantage returned empty/invalid response: {response_text[:100]}")
+                return []
+            
+            # Check if response is JSON (error) instead of CSV
+            if response_text.startswith('{') and response_text.endswith('}'):
+                self.logger.warning("Alpha Vantage returned JSON error response instead of CSV data")
+                return []
+            
             # Parse CSV response
-            lines = response.text.strip().split('\n')
+            lines = response_text.split('\n')
+            if len(lines) < 2:
+                self.logger.warning("Alpha Vantage response has insufficient data")
+                return []
+                
             headers = lines[0].split(',')
             
             for line in lines[1:]:
@@ -250,6 +292,86 @@ class TickerFetcher:
         
         return unique_tickers
     
+    def apply_quality_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+        """Apply efficient quality filters to ticker list"""
+        if not self.enable_quality_filter or not self.quality_filter:
+            self.logger.info("Quality filtering disabled, returning all tickers")
+            return tickers
+        
+        self.logger.info(f"Applying efficient quality filters to {len(tickers)} tickers")
+        
+        # Convert TickerInfo to dict format for efficient filtering
+        ticker_dicts = []
+        for ticker in tickers:
+            ticker_dict = {
+                'symbol': ticker.symbol,
+                'name': ticker.name,
+                'exchange': ticker.exchange,
+                'country': ticker.country,
+                'currency': ticker.currency,
+                'sector': ticker.sector,
+                'industry': ticker.industry,
+                'market_cap': ticker.market_cap,
+                'ticker_type': ticker.ticker_type
+            }
+            ticker_dicts.append(ticker_dict)
+        
+        try:
+            # Apply efficient filtering (includes US-only filtering internally)
+            high_quality_symbols, quality_metrics = self.quality_filter.filter_high_quality_tickers(
+                ticker_dicts,
+                min_quality_score=self.min_quality_score,
+                max_tickers=2000  # Increased limit for better coverage
+            )
+            
+            if not high_quality_symbols:
+                self.logger.warning("No symbols passed quality filtering")
+                return []
+            
+            # Convert back to TickerInfo objects
+            filtered_tickers = []
+            symbol_set = set(high_quality_symbols)
+            
+            for ticker in tickers:
+                if ticker.symbol in symbol_set:
+                    # Update with metrics from efficient filter
+                    for metrics in quality_metrics:
+                        if metrics.symbol == ticker.symbol:
+                            if metrics.market_cap:
+                                ticker.market_cap = int(metrics.market_cap)
+                            if metrics.exchange:
+                                ticker.exchange = metrics.exchange
+                            if metrics.sector:
+                                ticker.sector = metrics.sector
+                            # Set country to US for filtered tickers
+                            ticker.country = 'US'
+                            break
+                    
+                    filtered_tickers.append(ticker)
+            
+            # Generate summary
+            summary = self.quality_filter.get_filtering_summary(high_quality_symbols, quality_metrics)
+            
+            self.logger.info(
+                f"Efficient filtering complete: {len(filtered_tickers)} high-quality "
+                f"tickers selected from {len(tickers)} total "
+                f"({len(filtered_tickers)/len(tickers)*100:.1f}% pass rate)"
+            )
+            
+            if summary:
+                self.logger.info(
+                    f"Quality summary: avg_score={summary.get('avg_quality_score', 0):.1f}, "
+                    f"sp500_count={summary.get('sp500_count', 0)}, "
+                    f"avg_price=${summary.get('price_range', {}).get('avg', 0):.2f}"
+                )
+            
+            return filtered_tickers
+            
+        except Exception as e:
+            self.logger.error(f"Error during efficient quality filtering: {e}")
+            self.logger.info("Falling back to unfiltered ticker list")
+            return tickers
+    
     def store_tickers(self, tickers: List[TickerInfo]) -> bool:
         """Store tickers in Supabase database"""
         if self.dry_run:
@@ -335,8 +457,15 @@ class TickerFetcher:
         # Deduplicate
         unique_tickers = self.deduplicate_tickers(all_tickers)
         
+        # Apply quality filters
+        filtered_tickers = self.apply_quality_filters(unique_tickers)
+        
+        if not filtered_tickers:
+            self.logger.error("No tickers remaining after quality filtering")
+            return False
+        
         # Store in database
-        success = self.store_tickers(unique_tickers)
+        success = self.store_tickers(filtered_tickers)
         
         if success:
             self.logger.info("Ticker fetch process completed successfully")
@@ -360,11 +489,33 @@ def main():
         action='store_true',
         help='Enable verbose logging'
     )
+    parser.add_argument(
+        '--disable-quality-filter',
+        action='store_true',
+        help='Disable quality filtering (fetch all tickers)'
+    )
+    parser.add_argument(
+        '--include-global',
+        action='store_true',
+        help='Include non-US tickers (default: US-only)'
+    )
+    parser.add_argument(
+        '--min-quality-score',
+        type=float,
+        default=60.0,
+        help='Minimum quality score for filtering (0-100, default: 60.0)'
+    )
     
     args = parser.parse_args()
     
     try:
-        fetcher = TickerFetcher(dry_run=args.dry_run, verbose=args.verbose)
+        fetcher = TickerFetcher(
+            dry_run=args.dry_run, 
+            verbose=args.verbose,
+            enable_quality_filter=not args.disable_quality_filter,
+            us_only=not args.include_global,
+            min_quality_score=args.min_quality_score
+        )
         success = fetcher.run()
         sys.exit(0 if success else 1)
         

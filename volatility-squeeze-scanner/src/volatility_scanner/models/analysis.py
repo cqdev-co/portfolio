@@ -1,6 +1,6 @@
 """Analysis models and schemas for volatility squeeze detection."""
 
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 from typing import Optional, Dict, Any
 
@@ -19,6 +19,22 @@ class SignalType(str, Enum):
     CONTINUATION = "continuation"
     REVERSAL = "reversal" 
     CHOP = "chop"
+
+
+class SignalStatus(str, Enum):
+    """Signal continuity status."""
+    NEW = "NEW"
+    CONTINUING = "CONTINUING"
+    ENDED = "ENDED"
+
+
+class OpportunityRank(str, Enum):
+    """Opportunity ranking classification."""
+    S_TIER = "S"      # Exceptional (≥0.90, premium conditions)
+    A_TIER = "A"      # Excellent (≥0.80, strong conditions)
+    B_TIER = "B"      # Good (≥0.70, solid conditions)
+    C_TIER = "C"      # Fair (≥0.60, acceptable conditions)
+    D_TIER = "D"      # Poor (<0.60, weak conditions)
 
 
 class SqueezeSignal(BaseModel):
@@ -77,6 +93,14 @@ class SqueezeSignal(BaseModel):
         None, description="20-day average volume"
     )
     
+    # Liquidity metrics
+    dollar_volume: Optional[float] = Field(
+        None, description="Daily dollar volume (price * volume)"
+    )
+    avg_dollar_volume: Optional[float] = Field(
+        None, description="20-day average dollar volume"
+    )
+    
     # Price context (OHLC)
     open_price: float = Field(description="Opening price")
     high_price: float = Field(description="High price")
@@ -103,6 +127,24 @@ class SqueezeSignal(BaseModel):
     adx: Optional[float] = Field(None, description="ADX (trend strength)")
     di_plus: Optional[float] = Field(None, description="DI+ indicator")
     di_minus: Optional[float] = Field(None, description="DI- indicator")
+    
+    # Signal continuity tracking
+    signal_status: SignalStatus = Field(
+        default=SignalStatus.NEW,
+        description="Signal continuity status"
+    )
+    days_in_squeeze: int = Field(
+        default=1,
+        description="Number of consecutive days in squeeze"
+    )
+    first_detected_date: Optional[date] = Field(
+        None,
+        description="Date when squeeze was first detected"
+    )
+    last_active_date: Optional[date] = Field(
+        None,
+        description="Most recent date signal was active"
+    )
 
 
 class AIAnalysis(BaseModel):
@@ -169,6 +211,9 @@ class AnalysisResult(BaseModel):
         le=1.0,
         description="Combined technical + AI score (0-1)"
     )
+    opportunity_rank: OpportunityRank = Field(
+        description="Opportunity ranking tier (S/A/B/C/D)"
+    )
     recommendation: str = Field(
         description="Overall recommendation (BUY/SELL/HOLD/WAIT)"
     )
@@ -202,34 +247,63 @@ class AnalysisResult(BaseModel):
     )
     
     def is_actionable(self) -> bool:
-        """Check if the signal is actionable based on enhanced thresholds."""
-        # More aggressive thresholds for better signal generation
+        """Check if the signal is actionable based on enhanced thresholds with stricter filters."""
+        # Base quality requirements
         base_actionable = (
-            self.overall_score >= 0.6 and  # Lowered from 0.7
-            self.squeeze_signal.signal_strength >= 0.4  # Lowered from 0.6
+            self.overall_score >= 0.6 and
+            self.squeeze_signal.signal_strength >= 0.4
         )
         
-        # Additional quality filters
         if not base_actionable:
             return False
         
-        # Strong signals are always actionable
+        # Liquidity guardrails: enforce minimum dollar volume and price thresholds
+        liquidity_check = (
+            self.squeeze_signal.close_price >= 3.0 and  # Min $3 price
+            (self.squeeze_signal.avg_dollar_volume is None or 
+             self.squeeze_signal.avg_dollar_volume >= 2_000_000)  # Min $2M avg dollar volume
+        )
+        
+        # For lower liquidity names, only allow exceptional confluence
+        if not liquidity_check:
+            exceptional_confluence = (
+                self.overall_score >= 0.85 and
+                self.squeeze_signal.bb_width_percentile <= 5 and
+                self.squeeze_signal.volume_ratio >= 2.0 and
+                self.squeeze_signal.signal_strength >= 0.7
+            )
+            if not exceptional_confluence:
+                return False
+        
+        # Tighter actionable gates as per feedback
+        # For squeeze signals: require bb_width_percentile ≤ 10, ADX ≥ 18-20, range_vs_atr ≤ 2.5
+        if self.squeeze_signal.is_squeeze:
+            squeeze_quality_check = (
+                self.squeeze_signal.bb_width_percentile <= 10 and
+                (self.squeeze_signal.adx is None or self.squeeze_signal.adx >= 18) and
+                self.squeeze_signal.range_vs_atr <= 2.5
+            )
+            if not squeeze_quality_check:
+                return False
+        
+        # Strong signals are actionable if they pass the above filters
         if self.overall_score >= 0.8:
             return True
         
         # Medium signals need additional confirmation
         if self.overall_score >= 0.65:
-            # Require volume confirmation or tight squeeze
+            # Require volume confirmation AND tight squeeze for medium signals
             return (
-                self.squeeze_signal.volume_ratio >= 1.2 or
-                self.squeeze_signal.bb_width_percentile <= 10 or
-                (self.recommendation in ["BUY", "STRONG_BUY", "SELL"])
+                self.squeeze_signal.volume_ratio >= 1.2 and
+                self.squeeze_signal.bb_width_percentile <= 10 and
+                self.recommendation in ["BUY", "STRONG_BUY", "SELL"]
             )
         
-        # Lower quality signals need strong confirmation
+        # Lower quality signals need exceptional confirmation
         return (
             self.squeeze_signal.volume_ratio >= 1.5 and
             self.squeeze_signal.bb_width_percentile <= 5 and
+            self.squeeze_signal.range_vs_atr <= 2.0 and
             self.recommendation in ["BUY", "STRONG_BUY"]
         )
     

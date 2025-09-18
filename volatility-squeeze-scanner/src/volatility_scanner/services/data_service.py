@@ -1,6 +1,7 @@
 """Data service for market data retrieval and management."""
 
 import asyncio
+import random
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import logging
@@ -23,6 +24,86 @@ class DataService:
         self.settings = settings
         self.cache: Dict[str, MarketData] = {}
         self.cache_timestamps: Dict[str, datetime] = {}
+        self._last_request_time: Optional[datetime] = None
+        self._request_lock = asyncio.Lock()
+    
+    async def _respect_rate_limit(self) -> None:
+        """Ensure we respect rate limits by adding delays between requests."""
+        async with self._request_lock:
+            if self._last_request_time is not None:
+                time_since_last = (datetime.now() - self._last_request_time).total_seconds()
+                if time_since_last < self.settings.request_delay_seconds:
+                    delay = self.settings.request_delay_seconds - time_since_last
+                    # Add small random jitter to avoid thundering herd
+                    jitter = random.uniform(0, 0.1)
+                    await asyncio.sleep(delay + jitter)
+            
+            self._last_request_time = datetime.now()
+    
+    async def _retry_with_backoff(self, func, *args, **kwargs):
+        """
+        Execute a function with exponential backoff retry logic.
+        
+        Args:
+            func: Function to execute
+            *args: Function arguments
+            **kwargs: Function keyword arguments
+            
+        Returns:
+            Function result
+            
+        Raises:
+            DataError: If all retries are exhausted
+        """
+        last_exception = None
+        
+        for attempt in range(self.settings.max_retries + 1):
+            try:
+                # Respect rate limits before each attempt
+                await self._respect_rate_limit()
+                
+                # Execute the function
+                return await func(*args, **kwargs) if asyncio.iscoroutinefunction(func) else func(*args, **kwargs)
+                
+            except Exception as e:
+                last_exception = e
+                error_msg = str(e).lower()
+                
+                # Check if this is a rate limit error
+                if any(term in error_msg for term in [
+                    'rate limit', 'too many requests', 'throttle', 
+                    '429', 'quota exceeded', 'limit exceeded'
+                ]):
+                    if attempt < self.settings.max_retries:
+                        # Calculate exponential backoff with jitter
+                        delay = (self.settings.retry_delay_base * 
+                                (self.settings.rate_limit_backoff_factor ** attempt))
+                        jitter = random.uniform(0.1, 0.3) * delay
+                        total_delay = delay + jitter
+                        
+                        logger.warning(
+                            f"Rate limited on attempt {attempt + 1}, "
+                            f"retrying in {total_delay:.2f}s: {e}"
+                        )
+                        await asyncio.sleep(total_delay)
+                        continue
+                
+                # For non-rate-limit errors, fail fast
+                if attempt == 0:
+                    raise e
+                
+                # For other errors, use shorter backoff
+                if attempt < self.settings.max_retries:
+                    delay = self.settings.retry_delay_base * (1.5 ** attempt)
+                    logger.warning(f"Retrying after error on attempt {attempt + 1}: {e}")
+                    await asyncio.sleep(delay)
+                    continue
+                
+                # All retries exhausted
+                break
+        
+        # If we get here, all retries failed
+        raise DataError(f"Failed after {self.settings.max_retries + 1} attempts: {last_exception}")
         
     async def get_market_data(
         self,
@@ -57,15 +138,19 @@ class DataService:
             return self.cache[cache_key]
         
         try:
-            # Fetch data from yfinance
+            # Fetch data from yfinance with retry logic
             logger.info(f"Fetching market data for {symbol} (period: {period})")
-            ticker = yf.Ticker(symbol)
             
-            # Get historical data with proper date handling
-            if start_date and end_date:
-                hist_data = ticker.history(start=start_date, end=end_date)
-            else:
-                hist_data = ticker.history(period=period)
+            async def fetch_data():
+                ticker = yf.Ticker(symbol)
+                
+                # Get historical data with proper date handling
+                if start_date and end_date:
+                    return ticker.history(start=start_date, end=end_date)
+                else:
+                    return ticker.history(period=period)
+            
+            hist_data = await self._retry_with_backoff(fetch_data)
                 
             if hist_data.empty:
                 raise DataError(f"No data available for symbol {symbol}")
@@ -73,10 +158,14 @@ class DataService:
             # Clean the data to fix OHLC violations
             hist_data = self._clean_ohlc_data(hist_data, symbol)
             
-            # Get ticker info
+            # Get ticker info with retry logic
             info = {}
             try:
-                info = ticker.info
+                async def fetch_info():
+                    ticker = yf.Ticker(symbol)
+                    return ticker.info
+                
+                info = await self._retry_with_backoff(fetch_info)
             except Exception as e:
                 logger.warning(f"Could not fetch ticker info for {symbol}: {e}")
             
@@ -256,9 +345,9 @@ class DataService:
                 )
                 all_data.update(chunk_data)
                 
-                # Small delay between chunks to be respectful to APIs
+                # Delay between chunks to be respectful to APIs
                 if chunk_num < total_chunks:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(self.settings.chunk_delay_seconds)
                     
             except Exception as e:
                 logger.error(f"Error processing chunk {chunk_num}: {e}")
@@ -358,16 +447,19 @@ class DataService:
             True if symbol is valid, False otherwise
         """
         try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
+            async def validate():
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                
+                # Check if we got valid info
+                if not info or 'regularMarketPrice' not in info:
+                    return False
+                
+                # Try to get a small amount of recent data
+                hist = ticker.history(period="5d")
+                return not hist.empty
             
-            # Check if we got valid info
-            if not info or 'regularMarketPrice' not in info:
-                return False
-            
-            # Try to get a small amount of recent data
-            hist = ticker.history(period="5d")
-            return not hist.empty
+            return await self._retry_with_backoff(validate)
             
         except Exception as e:
             logger.warning(f"Symbol validation failed for {symbol}: {e}")
@@ -387,11 +479,16 @@ class DataService:
             DataError: If symbol info cannot be retrieved
         """
         try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
+            async def fetch_symbol_info():
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                
+                if not info:
+                    raise DataError(f"No information available for {symbol}")
+                
+                return info
             
-            if not info:
-                raise DataError(f"No information available for {symbol}")
+            info = await self._retry_with_backoff(fetch_symbol_info)
             
             # Extract relevant information
             return {

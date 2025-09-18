@@ -39,6 +39,7 @@ try:
         get_sp500_tickers,
         get_tech_tickers
     )
+    TICKER_UTILS_AVAILABLE = True
 except ImportError as e:
     error_msg = (
         f"Failed to import ticker utilities from {lib_path}: {e}. "
@@ -46,7 +47,19 @@ except ImportError as e:
         f"Current path calculation: {current_file} -> {monorepo_root} -> {lib_path}"
     )
     logging.error(error_msg)
-    raise ImportError(error_msg) from e
+    TICKER_UTILS_AVAILABLE = False
+    
+    # Create dummy functions to prevent further import errors
+    def get_all_tickers(*args, **kwargs): return []
+    def get_tickers_by_exchange(*args, **kwargs): return []
+    def get_tickers_by_country(*args, **kwargs): return []
+    def get_tickers_by_sector(*args, **kwargs): return []
+    def search_tickers(*args, **kwargs): return []
+    def get_ticker_count(*args, **kwargs): return 0
+    def get_exchanges(*args, **kwargs): return []
+    def get_sectors(*args, **kwargs): return []
+    def get_sp500_tickers(*args, **kwargs): return []
+    def get_tech_tickers(*args, **kwargs): return []
 
 from volatility_scanner.core.exceptions import DataError
 from volatility_scanner.config.settings import Settings
@@ -63,6 +76,14 @@ class TickerService:
         self._cache: Dict[str, Any] = {}
         self._cache_timestamp: Optional[datetime] = None
         self._cache_ttl = 3600  # 1 hour cache
+        
+        # Check if ticker utilities are available
+        if not TICKER_UTILS_AVAILABLE:
+            raise RuntimeError(
+                "Ticker utilities are not available. This could be due to missing "
+                "Supabase credentials or import errors. The service will fall back "
+                "to basic symbol lists."
+            )
         
     def _is_cache_valid(self) -> bool:
         """Check if the ticker cache is still valid."""
