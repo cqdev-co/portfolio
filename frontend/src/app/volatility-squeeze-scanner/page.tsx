@@ -477,7 +477,6 @@ export default function VolatilitySqueezeScanner() {
                       <span>{selectedSignal.symbol}</span>
                       <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
                     </button>
-                    <h2 className="text-base font-semibold">{selectedSignal.symbol}</h2>
                     {selectedSignal.is_actionable && (
                       <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     )}

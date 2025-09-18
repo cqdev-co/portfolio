@@ -53,6 +53,8 @@ src/app/
 ├── opengraph-image.tsx    # Main site OG image (serene-gold)
 ├── about/
 │   └── opengraph-image.tsx # About page OG image (serene-gold)
+├── volatility-squeeze-scanner/
+│   └── opengraph-image.tsx # VSS page OG image (serene-gold)
 └── blog/[slug]/
     └── opengraph-image.tsx # Blog post OG images (default)
 ```
