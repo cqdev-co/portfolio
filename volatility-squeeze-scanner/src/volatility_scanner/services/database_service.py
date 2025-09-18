@@ -65,13 +65,14 @@ class DatabaseService:
     
     async def store_signal(self, analysis_result: AnalysisResult) -> Optional[str]:
         """
-        Store a single volatility squeeze signal in the database.
+        Store or update a single volatility squeeze signal in the database.
+        Uses upsert logic to prevent duplicates for the same symbol on the same date.
         
         Args:
             analysis_result: The analysis result to store
             
         Returns:
-            The ID of the stored signal, or None if failed
+            The ID of the stored/updated signal, or None if failed
         """
         if not self.is_available():
             logger.warning("Database service not available")
@@ -80,11 +81,15 @@ class DatabaseService:
         try:
             signal_data = self._prepare_signal_data(analysis_result)
             
-            response = self.client.table('volatility_squeeze_signals').insert(signal_data).execute()
+            # Use upsert to prevent duplicates (INSERT or UPDATE)
+            response = self.client.table('volatility_squeeze_signals').upsert(
+                signal_data,
+                on_conflict='symbol,scan_date'  # Match on symbol and scan_date
+            ).execute()
             
             if response.data:
                 signal_id = response.data[0]['id']
-                logger.debug(f"Stored signal for {analysis_result.symbol}: {signal_id}")
+                logger.debug(f"Stored/updated signal for {analysis_result.symbol}: {signal_id}")
                 return signal_id
             else:
                 logger.error(f"Failed to store signal for {analysis_result.symbol}")
@@ -138,11 +143,14 @@ class DatabaseService:
                     for result in batch
                 ]
                 
-                # Insert batch
-                response = self.client.table('volatility_squeeze_signals').insert(signals_data).execute()
+                # Use upsert for batch operations to prevent duplicates
+                response = self.client.table('volatility_squeeze_signals').upsert(
+                    signals_data,
+                    on_conflict='symbol,scan_date'  # Match on symbol and scan_date
+                ).execute()
                 
                 stored_count = len(response.data) if response.data else 0
-                logger.debug(f"✅ Batch {batch_num}: Stored {stored_count}/{len(batch)} signals")
+                logger.debug(f"✅ Batch {batch_num}: Stored/updated {stored_count}/{len(batch)} signals")
                 
                 return stored_count
                 
@@ -186,6 +194,7 @@ class DatabaseService:
         # Convert to database format
         data = {
             'symbol': analysis_result.symbol,
+            'scan_date': date.today().isoformat(),  # Add scan_date for unique constraint
             'scan_timestamp': datetime.now().isoformat(),
             
             # Price data
@@ -344,3 +353,122 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error retrieving signals for {target_date}: {e}")
             return []
+    
+    async def cleanup_duplicate_signals(self, target_date: date = None) -> int:
+        """
+        Clean up duplicate signals for a specific date.
+        Keeps the most recent record for each symbol/date combination.
+        
+        Args:
+            target_date: Date to clean up (defaults to today)
+            
+        Returns:
+            Number of duplicate records removed
+        """
+        if not self.is_available():
+            logger.warning("Database service not available")
+            return 0
+        
+        if target_date is None:
+            target_date = date.today()
+        
+        try:
+            logger.info(f"Cleaning up duplicate signals for {target_date}")
+            
+            # Get all signals for the target date, ordered by creation time
+            response = self.client.table('volatility_squeeze_signals').select(
+                'id, symbol, scan_date, created_at'
+            ).eq(
+                'scan_date', target_date.isoformat()
+            ).order('symbol', desc=False).order('created_at', desc=True).execute()
+            
+            if not response.data:
+                logger.info(f"No signals found for {target_date}")
+                return 0
+            
+            signals = response.data
+            
+            # Group by symbol and identify duplicates
+            seen_symbols = set()
+            duplicates_to_remove = []
+            
+            for signal in signals:
+                symbol = signal['symbol']
+                if symbol in seen_symbols:
+                    # This is a duplicate - mark for removal
+                    duplicates_to_remove.append(signal['id'])
+                else:
+                    seen_symbols.add(symbol)
+            
+            if not duplicates_to_remove:
+                logger.info(f"No duplicate signals found for {target_date}")
+                return 0
+            
+            # Remove duplicates in batches
+            batch_size = 50
+            removed_count = 0
+            
+            for i in range(0, len(duplicates_to_remove), batch_size):
+                batch_ids = duplicates_to_remove[i:i + batch_size]
+                
+                try:
+                    delete_response = self.client.table('volatility_squeeze_signals').delete().in_(
+                        'id', batch_ids
+                    ).execute()
+                    
+                    batch_removed = len(delete_response.data) if delete_response.data else 0
+                    removed_count += batch_removed
+                    
+                    logger.debug(f"Removed {batch_removed} duplicate signals in batch {i//batch_size + 1}")
+                    
+                except Exception as e:
+                    logger.error(f"Error removing duplicate batch: {e}")
+            
+            logger.info(f"✅ Removed {removed_count} duplicate signals for {target_date}")
+            return removed_count
+            
+        except Exception as e:
+            logger.error(f"Error during duplicate cleanup: {e}")
+            return 0
+    
+    async def get_duplicate_signals_count(self, target_date: date = None) -> Dict[str, int]:
+        """
+        Get count of duplicate signals for analysis.
+        
+        Args:
+            target_date: Date to analyze (defaults to today)
+            
+        Returns:
+            Dictionary with duplicate statistics
+        """
+        if not self.is_available():
+            return {}
+        
+        if target_date is None:
+            target_date = date.today()
+        
+        try:
+            # Get signal counts by symbol for the target date
+            response = self.client.table('volatility_squeeze_signals').select(
+                'symbol'
+            ).eq(
+                'scan_date', target_date.isoformat()
+            ).execute()
+            
+            if not response.data:
+                return {'total_signals': 0, 'unique_symbols': 0, 'duplicates': 0}
+            
+            symbols = [signal['symbol'] for signal in response.data]
+            unique_symbols = set(symbols)
+            
+            stats = {
+                'total_signals': len(symbols),
+                'unique_symbols': len(unique_symbols),
+                'duplicates': len(symbols) - len(unique_symbols)
+            }
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting duplicate statistics: {e}")
+            return {}

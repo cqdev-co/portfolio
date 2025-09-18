@@ -48,7 +48,7 @@ export interface VolatilitySqueezeSignalDB {
   market_volatility: string | number | null;
   ai_analysis: string | null;
   ai_confidence: string | number | null;
-  signal_status: "NEW" | "ACTIVE" | "EXPIRED" | "TRIGGERED" | null;
+  signal_status: "NEW" | "CONTINUING" | "ENDED" | null;
   days_in_squeeze: number | null;
   first_detected_date: string | null;
   last_active_date: string | null;

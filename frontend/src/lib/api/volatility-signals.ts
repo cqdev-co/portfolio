@@ -51,6 +51,15 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
       query = query.ilike('symbol', `%${searchTerm}%`);
     }
 
+    // Apply signal status filtering
+    if (filters.signal_status?.length) {
+      // If explicit signal status filter is provided, use it
+      query = query.in('signal_status', filters.signal_status);
+    } else {
+      // By default, filter out ENDED signals (only show active signals)
+      query = query.neq('signal_status', 'ENDED');
+    }
+
     // Apply filters
     if (filters.recommendation?.length) {
       query = query.in('recommendation', filters.recommendation);
@@ -103,6 +112,15 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
           if (searchTerm) {
             fallbackQuery = fallbackQuery.ilike('symbol', `%${searchTerm}%`);
           }
+          
+          // Apply signal status filtering
+          if (filters.signal_status?.length) {
+            fallbackQuery = fallbackQuery.in('signal_status', filters.signal_status);
+          } else {
+            // By default, filter out ENDED signals
+            fallbackQuery = fallbackQuery.neq('signal_status', 'ENDED');
+          }
+          
           if (filters.recommendation?.length) {
             fallbackQuery = fallbackQuery.in('recommendation', filters.recommendation);
           }
@@ -172,6 +190,7 @@ export async function fetchLatestSignals(limit: number = 50): Promise<SignalResp
       .from('signal_analysis')
       .select('*', { count: 'exact' })
       .eq('scan_date', today)
+      .neq('signal_status', 'ENDED')
       .order('overall_score', { ascending: false })
       .limit(limit);
 
@@ -204,17 +223,19 @@ export async function fetchLatestSignals(limit: number = 50): Promise<SignalResp
  */
 export async function fetchSignalStats(): Promise<SignalStats | null> {
   try {
-    // Get all signals to calculate stats (not just today's)
+    // Get all active signals to calculate stats (exclude ENDED signals)
     const { data: signals, error: signalsError } = await supabase
       .from('signal_analysis')
-      .select('is_actionable, trend_direction, overall_score, scan_date');
+      .select('is_actionable, trend_direction, overall_score, scan_date')
+      .neq('signal_status', 'ENDED');
 
     if (signalsError) {
       console.error('Error fetching signal stats:', signalsError);
       // If the view doesn't exist, try the main table
       const { data: fallbackSignals, error: fallbackError } = await supabase
         .from('volatility_squeeze_signals')
-        .select('is_actionable, trend_direction, overall_score, scan_date');
+        .select('is_actionable, trend_direction, overall_score, scan_date')
+        .neq('signal_status', 'ENDED');
       
       if (fallbackError) {
         console.error('Error fetching fallback signal stats:', fallbackError);

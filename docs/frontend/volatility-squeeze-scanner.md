@@ -10,6 +10,7 @@ The Volatility Squeeze Scanner is a professional, modern web interface for displ
 - **Minimalistic Table View**: Clean display showing only Symbol, Price, Score, and Recommendation
 - **Detailed Sidebar**: Comprehensive signal analysis in a sliding sidebar panel
 - **Advanced Filtering**: Filter by recommendation, squeeze category, signal quality, and more
+- **Signal Status Filtering**: Automatically excludes ENDED signals to show only active squeeze opportunities
 - **Dynamic Sorting**: Sort by any column with visual indicators
 - **Search Functionality**: Quick symbol search with real-time filtering
 - **Interactive Navigation**: Click any row to view detailed analysis
@@ -29,6 +30,7 @@ The Volatility Squeeze Scanner is a professional, modern web interface for displ
 - **Detailed Analysis**: Comprehensive sidebar with all technical data
 - **Smooth Animations**: Slide-in/out transitions for sidebar
 - **Keyboard Navigation**: Escape key to close sidebar, click outside to dismiss
+- **External Integration**: Clickable ticker symbols redirect to Yahoo Finance for detailed charts and fundamentals
 - **Dark/Light Mode**: Seamless theme switching support
 - **Loading States**: Smooth loading animations and error handling
 - **Interactive Elements**: Hover effects and smooth transitions
@@ -63,6 +65,7 @@ Comprehensive TypeScript interface defining all signal properties:
 - **Filtering Logic**: Server-side filtering with real-time updates
 - **Sorting Logic**: Dynamic sorting with direction indicators
 - **Sidebar Management**: Modal-style detailed view with smooth animations
+- **External Integration**: Yahoo Finance URL generation with `getYahooFinanceUrl()` helper function
 - **Keyboard Handling**: Escape key support and click-outside-to-close
 
 #### UI Components
@@ -70,6 +73,7 @@ Comprehensive TypeScript interface defining all signal properties:
 - **Search Bar**: Real-time symbol filtering
 - **Minimalistic Table**: Clean 4-column layout (Symbol, Price, Score, Recommendation)
 - **Detail Sidebar**: Comprehensive analysis panel with organized sections
+- **Clickable Ticker**: Interactive ticker symbol with external link icon and hover effects
 - **Badge System**: Color-coded status indicators
 - **Overlay System**: Modal backdrop with blur effect
 
@@ -120,8 +124,47 @@ Each signal contains:
 - **Technical Indicators**: Bollinger Bands, Keltner Channels, ATR, EMAs
 - **Analysis**: Signal strength, technical score, overall score (0-1 scale)
 - **Recommendations**: BUY/SELL/WATCH/HOLD with stop loss calculations
+- **Signal Status**: NEW, CONTINUING, or ENDED (tracks signal lifecycle)
 - **Computed Fields**: Days since scan, squeeze categories, signal quality tiers
 - **Real-time Metadata**: Creation/update timestamps, actionability flags
+
+### Signal Status Filtering
+
+The frontend implements intelligent signal status filtering to ensure users only see relevant, active squeeze opportunities:
+
+#### Automatic Filtering
+- **Default Behavior**: All API calls automatically exclude signals with `signal_status = 'ENDED'`
+- **Active Signals Only**: Only displays NEW and CONTINUING squeeze signals
+- **Real-time Updates**: As signals transition to ENDED status, they disappear from the interface
+- **Statistics Accuracy**: Dashboard statistics only count active signals
+
+#### Signal Status Values
+- **NEW**: Recently detected squeeze signal (first occurrence)
+- **CONTINUING**: Ongoing squeeze signal from previous scans (multi-day squeeze)
+- **ENDED**: Squeeze condition no longer met (filtered out by default)
+
+#### Advanced Filtering
+- **Explicit Control**: Developers can override default filtering by providing `signal_status` filter
+- **Flexible API**: Supports filtering for specific status combinations when needed
+- **Fallback Support**: Both main table and view queries include status filtering
+
+#### Implementation Details
+```typescript
+// Default behavior - excludes ENDED signals
+fetchVolatilitySignals()
+
+// Explicit filtering - show only NEW signals
+fetchVolatilitySignals({
+  filters: { signal_status: ['NEW'] }
+})
+
+// Show all signals including ENDED
+fetchVolatilitySignals({
+  filters: { signal_status: ['NEW', 'CONTINUING', 'ENDED'] }
+})
+```
+
+This ensures the volatility squeeze scanner always shows actionable, current opportunities while maintaining the flexibility to analyze historical signal patterns when needed.
 
 ### Environment Configuration
 Required environment variables in `.env.local`:
@@ -189,6 +232,7 @@ Each section is visually separated with clean horizontal dividers for better org
 - **Escape Key**: Closes sidebar instantly
 - **Click Overlay**: Closes sidebar by clicking outside
 - **Close Button**: X button in header for explicit closing
+- **Clickable Ticker**: Click ticker symbol in sidebar header to open Yahoo Finance in new tab
 - **Responsive**: Full-width on mobile, fixed 384px width on desktop
 
 #### Visual Design

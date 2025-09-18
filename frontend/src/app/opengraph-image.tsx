@@ -10,5 +10,6 @@ export default async function OGImage() {
     title: DATA.name,
     subtitle: DATA.title,
     logoText: DATA.initials,
+    backgroundStyle: 'serene-gold',
   });
 }

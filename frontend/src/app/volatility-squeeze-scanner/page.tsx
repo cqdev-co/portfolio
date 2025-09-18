@@ -17,7 +17,7 @@ import { Card } from "@/components/ui/card";
 import type { VolatilitySqueezeSignal, SignalFilters, SignalSortConfig } from "@/lib/types/signals";
 import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
 import { cn } from "@/lib/utils";
-import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw, ExternalLink } from "lucide-react";
 
 // Helper function to safely parse numeric values
 function safeParseNumber(value: string | number | null): number {
@@ -25,6 +25,11 @@ function safeParseNumber(value: string | number | null): number {
   if (typeof value === 'number') return value;
   const parsed = parseFloat(value);
   return isNaN(parsed) ? 0 : parsed;
+}
+
+// Helper function to generate Yahoo Finance URL
+function getYahooFinanceUrl(symbol: string): string {
+  return `https://finance.yahoo.com/quote/${symbol}`;
 }
 
 function getRecommendationColor(recommendation: string) {
@@ -464,7 +469,14 @@ export default function VolatilitySqueezeScanner() {
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <h2 className="text-base font-semibold">{selectedSignal.symbol}</h2>
+                    <button
+                      onClick={() => window.open(getYahooFinanceUrl(selectedSignal.symbol), '_blank')}
+                      className="flex items-center gap-1.5 text-base font-semibold hover:text-blue-600 transition-colors cursor-pointer group"
+                      title={`View ${selectedSignal.symbol} on Yahoo Finance`}
+                    >
+                      <span>{selectedSignal.symbol}</span>
+                      <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </button>
                     {selectedSignal.is_actionable && (
                       <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     )}
