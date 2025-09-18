@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         
@@ -42,7 +42,7 @@ jobs:
         virtualenvs-in-project: true
         
     - name: Cache Poetry dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: volatility-squeeze-scanner/.venv
         key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
@@ -51,13 +51,21 @@ jobs:
           
     - name: Install dependencies
       working-directory: volatility-squeeze-scanner
-      run: poetry install --no-dev
+      run: |
+        # Force update to specific Typer version
+        poetry add typer@0.9.4 --group=main
+        poetry install --only=main
         
     - name: Run Volatility Squeeze Scanner
       env:
+        # Frontend environment variables
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        # Backend environment variables (for ticker service)
+        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
       working-directory: volatility-squeeze-scanner
       run: |
         # Set scan parameters
@@ -73,16 +81,47 @@ jobs:
         
         echo "🚀 Running: $SCAN_CMD"
         
-        # Run the scanner and capture output
-        $SCAN_CMD > scan_output.log 2>&1
+        # First, test if the CLI is accessible
+        echo "🔍 Testing CLI accessibility..."
+        poetry run python -m volatility_scanner.cli --help > cli_test.log 2>&1 || {
+          echo "❌ CLI not accessible, showing error:"
+          cat cli_test.log
+          exit 1
+        }
+        echo "✅ CLI is accessible"
         
-        # Show the results
-        echo "📊 Scan Results:"
-        tail -20 scan_output.log
+        # Test version and system status
+        echo "🔍 Testing system status..."
+        poetry run python -m volatility_scanner.cli version > version_test.log 2>&1 || {
+          echo "❌ Version command failed, showing error:"
+          cat version_test.log
+          exit 1
+        }
+        echo "✅ System status check passed"
+        cat version_test.log
+        
+        # Run the scanner and capture output
+        echo "🚀 Starting volatility scan..."
+        $SCAN_CMD > scan_output.log 2>&1
+        SCAN_EXIT_CODE=$?
+        
+        # Show the results regardless of exit code
+        echo "📊 Scan Results (Exit Code: $SCAN_EXIT_CODE):"
+        echo "--- Last 30 lines of output ---"
+        tail -30 scan_output.log
+        
+        # If scan failed, show more context
+        if [ $SCAN_EXIT_CODE -ne 0 ]; then
+          echo ""
+          echo "❌ Scan failed with exit code $SCAN_EXIT_CODE"
+          echo "--- Full error output ---"
+          cat scan_output.log
+          exit $SCAN_EXIT_CODE
+        fi
         
     - name: Upload scan logs
       if: always()  # Upload logs even if scan fails
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: scan-logs-${{ github.run_number }}
         path: volatility-squeeze-scanner/scan_output.log

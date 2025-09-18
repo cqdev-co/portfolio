@@ -196,6 +196,7 @@ class DatabaseService:
             'signal_strength': float(squeeze_signal.signal_strength),
             'technical_score': float(analysis_result.overall_score),  # Use overall_score as technical_score
             'overall_score': float(analysis_result.overall_score),
+            'opportunity_rank': analysis_result.opportunity_rank.value if analysis_result.opportunity_rank else None,
             
             # Recommendations
             'recommendation': analysis_result.recommendation if analysis_result.recommendation else None,
@@ -207,6 +208,12 @@ class DatabaseService:
             # AI analysis
             'ai_analysis': analysis_result.ai_analysis.rationale if analysis_result.ai_analysis else None,
             'ai_confidence': float(analysis_result.ai_analysis.confidence) if analysis_result.ai_analysis else None,
+            
+            # Signal continuity tracking
+            'signal_status': squeeze_signal.signal_status.value if squeeze_signal.signal_status else 'NEW',
+            'days_in_squeeze': squeeze_signal.days_in_squeeze if squeeze_signal.days_in_squeeze else 1,
+            'first_detected_date': squeeze_signal.first_detected_date.isoformat() if squeeze_signal.first_detected_date else None,
+            'last_active_date': squeeze_signal.last_active_date.isoformat() if squeeze_signal.last_active_date else None,
             
             # Metadata
             'is_actionable': hasattr(analysis_result, 'is_actionable') and (

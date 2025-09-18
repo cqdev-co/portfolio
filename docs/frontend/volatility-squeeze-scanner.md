@@ -200,6 +200,37 @@ Each section is visually separated with clean horizontal dividers for better org
 - **Color Coding**: Consistent badge colors and status indicators
 - **Scrollable Content**: Handles long content with proper overflow
 
+## Automated Scanning
+
+### GitHub Actions Integration
+The volatility squeeze scanner includes a comprehensive GitHub Actions workflow (`/.github/workflows/vss.yml`) that provides:
+
+#### Daily Automated Scanning
+- **Schedule**: Runs Monday-Friday at 6:30 AM UTC (after US market close)
+- **Coverage**: Scans all 12,167+ database symbols automatically
+- **Storage**: Results stored directly in Supabase database
+- **Artifacts**: Scan logs retained for 30 days with detailed metrics
+
+#### Workflow Features
+- **Manual Triggering**: Supports on-demand execution with custom parameters
+- **Parameter Control**: Configurable minimum score threshold and symbol limits
+- **Performance Monitoring**: Tracks success rates, symbols scanned, and signals found
+- **Error Handling**: Comprehensive failure detection and reporting
+- **Notifications**: Automated alerts for high-value signals (≥0.9 score)
+
+#### Technical Implementation
+- **Latest Actions**: Uses updated GitHub Actions (v4/v5) for reliability
+- **Environment Setup**: Python 3.11 with Poetry dependency management (modern `--only=main` syntax)
+- **CLI Command**: Uses Poetry script entry point (`volatility-scanner`) for reliable execution
+- **Caching**: Optimized dependency caching for faster execution
+- **Security**: Secure environment variable handling for Supabase credentials
+- **Monitoring**: Detailed logging and summary generation
+
+#### Workflow Status
+- **Dependencies**: `actions/checkout@v4`, `actions/setup-python@v5`, `actions/cache@v4`, `actions/upload-artifact@v4`
+- **Runtime**: 120-minute timeout with comprehensive error recovery
+- **Output**: Professional summary reports with key metrics and status indicators
+
 ## Future Enhancements
 
 ### Planned Features

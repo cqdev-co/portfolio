@@ -19,6 +19,14 @@ import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, typ
 import { cn } from "@/lib/utils";
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw } from "lucide-react";
 
+// Helper function to safely parse numeric values
+function safeParseNumber(value: string | number | null): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 function getRecommendationColor(recommendation: string) {
   switch (recommendation) {
     case "STRONG_BUY":
@@ -63,6 +71,23 @@ function getSqueezeCategoryColor(category: string) {
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
     case "Normal":
       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    default:
+      return "bg-secondary text-secondary-foreground";
+  }
+}
+
+function getOpportunityRankColor(rank: string) {
+  switch (rank) {
+    case "A":
+      return "bg-green-600 text-white hover:bg-green-700";
+    case "B":
+      return "bg-blue-600 text-white hover:bg-blue-700";
+    case "C":
+      return "bg-yellow-600 text-white hover:bg-yellow-700";
+    case "D":
+      return "bg-orange-600 text-white hover:bg-orange-700";
+    case "F":
+      return "bg-red-600 text-white hover:bg-red-700";
     default:
       return "bg-secondary text-secondary-foreground";
   }
@@ -137,20 +162,42 @@ export default function VolatilitySqueezeScanner() {
     return unsubscribe;
   }, [loadData]);
 
-  // Handle escape key to close sidebar
+  // Signals are already filtered and sorted by the API
+  const displaySignals = signals;
+
+  // Handle keyboard navigation in sidebar
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && sidebarOpen) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!sidebarOpen || !selectedSignal) return;
+
+      if (e.key === 'Escape') {
         closeSidebar();
+        return;
+      }
+
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const currentIndex = displaySignals.findIndex(signal => signal.id === selectedSignal.id);
+        
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (e.key === 'ArrowUp') {
+          nextIndex = currentIndex > 0 ? currentIndex - 1 : displaySignals.length - 1;
+        } else {
+          nextIndex = currentIndex < displaySignals.length - 1 ? currentIndex + 1 : 0;
+        }
+
+        const nextSignal = displaySignals[nextIndex];
+        if (nextSignal) {
+          setSelectedSignal(nextSignal);
+        }
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [sidebarOpen]);
-
-  // Signals are already filtered and sorted by the API
-  const displaySignals = signals;
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarOpen, selectedSignal, displaySignals]);
 
   const handleSort = (field: keyof VolatilitySqueezeSignal) => {
     setSortConfig(prev => ({
@@ -309,6 +356,15 @@ export default function VolatilitySqueezeScanner() {
                     {getSortIcon("overall_score")}
                   </div>
                 </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort("opportunity_rank")}
+                >
+                  <div className="flex items-center gap-2">
+                    Rank
+                    {getSortIcon("opportunity_rank")}
+                  </div>
+                </TableHead>
                 <TableHead>Recommendation</TableHead>
               </TableRow>
             </TableHeader>
@@ -329,22 +385,29 @@ export default function VolatilitySqueezeScanner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium">${signal.close_price.toFixed(2)}</span>
+                      <span className="font-medium">${safeParseNumber(signal.close_price).toFixed(2)}</span>
                       <span className={cn(
                         "text-caption",
-                        (signal.price_vs_20d_high || 0) >= 0 ? "text-green-600" : "text-red-600"
+                        safeParseNumber(signal.price_vs_20d_high) >= 0 ? "text-green-600" : "text-red-600"
                       )}>
-                        {(signal.price_vs_20d_high || 0) >= 0 ? "+" : ""}{(signal.price_vs_20d_high || 0).toFixed(1)}%
+                        {safeParseNumber(signal.price_vs_20d_high) >= 0 ? "+" : ""}{safeParseNumber(signal.price_vs_20d_high).toFixed(1)}%
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium">{(signal.overall_score * 100).toFixed(0)}%</span>
+                      <span className="font-medium">{(safeParseNumber(signal.overall_score) * 100).toFixed(0)}%</span>
                       <span className="text-caption text-muted-foreground">
                         {signal.signal_quality}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {signal.opportunity_rank && (
+                      <Badge className={getOpportunityRankColor(signal.opportunity_rank)}>
+                        {signal.opportunity_rank}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {signal.recommendation && (
@@ -398,9 +461,12 @@ export default function VolatilitySqueezeScanner() {
                     </Badge>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" onClick={closeSidebar}>
-                  ✕
-                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">↑↓ Navigate</span>
+                  <Button variant="ghost" size="sm" onClick={closeSidebar}>
+                    ✕
+                  </Button>
+                </div>
               </div>
 
               {/* Content */}
@@ -411,27 +477,27 @@ export default function VolatilitySqueezeScanner() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-0.5">
                       <p className="text-xs text-muted-foreground">Current Price</p>
-                      <p className="text-sm font-semibold">${selectedSignal.close_price.toFixed(2)}</p>
+                      <p className="text-sm font-semibold">${safeParseNumber(selectedSignal.close_price).toFixed(2)}</p>
                     </div>
                     <div className="space-y-0.5">
                       <p className="text-xs text-muted-foreground">vs 20D High</p>
                       <p className={cn(
                         "text-sm font-semibold",
-                        (selectedSignal.price_vs_20d_high || 0) >= 0 ? "text-green-600" : "text-red-600"
+                        safeParseNumber(selectedSignal.price_vs_20d_high) >= 0 ? "text-green-600" : "text-red-600"
                       )}>
-                        {(selectedSignal.price_vs_20d_high || 0) >= 0 ? "+" : ""}{(selectedSignal.price_vs_20d_high || 0).toFixed(1)}%
+                        {safeParseNumber(selectedSignal.price_vs_20d_high) >= 0 ? "+" : ""}{safeParseNumber(selectedSignal.price_vs_20d_high).toFixed(1)}%
                       </p>
                     </div>
                     <div className="space-y-0.5">
                       <p className="text-xs text-muted-foreground">vs 20D Low</p>
                       <p className="text-xs font-medium">
-                        +{(selectedSignal.price_vs_20d_low || 0).toFixed(1)}%
+                        +{safeParseNumber(selectedSignal.price_vs_20d_low).toFixed(1)}%
                       </p>
                     </div>
                     <div className="space-y-0.5">
                       <p className="text-xs text-muted-foreground">Day Range</p>
                       <p className="text-xs font-medium">
-                        ${selectedSignal.low_price?.toFixed(2) || "N/A"} - ${selectedSignal.high_price?.toFixed(2) || "N/A"}
+                        ${safeParseNumber(selectedSignal.low_price).toFixed(2)} - ${safeParseNumber(selectedSignal.high_price).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -445,15 +511,15 @@ export default function VolatilitySqueezeScanner() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Overall Score</span>
-                      <span className="text-xs font-semibold">{(selectedSignal.overall_score * 100).toFixed(0)}%</span>
+                      <span className="text-xs font-semibold">{(safeParseNumber(selectedSignal.overall_score) * 100).toFixed(0)}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Signal Strength</span>
-                      <span className="text-xs font-semibold">{(selectedSignal.signal_strength * 100).toFixed(0)}%</span>
+                      <span className="text-xs font-semibold">{(safeParseNumber(selectedSignal.signal_strength) * 100).toFixed(0)}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Technical Score</span>
-                      <span className="text-xs font-semibold">{(selectedSignal.technical_score * 100).toFixed(0)}%</span>
+                      <span className="text-xs font-semibold">{(safeParseNumber(selectedSignal.technical_score) * 100).toFixed(0)}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Signal Quality</span>
@@ -461,6 +527,14 @@ export default function VolatilitySqueezeScanner() {
                         {selectedSignal.signal_quality}
                       </Badge>
                     </div>
+                    {selectedSignal.opportunity_rank && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Opportunity Rank</span>
+                        <Badge className={cn("text-xs h-5 px-2", getOpportunityRankColor(selectedSignal.opportunity_rank))}>
+                          {selectedSignal.opportunity_rank}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -478,7 +552,7 @@ export default function VolatilitySqueezeScanner() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">BB Width Percentile</span>
-                      <span className="text-xs font-medium">{selectedSignal.bb_width_percentile.toFixed(1)}%</span>
+                      <span className="text-xs font-medium">{safeParseNumber(selectedSignal.bb_width_percentile).toFixed(1)}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Is Squeeze</span>
@@ -529,7 +603,7 @@ export default function VolatilitySqueezeScanner() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs">Volume Ratio</span>
                       <span className="text-xs font-medium">
-                        {selectedSignal.volume_ratio ? `${selectedSignal.volume_ratio.toFixed(1)}x` : "N/A"}
+                        {safeParseNumber(selectedSignal.volume_ratio) > 0 ? `${safeParseNumber(selectedSignal.volume_ratio).toFixed(1)}x` : "N/A"}
                       </span>
                     </div>
                   </div>
@@ -544,18 +618,18 @@ export default function VolatilitySqueezeScanner() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs">Stop Loss</span>
-                        <span className="text-xs font-medium">${selectedSignal.stop_loss_price.toFixed(2)}</span>
+                        <span className="text-xs font-medium">${safeParseNumber(selectedSignal.stop_loss_price).toFixed(2)}</span>
                       </div>
-                      {selectedSignal.stop_loss_distance_pct && (
+                      {safeParseNumber(selectedSignal.stop_loss_distance_pct) > 0 && (
                         <div className="flex items-center justify-between">
                           <span className="text-xs">Stop Distance</span>
-                          <span className="text-xs font-medium">{selectedSignal.stop_loss_distance_pct.toFixed(1)}%</span>
+                          <span className="text-xs font-medium">{safeParseNumber(selectedSignal.stop_loss_distance_pct).toFixed(1)}%</span>
                         </div>
                       )}
-                      {selectedSignal.position_size_pct && (
+                      {safeParseNumber(selectedSignal.position_size_pct) > 0 && (
                         <div className="flex items-center justify-between">
                           <span className="text-xs">Position Size</span>
-                          <span className="text-xs font-medium">{(selectedSignal.position_size_pct * 100).toFixed(1)}%</span>
+                          <span className="text-xs font-medium">{(safeParseNumber(selectedSignal.position_size_pct) * 100).toFixed(1)}%</span>
                         </div>
                       )}
                     </div>
@@ -568,29 +642,29 @@ export default function VolatilitySqueezeScanner() {
                 <div className="space-y-2">
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Technical Indicators</h3>
                   <div className="space-y-2">
-                    {selectedSignal.bb_upper && (
+                    {safeParseNumber(selectedSignal.bb_upper) > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">Bollinger Bands</p>
                         <div className="text-xs space-y-0.5">
                           <div className="flex justify-between">
                             <span>Upper:</span>
-                            <span>${selectedSignal.bb_upper.toFixed(2)}</span>
+                            <span>${safeParseNumber(selectedSignal.bb_upper).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Middle:</span>
-                            <span>${selectedSignal.bb_middle?.toFixed(2) || "N/A"}</span>
+                            <span>${safeParseNumber(selectedSignal.bb_middle).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Lower:</span>
-                            <span>${selectedSignal.bb_lower?.toFixed(2) || "N/A"}</span>
+                            <span>${safeParseNumber(selectedSignal.bb_lower).toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
                     )}
-                    {selectedSignal.atr_20 && (
+                    {safeParseNumber(selectedSignal.atr_20) > 0 && (
                       <div className="flex items-center justify-between">
                         <span className="text-xs">ATR (20)</span>
-                        <span className="text-xs font-medium">{selectedSignal.atr_20.toFixed(2)}</span>
+                        <span className="text-xs font-medium">{safeParseNumber(selectedSignal.atr_20).toFixed(2)}</span>
                       </div>
                     )}
                   </div>

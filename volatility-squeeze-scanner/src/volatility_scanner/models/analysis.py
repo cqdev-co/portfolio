@@ -1,6 +1,6 @@
 """Analysis models and schemas for volatility squeeze detection."""
 
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 from typing import Optional, Dict, Any
 
@@ -19,6 +19,22 @@ class SignalType(str, Enum):
     CONTINUATION = "continuation"
     REVERSAL = "reversal" 
     CHOP = "chop"
+
+
+class SignalStatus(str, Enum):
+    """Signal continuity status."""
+    NEW = "NEW"
+    CONTINUING = "CONTINUING"
+    ENDED = "ENDED"
+
+
+class OpportunityRank(str, Enum):
+    """Opportunity ranking classification."""
+    S_TIER = "S"      # Exceptional (≥0.90, premium conditions)
+    A_TIER = "A"      # Excellent (≥0.80, strong conditions)
+    B_TIER = "B"      # Good (≥0.70, solid conditions)
+    C_TIER = "C"      # Fair (≥0.60, acceptable conditions)
+    D_TIER = "D"      # Poor (<0.60, weak conditions)
 
 
 class SqueezeSignal(BaseModel):
@@ -103,6 +119,24 @@ class SqueezeSignal(BaseModel):
     adx: Optional[float] = Field(None, description="ADX (trend strength)")
     di_plus: Optional[float] = Field(None, description="DI+ indicator")
     di_minus: Optional[float] = Field(None, description="DI- indicator")
+    
+    # Signal continuity tracking
+    signal_status: SignalStatus = Field(
+        default=SignalStatus.NEW,
+        description="Signal continuity status"
+    )
+    days_in_squeeze: int = Field(
+        default=1,
+        description="Number of consecutive days in squeeze"
+    )
+    first_detected_date: Optional[date] = Field(
+        None,
+        description="Date when squeeze was first detected"
+    )
+    last_active_date: Optional[date] = Field(
+        None,
+        description="Most recent date signal was active"
+    )
 
 
 class AIAnalysis(BaseModel):
@@ -168,6 +202,9 @@ class AnalysisResult(BaseModel):
         ge=0.0,
         le=1.0,
         description="Combined technical + AI score (0-1)"
+    )
+    opportunity_rank: OpportunityRank = Field(
+        description="Opportunity ranking tier (S/A/B/C/D)"
     )
     recommendation: str = Field(
         description="Overall recommendation (BUY/SELL/HOLD/WAIT)"
