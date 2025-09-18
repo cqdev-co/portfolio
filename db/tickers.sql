@@ -13,15 +13,6 @@ CREATE TABLE IF NOT EXISTS tickers (
     market_cap BIGINT,
     is_active BOOLEAN DEFAULT true,
     ticker_type VARCHAR(20) DEFAULT 'stock', -- stock, etf, crypto, forex, etc.
-    
-    -- Quality filtering fields
-    quality_score DECIMAL(4,3), -- Overall quality score (0.000 to 1.000)
-    quality_tier VARCHAR(10), -- S-Tier, A-Tier, B-Tier, C-Tier, D-Tier
-    exchange_quality_score DECIMAL(4,3), -- Exchange reputation score
-    is_high_quality BOOLEAN DEFAULT false, -- Quick filter for high quality tickers
-    current_price DECIMAL(12,4), -- Current/last known price
-    avg_volume BIGINT, -- Average daily trading volume
-    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_fetched TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -34,13 +25,6 @@ CREATE INDEX IF NOT EXISTS idx_tickers_country ON tickers(country);
 CREATE INDEX IF NOT EXISTS idx_tickers_sector ON tickers(sector);
 CREATE INDEX IF NOT EXISTS idx_tickers_is_active ON tickers(is_active);
 CREATE INDEX IF NOT EXISTS idx_tickers_ticker_type ON tickers(ticker_type);
-
--- Quality filtering indexes
-CREATE INDEX IF NOT EXISTS idx_tickers_quality_score ON tickers(quality_score DESC);
-CREATE INDEX IF NOT EXISTS idx_tickers_quality_tier ON tickers(quality_tier);
-CREATE INDEX IF NOT EXISTS idx_tickers_is_high_quality ON tickers(is_high_quality);
-CREATE INDEX IF NOT EXISTS idx_tickers_market_cap ON tickers(market_cap DESC);
-CREATE INDEX IF NOT EXISTS idx_tickers_avg_volume ON tickers(avg_volume DESC);
 
 -- Enable Row Level Security (RLS) if needed
 ALTER TABLE tickers ENABLE ROW LEVEL SECURITY;

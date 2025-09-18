@@ -40,9 +40,10 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
       searchTerm = ''
     } = options;
 
-    // Start with the signal_analysis view for computed fields
+    // Start with the signal_analysis view for computed fields, fallback to main table
+    const tableName = 'signal_analysis';
     let query = supabase
-      .from('signal_analysis')
+      .from(tableName)
       .select('*', { count: 'exact' });
 
     // Apply search filter
@@ -88,7 +89,56 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching signals:', error);
+      console.error('Error fetching signals from', tableName, ':', error);
+      
+      // If signal_analysis view failed, try the main table
+      if (tableName === 'signal_analysis') {
+        console.log('Retrying with main table...');
+        try {
+          let fallbackQuery = supabase
+            .from('volatility_squeeze_signals')
+            .select('*', { count: 'exact' });
+
+          // Reapply all filters to fallback query
+          if (searchTerm) {
+            fallbackQuery = fallbackQuery.ilike('symbol', `%${searchTerm}%`);
+          }
+          if (filters.recommendation?.length) {
+            fallbackQuery = fallbackQuery.in('recommendation', filters.recommendation);
+          }
+          if (filters.is_actionable !== undefined) {
+            fallbackQuery = fallbackQuery.eq('is_actionable', filters.is_actionable);
+          }
+          if (filters.min_overall_score !== undefined) {
+            fallbackQuery = fallbackQuery.gte('overall_score', filters.min_overall_score);
+          }
+          if (filters.max_overall_score !== undefined) {
+            fallbackQuery = fallbackQuery.lte('overall_score', filters.max_overall_score);
+          }
+
+          fallbackQuery = fallbackQuery.order(sortBy, { ascending: sortOrder === 'asc' });
+          fallbackQuery = fallbackQuery.range(offset, offset + limit - 1);
+
+          const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery;
+          
+          if (fallbackError) {
+            console.error('Fallback query also failed:', fallbackError);
+            return {
+              data: [],
+              count: 0,
+              error: fallbackError.message
+            };
+          }
+
+          return {
+            data: fallbackData || [],
+            count: fallbackCount || 0
+          };
+        } catch (fallbackErr) {
+          console.error('Fallback query exception:', fallbackErr);
+        }
+      }
+      
       return {
         data: [],
         count: 0,
@@ -154,35 +204,53 @@ export async function fetchLatestSignals(limit: number = 50): Promise<SignalResp
  */
 export async function fetchSignalStats(): Promise<SignalStats | null> {
   try {
-    const today = new Date().toISOString().split('T')[0];
-
-    // Get basic stats from today's signals
+    // Get all signals to calculate stats (not just today's)
     const { data: signals, error: signalsError } = await supabase
       .from('signal_analysis')
-      .select('is_actionable, trend_direction, overall_score, scan_date')
-      .eq('scan_date', today);
+      .select('is_actionable, trend_direction, overall_score, scan_date');
 
     if (signalsError) {
       console.error('Error fetching signal stats:', signalsError);
-      return null;
+      // If the view doesn't exist, try the main table
+      const { data: fallbackSignals, error: fallbackError } = await supabase
+        .from('volatility_squeeze_signals')
+        .select('is_actionable, trend_direction, overall_score, scan_date');
+      
+      if (fallbackError) {
+        console.error('Error fetching fallback signal stats:', fallbackError);
+        return null;
+      }
+      
+      if (!fallbackSignals || fallbackSignals.length === 0) {
+        return {
+          total_signals: 0,
+          actionable_signals: 0,
+          bullish_signals: 0,
+
+          bearish_signals: 0,
+          average_score: 0,
+          latest_scan_date: new Date().toISOString().split('T')[0]
+        };
+      }
+
+      return {
+        total_signals: fallbackSignals.length,
+        actionable_signals: fallbackSignals.filter(s => s.is_actionable).length,
+        bullish_signals: fallbackSignals.filter(s => s.trend_direction === 'bullish').length,
+        bearish_signals: fallbackSignals.filter(s => s.trend_direction === 'bearish').length,
+        average_score: 0,
+        latest_scan_date: new Date().toISOString().split('T')[0]
+      };
     }
 
     if (!signals || signals.length === 0) {
-      // Try to get the latest scan date if no signals today
-      const { data: latestSignal } = await supabase
-        .from('signal_analysis')
-        .select('scan_date')
-        .order('scan_date', { ascending: false })
-        .limit(1)
-        .single();
-
       return {
         total_signals: 0,
         actionable_signals: 0,
         bullish_signals: 0,
         bearish_signals: 0,
         average_score: 0,
-        latest_scan_date: latestSignal?.scan_date || today
+        latest_scan_date: new Date().toISOString().split('T')[0]
       };
     }
 
@@ -191,8 +259,8 @@ export async function fetchSignalStats(): Promise<SignalStats | null> {
       actionable_signals: signals.filter(s => s.is_actionable).length,
       bullish_signals: signals.filter(s => s.trend_direction === 'bullish').length,
       bearish_signals: signals.filter(s => s.trend_direction === 'bearish').length,
-      average_score: signals.reduce((sum, s) => sum + (s.overall_score || 0), 0) / signals.length,
-      latest_scan_date: signals[0]?.scan_date || today
+      average_score: signals.reduce((sum, s) => sum + (parseFloat(s.overall_score?.toString() || '0') || 0), 0) / signals.length,
+      latest_scan_date: signals[0]?.scan_date || new Date().toISOString().split('T')[0]
     };
 
     return stats;

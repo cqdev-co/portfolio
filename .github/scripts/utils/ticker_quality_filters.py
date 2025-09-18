@@ -1,475 +1,429 @@
 #!/usr/bin/env python3
 """
-Ticker Quality Filtering Utilities
+Ticker Quality Filtering System
 
 This module provides comprehensive filtering capabilities to identify 
-high-quality tickers for model training and backtesting. It filters out
-failing companies, penny stocks, low-volume tickers, and other problematic
-securities that could negatively impact analysis results.
-
-Quality Criteria:
-- Market Cap: Minimum thresholds based on exchange
-- Trading Volume: Consistent daily volume requirements  
-- Price Stability: Avoid extreme volatility and penny stocks
-- Financial Health: Basic fundamental screening
-- Exchange Quality: Prefer major exchanges
-- Data Availability: Ensure sufficient historical data
+high-quality US stock tickers suitable for model training and backtesting.
+Filters out penny stocks, low-volume stocks, and financially distressed companies.
 """
 
 import logging
-import requests
 import time
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import requests
+from ratelimit import limits, sleep_and_retry
 
 logger = logging.getLogger(__name__)
 
 @dataclass
-class QualityMetrics:
-    """Data class for ticker quality metrics"""
+class TickerQualityMetrics:
+    """Quality metrics for a ticker"""
     symbol: str
     market_cap: Optional[float] = None
     avg_volume: Optional[float] = None
     price: Optional[float] = None
-    price_stability_score: Optional[float] = None
-    data_availability_score: Optional[float] = None
-    exchange_quality_score: Optional[float] = None
-    overall_quality_score: Optional[float] = None
-    is_penny_stock: bool = False
-    is_low_volume: bool = False
-    has_sufficient_data: bool = False
-    passes_basic_filters: bool = False
+    beta: Optional[float] = None
+    pe_ratio: Optional[float] = None
+    debt_to_equity: Optional[float] = None
+    current_ratio: Optional[float] = None
+    revenue_growth: Optional[float] = None
+    profit_margin: Optional[float] = None
+    is_active: bool = True
+    exchange: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    quality_score: float = 0.0
+    quality_reasons: List[str] = None
+    
+    def __post_init__(self):
+        if self.quality_reasons is None:
+            self.quality_reasons = []
 
 class TickerQualityFilter:
-    """Main class for filtering ticker quality"""
+    """Main class for filtering tickers based on quality metrics"""
     
-    # Exchange quality ratings (higher is better)
-    EXCHANGE_RATINGS = {
-        'NYSE': 10,
-        'NASDAQ': 10,
-        'AMEX': 8,
-        'TSX': 8,
-        'LSE': 9,
-        'EURONEXT': 8,
-        'XETRA': 8,
-        'ASX': 7,
-        'HKEX': 7,
-        'TSE': 7,
-        'OTC': 3,
-        'PINK': 2,
-        'GREY': 1
-    }
-    
-        # Minimum market cap thresholds by exchange (in USD millions) - More liberal
-    MIN_MARKET_CAP = {
-        'NYSE': 100,      # Lower threshold for NYSE
-        'NASDAQ': 50,     # Much lower for NASDAQ to include small caps
-        'AMEX': 25,       # Very low for AMEX
-        'TSX': 100,       # Canadian main exchange
-        'LSE': 200,       # London Stock Exchange
-        'EURONEXT': 150,  # European exchange
-        'XETRA': 150,     # German exchange
-        'ASX': 75,        # Australian exchange
-        'HKEX': 100,      # Hong Kong exchange
-        'TSE': 100,       # Tokyo Stock Exchange
-        'OTC': 10,        # Very low for OTC
-        'PINK': 5,        # Minimal for pink sheets
-        'GREY': 1         # Almost no minimum for grey market
-    }
-    
-    def __init__(self, 
-                 min_price: float = 1.0,  # Allow penny stocks
-                 min_avg_volume: int = 50000,  # Lower volume requirement
-                 max_volatility: float = 1.5,  # Allow higher volatility
-                 min_data_days: int = 180,  # Require 6 months instead of 1 year
-                 batch_size: int = 50,
-                 max_workers: int = 10):
-        """
-        Initialize quality filter with configurable parameters
+    def __init__(self, alpha_vantage_key: Optional[str] = None):
+        self.alpha_vantage_key = alpha_vantage_key
+        self.setup_logging()
         
-        Args:
-            min_price: Minimum stock price (avoid penny stocks)
-            min_avg_volume: Minimum average daily volume
-            max_volatility: Maximum acceptable volatility (annualized)
-            min_data_days: Minimum days of historical data required
-            batch_size: Number of tickers to process in each batch
-            max_workers: Maximum number of concurrent workers
-        """
-        self.min_price = min_price
-        self.min_avg_volume = min_avg_volume
-        self.max_volatility = max_volatility
-        self.min_data_days = min_data_days
-        self.batch_size = batch_size
-        self.max_workers = max_workers
+        # Quality thresholds
+        self.min_market_cap = 1_000_000_000  # $1B minimum market cap
+        self.min_price = 5.0  # Minimum $5 per share (avoid penny stocks)
+        self.max_price = 10_000.0  # Maximum $10k per share (avoid outliers)
+        self.min_avg_volume = 100_000  # Minimum 100k shares daily volume
+        self.max_beta = 3.0  # Maximum beta (volatility measure)
+        self.min_current_ratio = 1.0  # Minimum current ratio (liquidity)
+        self.max_debt_to_equity = 2.0  # Maximum debt-to-equity ratio
         
-    def get_exchange_quality_score(self, exchange: str) -> float:
-        """Get quality score for exchange (0-1 scale)"""
-        if not exchange:
-            return 0.3
+        # Excluded exchanges (focus on major US exchanges)
+        self.allowed_exchanges = {
+            'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'BATS'
+        }
         
-        exchange_upper = exchange.upper()
-        rating = self.EXCHANGE_RATINGS.get(exchange_upper, 5)
-        return rating / 10.0
+        # Excluded sectors (optional - can be configured)
+        self.excluded_sectors = {
+            'Penny Stocks', 'Shell Companies', 'Closed-End Funds'
+        }
+        
+    def setup_logging(self):
+        """Setup logging for the filter"""
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
     
-    def get_min_market_cap_for_exchange(self, exchange: str) -> float:
-        """Get minimum market cap threshold for exchange"""
-        if not exchange:
-            return 100  # Default minimum
+    def filter_us_tickers_only(self, tickers: List[Dict]) -> List[Dict]:
+        """Filter to only include US-based tickers"""
+        us_tickers = []
         
-        exchange_upper = exchange.upper()
-        return self.MIN_MARKET_CAP.get(exchange_upper, 100)
+        for ticker in tickers:
+            # Check country field
+            if ticker.get('country') == 'US':
+                us_tickers.append(ticker)
+                continue
+                
+            # Check exchange for US exchanges
+            exchange = ticker.get('exchange')
+            if exchange and exchange.upper() in self.allowed_exchanges:
+                ticker['country'] = 'US'  # Ensure country is set
+                us_tickers.append(ticker)
+                continue
+                
+            # Check symbol patterns (US tickers typically don't have dots)
+            symbol = ticker.get('symbol', '')
+            if ('.' not in symbol and 
+                len(symbol) <= 5 and 
+                symbol.isalpha() and 
+                not ticker.get('country')):
+                # Likely US ticker, add it
+                ticker['country'] = 'US'
+                us_tickers.append(ticker)
+        
+        logger.info(f"Filtered to {len(us_tickers)} US tickers from "
+                   f"{len(tickers)} total tickers")
+        return us_tickers
     
-    def fetch_ticker_data(self, symbol: str) -> Optional[Dict]:
-        """Fetch comprehensive data for a single ticker"""
+    @sleep_and_retry
+    @limits(calls=5, period=60)  # Rate limit for yfinance
+    def get_ticker_metrics_yfinance(self, symbol: str) -> TickerQualityMetrics:
+        """Get quality metrics for a ticker using yfinance"""
         try:
             ticker = yf.Ticker(symbol)
-            
-            # Get basic info
             info = ticker.info
-            
-            # Get recent price data (1 year)
-            hist = ticker.history(period="1y")
+            hist = ticker.history(period="3mo")  # 3 months of data
             
             if hist.empty:
                 logger.debug(f"No historical data for {symbol}")
-                return None
+                return TickerQualityMetrics(
+                    symbol=symbol, 
+                    is_active=False,
+                    quality_reasons=["No historical data"]
+                )
             
             # Calculate metrics
-            current_price = hist['Close'].iloc[-1]
-            avg_volume = hist['Volume'].mean()
-            volatility = hist['Close'].pct_change().std() * (252 ** 0.5)  # Annualized
+            metrics = TickerQualityMetrics(symbol=symbol)
             
-            # Market cap from info or calculate estimate
-            market_cap = info.get('marketCap')
-            if not market_cap and 'sharesOutstanding' in info:
-                shares = info.get('sharesOutstanding', 0)
-                if shares > 0:
-                    market_cap = current_price * shares
+            # Basic info
+            metrics.market_cap = info.get('marketCap')
+            metrics.price = info.get('currentPrice') or info.get('regularMarketPrice')
+            metrics.beta = info.get('beta')
+            metrics.pe_ratio = info.get('trailingPE')
+            metrics.exchange = info.get('exchange')
+            metrics.sector = info.get('sector')
+            metrics.industry = info.get('industry')
             
-            return {
-                'symbol': symbol,
-                'price': current_price,
-                'market_cap': market_cap,
-                'avg_volume': avg_volume,
-                'volatility': volatility,
-                'data_points': len(hist),
-                'sector': info.get('sector'),
-                'industry': info.get('industry'),
-                'exchange': info.get('exchange'),
-                'country': info.get('country'),
-                'currency': info.get('currency'),
-                'beta': info.get('beta'),
-                'pe_ratio': info.get('trailingPE'),
-                'forward_pe': info.get('forwardPE'),
-                'peg_ratio': info.get('pegRatio'),
-                'debt_to_equity': info.get('debtToEquity'),
-                'roe': info.get('returnOnEquity'),
-                'profit_margins': info.get('profitMargins'),
-                'revenue_growth': info.get('revenueGrowth'),
-                'earnings_growth': info.get('earningsGrowth')
-            }
+            # Financial ratios
+            metrics.debt_to_equity = info.get('debtToEquity')
+            metrics.current_ratio = info.get('currentRatio')
+            metrics.revenue_growth = info.get('revenueGrowth')
+            metrics.profit_margin = info.get('profitMargins')
+            
+            # Volume calculation (average over 3 months)
+            if not hist.empty and 'Volume' in hist.columns:
+                metrics.avg_volume = hist['Volume'].mean()
+            
+            # If price not in info, get from recent history
+            if not metrics.price and not hist.empty:
+                metrics.price = hist['Close'].iloc[-1]
+            
+            logger.debug(f"Retrieved metrics for {symbol}")
+            return metrics
             
         except Exception as e:
-            logger.debug(f"Error fetching data for {symbol}: {e}")
-            return None
+            logger.warning(f"Error getting metrics for {symbol}: {e}")
+            return TickerQualityMetrics(
+                symbol=symbol, 
+                is_active=False,
+                quality_reasons=[f"Error retrieving data: {str(e)}"]
+            )
     
-    def calculate_quality_metrics(self, ticker_data: Dict, exchange: str = None) -> QualityMetrics:
-        """Calculate comprehensive quality metrics for a ticker"""
-        symbol = ticker_data['symbol']
-        price = ticker_data.get('price', 0)
-        market_cap = ticker_data.get('market_cap', 0)
-        avg_volume = ticker_data.get('avg_volume', 0)
-        volatility = ticker_data.get('volatility', 1.0)
-        data_points = ticker_data.get('data_points', 0)
-        ticker_exchange = ticker_data.get('exchange') or exchange
+    @sleep_and_retry
+    @limits(calls=5, period=60)  # Rate limit for Alpha Vantage
+    def get_ticker_metrics_alpha_vantage(self, symbol: str) -> TickerQualityMetrics:
+        """Get quality metrics using Alpha Vantage API"""
+        if not self.alpha_vantage_key:
+            return TickerQualityMetrics(
+                symbol=symbol,
+                is_active=False,
+                quality_reasons=["No Alpha Vantage API key"]
+            )
         
-        # Basic filters
-        is_penny_stock = price < self.min_price
-        is_low_volume = avg_volume < self.min_avg_volume
-        has_sufficient_data = data_points >= self.min_data_days
-        
-        # Exchange quality score
-        exchange_quality_score = self.get_exchange_quality_score(ticker_exchange)
-        
-        # Market cap quality score
-        min_market_cap = self.get_min_market_cap_for_exchange(ticker_exchange)
-        market_cap_millions = (market_cap or 0) / 1_000_000
-        
-        if market_cap_millions >= min_market_cap * 2:
-            market_cap_score = 1.0
-        elif market_cap_millions >= min_market_cap:
-            market_cap_score = 0.8
-        elif market_cap_millions >= min_market_cap * 0.5:
-            market_cap_score = 0.6
-        elif market_cap_millions >= min_market_cap * 0.25:
-            market_cap_score = 0.4
-        else:
-            market_cap_score = 0.2
-        
-        # Price stability score (inverse of volatility)
-        if volatility <= 0.3:
-            price_stability_score = 1.0
-        elif volatility <= 0.5:
-            price_stability_score = 0.8
-        elif volatility <= 0.8:
-            price_stability_score = 0.6
-        elif volatility <= 1.2:
-            price_stability_score = 0.4
-        else:
-            price_stability_score = 0.2
-        
-        # Volume quality score
-        if avg_volume >= self.min_avg_volume * 10:
-            volume_score = 1.0
-        elif avg_volume >= self.min_avg_volume * 5:
-            volume_score = 0.9
-        elif avg_volume >= self.min_avg_volume * 2:
-            volume_score = 0.8
-        elif avg_volume >= self.min_avg_volume:
-            volume_score = 0.7
-        else:
-            volume_score = 0.3
-        
-        # Data availability score
-        if data_points >= self.min_data_days * 2:
-            data_availability_score = 1.0
-        elif data_points >= self.min_data_days * 1.5:
-            data_availability_score = 0.9
-        elif data_points >= self.min_data_days:
-            data_availability_score = 0.8
-        elif data_points >= self.min_data_days * 0.75:
-            data_availability_score = 0.6
-        else:
-            data_availability_score = 0.3
-        
-        # Fundamental quality score (if available)
-        fundamental_score = 0.7  # Default neutral score
-        
-        pe_ratio = ticker_data.get('pe_ratio')
-        debt_to_equity = ticker_data.get('debt_to_equity')
-        roe = ticker_data.get('roe')
-        profit_margins = ticker_data.get('profit_margins')
-        
-        if pe_ratio and debt_to_equity is not None and roe and profit_margins:
-            # Positive factors
-            score_adjustments = 0
-            
-            # Reasonable P/E ratio
-            if 5 <= pe_ratio <= 25:
-                score_adjustments += 0.1
-            elif pe_ratio <= 5 or pe_ratio >= 50:
-                score_adjustments -= 0.2
-                
-            # Healthy debt levels
-            if debt_to_equity <= 0.3:
-                score_adjustments += 0.1
-            elif debt_to_equity >= 1.0:
-                score_adjustments -= 0.1
-                
-            # Good ROE
-            if roe >= 0.15:
-                score_adjustments += 0.1
-            elif roe <= 0.05:
-                score_adjustments -= 0.1
-                
-            # Healthy profit margins
-            if profit_margins >= 0.1:
-                score_adjustments += 0.1
-            elif profit_margins <= 0.02:
-                score_adjustments -= 0.1
-                
-            fundamental_score = max(0.2, min(1.0, 0.7 + score_adjustments))
-        
-        # Calculate overall quality score (weighted average)
-        weights = {
-            'market_cap': 0.25,
-            'exchange': 0.20,
-            'volume': 0.20,
-            'price_stability': 0.15,
-            'data_availability': 0.10,
-            'fundamentals': 0.10
-        }
-        
-        overall_quality_score = (
-            market_cap_score * weights['market_cap'] +
-            exchange_quality_score * weights['exchange'] +
-            volume_score * weights['volume'] +
-            price_stability_score * weights['price_stability'] +
-            data_availability_score * weights['data_availability'] +
-            fundamental_score * weights['fundamentals']
-        )
-        
-        # Basic pass/fail
-        passes_basic_filters = (
-            not is_penny_stock and
-            not is_low_volume and
-            has_sufficient_data and
-            exchange_quality_score >= 0.5 and
-            market_cap_score >= 0.4
-        )
-        
-        return QualityMetrics(
-            symbol=symbol,
-            market_cap=market_cap,
-            avg_volume=avg_volume,
-            price=price,
-            price_stability_score=price_stability_score,
-            data_availability_score=data_availability_score,
-            exchange_quality_score=exchange_quality_score,
-            overall_quality_score=overall_quality_score,
-            is_penny_stock=is_penny_stock,
-            is_low_volume=is_low_volume,
-            has_sufficient_data=has_sufficient_data,
-            passes_basic_filters=passes_basic_filters
-        )
-    
-    def filter_tickers_batch(self, tickers: List[Dict]) -> List[Tuple[Dict, QualityMetrics]]:
-        """Filter a batch of tickers and return quality metrics"""
-        results = []
-        
-        def process_ticker(ticker_info):
-            symbol = ticker_info['symbol']
-            exchange = ticker_info.get('exchange')
-            
-            # Fetch additional data from Yahoo Finance
-            ticker_data = self.fetch_ticker_data(symbol)
-            
-            if not ticker_data:
-                # Use basic info if Yahoo Finance fails
-                ticker_data = {
-                    'symbol': symbol,
-                    'price': 0,
-                    'market_cap': ticker_info.get('market_cap'),
-                    'avg_volume': 0,
-                    'volatility': 1.0,
-                    'data_points': 0,
-                    'exchange': exchange
-                }
-            
-            # Calculate quality metrics
-            quality_metrics = self.calculate_quality_metrics(ticker_data, exchange)
-            
-            return ticker_info, quality_metrics
-        
-        # Process tickers concurrently
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_ticker = {
-                executor.submit(process_ticker, ticker): ticker 
-                for ticker in tickers
+        try:
+            # Get company overview
+            url = "https://www.alphavantage.co/query"
+            params = {
+                'function': 'OVERVIEW',
+                'symbol': symbol,
+                'apikey': self.alpha_vantage_key
             }
             
-            for future in as_completed(future_to_ticker):
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'Error Message' in data or not data:
+                return TickerQualityMetrics(
+                    symbol=symbol,
+                    is_active=False,
+                    quality_reasons=["No data from Alpha Vantage"]
+                )
+            
+            metrics = TickerQualityMetrics(symbol=symbol)
+            
+            # Parse numeric values safely
+            def safe_float(value, default=None):
                 try:
-                    ticker_info, quality_metrics = future.result()
-                    results.append((ticker_info, quality_metrics))
-                except Exception as e:
-                    ticker = future_to_ticker[future]
-                    logger.error(f"Error processing ticker {ticker['symbol']}: {e}")
-                    continue
-                    
-                # Rate limiting
-                time.sleep(0.01)
-        
-        return results
-    
-    def filter_high_quality_tickers(self, 
-                                  tickers: List[Dict], 
-                                  min_quality_score: float = 0.6,
-                                  max_results: Optional[int] = None) -> List[Dict]:
-        """
-        Filter tickers to return only high-quality ones
-        
-        Args:
-            tickers: List of ticker dictionaries
-            min_quality_score: Minimum quality score threshold (0-1)
-            max_results: Maximum number of results to return
+                    return float(value) if value and value != 'None' else default
+                except (ValueError, TypeError):
+                    return default
             
-        Returns:
-            List of high-quality ticker dictionaries with quality metrics
-        """
-        logger.info(f"Filtering {len(tickers)} tickers for quality...")
-        
-        high_quality_tickers = []
-        
-        # Process in batches
-        for i in range(0, len(tickers), self.batch_size):
-            batch = tickers[i:i + self.batch_size]
-            logger.info(f"Processing batch {i//self.batch_size + 1}/{(len(tickers)-1)//self.batch_size + 1}")
+            metrics.market_cap = safe_float(data.get('MarketCapitalization'))
+            metrics.pe_ratio = safe_float(data.get('PERatio'))
+            metrics.beta = safe_float(data.get('Beta'))
+            metrics.debt_to_equity = safe_float(data.get('DebtToEquityRatio'))
+            metrics.profit_margin = safe_float(data.get('ProfitMargin'))
+            metrics.revenue_growth = safe_float(data.get('QuarterlyRevenueGrowthYOY'))
+            metrics.exchange = data.get('Exchange')
+            metrics.sector = data.get('Sector')
+            metrics.industry = data.get('Industry')
             
-            batch_results = self.filter_tickers_batch(batch)
+            logger.debug(f"Retrieved Alpha Vantage metrics for {symbol}")
+            return metrics
             
-            for ticker_info, quality_metrics in batch_results:
-                # Apply quality filters
-                if (quality_metrics.passes_basic_filters and 
-                    quality_metrics.overall_quality_score >= min_quality_score):
-                    
-                    # Add quality metrics to ticker info
-                    enhanced_ticker = ticker_info.copy()
-                    enhanced_ticker.update({
-                        'quality_score': quality_metrics.overall_quality_score,
-                        'market_cap': quality_metrics.market_cap,
-                        'avg_volume': quality_metrics.avg_volume,
-                        'current_price': quality_metrics.price,
-                        'exchange_quality_score': quality_metrics.exchange_quality_score,
-                        'price_stability_score': quality_metrics.price_stability_score,
-                        'data_availability_score': quality_metrics.data_availability_score,
-                        'is_high_quality': True
-                    })
-                    
-                    high_quality_tickers.append(enhanced_ticker)
+        except Exception as e:
+            logger.warning(f"Error getting Alpha Vantage metrics for {symbol}: {e}")
+            return TickerQualityMetrics(
+                symbol=symbol,
+                is_active=False,
+                quality_reasons=[f"Alpha Vantage error: {str(e)}"]
+            )
+    
+    def calculate_quality_score(self, metrics: TickerQualityMetrics) -> float:
+        """Calculate a quality score for the ticker (0-100)"""
+        if not metrics.is_active:
+            return 0.0
         
-        # Sort by quality score (highest first)
-        high_quality_tickers.sort(
-            key=lambda x: x['quality_score'], 
-            reverse=True
-        )
+        score = 0.0
+        max_score = 100.0
+        reasons = []
         
-        # Limit results if specified
-        if max_results:
-            high_quality_tickers = high_quality_tickers[:max_results]
+        # Market cap score (30 points max)
+        if metrics.market_cap:
+            if metrics.market_cap >= 10_000_000_000:  # $10B+
+                score += 30
+            elif metrics.market_cap >= 1_000_000_000:  # $1B+
+                score += 20
+            elif metrics.market_cap >= 100_000_000:  # $100M+
+                score += 10
+            else:
+                reasons.append(f"Low market cap: ${metrics.market_cap:,.0f}")
+        else:
+            reasons.append("No market cap data")
         
-        logger.info(
-            f"Filtered to {len(high_quality_tickers)} high-quality tickers "
-            f"({len(high_quality_tickers)/len(tickers)*100:.1f}% pass rate)"
-        )
+        # Price score (20 points max)
+        if metrics.price:
+            if 10 <= metrics.price <= 1000:  # Sweet spot
+                score += 20
+            elif 5 <= metrics.price <= 2000:  # Acceptable
+                score += 15
+            else:
+                reasons.append(f"Price outside optimal range: ${metrics.price:.2f}")
+        else:
+            reasons.append("No price data")
         
-        return high_quality_tickers
-
-def create_quality_summary(quality_results: List[Tuple[Dict, QualityMetrics]]) -> Dict:
-    """Create a summary of quality filtering results"""
-    total_tickers = len(quality_results)
+        # Volume score (20 points max)
+        if metrics.avg_volume:
+            if metrics.avg_volume >= 1_000_000:  # 1M+ daily volume
+                score += 20
+            elif metrics.avg_volume >= 100_000:  # 100k+ daily volume
+                score += 15
+            else:
+                reasons.append(f"Low volume: {metrics.avg_volume:,.0f}")
+        else:
+            reasons.append("No volume data")
+        
+        # Financial health score (20 points max)
+        financial_score = 0
+        if metrics.debt_to_equity is not None:
+            if metrics.debt_to_equity <= 0.5:
+                financial_score += 7
+            elif metrics.debt_to_equity <= 1.0:
+                financial_score += 5
+            elif metrics.debt_to_equity <= 2.0:
+                financial_score += 2
+            else:
+                reasons.append(f"High debt-to-equity: {metrics.debt_to_equity:.2f}")
+        
+        if metrics.current_ratio is not None:
+            if metrics.current_ratio >= 2.0:
+                financial_score += 7
+            elif metrics.current_ratio >= 1.0:
+                financial_score += 5
+            else:
+                reasons.append(f"Low current ratio: {metrics.current_ratio:.2f}")
+        
+        if metrics.profit_margin is not None:
+            if metrics.profit_margin >= 0.15:  # 15%+
+                financial_score += 6
+            elif metrics.profit_margin >= 0.05:  # 5%+
+                financial_score += 3
+            elif metrics.profit_margin < 0:
+                reasons.append(f"Negative profit margin: {metrics.profit_margin:.2%}")
+        
+        score += financial_score
+        
+        # Stability score (10 points max)
+        if metrics.beta is not None:
+            if metrics.beta <= 1.2:
+                score += 10
+            elif metrics.beta <= 2.0:
+                score += 7
+            elif metrics.beta <= 3.0:
+                score += 3
+            else:
+                reasons.append(f"High beta (volatility): {metrics.beta:.2f}")
+        
+        metrics.quality_score = score
+        metrics.quality_reasons = reasons
+        
+        return score
     
-    if total_tickers == 0:
-        return {}
+    def is_high_quality_ticker(self, metrics: TickerQualityMetrics, 
+                              min_score: float = 60.0) -> bool:
+        """Determine if a ticker meets high-quality criteria"""
+        if not metrics.is_active:
+            return False
+        
+        # Calculate quality score
+        score = self.calculate_quality_score(metrics)
+        
+        # Hard filters (must pass all)
+        hard_filters = [
+            (metrics.market_cap is None or metrics.market_cap >= self.min_market_cap,
+             f"Market cap too low: ${metrics.market_cap:,.0f}" if metrics.market_cap else "No market cap"),
+            
+            (metrics.price is None or (self.min_price <= metrics.price <= self.max_price),
+             f"Price outside range: ${metrics.price:.2f}" if metrics.price else "No price"),
+            
+            (metrics.avg_volume is None or metrics.avg_volume >= self.min_avg_volume,
+             f"Volume too low: {metrics.avg_volume:,.0f}" if metrics.avg_volume else "No volume"),
+            
+            (metrics.exchange is None or (metrics.exchange and metrics.exchange.upper() in self.allowed_exchanges),
+             f"Exchange not allowed: {metrics.exchange}" if metrics.exchange else "No exchange"),
+            
+            (metrics.sector is None or metrics.sector not in self.excluded_sectors,
+             f"Excluded sector: {metrics.sector}" if metrics.sector else "No sector")
+        ]
+        
+        for passes, reason in hard_filters:
+            if not passes:
+                metrics.quality_reasons.append(reason)
+                return False
+        
+        # Quality score filter
+        if score < min_score:
+            metrics.quality_reasons.append(f"Quality score too low: {score:.1f}")
+            return False
+        
+        return True
     
-    # Count various categories
-    penny_stocks = sum(1 for _, q in quality_results if q.is_penny_stock)
-    low_volume = sum(1 for _, q in quality_results if q.is_low_volume)
-    insufficient_data = sum(1 for _, q in quality_results if not q.has_sufficient_data)
-    passed_basic = sum(1 for _, q in quality_results if q.passes_basic_filters)
+    def filter_tickers_batch(self, symbols: List[str], 
+                           batch_size: int = 50,
+                           max_workers: int = 10,
+                           use_alpha_vantage: bool = True) -> List[TickerQualityMetrics]:
+        """Filter a batch of tickers using parallel processing"""
+        logger.info(f"Starting quality filtering for {len(symbols)} tickers")
+        
+        all_metrics = []
+        
+        # Process in batches to manage memory and rate limits
+        for i in range(0, len(symbols), batch_size):
+            batch_symbols = symbols[i:i + batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1}: "
+                       f"{len(batch_symbols)} tickers")
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit tasks
+                future_to_symbol = {}
+                
+                for symbol in batch_symbols:
+                    if use_alpha_vantage and self.alpha_vantage_key:
+                        future = executor.submit(
+                            self.get_ticker_metrics_alpha_vantage, symbol
+                        )
+                    else:
+                        future = executor.submit(
+                            self.get_ticker_metrics_yfinance, symbol
+                        )
+                    future_to_symbol[future] = symbol
+                
+                # Collect results
+                for future in as_completed(future_to_symbol):
+                    symbol = future_to_symbol[future]
+                    try:
+                        metrics = future.result()
+                        all_metrics.append(metrics)
+                    except Exception as e:
+                        logger.error(f"Error processing {symbol}: {e}")
+                        all_metrics.append(TickerQualityMetrics(
+                            symbol=symbol,
+                            is_active=False,
+                            quality_reasons=[f"Processing error: {str(e)}"]
+                        ))
+            
+            # Rate limiting between batches
+            if i + batch_size < len(symbols):
+                logger.info("Waiting between batches to respect rate limits...")
+                time.sleep(12)  # 12 second delay between batches
+        
+        logger.info(f"Completed quality filtering for {len(all_metrics)} tickers")
+        return all_metrics
     
-    # Quality score distribution
-    quality_scores = [q.overall_quality_score for _, q in quality_results if q.overall_quality_score]
-    
-    summary = {
-        'total_tickers_analyzed': total_tickers,
-        'penny_stocks_filtered': penny_stocks,
-        'low_volume_filtered': low_volume,
-        'insufficient_data_filtered': insufficient_data,
-        'passed_basic_filters': passed_basic,
-        'pass_rate_percent': (passed_basic / total_tickers) * 100,
-        'avg_quality_score': sum(quality_scores) / len(quality_scores) if quality_scores else 0,
-        'quality_score_distribution': {
-            'excellent (>= 0.9)': sum(1 for s in quality_scores if s >= 0.9),
-            'very_good (>= 0.8)': sum(1 for s in quality_scores if 0.8 <= s < 0.9),
-            'good (>= 0.7)': sum(1 for s in quality_scores if 0.7 <= s < 0.8),
-            'fair (>= 0.6)': sum(1 for s in quality_scores if 0.6 <= s < 0.7),
-            'poor (< 0.6)': sum(1 for s in quality_scores if s < 0.6)
-        }
-    }
-    
-    return summary
+    def get_high_quality_tickers(self, symbols: List[str],
+                               min_quality_score: float = 60.0,
+                               **kwargs) -> Tuple[List[str], List[TickerQualityMetrics]]:
+        """Get list of high-quality ticker symbols and their metrics"""
+        all_metrics = self.filter_tickers_batch(symbols, **kwargs)
+        
+        high_quality_symbols = []
+        high_quality_metrics = []
+        
+        for metrics in all_metrics:
+            if self.is_high_quality_ticker(metrics, min_quality_score):
+                high_quality_symbols.append(metrics.symbol)
+                high_quality_metrics.append(metrics)
+        
+        logger.info(f"Found {len(high_quality_symbols)} high-quality tickers "
+                   f"out of {len(symbols)} total ({len(high_quality_symbols)/len(symbols)*100:.1f}%)")
+        
+        return high_quality_symbols, high_quality_metrics

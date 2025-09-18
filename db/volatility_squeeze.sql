@@ -1,9 +1,6 @@
 -- Volatility Squeeze Scanner Database Schema
 -- This schema stores all volatility squeeze signals and related data for visualization
 
--- Enable RLS (Row Level Security)
-ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
-
 -- Create the main signals table
 CREATE TABLE IF NOT EXISTS volatility_squeeze_signals (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -67,6 +64,7 @@ CREATE TABLE IF NOT EXISTS volatility_squeeze_signals (
     signal_strength DECIMAL(6,4) NOT NULL,
     technical_score DECIMAL(6,4) NOT NULL,
     overall_score DECIMAL(6,4) NOT NULL,
+    opportunity_rank VARCHAR(1) CHECK (opportunity_rank IN ('S', 'A', 'B', 'C', 'D')),
     
     -- Recommendations
     recommendation VARCHAR(20) CHECK (recommendation IN ('STRONG_BUY', 'BUY', 'HOLD', 'SELL', 'STRONG_SELL', 'WATCH', 'PASS')),
@@ -83,6 +81,12 @@ CREATE TABLE IF NOT EXISTS volatility_squeeze_signals (
     ai_analysis TEXT,
     ai_confidence DECIMAL(6,4),
     
+    -- Signal Continuity Tracking
+    signal_status VARCHAR(20) CHECK (signal_status IN ('NEW', 'CONTINUING', 'ENDED')) DEFAULT 'NEW',
+    days_in_squeeze INTEGER DEFAULT 1,
+    first_detected_date DATE,
+    last_active_date DATE DEFAULT CURRENT_DATE,
+    
     -- Metadata
     is_actionable BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -97,12 +101,30 @@ CREATE INDEX IF NOT EXISTS idx_signals_recommendation ON volatility_squeeze_sign
 CREATE INDEX IF NOT EXISTS idx_signals_is_actionable ON volatility_squeeze_signals(is_actionable);
 CREATE INDEX IF NOT EXISTS idx_signals_bb_width_percentile ON volatility_squeeze_signals(bb_width_percentile);
 CREATE INDEX IF NOT EXISTS idx_signals_trend ON volatility_squeeze_signals(trend_direction);
+CREATE INDEX IF NOT EXISTS idx_signals_status ON volatility_squeeze_signals(signal_status);
+CREATE INDEX IF NOT EXISTS idx_signals_first_detected ON volatility_squeeze_signals(first_detected_date);
+CREATE INDEX IF NOT EXISTS idx_signals_last_active ON volatility_squeeze_signals(last_active_date);
+CREATE INDEX IF NOT EXISTS idx_signals_opportunity_rank ON volatility_squeeze_signals(opportunity_rank);
 
 -- Create a composite index for common queries
 CREATE INDEX IF NOT EXISTS idx_signals_composite ON volatility_squeeze_signals(
     scan_date DESC, 
     overall_score DESC, 
     is_actionable
+);
+
+-- Create a composite index for continuity tracking
+CREATE INDEX IF NOT EXISTS idx_signals_continuity ON volatility_squeeze_signals(
+    symbol, 
+    last_active_date DESC, 
+    signal_status
+);
+
+-- Create a composite index for ranking-based queries
+CREATE INDEX IF NOT EXISTS idx_signals_ranking ON volatility_squeeze_signals(
+    scan_date DESC,
+    opportunity_rank,
+    overall_score DESC
 );
 
 -- Create a table for scan summaries
@@ -166,7 +188,14 @@ SELECT
         WHEN s.overall_score >= 0.8 THEN 'Very Good'
         WHEN s.overall_score >= 0.7 THEN 'Good'
         ELSE 'Fair'
-    END as signal_quality
+    END as signal_quality,
+    
+    -- Days since first detected (calculated field)
+    CASE 
+        WHEN s.first_detected_date IS NOT NULL 
+        THEN CURRENT_DATE - s.first_detected_date
+        ELSE NULL 
+    END as total_days_tracked
     
 FROM volatility_squeeze_signals s;
 
@@ -226,4 +255,65 @@ WHERE scan_date >= CURRENT_DATE - INTERVAL '30 days'
 GROUP BY symbol 
 HAVING COUNT(*) >= 3
 ORDER BY avg_score DESC;
+
+-- New signals today (just entered squeeze)
+SELECT symbol, overall_score, bb_width_percentile, recommendation
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE AND signal_status = 'NEW'
+ORDER BY overall_score DESC;
+
+-- Continuing signals (still in squeeze from previous days)
+SELECT symbol, overall_score, days_in_squeeze, first_detected_date, total_days_tracked
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE AND signal_status = 'CONTINUING'
+ORDER BY days_in_squeeze DESC;
+
+-- Recently ended signals (exited squeeze condition)
+SELECT symbol, overall_score, days_in_squeeze, first_detected_date, last_active_date
+FROM signal_analysis 
+WHERE signal_status = 'ENDED' AND last_active_date >= CURRENT_DATE - INTERVAL '7 days'
+ORDER BY last_active_date DESC;
+
+-- Longest running active squeezes
+SELECT symbol, days_in_squeeze, first_detected_date, overall_score, bb_width_percentile
+FROM signal_analysis 
+WHERE signal_status IN ('NEW', 'CONTINUING') AND scan_date = CURRENT_DATE
+ORDER BY days_in_squeeze DESC
+LIMIT 10;
+
+-- S-Tier opportunities (premium signals)
+SELECT symbol, opportunity_rank, overall_score, bb_width_percentile, recommendation, signal_status
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE AND opportunity_rank = 'S'
+ORDER BY overall_score DESC;
+
+-- Ranking distribution for today
+SELECT opportunity_rank, COUNT(*) as count, AVG(overall_score) as avg_score
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE
+GROUP BY opportunity_rank 
+ORDER BY opportunity_rank;
+
+-- Top opportunities by rank (mixed tiers)
+SELECT symbol, opportunity_rank, overall_score, signal_status, bb_width_percentile, recommendation
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE 
+ORDER BY 
+    CASE opportunity_rank 
+        WHEN 'S' THEN 0 
+        WHEN 'A' THEN 1 
+        WHEN 'B' THEN 2 
+        WHEN 'C' THEN 3 
+        WHEN 'D' THEN 4 
+    END,
+    overall_score DESC
+LIMIT 20;
+
+-- New S/A-tier opportunities (highest priority)
+SELECT symbol, opportunity_rank, signal_status, overall_score, bb_width_percentile, recommendation
+FROM signal_analysis 
+WHERE scan_date = CURRENT_DATE 
+    AND opportunity_rank IN ('S', 'A') 
+    AND signal_status = 'NEW'
+ORDER BY opportunity_rank, overall_score DESC;
 */

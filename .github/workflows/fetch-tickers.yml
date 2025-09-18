@@ -16,24 +16,6 @@ on:
         required: false
         default: false
         type: boolean
-      disable_quality_filtering:
-        description: 'Disable quality filtering (fetch all tickers)'
-        required: false
-        default: false
-        type: boolean
-      quality_filter_config:
-        description: 'Quality filtering level'
-        required: false
-        default: 'moderate'
-        type: choice
-        options:
-          - conservative
-          - moderate
-          - liberal
-      max_quality_tickers:
-        description: 'Maximum number of quality tickers to keep'
-        required: false
-        type: number
 
 permissions:
   issues: write
@@ -57,14 +39,14 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('.github/scripts/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
           
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r .github/scripts/requirements.txt
         
     - name: Create .env file
       run: |
@@ -77,18 +59,10 @@ jobs:
       if: github.event.inputs.dry_run == 'true'
       run: |
         cd .github/scripts
-        python fetch_tickers.py --dry-run \
-          ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} \
-          ${{ github.event.inputs.disable_quality_filtering == 'true' && '--disable-quality-filtering' || '' }} \
-          ${{ github.event.inputs.quality_filter_config && format('--quality-filter-config {0}', github.event.inputs.quality_filter_config) || '' }} \
-          ${{ github.event.inputs.max_quality_tickers && format('--max-quality-tickers {0}', github.event.inputs.max_quality_tickers) || '' }}
+        python fetch_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
         
     - name: Run ticker fetch (production)
       if: github.event.inputs.dry_run != 'true'
       run: |
         cd .github/scripts
-        python fetch_tickers.py \
-          ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} \
-          ${{ github.event.inputs.disable_quality_filtering == 'true' && '--disable-quality-filtering' || '' }} \
-          ${{ github.event.inputs.quality_filter_config && format('--quality-filter-config {0}', github.event.inputs.quality_filter_config) || '' }} \
-          ${{ github.event.inputs.max_quality_tickers && format('--max-quality-tickers {0}', github.event.inputs.max_quality_tickers) || '' }}
+        python fetch_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}

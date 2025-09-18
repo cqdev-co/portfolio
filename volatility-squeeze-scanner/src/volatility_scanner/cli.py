@@ -78,7 +78,17 @@ def get_services():
         else:
             console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
         
-        return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service
+        # Signal continuity service (depends on database service)
+        continuity_service = None
+        if database_service and database_service.is_available():
+            try:
+                from volatility_scanner.services.signal_continuity_service import SignalContinuityService
+                continuity_service = SignalContinuityService(database_service)
+                console.print("[green]✅ Signal continuity tracking enabled[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Signal continuity service failed: {e}[/yellow]")
+        
+        return data_service, analysis_service, ai_service, backtest_service, ticker_service, database_service, continuity_service
         
     except Exception as e:
         console.print(f"[red]❌ Failed to initialize services: {e}[/red]")
@@ -95,7 +105,7 @@ def analyze(
     """Analyze a symbol for volatility squeeze signals."""
     
     async def _analyze():
-        data_service, analysis_service, ai_service, _ = get_services()
+        data_service, analysis_service, ai_service, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -148,7 +158,7 @@ def batch(
     """Analyze multiple symbols for volatility squeeze signals."""
     
     async def _batch_analyze():
-        data_service, analysis_service, ai_service, _ = get_services()
+        data_service, analysis_service, ai_service, _, _, _, _ = get_services()
         
         # Parse comma-separated symbols
         symbol_list = [s.strip().upper() for s in symbols.split(',')]
@@ -215,7 +225,7 @@ def backtest(
     """Run a backtest of the volatility squeeze strategy."""
     
     async def _backtest():
-        _, _, _, backtest_service = get_services()
+        _, _, _, backtest_service, _, _, _ = get_services()
         
         # Parse dates
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
@@ -318,7 +328,7 @@ def validate(
     """Validate if a symbol exists and has data."""
     
     async def _validate():
-        data_service, _, _, _ = get_services()
+        data_service, _, _, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -468,7 +478,7 @@ def scan_database(
     """Scan ticker database for volatility squeeze signals."""
     
     async def _scan_database():
-        data_service, analysis_service, ai_service, _, ticker_service, database_service = get_services()
+        data_service, analysis_service, ai_service, _, ticker_service, database_service, _ = get_services()
         
         try:
             # Get symbols based on filters
@@ -601,7 +611,7 @@ def scan_all(
     """Scan ALL available symbols for volatility squeeze signals."""
     
     async def _scan_all():
-        data_service, analysis_service, ai_service, _, ticker_service, database_service = get_services()
+        data_service, analysis_service, ai_service, _, ticker_service, database_service, continuity_service = get_services()
         
         try:
             # Get ALL symbols
@@ -691,6 +701,15 @@ def scan_all(
             analysis_time = asyncio.get_event_loop().time() - analysis_start_time
             data_fetch_time = analysis_start_time - start_time
             
+            # Process signals for continuity tracking
+            if signals and continuity_service:
+                try:
+                    console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
+                    signals = await continuity_service.process_signals_with_continuity(signals)
+                    console.print(f"[green]✅ Signal continuity processing complete[/green]")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
+            
             # Store signals in database
             if signals and database_service.is_available():
                 try:
@@ -702,14 +721,21 @@ def scan_all(
             
             # Display results
             if signals:
-                # Sort by score (highest first)
-                signals.sort(key=lambda x: x.overall_score, reverse=True)
+                # Sort by ranking tier first, then by score within tier
+                tier_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+                signals.sort(key=lambda x: (
+                    tier_order.get(x.opportunity_rank.value, 5),  # Rank tier first
+                    -x.overall_score  # Then by score (descending)
+                ))
                 
                 console.print(f"\n[bold green]🎯 Found {len(signals)} signals above threshold {min_score}[/bold green]\n")
                 
-                # Create results table
+                # Create results table with ranking and continuity information
                 table = Table(title="🔥 Top Volatility Squeeze Signals")
                 table.add_column("Symbol", style="cyan", no_wrap=True)
+                table.add_column("Rank", style="bold magenta", no_wrap=True, justify="center")
+                table.add_column("Status", style="blue", no_wrap=True)
+                table.add_column("Days", style="dim yellow", justify="right")
                 table.add_column("Score", style="magenta", justify="right")
                 table.add_column("Recommendation", style="green")
                 table.add_column("Trend", style="blue")
@@ -718,8 +744,30 @@ def scan_all(
                 
                 for signal in signals[:20]:  # Show top 20
                     squeeze = signal.squeeze_signal
+                    
+                    # Format status with emoji
+                    status_emoji = {
+                        'NEW': '🆕',
+                        'CONTINUING': '🔄',
+                        'ENDED': '🔚'
+                    }
+                    status_display = f"{status_emoji.get(squeeze.signal_status.value, '❓')} {squeeze.signal_status.value}"
+                    
+                    # Format ranking with styling
+                    rank_colors = {
+                        'S': '🏆 S',  # Gold trophy for S-tier
+                        'A': '🥇 A',  # Gold medal for A-tier
+                        'B': '🥈 B',  # Silver medal for B-tier
+                        'C': '🥉 C',  # Bronze medal for C-tier
+                        'D': '📉 D'   # Chart down for D-tier
+                    }
+                    rank_display = rank_colors.get(signal.opportunity_rank.value, f"❓ {signal.opportunity_rank.value}")
+                    
                     table.add_row(
                         signal.symbol,
+                        rank_display,
+                        status_display,
+                        str(squeeze.days_in_squeeze),
                         f"{signal.overall_score:.3f}",
                         signal.recommendation,
                         squeeze.trend_direction.value,
@@ -770,6 +818,33 @@ def scan_all(
             console.print(f"   📈 Signal rate: {len(signals)/len(symbol_data)*100:.1f}%" if symbol_data else "0%")
             console.print(f"   🔄 Data retrieval success: {len(symbol_data)/len(all_symbols)*100:.1f}%")
             
+            # Signal continuity summary
+            if signals and continuity_service:
+                new_count = len([s for s in signals if s.squeeze_signal.signal_status.value == 'NEW'])
+                continuing_count = len([s for s in signals if s.squeeze_signal.signal_status.value == 'CONTINUING'])
+                avg_days = sum(s.squeeze_signal.days_in_squeeze for s in signals) / len(signals) if signals else 0
+                max_days = max(s.squeeze_signal.days_in_squeeze for s in signals) if signals else 0
+                
+                console.print(f"\n[bold cyan]🔄 Signal Continuity Tracking:[/bold cyan]")
+                console.print(f"   🆕 New signals: {new_count}")
+                console.print(f"   🔄 Continuing signals: {continuing_count}")
+                console.print(f"   📅 Average days in squeeze: {avg_days:.1f}")
+                console.print(f"   🏆 Longest running squeeze: {max_days} days")
+                
+                # Opportunity ranking summary
+                rank_counts = {}
+                for rank in ['S', 'A', 'B', 'C', 'D']:
+                    count = len([s for s in signals if s.opportunity_rank.value == rank])
+                    if count > 0:
+                        rank_counts[rank] = count
+                
+                if rank_counts:
+                    console.print(f"\n[bold gold1]🏆 Opportunity Rankings:[/bold gold1]")
+                    rank_emojis = {'S': '🏆', 'A': '🥇', 'B': '🥈', 'C': '🥉', 'D': '📉'}
+                    for rank, count in rank_counts.items():
+                        emoji = rank_emojis.get(rank, '❓')
+                        console.print(f"   {emoji} {rank}-Tier: {count} signals")
+            
             # Performance metrics
             console.print(f"\n[bold green]⚡ Performance Metrics:[/bold green]")
             console.print(f"   📥 Data fetch time: {data_fetch_time:.1f}s")
@@ -812,7 +887,7 @@ def query_signals(
     """Query stored volatility squeeze signals from database."""
     
     async def _query_signals():
-        _, _, _, _, _, database_service = get_services()
+        _, _, _, _, _, database_service, _ = get_services()
         
         if not database_service.is_available():
             console.print("[red]❌ Database service not available[/red]")
@@ -872,7 +947,7 @@ def list_tickers(
     """List available tickers from the database."""
     
     def _list_tickers():
-        _, _, _, _, ticker_service = get_services()
+        _, _, _, _, ticker_service, _, _ = get_services()
         
         try:
             console.print("[bold blue]📊 Ticker Database Information[/bold blue]")
