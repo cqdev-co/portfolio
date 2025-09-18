@@ -1,9 +1,9 @@
-name: Fetch Global Market Tickers
+name: Weekly Global Market Tickers Update
 
 on:
   schedule:
-    # Run daily at 6 AM UTC (after markets close)
-    - cron: '0 6 * * *'
+    # Run weekly on Sundays at 6 AM UTC (after week ends, before new week starts)
+    - cron: '0 6 * * 0'
   workflow_dispatch:
     inputs:
       dry_run:

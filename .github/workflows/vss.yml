@@ -1,15 +1,17 @@
-name: Daily Volatility Squeeze Scanner
+name: Market Hours Volatility Squeeze Scanner
 
 on:
   schedule:
-    # Run daily at 6:30 AM UTC (after US market close, before next day prep)
-    - cron: '30 6 * * 1-5'  # Monday to Friday only
+    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM EST)
+    # EST = UTC-5, EDT = UTC-4 (market hours: 14:30-21:00 UTC in EST, 13:30-20:00 UTC in EDT)
+    # Using EST times (UTC-5) for consistency: 14:30-21:00 UTC
+    - cron: '30,0 14,15,16,17,18,19,20 * * 1-5'  # Every 30 min during market hours, Mon-Fri
   workflow_dispatch:  # Allow manual triggering
     inputs:
       min_score:
         description: 'Minimum signal score threshold'
         required: false
-        default: '0.9'
+        default: '0.7'
         type: string
       max_symbols:
         description: 'Maximum symbols to scan (leave empty for all)'
@@ -23,7 +25,7 @@ env:
 jobs:
   scan-signals:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Prevent hanging jobs
+    timeout-minutes: 45  # Shorter timeout for frequent runs
     
     steps:
     - name: Checkout code
@@ -56,6 +58,30 @@ jobs:
         poetry add typer@0.9.4 --group=main
         poetry install --only=main
         
+    - name: Validate market hours
+      run: |
+        # Check if we're within market hours (allowing some buffer)
+        CURRENT_HOUR=$(date -u +%H)
+        CURRENT_MINUTE=$(date -u +%M)
+        CURRENT_DAY=$(date -u +%u)  # 1=Monday, 7=Sunday
+        
+        echo "Current UTC time: $(date -u)"
+        echo "Current hour: $CURRENT_HOUR, minute: $CURRENT_MINUTE, day: $CURRENT_DAY"
+        
+        # Market hours: 14:30-21:00 UTC (9:30 AM - 4:00 PM EST)
+        # Allow weekend manual runs for testing
+        if [ "$CURRENT_DAY" -le 5 ]; then  # Monday-Friday
+          if [ "$CURRENT_HOUR" -lt 14 ] || [ "$CURRENT_HOUR" -gt 20 ]; then
+            echo "⚠️  Outside standard market hours, but proceeding with scan"
+          elif [ "$CURRENT_HOUR" -eq 14 ] && [ "$CURRENT_MINUTE" -lt 30 ]; then
+            echo "⚠️  Before market open (9:30 AM EST), but proceeding with scan"
+          else
+            echo "✅ Within market hours - proceeding with scan"
+          fi
+        else
+          echo "📅 Weekend detected - manual run or testing"
+        fi
+        
     - name: Run Volatility Squeeze Scanner
       env:
         # Frontend environment variables
@@ -68,8 +94,8 @@ jobs:
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
       working-directory: volatility-squeeze-scanner
       run: |
-        # Set scan parameters
-        MIN_SCORE="${{ github.event.inputs.min_score || '0.7' }}"
+        # Set scan parameters (lower threshold for frequent runs)
+        MIN_SCORE="${{ github.event.inputs.min_score || '0.6' }}"
         MAX_SYMBOLS="${{ github.event.inputs.max_symbols }}"
         
         # Build command with optional parameters
@@ -159,14 +185,18 @@ jobs:
       if: success()
       run: |
         SIGNALS_FOUND="${{ steps.check-scan-success.outputs.signals_found || '0' }}"
+        CURRENT_TIME=$(date -u '+%H:%M UTC')
         
-        if [ "$SIGNALS_FOUND" -gt 10 ]; then
-          echo "🚨 High signal count detected: $SIGNALS_FOUND signals found!"
-          echo "Consider reviewing the market conditions and signal quality."
+        if [ "$SIGNALS_FOUND" -gt 20 ]; then
+          echo "🚨 Very high signal count detected: $SIGNALS_FOUND signals found at $CURRENT_TIME!"
+          echo "Market may be experiencing unusual volatility - review immediately."
+        elif [ "$SIGNALS_FOUND" -gt 10 ]; then
+          echo "⚡ High signal count detected: $SIGNALS_FOUND signals found at $CURRENT_TIME"
+          echo "Above average market activity detected."
         elif [ "$SIGNALS_FOUND" -gt 0 ]; then
-          echo "📊 Found $SIGNALS_FOUND signals - normal activity"
+          echo "📊 Found $SIGNALS_FOUND signals at $CURRENT_TIME - normal activity"
         else
-          echo "📉 No signals found - quiet market or high threshold"
+          echo "📉 No signals found at $CURRENT_TIME - quiet market or high threshold"
         fi
 
   # Optional: Add a job to create summary issue or send notifications
@@ -178,10 +208,11 @@ jobs:
     steps:
     - name: Create run summary
       run: |
-        echo "## 📊 Daily Volatility Squeeze Scanner Results" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Market Hours Volatility Squeeze Scanner Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "**Status:** ${{ needs.scan-signals.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Schedule:** Every 30 minutes during market hours (9:30 AM - 4:00 PM EST)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ needs.scan-signals.result }}" = "success" ]; then
@@ -198,4 +229,5 @@ jobs:
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "*Signals are stored in Supabase database for analysis and visualization.*" >> $GITHUB_STEP_SUMMARY
+        echo "*Signals are stored in Supabase database for real-time analysis and visualization.*" >> $GITHUB_STEP_SUMMARY
+        echo "*Next scan scheduled in 30 minutes (if within market hours).*" >> $GITHUB_STEP_SUMMARY

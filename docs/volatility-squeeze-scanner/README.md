@@ -32,9 +32,9 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 - **Backtesting Framework**: Historical performance validation
 
 ### 🚀 **Production-Ready Infrastructure**
-- **Daily Automated Scanning**: GitHub Actions workflow
-- **Database Integration**: Supabase for signal storage
-- **Web Interface**: React/Next.js frontend
+- **Real-Time Automated Scanning**: GitHub Actions workflow running every 30 minutes during market hours
+- **Database Integration**: Supabase for signal storage with real-time updates
+- **Web Interface**: React/Next.js frontend with live data
 - **CLI Tools**: Command-line interface for analysis
 - **API Service**: FastAPI web service
 
@@ -148,10 +148,11 @@ Signals are stored with comprehensive tracking:
 ## Monitoring & Alerts
 
 ### GitHub Actions Workflow
-- **Automated Daily Scans**: Monday-Friday at 6:30 AM UTC
-- **Error Handling**: Comprehensive error recovery
-- **Artifact Storage**: 30-day log retention
-- **Issue Creation**: Automatic failure notifications
+- **Real-Time Market Scans**: Every 30 minutes during US market hours (9:30 AM - 4:00 PM EST, Monday-Friday)
+- **Market Hours Validation**: Automatic detection of trading hours with appropriate logging
+- **Error Handling**: Comprehensive error recovery with shorter timeouts for frequent runs
+- **Artifact Storage**: 30-day log retention with timestamped results
+- **Issue Creation**: Automatic failure notifications with market time context
 
 ### Alert Criteria
 Consider alerts for:
