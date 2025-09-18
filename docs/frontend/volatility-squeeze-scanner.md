@@ -31,6 +31,7 @@ The Volatility Squeeze Scanner is a professional, modern web interface for displ
 - **Smooth Animations**: Slide-in/out transitions for sidebar
 - **Keyboard Navigation**: Escape key to close sidebar, click outside to dismiss
 - **External Integration**: Clickable ticker symbols redirect to Yahoo Finance for detailed charts and fundamentals
+
 - **Dark/Light Mode**: Seamless theme switching support
 - **Loading States**: Smooth loading animations and error handling
 - **Interactive Elements**: Hover effects and smooth transitions
@@ -165,6 +166,9 @@ fetchVolatilitySignals({
 ```
 
 This ensures the volatility squeeze scanner always shows actionable, current opportunities while maintaining the flexibility to analyze historical signal patterns when needed.
+
+- **Computed Fields**: Days since scan, squeeze categories, signal quality tiers
+- **Real-time Metadata**: Creation/update timestamps, actionability flags
 
 ### Environment Configuration
 Required environment variables in `.env.local`:

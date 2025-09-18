@@ -37,6 +37,9 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 - **Data Integrity**: Automatic duplicate detection and cleanup tools
 - **Web Interface**: React/Next.js frontend with live data
 - **CLI Tools**: Command-line interface for analysis and database maintenance
+- **Database Integration**: Supabase for signal storage with real-time updates
+- **Web Interface**: React/Next.js frontend with live data
+- **CLI Tools**: Command-line interface for analysis
 - **API Service**: FastAPI web service
 
 ## Documentation Index
