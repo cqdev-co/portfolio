@@ -93,6 +93,10 @@ CREATE TABLE IF NOT EXISTS volatility_squeeze_signals (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Create a unique constraint to prevent duplicates for same symbol on same date
+CREATE UNIQUE INDEX IF NOT EXISTS idx_signals_unique_symbol_date 
+ON volatility_squeeze_signals(symbol, scan_date);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_signals_symbol ON volatility_squeeze_signals(symbol);
 CREATE INDEX IF NOT EXISTS idx_signals_scan_date ON volatility_squeeze_signals(scan_date);

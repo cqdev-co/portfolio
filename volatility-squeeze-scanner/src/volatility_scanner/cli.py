@@ -602,6 +602,69 @@ def scan_database(
 
 
 @app.command()
+def cleanup_duplicates(
+    target_date: Optional[str] = typer.Option(None, "--date", help="Target date (YYYY-MM-DD, defaults to today)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be removed without actually removing")
+) -> None:
+    """Clean up duplicate signals in the database."""
+    
+    async def _cleanup_duplicates():
+        _, _, _, _, database_service, _ = get_services()
+        
+        if not database_service.is_available():
+            console.print("[red]❌ Database service not available[/red]")
+            raise typer.Exit(1)
+        
+        # Parse target date
+        if target_date:
+            try:
+                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+            except ValueError:
+                console.print("[red]❌ Invalid date format. Use YYYY-MM-DD[/red]")
+                raise typer.Exit(1)
+        else:
+            parsed_date = date.today()
+        
+        console.print(f"[bold blue]🔍 Analyzing duplicates for {parsed_date}...[/bold blue]")
+        
+        # Get duplicate statistics
+        stats = await database_service.get_duplicate_signals_count(parsed_date)
+        
+        if not stats:
+            console.print("[red]❌ Failed to get duplicate statistics[/red]")
+            raise typer.Exit(1)
+        
+        console.print(f"[cyan]📊 Signal Statistics for {parsed_date}:[/cyan]")
+        console.print(f"  • Total signals: {stats['total_signals']}")
+        console.print(f"  • Unique symbols: {stats['unique_symbols']}")
+        console.print(f"  • Duplicates: {stats['duplicates']}")
+        
+        if stats['duplicates'] == 0:
+            console.print("[green]✅ No duplicates found![/green]")
+            return
+        
+        if dry_run:
+            console.print(f"[yellow]🔍 DRY RUN: Would remove {stats['duplicates']} duplicate signals[/yellow]")
+            return
+        
+        # Confirm cleanup
+        if not typer.confirm(f"Remove {stats['duplicates']} duplicate signals?"):
+            console.print("[yellow]⚠️  Cleanup cancelled[/yellow]")
+            return
+        
+        # Perform cleanup
+        console.print("[bold blue]🧹 Cleaning up duplicates...[/bold blue]")
+        removed_count = await database_service.cleanup_duplicate_signals(parsed_date)
+        
+        if removed_count > 0:
+            console.print(f"[green]✅ Successfully removed {removed_count} duplicate signals[/green]")
+        else:
+            console.print("[yellow]⚠️  No duplicates were removed[/yellow]")
+    
+    asyncio.run(_cleanup_duplicates())
+
+
+@app.command()
 def scan_all(
     min_score: float = typer.Option(0.6, "--min-score", help="Minimum signal score threshold"),
     max_symbols: Optional[int] = typer.Option(None, "--max-symbols", help="Maximum symbols to scan (None for all symbols)"),
@@ -710,12 +773,31 @@ def scan_all(
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
             
-            # Store signals in database
+            # Store signals in database (now with duplicate prevention)
             if signals and database_service.is_available():
                 try:
+                    # Check for existing duplicates before storing
+                    today = date.today()
+                    duplicate_stats = await database_service.get_duplicate_signals_count(today)
+                    
+                    if duplicate_stats.get('duplicates', 0) > 0:
+                        console.print(f"[yellow]⚠️  Found {duplicate_stats['duplicates']} existing duplicates for today[/yellow]")
+                        console.print("[blue]🧹 Cleaning up existing duplicates before storing new signals...[/blue]")
+                        
+                        cleaned_count = await database_service.cleanup_duplicate_signals(today)
+                        if cleaned_count > 0:
+                            console.print(f"[green]✅ Cleaned up {cleaned_count} duplicate signals[/green]")
+                    
+                    # Store new signals (using upsert to prevent new duplicates)
                     stored_count = await database_service.store_signals_batch(signals)
                     if stored_count > 0:
-                        console.print(f"[green]💾 Stored {stored_count} signals in database[/green]")
+                        console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
+                        
+                        # Verify no duplicates were created
+                        final_stats = await database_service.get_duplicate_signals_count(today)
+                        if final_stats.get('duplicates', 0) > 0:
+                            console.print(f"[yellow]⚠️  Warning: {final_stats['duplicates']} duplicates still exist[/yellow]")
+                            
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
             

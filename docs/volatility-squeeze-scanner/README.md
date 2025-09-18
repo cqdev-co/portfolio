@@ -33,6 +33,10 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 
 ### 🚀 **Production-Ready Infrastructure**
 - **Real-Time Automated Scanning**: GitHub Actions workflow running every 30 minutes during market hours
+- **Database Integration**: Supabase for signal storage with real-time updates and duplicate prevention
+- **Data Integrity**: Automatic duplicate detection and cleanup tools
+- **Web Interface**: React/Next.js frontend with live data
+- **CLI Tools**: Command-line interface for analysis and database maintenance
 - **Database Integration**: Supabase for signal storage with real-time updates
 - **Web Interface**: React/Next.js frontend with live data
 - **CLI Tools**: Command-line interface for analysis
@@ -41,6 +45,7 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 ## Documentation Index
 
 - **[Enhanced Filtering Improvements](./enhanced-filtering-improvements.md)** - Latest signal quality enhancements *(New)*
+- **[Duplicate Signal Handling](./duplicate-signal-handling.md)** - Data integrity and duplicate prevention *(New)*
 - **[Opportunity Ranking System](./opportunity-ranking-system.md)** - Multi-tier ranking for prioritizing signals
 - **[Signal Continuity Tracking](./signal-continuity-tracking.md)** - Feature for tracking signal evolution
 - **[Frontend Integration](../frontend/volatility-squeeze-scanner.md)** - Web interface documentation
@@ -109,11 +114,17 @@ The scanner processes:
 ### CLI Commands
 
 ```bash
-# Scan all symbols with continuity tracking
+# Scan all symbols with continuity tracking and duplicate prevention
 poetry run python -m volatility_scanner.cli scan-all --min-score 0.7
 
 # Analyze specific symbol
 poetry run python -m volatility_scanner.cli analyze AAPL
+
+# Database maintenance - check for duplicates
+poetry run python -m volatility_scanner.cli cleanup-duplicates --dry-run
+
+# Database maintenance - clean up duplicates
+poetry run python -m volatility_scanner.cli cleanup-duplicates
 
 # Query stored signals
 poetry run python -m volatility_scanner.cli query-signals --min-score 0.8

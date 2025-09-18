@@ -10,5 +10,6 @@ export default async function AboutOGImage() {
     title: 'About Me',
     subtitle: 'Security Engineer specializing in cloud security, DevSecOps, and secure infrastructure',
     logoText: DATA.initials,
+    backgroundStyle: 'serene-gold',
   });
 }
