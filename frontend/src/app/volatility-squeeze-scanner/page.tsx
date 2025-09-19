@@ -17,7 +17,8 @@ import { Card } from "@/components/ui/card";
 import type { VolatilitySqueezeSignal, SignalFilters, SignalSortConfig } from "@/lib/types/signals";
 import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
 import { cn } from "@/lib/utils";
-import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw, ExternalLink, Lock } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
 
 // Helper function to safely parse numeric values
 function safeParseNumber(value: string | number | null): number {
@@ -99,6 +100,7 @@ function getOpportunityRankColor(rank: string) {
 }
 
 export default function VolatilitySqueezeScanner() {
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [signals, setSignals] = useState<VolatilitySqueezeSignal[]>([]);
   const [stats, setStats] = useState<SignalStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,11 @@ export default function VolatilitySqueezeScanner() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSignal, setSelectedSignal] = useState<VolatilitySqueezeSignal | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Authentication gating constants
+  const MAX_FREE_SIGNALS = 3;
+  const isAuthenticated = !!user;
+  const shouldShowAllSignals = isAuthenticated;
 
   // Load data
   const loadData = useCallback(async (showRefreshing = false) => {
@@ -168,7 +175,8 @@ export default function VolatilitySqueezeScanner() {
   }, [loadData]);
 
   // Signals are already filtered and sorted by the API
-  const displaySignals = signals;
+  // For unauthenticated users, only show top 5 signals
+  const displaySignals = shouldShowAllSignals ? signals : signals.slice(0, MAX_FREE_SIGNALS);
 
   // Handle keyboard navigation in sidebar
   useEffect(() => {
@@ -231,7 +239,7 @@ export default function VolatilitySqueezeScanner() {
     setTimeout(() => setSelectedSignal(null), 300);
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex flex-col gap-12">
         <section>
@@ -248,29 +256,37 @@ export default function VolatilitySqueezeScanner() {
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <section>
+      <header>
         <div className="flex items-center gap-3 mb-3">
-          <Activity className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-medium">Volatility Squeeze Scanner</h1>
+          <Activity className="h-6 w-6 text-primary" aria-hidden="true" />
+          <h1 className="text-2xl font-medium">Professional Volatility Squeeze Scanner</h1>
         </div>
         <Separator className="mb-4" />
-        <p className="text-compact text-muted-foreground">
-          The volatility squeeze strategy identifies stocks experiencing unusually low price movement, 
-          which often precedes explosive breakouts in either direction. Deploy this scanner when markets 
-          are calm and consolidating—these compressed periods historically deliver 1.2-3.3% moves with high accuracy.
-        </p>
-      </section>
+        <div className="text-compact text-muted-foreground space-y-2">
+          <p>
+            The <strong>volatility squeeze strategy</strong> identifies stocks experiencing unusually low price movement, 
+            which often precedes explosive breakouts in either direction. This professional <em>stock market scanner</em> uses 
+            <strong>Bollinger Bands</strong> and <strong>Keltner Channels</strong> to detect squeeze conditions with high accuracy.
+          </p>
+          <p>
+            Deploy this <strong>trading tool</strong> when markets are calm and consolidating—these compressed periods 
+            historically deliver <strong>1.2-3.3% moves</strong> with exceptional precision. Perfect for 
+            <em>day traders</em> and <em>swing traders</em> seeking high-probability breakout opportunities.
+          </p>
+        </div>
+      </header>
 
       {/* Market Conditions & Stats */}
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="market-conditions-title">
+        <h2 id="market-conditions-title" className="sr-only">Market Conditions and Statistics</h2>
         {/* Simple Market Conditions */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-muted-foreground">Market Conditions:</span>
-            <span className="font-medium">Favorable for Squeeze Strategy</span>
+            <div className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true"></div>
+            <span className="text-muted-foreground">Current Market Conditions:</span>
+            <span className="font-medium">Favorable for Volatility Squeeze Strategy</span>
           </div>
-          <span className="text-xs text-muted-foreground">Low Vol Regime • VIX ~20</span>
+          <span className="text-xs text-muted-foreground" title="Market volatility indicators">Low Vol Regime • VIX ~20</span>
         </div>
 
         {/* Stats Cards */}
@@ -307,14 +323,16 @@ export default function VolatilitySqueezeScanner() {
       </section>
 
       {/* Search and Filters */}
-      <section className="flex flex-col sm:flex-row gap-4">
+      <section className="flex flex-col sm:flex-row gap-4" aria-labelledby="search-section-title">
+        <h2 id="search-section-title" className="sr-only">Search and Filter Stock Signals</h2>
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
-            placeholder="Search symbols..."
+            placeholder="Search stock symbols (e.g., AAPL, GOOGL)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+            aria-label="Search for stock symbols"
           />
         </div>
         <div className="flex gap-2">
@@ -343,8 +361,9 @@ export default function VolatilitySqueezeScanner() {
       )}
 
       {/* Signals Table */}
-      <section>
-        <div className="rounded-md border">
+      <section aria-labelledby="signals-table-title">
+        <h2 id="signals-table-title" className="sr-only">Live Volatility Squeeze Signals</h2>
+        <div className="rounded-md border" role="region" aria-label="Stock signals data table">
           <Table>
             <TableHeader>
               <TableRow>
@@ -446,6 +465,98 @@ export default function VolatilitySqueezeScanner() {
             <p className="text-muted-foreground">No signals found matching your criteria.</p>
           </div>
         )}
+
+        {/* Authentication Gate for Additional Signals */}
+        {!isAuthenticated && signals.length > MAX_FREE_SIGNALS && (
+          <div className="relative mt-8">
+            {/* Blurred preview of additional signals */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-20 rounded-md" />
+              <div className="blur-sm pointer-events-none select-none opacity-60">
+                <Table>
+                  <TableBody>
+                    {signals.slice(MAX_FREE_SIGNALS, MAX_FREE_SIGNALS + 3).map((signal, index) => (
+                      <TableRow key={`preview-${index}`}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {signal.symbol}
+                            {signal.is_actionable && (
+                              <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">${safeParseNumber(signal.close_price).toFixed(2)}</span>
+                            <span className={cn(
+                              "text-caption",
+                              safeParseNumber(signal.price_vs_20d_high) >= 0 ? "text-green-600" : "text-red-600"
+                            )}>
+                              {safeParseNumber(signal.price_vs_20d_high) >= 0 ? "+" : ""}{safeParseNumber(signal.price_vs_20d_high).toFixed(1)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{(safeParseNumber(signal.overall_score) * 100).toFixed(0)}%</span>
+                            <span className="text-caption text-muted-foreground">
+                              {signal.signal_quality}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {signal.opportunity_rank && (
+                            <Badge className={getOpportunityRankColor(signal.opportunity_rank)}>
+                              {signal.opportunity_rank}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {signal.recommendation && (
+                            <Badge className={getRecommendationColor(signal.recommendation)}>
+                              {signal.recommendation.replace("_", " ")}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Sign-in CTA overlay */}
+            <div className="absolute inset-0 z-30 flex items-center justify-center">
+              <Card className="p-8 text-center max-w-md mx-auto bg-background/95 backdrop-blur-sm border-2 border-primary/20">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="p-3 rounded-full bg-primary/10">
+                    <Lock className="h-6 w-6 text-primary" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Sign In to See the Rest!</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  You&apos;re viewing the top {MAX_FREE_SIGNALS} signals. Sign in to access all {signals.length} volatility squeeze opportunities and unlock detailed analysis.
+                </p>
+                <Button 
+                  onClick={signInWithGoogle}
+                  className="w-full"
+                  size="lg"
+                >
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Sign In with Google
+                </Button>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Free account • Access all features instantly
+                </p>
+              </Card>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Detail Sidebar */}
@@ -496,7 +607,7 @@ export default function VolatilitySqueezeScanner() {
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
                 {/* Price & Performance */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Price & Performance</h3>
@@ -603,118 +714,158 @@ export default function VolatilitySqueezeScanner() {
 
                 <Separator />
 
-                {/* Trend & Volume */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Trend & Volume</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Trend Direction</span>
-                      <div className="flex items-center gap-1">
-                        {selectedSignal.trend_direction === "bullish" ? (
-                          <TrendingUp className="h-3 w-3 text-green-500" />
-                        ) : selectedSignal.trend_direction === "bearish" ? (
-                          <TrendingDown className="h-3 w-3 text-red-500" />
-                        ) : (
-                          <div className="h-3 w-3" />
-                        )}
-                        <span className="text-xs font-medium capitalize">{selectedSignal.trend_direction || "N/A"}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Volume</span>
-                      <span className="text-xs font-medium">
-                        {selectedSignal.volume ? `${(selectedSignal.volume / 1000000).toFixed(1)}M` : "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Volume Ratio</span>
-                      <span className="text-xs font-medium">
-                        {safeParseNumber(selectedSignal.volume_ratio) > 0 ? `${safeParseNumber(selectedSignal.volume_ratio).toFixed(1)}x` : "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Risk Management */}
-                {selectedSignal.stop_loss_price && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risk Management</h3>
+                {/* Premium Sections Container */}
+                <div className="relative">
+                  {/* Premium content with blur effect */}
+                  <div className={cn("space-y-4", !isAuthenticated && "blur-sm select-none pointer-events-none opacity-60")}>
+                    {/* Trend & Volume */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs">Stop Loss</span>
-                        <span className="text-xs font-medium">${safeParseNumber(selectedSignal.stop_loss_price).toFixed(2)}</span>
-                      </div>
-                      {safeParseNumber(selectedSignal.stop_loss_distance_pct) > 0 && (
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Trend & Volume</h3>
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs">Stop Distance</span>
-                          <span className="text-xs font-medium">{safeParseNumber(selectedSignal.stop_loss_distance_pct).toFixed(1)}%</span>
+                          <span className="text-xs">Trend Direction</span>
+                          <div className="flex items-center gap-1">
+                            {selectedSignal.trend_direction === "bullish" ? (
+                              <TrendingUp className="h-3 w-3 text-green-500" />
+                            ) : selectedSignal.trend_direction === "bearish" ? (
+                              <TrendingDown className="h-3 w-3 text-red-500" />
+                            ) : (
+                              <div className="h-3 w-3" />
+                            )}
+                            <span className="text-xs font-medium capitalize">{selectedSignal.trend_direction || "N/A"}</span>
+                          </div>
                         </div>
-                      )}
-                      {safeParseNumber(selectedSignal.position_size_pct) > 0 && (
                         <div className="flex items-center justify-between">
-                          <span className="text-xs">Position Size</span>
-                          <span className="text-xs font-medium">{(safeParseNumber(selectedSignal.position_size_pct) * 100).toFixed(1)}%</span>
+                          <span className="text-xs">Volume</span>
+                          <span className="text-xs font-medium">
+                            {selectedSignal.volume ? `${(selectedSignal.volume / 1000000).toFixed(1)}M` : "N/A"}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Technical Indicators */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Technical Indicators</h3>
-                  <div className="space-y-2">
-                    {safeParseNumber(selectedSignal.bb_upper) > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Bollinger Bands</p>
-                        <div className="text-xs space-y-0.5">
-                          <div className="flex justify-between">
-                            <span>Upper:</span>
-                            <span>${safeParseNumber(selectedSignal.bb_upper).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Middle:</span>
-                            <span>${safeParseNumber(selectedSignal.bb_middle).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Lower:</span>
-                            <span>${safeParseNumber(selectedSignal.bb_lower).toFixed(2)}</span>
-                          </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Volume Ratio</span>
+                          <span className="text-xs font-medium">
+                            {safeParseNumber(selectedSignal.volume_ratio) > 0 ? `${safeParseNumber(selectedSignal.volume_ratio).toFixed(1)}x` : "N/A"}
+                          </span>
                         </div>
                       </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Risk Management */}
+                    {selectedSignal.stop_loss_price && (
+                      <>
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risk Management</h3>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs">Stop Loss</span>
+                              <span className="text-xs font-medium">${safeParseNumber(selectedSignal.stop_loss_price).toFixed(2)}</span>
+                            </div>
+                            {safeParseNumber(selectedSignal.stop_loss_distance_pct) > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs">Stop Distance</span>
+                                <span className="text-xs font-medium">{safeParseNumber(selectedSignal.stop_loss_distance_pct).toFixed(1)}%</span>
+                              </div>
+                            )}
+                            {safeParseNumber(selectedSignal.position_size_pct) > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs">Position Size</span>
+                                <span className="text-xs font-medium">{(safeParseNumber(selectedSignal.position_size_pct) * 100).toFixed(1)}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Separator />
+                      </>
                     )}
-                    {safeParseNumber(selectedSignal.atr_20) > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs">ATR (20)</span>
-                        <span className="text-xs font-medium">{safeParseNumber(selectedSignal.atr_20).toFixed(2)}</span>
+
+                    {/* Technical Indicators */}
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Technical Indicators</h3>
+                      <div className="space-y-2">
+                        {safeParseNumber(selectedSignal.bb_upper) > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Bollinger Bands</p>
+                            <div className="text-xs space-y-0.5">
+                              <div className="flex justify-between">
+                                <span>Upper:</span>
+                                <span>${safeParseNumber(selectedSignal.bb_upper).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Middle:</span>
+                                <span>${safeParseNumber(selectedSignal.bb_middle).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Lower:</span>
+                                <span>${safeParseNumber(selectedSignal.bb_lower).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {safeParseNumber(selectedSignal.atr_20) > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">ATR (20)</span>
+                            <span className="text-xs font-medium">{safeParseNumber(selectedSignal.atr_20).toFixed(2)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                <Separator />
+                    <Separator />
 
-                {/* Metadata */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scan Info</h3>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Scan Date</span>
-                      <span className="text-xs">{new Date(selectedSignal.scan_date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Days Since</span>
-                      <span className="text-xs">{selectedSignal.days_since_scan} days</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Updated</span>
-                      <span className="text-xs">{new Date(selectedSignal.updated_at).toLocaleDateString()}</span>
+                    {/* Metadata */}
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scan Info</h3>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Scan Date</span>
+                          <span className="text-xs">{new Date(selectedSignal.scan_date).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Days Since</span>
+                          <span className="text-xs">{selectedSignal.days_since_scan} days</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Updated</span>
+                          <span className="text-xs">{new Date(selectedSignal.updated_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Overlay for premium sections only */}
+                  {!isAuthenticated && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50">
+                      <Card className="p-6 text-center max-w-xs mx-auto bg-background/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl">
+                        <div className="flex items-center justify-center mb-3">
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <Lock className="h-5 w-5 text-primary" />
+                          </div>
+                        </div>
+                        <h3 className="text-base font-semibold mb-2">Sign In to View Premium Analysis</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          Get access to detailed technical indicators, risk management data, and comprehensive market insights.
+                        </p>
+                        <Button 
+                          onClick={signInWithGoogle}
+                          className="w-full mb-3"
+                          size="sm"
+                        >
+                          <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          Sign In with Google
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Free account • Access all features instantly
+                        </p>
+                      </Card>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,5 +1,18 @@
 # Frontend Documentation
 
+## Authentication Gating Feature
+
+The frontend now includes a sophisticated authentication gating system for the Volatility Squeeze Scanner, implementing a freemium model that encourages user registration while providing immediate value to anonymous visitors.
+
+### Key Features
+- **Freemium Access**: Top 3 signals visible to all users, full access for authenticated users
+- **Visual Incentive**: Blurred preview of additional signals with elegant sign-in CTA
+- **Sidebar Gating**: Premium analysis sections blurred with prominent sign-in banner
+- **One-Click Authentication**: Google OAuth integration with smart return URL handling for seamless user onboarding
+- **Professional UX**: Glass morphism effects and smooth visual transitions
+
+For detailed implementation documentation, see [Authentication Gating](./authentication-gating.md).
+
 ## Open Graph Images with WP-Service Backgrounds
 
 ### Overview
