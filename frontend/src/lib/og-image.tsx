@@ -64,38 +64,44 @@ export function createOGImage({
           fontFamily: 'sans-serif',
         }}
       >
-        {/* Logo Circle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '120px',
-            height: '120px',
-            borderRadius: '60px',
-            backgroundColor: style.logoBackground,
-            marginBottom: '30px',
-            fontWeight: 'bold',
-            fontSize: '48px',
-            backdropFilter: backgroundStyle !== 'default' ? 'blur(10px)' : 'none',
-            border: backgroundStyle !== 'default' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-          }}
-        >
-          {logoText}
-        </div>
+        {/* Logo Circle - only show if logoText is provided */}
+        {logoText && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '120px',
+              height: '120px',
+              borderRadius: '60px',
+              backgroundColor: style.logoBackground,
+              marginBottom: '30px',
+              fontWeight: 'bold',
+              fontSize: '48px',
+              backdropFilter: backgroundStyle !== 'default' ? 'blur(10px)' : 'none',
+              border: backgroundStyle !== 'default' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+            }}
+          >
+            {logoText}
+          </div>
+        )}
         
-        <h1
-          style={{
-            fontSize: 64,
-            fontWeight: 700,
-            marginBottom: '20px',
-            color: style.textColor,
-            textShadow: backgroundStyle !== 'default' ? '0 2px 4px rgba(0,0,0,0.3)' : 'none',
-          }}
-        >
-          {title}
-        </h1>
+        {/* Title - only show if title is provided */}
+        {title && (
+          <h1
+            style={{
+              fontSize: 64,
+              fontWeight: 700,
+              marginBottom: '20px',
+              color: style.textColor,
+              textShadow: backgroundStyle !== 'default' ? '0 2px 4px rgba(0,0,0,0.3)' : 'none',
+            }}
+          >
+            {title}
+          </h1>
+        )}
         
+        {/* Subtitle - only show if subtitle is provided */}
         {subtitle && (
           <p
             style={{
@@ -109,21 +115,24 @@ export function createOGImage({
           </p>
         )}
         
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px 24px',
-            backgroundColor: style.buttonBackground,
-            borderRadius: 8,
-            fontSize: 24,
-            backdropFilter: backgroundStyle !== 'default' ? 'blur(10px)' : 'none',
-            border: backgroundStyle !== 'default' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-          }}
-        >
-          {DATA.url.replace('https://', '')}
-        </div>
+        {/* Website URL - only show if any content is provided */}
+        {(title || subtitle || logoText) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 24px',
+              backgroundColor: style.buttonBackground,
+              borderRadius: 8,
+              fontSize: 24,
+              backdropFilter: backgroundStyle !== 'default' ? 'blur(10px)' : 'none',
+              border: backgroundStyle !== 'default' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+            }}
+          >
+            {DATA.url.replace('https://', '')}
+          </div>
+        )}
       </div>
     ),
     { ...DEFAULT_OG_SIZE }
