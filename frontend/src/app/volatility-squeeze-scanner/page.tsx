@@ -256,29 +256,37 @@ export default function VolatilitySqueezeScanner() {
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <section>
+      <header>
         <div className="flex items-center gap-3 mb-3">
-          <Activity className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-medium">Volatility Squeeze Scanner</h1>
+          <Activity className="h-6 w-6 text-primary" aria-hidden="true" />
+          <h1 className="text-2xl font-medium">Professional Volatility Squeeze Scanner</h1>
         </div>
         <Separator className="mb-4" />
-        <p className="text-compact text-muted-foreground">
-          The volatility squeeze strategy identifies stocks experiencing unusually low price movement, 
-          which often precedes explosive breakouts in either direction. Deploy this scanner when markets 
-          are calm and consolidating—these compressed periods historically deliver 1.2-3.3% moves with high accuracy.
-        </p>
-      </section>
+        <div className="text-compact text-muted-foreground space-y-2">
+          <p>
+            The <strong>volatility squeeze strategy</strong> identifies stocks experiencing unusually low price movement, 
+            which often precedes explosive breakouts in either direction. This professional <em>stock market scanner</em> uses 
+            <strong>Bollinger Bands</strong> and <strong>Keltner Channels</strong> to detect squeeze conditions with high accuracy.
+          </p>
+          <p>
+            Deploy this <strong>trading tool</strong> when markets are calm and consolidating—these compressed periods 
+            historically deliver <strong>1.2-3.3% moves</strong> with exceptional precision. Perfect for 
+            <em>day traders</em> and <em>swing traders</em> seeking high-probability breakout opportunities.
+          </p>
+        </div>
+      </header>
 
       {/* Market Conditions & Stats */}
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="market-conditions-title">
+        <h2 id="market-conditions-title" className="sr-only">Market Conditions and Statistics</h2>
         {/* Simple Market Conditions */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-muted-foreground">Market Conditions:</span>
-            <span className="font-medium">Favorable for Squeeze Strategy</span>
+            <div className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true"></div>
+            <span className="text-muted-foreground">Current Market Conditions:</span>
+            <span className="font-medium">Favorable for Volatility Squeeze Strategy</span>
           </div>
-          <span className="text-xs text-muted-foreground">Low Vol Regime • VIX ~20</span>
+          <span className="text-xs text-muted-foreground" title="Market volatility indicators">Low Vol Regime • VIX ~20</span>
         </div>
 
         {/* Stats Cards */}
@@ -315,14 +323,16 @@ export default function VolatilitySqueezeScanner() {
       </section>
 
       {/* Search and Filters */}
-      <section className="flex flex-col sm:flex-row gap-4">
+      <section className="flex flex-col sm:flex-row gap-4" aria-labelledby="search-section-title">
+        <h2 id="search-section-title" className="sr-only">Search and Filter Stock Signals</h2>
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
-            placeholder="Search symbols..."
+            placeholder="Search stock symbols (e.g., AAPL, GOOGL)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+            aria-label="Search for stock symbols"
           />
         </div>
         <div className="flex gap-2">
@@ -351,8 +361,9 @@ export default function VolatilitySqueezeScanner() {
       )}
 
       {/* Signals Table */}
-      <section>
-        <div className="rounded-md border">
+      <section aria-labelledby="signals-table-title">
+        <h2 id="signals-table-title" className="sr-only">Live Volatility Squeeze Signals</h2>
+        <div className="rounded-md border" role="region" aria-label="Stock signals data table">
           <Table>
             <TableHeader>
               <TableRow>

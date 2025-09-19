@@ -29,6 +29,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.9,
       },
       {
+        url: `${baseUrl}/volatility-squeeze-scanner`,
+        lastModified: new Date(),
+        changeFrequency: 'daily' as const,
+        priority: 0.9,
+      },
+      {
         url: `${baseUrl}/blog`,
         lastModified: new Date(),
         changeFrequency: 'weekly' as const,
@@ -57,6 +63,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${baseUrl}/about`,
         lastModified: new Date(),
         changeFrequency: 'monthly' as const,
+        priority: 0.9,
+      },
+      {
+        url: `${baseUrl}/volatility-squeeze-scanner`,
+        lastModified: new Date(),
+        changeFrequency: 'daily' as const,
         priority: 0.9,
       },
       {

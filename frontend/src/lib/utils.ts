@@ -87,7 +87,7 @@ export function getAllTags<T extends { metadata: { tags?: string[] } }>(posts: T
 }
 
 /**
- * Creates consistent OpenGraph metadata for pages
+ * Creates comprehensive SEO metadata for pages
  */
 export function createMetadata({
   title,
@@ -95,18 +95,43 @@ export function createMetadata({
   pageUrl,
   type = "website",
   imagePath = "/logos/cgq.png",
+  keywords = [],
+  imageAlt,
 }: {
   title: string;
   description: string;
   pageUrl?: string;
   type?: "website" | "article" | "profile";
   imagePath?: string;
+  keywords?: string[];
+  imageAlt?: string;
 }): Metadata {
   const url = pageUrl ? `${DATA.url}${pageUrl}` : DATA.url;
+  const defaultImageAlt = imageAlt || "Conor Quinlan's Portfolio";
   
   return {
     title,
     description,
+    keywords: keywords.length > 0 ? keywords.join(", ") : undefined,
+    authors: [
+      {
+        name: "Conor Quinlan",
+        url: DATA.url || "https://conorq.com",
+      },
+    ],
+    creator: "Conor Quinlan",
+    publisher: "Conor Quinlan",
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     openGraph: {
       title,
       description,
@@ -117,9 +142,9 @@ export function createMetadata({
       images: [
         {
           url: imagePath,
-          width: 800,
-          height: 600,
-          alt: "Conor Quinlan's logo",
+          width: 1200,
+          height: 630,
+          alt: defaultImageAlt,
         },
       ],
     },
