@@ -2,16 +2,30 @@ name: Market Hours Volatility Squeeze Scanner
 
 on:
   schedule:
-    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM EST)
-    # EST = UTC-5, EDT = UTC-4 (market hours: 14:30-21:00 UTC in EST, 13:30-20:00 UTC in EDT)
-    # Using EST times (UTC-5) for consistency: 14:30-21:00 UTC
-    - cron: '30,0 14,15,16,17,18,19,20 * * 1-5'  # Every 30 min during market hours, Mon-Fri
+    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
+    # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
+    # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
+    # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges
+    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
+    - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
+    - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
+    - cron: '0 15 * * 1-5'   # 11:00 AM EDT (15:00 UTC)
+    - cron: '30 15 * * 1-5'  # 11:30 AM EDT (15:30 UTC)
+    - cron: '0 16 * * 1-5'   # 12:00 PM EDT (16:00 UTC)
+    - cron: '30 16 * * 1-5'  # 12:30 PM EDT (16:30 UTC)
+    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (17:00 UTC)
+    - cron: '30 17 * * 1-5'  # 1:30 PM EDT (17:30 UTC)
+    - cron: '0 18 * * 1-5'   # 2:00 PM EDT (18:00 UTC)
+    - cron: '30 18 * * 1-5'  # 2:30 PM EDT (18:30 UTC)
+    - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
+    - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
+    - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
   workflow_dispatch:  # Allow manual triggering
     inputs:
       min_score:
         description: 'Minimum signal score threshold'
         required: false
-        default: '0.7'
+        default: '0.9'
         type: string
       max_symbols:
         description: 'Maximum symbols to scan (leave empty for all)'
@@ -95,7 +109,7 @@ jobs:
       working-directory: volatility-squeeze-scanner
       run: |
         # Set scan parameters (lower threshold for frequent runs)
-        MIN_SCORE="${{ github.event.inputs.min_score || '0.6' }}"
+        MIN_SCORE="${{ github.event.inputs.min_score || '0.9' }}"
         MAX_SYMBOLS="${{ github.event.inputs.max_symbols }}"
         
         # Build command with optional parameters

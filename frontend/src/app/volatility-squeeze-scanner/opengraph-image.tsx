@@ -7,9 +7,9 @@ export const contentType = 'image/png';
 
 export default async function VolatilitySqueezeOGImage() {
   return createOGImage({
-    title: 'Volatility Squeeze Scanner',
-    subtitle: 'Professional trading tool for identifying explosive breakout opportunities',
-    logoText: DATA.initials,
+    title: '',
+    subtitle: '',
+    logoText: '',
     backgroundStyle: 'serene-gold',
   });
 }

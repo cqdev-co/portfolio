@@ -255,7 +255,7 @@ Each section is visually separated with clean horizontal dividers for better org
 The volatility squeeze scanner includes a comprehensive GitHub Actions workflow (`/.github/workflows/vss.yml`) that runs every 30 minutes during US market hours (9:30 AM - 4:00 PM EST) and provides:
 
 #### Market Hours Automated Scanning
-- **Schedule**: Runs every 30 minutes during US market hours (9:30 AM - 4:00 PM EST, Monday-Friday)
+- **Schedule**: Runs every 30 minutes during US market hours (9:30 AM - 4:00 PM EST, Monday-Friday) with 14 individual cron jobs covering all time slots
 - **Coverage**: Scans all 12,167+ database symbols automatically for real-time updates
 - **Storage**: Results stored directly in Supabase database with each scan
 - **Artifacts**: Scan logs retained for 30 days with detailed metrics

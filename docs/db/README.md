@@ -13,7 +13,7 @@ The portfolio includes an automated GitHub Actions workflow (`/.github/workflows
 ### Real-Time Signal Scanning
 The volatility squeeze scanner runs every 30 minutes during market hours to provide real-time trading signals:
 
-- **Schedule**: Every 30 minutes during US market hours (9:30 AM - 4:00 PM EST, Monday-Friday)
+- **Schedule**: Every 30 minutes during US market hours (9:30 AM - 4:00 PM EST, Monday-Friday) using 14 individual cron schedules
 - **Purpose**: Scans all database symbols for volatility squeeze opportunities
 - **Storage**: Results stored in Supabase for immediate access via the frontend interface
 
