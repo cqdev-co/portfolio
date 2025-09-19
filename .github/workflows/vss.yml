@@ -25,7 +25,7 @@ on:
       min_score:
         description: 'Minimum signal score threshold'
         required: false
-        default: '0.9'
+        default: '0.85'
         type: string
       max_symbols:
         description: 'Maximum symbols to scan (leave empty for all)'
