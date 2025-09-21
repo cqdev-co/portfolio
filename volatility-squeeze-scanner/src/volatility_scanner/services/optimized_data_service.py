@@ -66,11 +66,11 @@ class OptimizedDataService:
         self.failed_symbols: Set[str] = set()  # Permanent failure cache
         self.rate_limited_symbols: Dict[str, datetime] = {}  # Temporary rate limit cache
         
-        # Cache configuration
-        self.max_cache_size = 5000  # Maximum symbols in memory cache
-        self.cache_ttl_seconds = settings.yfinance_cache_ttl or 1800  # 30 minutes default
-        self.failed_symbol_ttl = 3600  # 1 hour for failed symbols
-        self.rate_limit_ttl = 300  # 5 minutes for rate limited symbols
+        # Cache configuration - reduced for fresh data
+        self.max_cache_size = 100  # Smaller cache for fresh data
+        self.cache_ttl_seconds = 300  # 5 minutes max for fresh data
+        self.failed_symbol_ttl = 600  # 10 minutes for failed symbols
+        self.rate_limit_ttl = 180  # 3 minutes for rate limited symbols
         
         # Concurrency control
         self.max_concurrent = min(100, settings.bulk_scan_concurrency * 4)  # Aggressive
@@ -219,30 +219,62 @@ class OptimizedDataService:
                 data = await self.get_market_data_optimized(symbol, period)
                 return symbol, data
         
-        logger.info(f"Bulk fetching {len(symbols)} symbols with {semaphore._value} concurrency")
-        
-        # Create all tasks
-        tasks = [fetch_with_semaphore(symbol) for symbol in symbols]
-        
-        # Execute with progress tracking
-        start_time = time.time()
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Process results
+        # Process in smaller batches to prevent system overload and hangs
+        batch_size = min(10, len(symbols))  # Max 10 symbols per batch for reliability
         symbol_data = {}
         successful = 0
+        total_batches = (len(symbols) + batch_size - 1) // batch_size
         
-        for result in results:
-            if isinstance(result, Exception):
-                logger.debug(f"Bulk fetch task failed: {result}")
-                continue
+        logger.info(f"Bulk fetching {len(symbols)} symbols in {total_batches} batches of {batch_size}")
+        
+        overall_start = time.time()
+        
+        for batch_num, i in enumerate(range(0, len(symbols), batch_size), 1):
+            batch_symbols = symbols[i:i + batch_size]
+            logger.debug(f"Processing batch {batch_num}/{total_batches} ({len(batch_symbols)} symbols)")
             
-            symbol, data = result
-            if data:
-                symbol_data[symbol] = data
-                successful += 1
+            # Create tasks for this batch only
+            tasks = [fetch_with_semaphore(symbol) for symbol in batch_symbols]
+            
+            # Execute batch with timeout to prevent hangs
+            try:
+                batch_start = time.time()
+                results = await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=30.0  # 30 second timeout per batch
+                )
+                
+                # Process batch results
+                batch_successful = 0
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.debug(f"Batch task failed: {result}")
+                        continue
+                    
+                    symbol, data = result
+                    if data:
+                        symbol_data[symbol] = data
+                        batch_successful += 1
+                        successful += 1
+                
+                batch_elapsed = time.time() - batch_start
+                batch_rate = len(batch_symbols) / batch_elapsed if batch_elapsed > 0 else 0
+                
+                logger.debug(f"Batch {batch_num} completed: {batch_successful}/{len(batch_symbols)} "
+                           f"successful in {batch_elapsed:.1f}s ({batch_rate:.1f} symbols/sec)")
+                
+                # Small delay between batches to prevent overwhelming API
+                if batch_num < total_batches:
+                    await asyncio.sleep(0.5)
+                    
+            except asyncio.TimeoutError:
+                logger.warning(f"Batch {batch_num} timed out after 30 seconds - skipping")
+                continue
+            except Exception as e:
+                logger.warning(f"Batch {batch_num} failed: {e}")
+                continue
         
-        elapsed = time.time() - start_time
+        elapsed = time.time() - overall_start
         rate = len(symbols) / elapsed if elapsed > 0 else 0
         
         logger.info(f"Bulk fetch completed: {successful}/{len(symbols)} successful "
@@ -265,11 +297,14 @@ class OptimizedDataService:
                 
                 fetch_start = time.time()
                 
-                # Fetch in thread pool to avoid blocking
+                # Fetch in thread pool to avoid blocking with timeout
                 ticker = yf.Ticker(symbol)
-                hist_data = await asyncio.get_event_loop().run_in_executor(
-                    self.thread_pool,
-                    lambda: ticker.history(period=period)
+                hist_data = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        self.thread_pool,
+                        lambda: ticker.history(period=period)
+                    ),
+                    timeout=10.0  # 10 second timeout per symbol
                 )
                 
                 fetch_time = time.time() - fetch_start
@@ -293,6 +328,12 @@ class OptimizedDataService:
                 
                 logger.debug(f"Fetched {symbol} in {fetch_time:.2f}s")
                 return market_data
+                
+            except asyncio.TimeoutError:
+                with self._stats_lock:
+                    self.stats.failed_requests += 1
+                logger.warning(f"Timeout fetching {symbol} after 10 seconds")
+                return None
                 
             except Exception as e:
                 with self._stats_lock:

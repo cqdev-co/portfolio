@@ -751,11 +751,8 @@ def scan_all(
             console.print(f"[dim]Initializing optimized services...[/dim]")
             optimized_data = OptimizedDataService(settings)
             
-            # Warm up cache with popular symbols if doing large scan
-            if len(all_symbols) > 100:
-                popular_symbols = all_symbols[:min(50, len(all_symbols))]
-                console.print(f"[dim]Warming up cache with {len(popular_symbols)} popular symbols...[/dim]")
-                await optimized_data.warmup_cache(popular_symbols)
+            # Skip cache warmup for fresh data
+            console.print(f"[dim]Skipping cache warmup to ensure fresh data...[/dim]")
             
             start_time = time.time()
             signals = []
