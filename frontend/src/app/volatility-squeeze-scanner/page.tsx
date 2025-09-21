@@ -16,8 +16,11 @@ import {
 import { Card } from "@/components/ui/card";
 import type { VolatilitySqueezeSignal, SignalFilters, SignalSortConfig } from "@/lib/types/signals";
 import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
+import { fetchPerformanceDashboard } from "@/lib/api/performance";
+import type { PerformanceDashboard } from "@/lib/types/performance";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Filter, Search, TrendingUp, TrendingDown, Activity, RefreshCw, ExternalLink, BarChart3, Shield, Target } from "lucide-react";
 
 // Helper function to safely parse numeric values
 function safeParseNumber(value: string | number | null): number {
@@ -101,6 +104,7 @@ function getOpportunityRankColor(rank: string) {
 export default function VolatilitySqueezeScanner() {
   const [signals, setSignals] = useState<VolatilitySqueezeSignal[]>([]);
   const [stats, setStats] = useState<SignalStats | null>(null);
+  const [performance, setPerformance] = useState<PerformanceDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -119,8 +123,8 @@ export default function VolatilitySqueezeScanner() {
     try {
       setError(null);
       
-      // Load signals and stats in parallel
-      const [signalsResponse, statsData] = await Promise.all([
+      // Load signals, stats, and performance data in parallel
+      const [signalsResponse, statsData, performanceData] = await Promise.all([
         fetchVolatilitySignals({
           limit: 100,
           sortBy: sortConfig.field,
@@ -128,7 +132,8 @@ export default function VolatilitySqueezeScanner() {
           filters,
           searchTerm
         }),
-        fetchSignalStats()
+        fetchSignalStats(),
+        fetchPerformanceDashboard()
       ]);
 
       if (signalsResponse.error) {
@@ -138,6 +143,7 @@ export default function VolatilitySqueezeScanner() {
       }
       
       setStats(statsData);
+      setPerformance(performanceData);
     } catch (error) {
       console.error("Failed to load data:", error);
       setError("Failed to load volatility signals");
@@ -266,6 +272,82 @@ export default function VolatilitySqueezeScanner() {
             <em>day traders</em> and <em>swing traders</em> seeking high-probability breakout opportunities.
           </p>
         </div>
+        
+        {/* Performance Metrics */}
+        {performance && (
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Shield className="h-4 w-4" />
+              <span>Live Performance Tracking</span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Win Rate */}
+              <div className="group">
+                <Link 
+                  href="/volatility-squeeze-scanner/performance"
+                  className="block p-4 rounded-lg border border-border/50 bg-card/50 hover:bg-card transition-all duration-200 hover:border-border"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Win Rate</p>
+                      <p className="text-xl font-light">
+                        {performance.win_rate_all ? `${performance.win_rate_all}%` : '—'}
+                      </p>
+                    </div>
+                    <Target className="h-4 w-4 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+                  </div>
+                </Link>
+              </div>
+
+              {/* Average Return */}
+              <div className="group">
+                <Link 
+                  href="/volatility-squeeze-scanner/performance"
+                  className="block p-4 rounded-lg border border-border/50 bg-card/50 hover:bg-card transition-all duration-200 hover:border-border"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Avg Return</p>
+                      <p className="text-xl font-light">
+                        {performance.avg_return_all ? `${performance.avg_return_all > 0 ? '+' : ''}${performance.avg_return_all}%` : '—'}
+                      </p>
+                    </div>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+                  </div>
+                </Link>
+              </div>
+
+              {/* Total Signals */}
+              <div className="group">
+                <Link 
+                  href="/volatility-squeeze-scanner/performance"
+                  className="block p-4 rounded-lg border border-border/50 bg-card/50 hover:bg-card transition-all duration-200 hover:border-border"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Total Signals</p>
+                      <p className="text-xl font-light">
+                        {performance.total_signals || '—'}
+                      </p>
+                    </div>
+                    <BarChart3 className="h-4 w-4 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+                  </div>
+                </Link>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <Link 
+                href="/volatility-squeeze-scanner/performance"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View detailed performance analysis
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Market Conditions & Stats */}

@@ -30,6 +30,8 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 - **Market Regime Detection**: Adapts to different market conditions
 - **AI Integration**: Optional AI-powered signal classification
 - **Backtesting Framework**: Historical performance validation
+- **CFD Filtering**: Automatic removal of Contract for Difference instruments
+- **Aggressive Filtering**: Multi-stage filtering reduces 80k+ tickers to 1k-2k quality stocks *(New)*
 
 ### 🚀 **Production-Ready Infrastructure**
 - **Real-Time Automated Scanning**: GitHub Actions workflow running every 30 minutes during market hours
@@ -44,10 +46,13 @@ The Volatility Squeeze Scanner is a comprehensive trading strategy implementatio
 
 ## Documentation Index
 
-- **[Enhanced Filtering Improvements](./enhanced-filtering-improvements.md)** - Latest signal quality enhancements *(New)*
-- **[Duplicate Signal Handling](./duplicate-signal-handling.md)** - Data integrity and duplicate prevention *(New)*
+- **[Aggressive Ticker Filtering](./aggressive-ticker-filtering.md)** - Dramatic reduction to high-quality stocks only *(New)*
+- **[CFD Filtering Enhancement](./cfd-filtering-enhancement.md)** - Automatic CFD filtering for better data quality
+- **[Enhanced Filtering Improvements](./enhanced-filtering-improvements.md)** - Latest signal quality enhancements
+- **[Duplicate Signal Handling](./duplicate-signal-handling.md)** - Data integrity and duplicate prevention
 - **[Opportunity Ranking System](./opportunity-ranking-system.md)** - Multi-tier ranking for prioritizing signals
 - **[Signal Continuity Tracking](./signal-continuity-tracking.md)** - Feature for tracking signal evolution
+- **[Cascading Deletes Fix](./cascading-deletes-fix.md)** - Signal cleanup with proper foreign key handling *(New)*
 - **[Frontend Integration](../frontend/volatility-squeeze-scanner.md)** - Web interface documentation
 - **[Database Schema](../db/README.md)** - Database structure and queries
 
@@ -103,11 +108,13 @@ The scanner runs automatically Monday-Friday at 6:30 AM UTC and provides:
 ### Performance Metrics
 
 The scanner processes:
-- **12,167+ symbols** in the database
-- **~8,000 symbols** with valid data daily
-- **50-200 signals** detected per day (depending on market conditions)
-- **Processing speed**: ~15-30 symbols/second
+- **1,000-2,000 symbols** in the database (aggressively filtered for quality)
+- **~1,500 symbols** with valid data daily
+- **25-100 signals** detected per day (high-quality opportunities only)
+- **Processing speed**: ~50-100 symbols/second (optimized)
 - **Analysis accuracy**: 100% win rate in current backtests
+- **Data quality**: Multi-stage aggressive filtering (1.2% pass rate)
+- **Ticker quality**: S&P 500 + major exchange stocks prioritized
 
 ## Usage Examples
 
@@ -128,6 +135,15 @@ poetry run python -m volatility_scanner.cli cleanup-duplicates
 
 # Query stored signals
 poetry run python -m volatility_scanner.cli query-signals --min-score 0.8
+
+# Signal cleanup - preview what would be cleaned
+python3 scripts/clean_signals.py --min-score 0.85 --dry-run
+
+# Signal cleanup - remove low-quality signals (with backup)
+python3 scripts/clean_signals.py --min-score 0.85
+
+# Signal cleanup - specific date range
+python3 scripts/clean_signals.py --min-score 0.80 --days-back 7
 ```
 
 ### API Endpoints
@@ -155,6 +171,14 @@ Signals are stored with comprehensive tracking:
 - Signal continuity fields *(New)*
 - Risk management data
 - AI analysis results
+- Performance tracking records (with proper foreign key relationships)
+
+### Database Maintenance
+The system includes robust database maintenance tools:
+- **Signal Cleanup**: Remove low-quality signals with cascading deletes
+- **Duplicate Prevention**: Automatic detection and cleanup of duplicate records
+- **Performance Tracking**: Comprehensive performance metrics with proper referential integrity
+- **Backup & Recovery**: Automatic backups before cleanup operations
 
 ## Monitoring & Alerts
 

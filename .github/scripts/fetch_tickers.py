@@ -4,15 +4,22 @@ Global Market Ticker Fetcher
 
 This script fetches all available stock tickers from multiple global markets
 and stores them in a Supabase database. It uses multiple data sources to
-ensure comprehensive coverage of global markets.
+ensure comprehensive coverage of global markets while filtering out CFDs
+and other non-tradeable instruments.
 
 Data Sources:
 - Alpha Vantage API (US markets)
 - Financial Modeling Prep API (Global markets)
 - Yahoo Finance (fallback for additional tickers)
 
+Quality Filtering:
+- Removes CFDs (Contracts for Difference)
+- Filters out warrants, units, preferred shares
+- Excludes penny stocks below minimum thresholds
+- Prioritizes liquid, tradeable securities
+
 Usage:
-    python fetch_tickers.py [--dry-run] [--verbose]
+    python fetch_tickers.py [--dry-run] [--verbose] [--disable-cfd-filter]
 """
 
 import os
@@ -53,12 +60,15 @@ class TickerFetcher:
     
     def __init__(self, dry_run: bool = False, verbose: bool = False, 
                  enable_quality_filter: bool = True, us_only: bool = True,
-                 min_quality_score: float = 60.0):
+                 min_quality_score: float = 45.0, enable_cfd_filter: bool = True,
+                 max_tickers: int = 5000):
         self.dry_run = dry_run
         self.verbose = verbose
         self.enable_quality_filter = enable_quality_filter
         self.us_only = us_only
         self.min_quality_score = min_quality_score
+        self.enable_cfd_filter = enable_cfd_filter
+        self.max_tickers = max_tickers
         
         self.setup_logging()
         self.setup_supabase()
@@ -112,7 +122,8 @@ class TickerFetcher:
                 
             self.logger.info(
                 f"Efficient quality filtering enabled: US-only={self.us_only}, "
-                f"min_score={self.min_quality_score}"
+                f"min_score={self.min_quality_score}, CFD-filter={self.enable_cfd_filter}, "
+                f"max_tickers={self.max_tickers}"
             )
         else:
             self.quality_filter = None
@@ -292,6 +303,53 @@ class TickerFetcher:
         
         return unique_tickers
     
+    def apply_cfd_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+        """Apply CFD filtering to remove Contract for Difference instruments"""
+        if not self.enable_cfd_filter:
+            self.logger.info("CFD filtering disabled, returning all tickers")
+            return tickers
+        
+        self.logger.info(f"Applying CFD filters to {len(tickers)} tickers")
+        
+        filtered_tickers = []
+        cfd_count = 0
+        
+        for ticker in tickers:
+            # Use the efficient filter's CFD detection if available
+            if self.quality_filter:
+                is_cfd = self.quality_filter._is_cfd_ticker(
+                    ticker.symbol, 
+                    ticker.name or '', 
+                    ticker.exchange or ''
+                )
+            else:
+                # Fallback CFD detection logic
+                is_cfd = self._basic_cfd_detection(ticker)
+            
+            if is_cfd:
+                cfd_count += 1
+                continue
+            
+            filtered_tickers.append(ticker)
+        
+        self.logger.info(
+            f"CFD filtering complete: {len(filtered_tickers)} tickers remaining "
+            f"(filtered out {cfd_count} CFDs)"
+        )
+        
+        return filtered_tickers
+    
+    def _basic_cfd_detection(self, ticker: TickerInfo) -> bool:
+        """Basic CFD detection fallback when quality filter is disabled"""
+        symbol_lower = ticker.symbol.lower()
+        name_lower = (ticker.name or '').lower()
+        
+        # Basic CFD patterns
+        cfd_patterns = ['cfd', 'contract for difference', 'derivative', 'synthetic']
+        
+        return any(pattern in symbol_lower or pattern in name_lower 
+                  for pattern in cfd_patterns)
+    
     def apply_quality_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
         """Apply efficient quality filters to ticker list"""
         if not self.enable_quality_filter or not self.quality_filter:
@@ -321,7 +379,7 @@ class TickerFetcher:
             high_quality_symbols, quality_metrics = self.quality_filter.filter_high_quality_tickers(
                 ticker_dicts,
                 min_quality_score=self.min_quality_score,
-                max_tickers=2000  # Increased limit for better coverage
+                max_tickers=self.max_tickers
             )
             
             if not high_quality_symbols:
@@ -457,12 +515,20 @@ class TickerFetcher:
         # Deduplicate
         unique_tickers = self.deduplicate_tickers(all_tickers)
         
+        # Apply CFD filters (before quality filters to reduce processing)
+        cfd_filtered_tickers = self.apply_cfd_filters(unique_tickers)
+        
         # Apply quality filters
-        filtered_tickers = self.apply_quality_filters(unique_tickers)
+        filtered_tickers = self.apply_quality_filters(cfd_filtered_tickers)
         
         if not filtered_tickers:
             self.logger.error("No tickers remaining after quality filtering")
             return False
+        
+        # Final safety check - ensure we don't exceed max_tickers
+        if len(filtered_tickers) > self.max_tickers:
+            self.logger.info(f"Final limit: Reducing from {len(filtered_tickers)} to {self.max_tickers} tickers")
+            filtered_tickers = filtered_tickers[:self.max_tickers]
         
         # Store in database
         success = self.store_tickers(filtered_tickers)
@@ -502,8 +568,19 @@ def main():
     parser.add_argument(
         '--min-quality-score',
         type=float,
-        default=60.0,
-        help='Minimum quality score for filtering (0-100, default: 60.0)'
+        default=45.0,
+        help='Minimum quality score for filtering (0-100, default: 45.0)'
+    )
+    parser.add_argument(
+        '--disable-cfd-filter',
+        action='store_true',
+        help='Disable CFD filtering (include Contract for Difference instruments)'
+    )
+    parser.add_argument(
+        '--max-tickers',
+        type=int,
+        default=5000,
+        help='Maximum number of tickers to store (default: 5000)'
     )
     
     args = parser.parse_args()
@@ -514,7 +591,9 @@ def main():
             verbose=args.verbose,
             enable_quality_filter=not args.disable_quality_filter,
             us_only=not args.include_global,
-            min_quality_score=args.min_quality_score
+            min_quality_score=args.min_quality_score,
+            enable_cfd_filter=not args.disable_cfd_filter,
+            max_tickers=args.max_tickers
         )
         success = fetcher.run()
         sys.exit(0 if success else 1)

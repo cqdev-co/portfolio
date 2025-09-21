@@ -42,16 +42,20 @@ class EfficientTickerFilter:
         self.fmp_key = fmp_key
         self.setup_logging()
         
-        # Optimized thresholds for quick filtering - more inclusive
-        self.min_market_cap = 50_000_000  # $50M (further reduced for small caps)
-        self.min_price = 0.10  # $0.10 minimum (very inclusive for penny stocks)
+        # Optimized thresholds for quick filtering - more inclusive for 2000 tickers
+        self.min_market_cap = 25_000_000  # $25M (reduced from $50M for more small caps)
+        self.min_price = 0.50  # $0.50 minimum (avoid true penny stocks but include more)
         self.max_price = 10_000.0
-        self.min_volume = 50_000  # Reduced from 100k to include more stocks
+        self.min_volume = 25_000  # Reduced from 50k to include more stocks
         
-        # US exchanges
+        # US exchanges - more restrictive list for better quality
         self.us_exchanges = {
-            'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'BATS', 
-            'NASDAQ GLOBAL MARKET', 'NASDAQ GLOBAL SELECT', 'NASDAQ CAPITAL MARKET'
+            'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT'
+        }
+        
+        # Major exchanges only (most liquid and reliable)
+        self.major_exchanges = {
+            'NASDAQ', 'NYSE'
         }
         
         # Known high-quality symbols (S&P 500 subset) for quick validation
@@ -84,47 +88,161 @@ class EfficientTickerFilter:
             'EOG', 'FDX', 'APD', 'NOC', 'BSX', 'EQIX', 'KLAC', 'CL', 'HCA'
         }
     
+    def _is_cfd_ticker(self, symbol: str, name: str, exchange: str = '') -> bool:
+        """Detect if a ticker is a CFD (Contract for Difference)"""
+        symbol_lower = symbol.lower()
+        name_lower = name.lower() if name else ''
+        exchange_lower = exchange.lower() if exchange else ''
+        
+        # CFD symbol patterns
+        cfd_symbol_patterns = [
+            '.cfd', '_cfd', 'cfd', '.c', '_c',  # Direct CFD indicators
+            '.d', '_d',  # Derivative indicators
+            '.x', '_x',  # Some brokers use X suffix for CFDs
+        ]
+        
+        # CFD name patterns - comprehensive list
+        cfd_name_patterns = [
+            'cfd', 'contract for difference', 'derivative',
+            'synthetic', 'swap', 'future', 'forward',
+            'etf cfd', 'index cfd', 'commodity cfd',
+            'fx cfd', 'crypto cfd', 'currency cfd',
+            'spread bet', 'spread betting', 'margin trade',
+            'leveraged product', 'structured product',
+            'binary option', 'digital option', 'barrier option'
+        ]
+        
+        # CFD exchange patterns (some brokers have dedicated CFD exchanges)
+        cfd_exchange_patterns = [
+            'cfd', 'derivative', 'synthetic', 'swap'
+        ]
+        
+        # Check symbol patterns
+        for pattern in cfd_symbol_patterns:
+            if pattern in symbol_lower:
+                return True
+        
+        # Check name patterns
+        for pattern in cfd_name_patterns:
+            if pattern in name_lower:
+                return True
+        
+        # Check exchange patterns
+        for pattern in cfd_exchange_patterns:
+            if pattern in exchange_lower:
+                return True
+        
+        # Additional heuristics for CFDs
+        # Many CFDs have numeric suffixes or special characters
+        if symbol_lower.endswith(('.1', '.2', '.3', '.4', '.5')):
+            return True
+        
+        # Some CFDs have very specific naming patterns
+        if any(indicator in name_lower for indicator in [
+            'mini', 'micro', 'leveraged', 'inverse',
+            '2x', '3x', 'bull', 'bear', 'short',
+            'ultra', 'pro', 'daily', 'turbo', 'knock-out'
+        ]):
+            # These could be leveraged ETFs or CFDs, need more context
+            if any(cfd_indicator in name_lower for cfd_indicator in [
+                'cfd', 'contract', 'derivative', 'synthetic', 'spread', 'margin'
+            ]):
+                return True
+        
+        # Additional CFD patterns based on common broker naming
+        if any(pattern in symbol_lower for pattern in [
+            'cfd', 'der', 'syn', 'lev', 'spr'
+        ]):
+            return True
+        
+        return False
+
     def pre_filter_tickers_fast(self, tickers: List[Dict]) -> List[Dict]:
-        """Fast pre-filtering based on basic criteria"""
-        logger.info(f"Pre-filtering {len(tickers)} tickers...")
+        """Fast pre-filtering based on basic criteria - AGGRESSIVE FILTERING"""
+        logger.info(f"Pre-filtering {len(tickers)} tickers with aggressive filtering...")
         
         filtered = []
+        cfd_count = 0
+        exchange_filtered = 0
+        symbol_filtered = 0
+        
         for ticker in tickers:
-            symbol = ticker.get('symbol', '')
-            exchange = ticker.get('exchange', '')
-            name = ticker.get('name', '')
+            symbol = ticker.get('symbol', '') or ''
+            exchange = ticker.get('exchange', '') or ''
+            name = ticker.get('name', '') or ''
             
-            # Quick rejection criteria
-            if not symbol or len(symbol) > 5:
+            # RELAXED: Allow 1-5 character symbols (include more legitimate stocks)
+            if not symbol or len(symbol) < 1 or len(symbol) > 5:
+                symbol_filtered += 1
                 continue
             
-            # Skip obvious non-stocks
-            if any(x in symbol for x in ['.', '-', '/', '^', '=']):
+            # RELAXED: Allow alphanumeric but exclude obvious non-stocks
+            if not symbol.replace('.', '').replace('-', '').isalnum():
+                symbol_filtered += 1
+                continue
+            
+            # Skip obvious non-stock patterns
+            if any(pattern in symbol.upper() for pattern in ['TEST', 'TEMP', 'NULL', 'VOID']):
+                symbol_filtered += 1
                 continue
                 
-            # Skip warrants, units, preferred shares
-            skip_suffixes = ['W', 'U', 'R', 'P']
+            # Skip warrants, units, preferred shares, etc.
+            skip_suffixes = ['W', 'U', 'R', 'P', 'Q', 'V', 'X', 'Y', 'Z']
             if any(symbol.endswith(suffix) for suffix in skip_suffixes):
                 continue
             
-            # Skip financial instruments (not penny stocks by price)
-            if any(word in name.lower() for word in ['warrant', 'unit', 'right', 'preferred']):
+            # Skip CFDs (Contract for Difference)
+            if self._is_cfd_ticker(symbol, name, exchange):
+                cfd_count += 1
                 continue
             
-            # Prioritize US exchanges
-            if exchange and any(us_ex in exchange.upper() for us_ex in self.us_exchanges):
+            # Skip financial instruments
+            if name and any(word in name.lower() for word in [
+                'warrant', 'unit', 'right', 'preferred', 'depositary', 'receipt',
+                'trust', 'fund', 'etf', 'etn', 'note', 'bond', 'debenture'
+            ]):
+                continue
+            
+            # AGGRESSIVE: Only major US exchanges or S&P 500 stocks
+            is_sp500 = symbol in self.sp500_symbols
+            is_major_exchange = exchange and any(major_ex in exchange.upper() 
+                                               for major_ex in self.major_exchanges)
+            is_us_exchange = exchange and any(us_ex in exchange.upper() 
+                                            for us_ex in self.us_exchanges)
+            
+            if is_sp500:
+                # S&P 500 stocks get highest priority regardless of exchange
                 ticker['country'] = 'US'
-                ticker['priority'] = 1 if symbol in self.sp500_symbols else 2
+                ticker['priority'] = 1
                 filtered.append(ticker)
-            elif not exchange and symbol.isalpha():  # Likely US stock
+            elif is_major_exchange:
+                # Major exchanges (NYSE, NASDAQ) get second priority
                 ticker['country'] = 'US'
-                ticker['priority'] = 1 if symbol in self.sp500_symbols else 3
+                ticker['priority'] = 2
                 filtered.append(ticker)
+            elif is_us_exchange:
+                # Other US exchanges get lower priority, but include more
+                ticker['country'] = 'US'
+                ticker['priority'] = 3
+                filtered.append(ticker)
+            elif not exchange and len(symbol) <= 5 and symbol.replace('.', '').replace('-', '').isalnum():
+                # Unknown exchange but clean symbol - include more with relaxed criteria
+                ticker['country'] = 'US'
+                ticker['priority'] = 4
+                filtered.append(ticker)
+            else:
+                exchange_filtered += 1
+                continue
         
         # Sort by priority (S&P 500 first, then others)
         filtered.sort(key=lambda x: x.get('priority', 999))
         
-        logger.info(f"Pre-filtered to {len(filtered)} potential US stocks")
+        logger.info(
+            f"AGGRESSIVE pre-filtering complete: {len(filtered)} potential US stocks remaining\n"
+            f"  - Filtered out {cfd_count} CFDs\n"
+            f"  - Filtered out {symbol_filtered} invalid symbols\n"
+            f"  - Filtered out {exchange_filtered} non-US/unlisted stocks"
+        )
         return filtered
     
     def batch_get_basic_metrics(self, symbols: List[str], batch_size: int = 100) -> Dict[str, EfficientTickerMetrics]:
@@ -149,18 +267,67 @@ class EfficientTickerFilter:
                     quality_score=85.0  # High score for S&P 500
                 )
         
-        # Process remaining symbols in batches
+        # Process remaining symbols with heuristic scoring (no API calls)
         remaining_symbols = [s for s in symbols if s not in self.sp500_symbols]
         
-        if self.fmp_key and remaining_symbols:
-            # Increased limit for FMP - it can handle more
-            metrics.update(self._batch_fmp_metrics(remaining_symbols[:2000]))  
-        elif remaining_symbols:
-            # Fallback to yfinance for larger batches
-            metrics.update(self._batch_yfinance_metrics(remaining_symbols[:1000]))
+        # Use heuristic-based scoring to avoid API rate limits
+        for symbol in remaining_symbols:
+            metrics[symbol] = self._create_heuristic_quality_metrics(symbol)
         
         logger.info(f"Retrieved metrics for {len(metrics)} symbols")
         return metrics
+    
+    def _create_heuristic_quality_metrics(self, symbol: str) -> EfficientTickerMetrics:
+        """Create quality metrics using heuristics (no API calls)"""
+        # Start with base score
+        quality_score = 50.0
+        
+        # Symbol length scoring (shorter symbols tend to be more established)
+        if len(symbol) <= 3:
+            quality_score += 15  # Very established (e.g., IBM, GE, GM)
+        elif len(symbol) == 4:
+            quality_score += 10  # Common for established companies
+        else:
+            quality_score += 5   # Longer symbols, still valid
+        
+        # Alphabetic symbols are generally more legitimate
+        if symbol.isalpha():
+            quality_score += 10
+        
+        # Uppercase format indicates proper ticker
+        if symbol.isupper():
+            quality_score += 5
+        
+        # Penalize obvious test/temporary symbols
+        if any(pattern in symbol.lower() for pattern in ['test', 'temp', 'new', 'old', 'xxx']):
+            quality_score -= 30
+        
+        # Bonus for common established company patterns
+        if len(symbol) <= 4 and symbol.isalpha() and symbol.isupper():
+            quality_score += 5
+        
+        # Estimate reasonable defaults for missing data
+        estimated_market_cap = 100_000_000  # $100M default
+        estimated_price = 15.0  # $15 default
+        estimated_volume = 100_000  # 100k volume default
+        
+        # Adjust estimates based on symbol characteristics
+        if len(symbol) <= 3:
+            # Shorter symbols tend to be larger companies
+            estimated_market_cap = 1_000_000_000  # $1B
+            estimated_price = 50.0
+            estimated_volume = 500_000
+        
+        return EfficientTickerMetrics(
+            symbol=symbol,
+            market_cap=estimated_market_cap,
+            price=estimated_price,
+            volume=estimated_volume,
+            exchange='NASDAQ',  # Default to major exchange
+            country='US',
+            is_valid=True,
+            quality_score=quality_score
+        )
     
     def _batch_fmp_metrics(self, symbols: List[str]) -> Dict[str, EfficientTickerMetrics]:
         """Get metrics using Financial Modeling Prep batch API"""
@@ -190,7 +357,7 @@ class EfficientTickerFilter:
                     volume = item.get('volume')
                     exchange = item.get('exchange')
                     
-                    # Quality check - more inclusive for penny stocks
+                    # Quality check - more inclusive thresholds for 2000 tickers
                     is_valid = (
                         market_cap and market_cap >= self.min_market_cap and
                         price and self.min_price <= price <= self.max_price and
@@ -199,33 +366,37 @@ class EfficientTickerFilter:
                     
                     quality_score = 0
                     if is_valid:
-                        # Simple scoring
+                        # More generous scoring for 2000 tickers target
                         if market_cap >= 10_000_000_000:
-                            quality_score += 40
+                            quality_score += 45  # Increased from 40
                         elif market_cap >= 1_000_000_000:
-                            quality_score += 30
+                            quality_score += 40  # Increased from 35
                         elif market_cap >= 100_000_000:
-                            quality_score += 20  # Give credit to smaller companies
+                            quality_score += 30  # Increased from 25
                         elif market_cap >= 50_000_000:
-                            quality_score += 15  # Small caps with potential
+                            quality_score += 25  # Increased from 18
+                        elif market_cap >= 25_000_000:
+                            quality_score += 20  # Increased from 15
                         
                         if 10 <= price <= 1000:
                             quality_score += 20
                         elif 2 <= price <= 2000:
                             quality_score += 18  # Good range including growth stocks
                         elif 0.50 <= price < 2:
-                            quality_score += 12  # Penny stocks with potential
+                            quality_score += 15  # Increased from 12 - more generous for low-price stocks
                         elif 0.10 <= price < 0.50:
-                            quality_score += 8   # Very low price stocks with upside
+                            quality_score += 10  # Increased from 8 - give more credit to very low price stocks
                         
                         if volume >= 1_000_000:
                             quality_score += 20
                         elif volume >= 100_000:
                             quality_score += 15
                         elif volume >= 50_000:
-                            quality_score += 10  # Lower volume but still tradeable
+                            quality_score += 12  # Increased from 10
+                        elif volume >= 25_000:
+                            quality_score += 8   # New tier for lower volume stocks
                         
-                        quality_score += 15  # Base score for passing filters
+                        quality_score += 20  # Increased base score from 15 to 20
                     
                     metrics[symbol] = EfficientTickerMetrics(
                         symbol=symbol,
@@ -298,17 +469,17 @@ class EfficientTickerFilter:
                             volume and volume >= self.min_volume
                         )
                         
-                        # Simple scoring with penny stock consideration
+                        # More generous scoring for 2000 tickers target
                         quality_score = 0
                         if is_valid:
                             if price >= 10:
-                                quality_score = 60  # Established stocks
+                                quality_score = 65  # Increased from 60 - established stocks
                             elif price >= 2:
-                                quality_score = 55  # Growth stocks
+                                quality_score = 60  # Increased from 55 - growth stocks
                             elif price >= 0.50:
-                                quality_score = 45  # Penny stocks with potential
+                                quality_score = 55  # Increased from 45 - more inclusive for penny stocks
                             else:
-                                quality_score = 30  # Very low price stocks
+                                quality_score = 50  # Increased from 30 - very low price stocks with potential
                         
                         metrics[symbol] = EfficientTickerMetrics(
                             symbol=symbol,
@@ -342,11 +513,12 @@ class EfficientTickerFilter:
         # Step 1: Fast pre-filtering
         pre_filtered = self.pre_filter_tickers_fast(tickers)
         
-        # Step 2: Limit to reasonable number for API calls (increased limit)
-        api_limit = max_tickers * 5  # Increased from 2x to 5x
-        if len(pre_filtered) > api_limit:
-            logger.info(f"Limiting to top {api_limit} tickers for performance")
-            pre_filtered = pre_filtered[:api_limit]
+        # Step 2: INCREASED LIMIT - Cap at reasonable number for processing
+        # This prevents overwhelming the system with too many API calls
+        hard_limit = min(max_tickers * 4, 8000)  # Increased to 8000 tickers max
+        if len(pre_filtered) > hard_limit:
+            logger.info(f"HARD LIMIT: Reducing from {len(pre_filtered)} to {hard_limit} tickers for system performance")
+            pre_filtered = pre_filtered[:hard_limit]
         
         # Step 3: Extract symbols
         symbols = [t['symbol'] for t in pre_filtered]

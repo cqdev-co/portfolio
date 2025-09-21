@@ -58,7 +58,12 @@ class SignalContinuityService:
             if isinstance(signal_date, str):
                 signal_date = datetime.fromisoformat(signal_date).date()
             
-            if symbol not in previous_by_symbol or signal_date > previous_by_symbol[symbol]['last_active_date']:
+            # Also convert the comparison date to ensure consistent types
+            existing_date = previous_by_symbol[symbol]['last_active_date'] if symbol in previous_by_symbol else None
+            if existing_date and isinstance(existing_date, str):
+                existing_date = datetime.fromisoformat(existing_date).date()
+            
+            if symbol not in previous_by_symbol or signal_date > existing_date:
                 previous_by_symbol[symbol] = signal
         
         # Mark signals that have ended (were active yesterday but not today)
