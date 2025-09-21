@@ -39,7 +39,7 @@ env:
 jobs:
   scan-signals:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # Shorter timeout for frequent runs
+    timeout-minutes: 20  # Optimized timeout with performance improvements
     
     steps:
     - name: Checkout code
@@ -72,6 +72,15 @@ jobs:
         poetry add typer@0.9.4 --group=main
         poetry install --only=main
         
+    - name: System Information
+      run: |
+        echo "=== GitHub Runner System Info ==="
+        echo "CPU cores: $(nproc)"
+        echo "Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
+        echo "Python version: $(python --version)"
+        echo "Current time: $(date)"
+        echo "============================="
+        
     - name: Run Volatility Squeeze Scanner
       env:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -82,5 +91,10 @@ jobs:
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
       working-directory: volatility-squeeze-scanner
       run: |
-        
-        poetry run python -m volatility_scanner.cli scan-all --min-score ${{ github.event.inputs.min_score || '0.9' }}
+        # Use production profile optimized for GitHub Actions 2-core runners
+        # This profile is specifically tuned for CI/CD environments
+        poetry run python -m volatility_scanner.cli scan-all \
+          --min-score ${{ github.event.inputs.min_score || '0.9' }} \
+          ${{ github.event.inputs.max_symbols && format('--max-symbols {0}', github.event.inputs.max_symbols) || '' }} \
+          --profile production \
+          --no-streaming
