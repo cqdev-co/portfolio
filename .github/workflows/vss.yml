@@ -97,4 +97,4 @@ jobs:
           --min-score ${{ github.event.inputs.min_score || '0.9' }} \
           ${{ github.event.inputs.max_symbols && format('--max-symbols {0}', github.event.inputs.max_symbols) || '' }} \
           --profile production \
-          --no-streaming
+          --batch
