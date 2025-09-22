@@ -83,4 +83,4 @@ jobs:
       working-directory: volatility-squeeze-scanner
       run: |
         
-        poetry run python -m volatility_scanner.cli scan-all --min-score ${{ github.event.inputs.min_score || '0.50' }}
+        poetry run python -m volatility_scanner.cli scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }}
