@@ -263,12 +263,12 @@ export default function VolatilitySqueezeScanner() {
         <div className="text-compact text-muted-foreground space-y-2">
           <p>
             The <strong>volatility squeeze strategy</strong> identifies stocks experiencing unusually low price movement, 
-            which often precedes explosive breakouts in either direction. This professional <em>stock market scanner</em> uses 
+            which often precedes explosive breakouts in either direction. This professional <em>stock market scanner</em> uses {" "}
             <strong>Bollinger Bands</strong> and <strong>Keltner Channels</strong> to detect squeeze conditions with high accuracy.
           </p>
           <p>
-            Deploy this <strong>trading tool</strong> when markets are calm and consolidating—these compressed periods 
-            historically deliver <strong>1.2-3.3% moves</strong> with exceptional precision. Perfect for 
+            Deploy this <strong>trading tool</strong> when markets are calm and consolidating; these compressed periods 
+            historically deliver <strong>1.2-3.3% moves</strong> with exceptional precision. Perfect for {" "} 
             <em>day traders</em> and <em>swing traders</em> seeking high-probability breakout opportunities.
           </p>
         </div>

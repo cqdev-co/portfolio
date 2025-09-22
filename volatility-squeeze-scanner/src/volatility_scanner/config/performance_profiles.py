@@ -1,6 +1,6 @@
 """Performance configuration profiles for different use cases."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -85,16 +85,16 @@ class PerformanceProfiles:
         PerformanceProfile.AGGRESSIVE: ProfileConfig(
             name="Aggressive",
             description="Maximum performance - use with caution, may hit rate limits",
-            max_concurrent_requests=25,  # Reduced from 50
-            bulk_scan_concurrency=15,   # Reduced from 25
-            bulk_scan_batch_size=300,   # Reduced from 500
-            request_delay_seconds=0.08, # Increased from 0.05
-            chunk_delay_seconds=0.2,    # Increased from 0.1
-            analysis_concurrency=40,    # Reduced from 80
-            max_retries=5,              # More retries since we're more likely to hit limits
-            retry_delay_base=0.5,       # Increased from 0.3
-            yfinance_cache_ttl=900,     # 15 minutes - fresher data
-            rate_limit_backoff_factor=2.0,  # Increased from 1.5
+            max_concurrent_requests=50,
+            bulk_scan_concurrency=25,
+            bulk_scan_batch_size=500,
+            request_delay_seconds=0.05,
+            chunk_delay_seconds=0.1,
+            analysis_concurrency=80,
+            max_retries=5,  # More retries since we're more likely to hit limits
+            retry_delay_base=0.3,
+            yfinance_cache_ttl=900,  # 15 minutes - fresher data
+            rate_limit_backoff_factor=1.5,
             use_bulk_download=True,
             enable_aggressive_caching=True,
             skip_ticker_info=True,
@@ -122,21 +122,21 @@ class PerformanceProfiles:
         
         PerformanceProfile.PRODUCTION: ProfileConfig(
             name="Production",
-            description="Optimized for GitHub Actions CI/CD with 2-core runners",
-            max_concurrent_requests=8,   # Optimized for 2-core GitHub runners
-            bulk_scan_concurrency=6,     # Conservative for CI environment
-            bulk_scan_batch_size=150,    # Smaller batches for reliability
-            request_delay_seconds=0.15,  # Slightly higher delay for stability
-            chunk_delay_seconds=0.3,     # Reduced delay for speed
-            analysis_concurrency=4,      # Match GitHub runner cores
-            max_retries=3,               # Fewer retries for faster execution
-            retry_delay_base=0.5,        # Reasonable retry delay
-            yfinance_cache_ttl=600,      # 10 minutes - fresh data for CI
-            rate_limit_backoff_factor=2.0,
+            description="Optimized for production with monitoring and reliability",
+            max_concurrent_requests=25,
+            bulk_scan_concurrency=20,
+            bulk_scan_batch_size=300,
+            request_delay_seconds=0.08,
+            chunk_delay_seconds=0.3,
+            analysis_concurrency=60,
+            max_retries=4,
+            retry_delay_base=0.5,
+            yfinance_cache_ttl=1200,  # 20 minutes
+            rate_limit_backoff_factor=1.6,
             use_bulk_download=True,
-            enable_aggressive_caching=False,  # No caching for fresh CI data
-            skip_ticker_info=True,       # Skip expensive info calls
-            parallel_indicator_calculation=False  # Disable for 2-core runners
+            enable_aggressive_caching=True,
+            skip_ticker_info=True,
+            parallel_indicator_calculation=True
         )
     }
     

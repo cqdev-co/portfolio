@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "volatility-squeeze-scanner"
-version = "0.1.0"
+version = "0.0.365"
 description = "Enterprise-grade volatility squeeze scanner for equity and ETF analysis"
 authors = ["Conor Quinlan <conor@example.com>"]
 readme = "README.md"

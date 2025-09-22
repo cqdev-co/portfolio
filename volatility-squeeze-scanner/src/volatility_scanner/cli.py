@@ -1,7 +1,6 @@
 """Command-line interface for the volatility scanner service."""
 
 import asyncio
-import time
 from datetime import datetime, date
 from typing import List, Optional
 import json
@@ -43,17 +42,8 @@ from volatility_scanner.models.backtest import BacktestConfig
 
 app = typer.Typer(
     name="volatility-scanner",
-    help="Enterprise-grade volatility squeeze scanner CLI with ultra-high performance optimization"
+    help="Enterprise-grade volatility squeeze scanner CLI"
 )
-
-# Import optimized commands if available
-OPTIMIZED_AVAILABLE = False  # Temporarily disabled due to typer compatibility
-# try:
-#     from volatility_scanner.cli_optimized import add_optimized_commands
-#     from volatility_scanner.cli_ultra_optimized import add_ultra_optimized_commands
-#     OPTIMIZED_AVAILABLE = True
-# except ImportError:
-#     OPTIMIZED_AVAILABLE = False
 
 
 def get_services():
@@ -679,44 +669,14 @@ def scan_all(
     min_score: float = typer.Option(0.6, "--min-score", help="Minimum signal score threshold"),
     max_symbols: Optional[int] = typer.Option(None, "--max-symbols", help="Maximum symbols to scan (None for all symbols)"),
     output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)"),
-    fast: bool = typer.Option(False, "--fast", help="Fast mode: skip detailed analysis"),
-    profile: str = typer.Option("conservative", "--profile", help="Performance profile: conservative, balanced, aggressive, production"),
-    streaming: bool = typer.Option(False, "--streaming/--batch", help="Use streaming pipeline for real-time results")
+    fast: bool = typer.Option(False, "--fast", help="Fast mode: skip detailed analysis")
 ) -> None:
-    """Scan ALL available symbols for volatility squeeze signals with ultra-high performance optimization."""
+    """Scan ALL available symbols for volatility squeeze signals."""
     
     async def _scan_all():
-        # Import optimized services
-        from volatility_scanner.config.performance_profiles import PerformanceProfiles, PerformanceProfile
-        from volatility_scanner.services.optimized_data_service import OptimizedDataService
-        from volatility_scanner.services.streaming_pipeline_service import StreamingPipelineService
-        
-        # Get standard services
         data_service, analysis_service, ai_service, _, ticker_service, database_service, continuity_service = get_services()
         
         try:
-            # Validate and apply performance profile
-            try:
-                profile_enum = PerformanceProfile(profile.lower())
-                profile_config = PerformanceProfiles.get_profile(profile_enum)
-            except ValueError:
-                console.print(f"[red]Invalid profile: {profile}[/red]")
-                console.print(f"Available profiles: {[p.value for p in PerformanceProfile]}")
-                return
-            
-            # Apply profile to settings
-            settings = get_settings()
-            settings = PerformanceProfiles.apply_profile(settings, profile_enum)
-            
-            console.print(f"[bold blue]🚀 Ultra-Optimized Volatility Scanner[/bold blue]")
-            console.print(f"Profile: [bold]{profile_config.name}[/bold] - {profile_config.description}")
-            
-            # Show performance estimates
-            if max_symbols and max_symbols > 100:
-                estimates = PerformanceProfiles.estimate_processing_time(max_symbols, profile_enum)
-                console.print(f"Estimated processing time: [yellow]{estimates['estimated_minutes']:.1f} minutes[/yellow]")
-                console.print(f"Estimated rate: [cyan]{estimates['estimated_rate_symbols_per_second']:.1f} symbols/second[/cyan]")
-            
             # Get ALL symbols
             if ticker_service:
                 console.print(f"[bold blue]🌍 Fetching ALL symbols from database...[/bold blue]")
@@ -747,129 +707,99 @@ def scan_all(
                 console.print("[red]❌ No symbols found[/red]")
                 return
             
-            # Initialize optimized services
-            console.print(f"[dim]Initializing optimized services...[/dim]")
-            optimized_data = OptimizedDataService(settings)
+            # Fetch market data with optimized chunked approach
+            console.print(f"[bold blue]📈 Fetching market data (optimized)...[/bold blue]")
             
-            # Skip cache warmup for fresh data
-            console.print(f"[dim]Skipping cache warmup to ensure fresh data...[/dim]")
+            start_time = asyncio.get_event_loop().time()
             
-            start_time = time.time()
-            signals = []
-            
-            if streaming and database_service and continuity_service:
-                # Use streaming pipeline for real-time results
-                console.print(f"[bold green]🎯 Starting streaming pipeline for real-time results[/bold green]")
-                console.print(f"[dim]Using {profile_config.name} profile with {settings.bulk_scan_concurrency} concurrent requests[/dim]")
-                
-                try:
-                    pipeline = StreamingPipelineService(
-                        settings, analysis_service, database_service, continuity_service
-                    )
-                    
-                    signal_count = 0
-                    processed_count = 0
-                    
-                    async for result in pipeline.process_symbols_streaming(
-                        all_symbols, period="6mo", min_score=min_score
-                    ):
-                        signals.append(result)
-                        signal_count += 1
-                        processed_count += 1
-                        
-                        # Real-time notification for high-value signals
-                        if result.overall_score >= 0.9:
-                            console.print(f"[bold red]🚨 HIGH-VALUE SIGNAL: {result.symbol} "
-                                         f"(score: {result.overall_score:.3f})[/bold red]")
-                        else:
-                            console.print(f"[green]✨ Signal found: {result.symbol} "
-                                         f"(score: {result.overall_score:.3f})[/green]")
-                        
-                        # Progress update every 100 symbols
-                        if processed_count % 100 == 0:
-                            console.print(f"[dim]Processed {processed_count}/{len(all_symbols)} symbols, "
-                                         f"found {signal_count} signals[/dim]")
-                    
-                    # Get final stats
-                    final_stats = pipeline.get_stats()
-                    data_fetch_time = final_stats.fetch_time
-                    analysis_time = final_stats.analysis_time
-                    
-                except KeyboardInterrupt:
-                    console.print(f"\n[yellow]⚠️  Scan interrupted by user[/yellow]")
-                    console.print(f"[dim]Processed {len(signals)} signals before interruption[/dim]")
-                except Exception as e:
-                    console.print(f"[red]❌ Streaming pipeline error: {e}[/red]")
-                    console.print(f"[yellow]Falling back to batch processing...[/yellow]")
-                    # Fall through to batch processing
-                
-            else:
-                # Use optimized bulk processing
-                console.print(f"[bold blue]📈 Fetching market data (ultra-optimized)...[/bold blue]")
-                
-                symbol_data = await optimized_data.get_multiple_symbols_bulk(
-                    all_symbols, period="6mo"
+            try:
+                # Use chunked approach for better performance
+                symbol_data = await data_service.get_multiple_symbols_chunked(
+                    all_symbols, 
+                    period="6mo"
                 )
-                
-                console.print(f"✅ Retrieved data for {len(symbol_data)}/{len(all_symbols)} symbols")
-                
-                if not symbol_data:
-                    console.print("[red]❌ No market data retrieved[/red]")
-                    return
-                
-                # Analyze symbols with parallel processing
-                console.print(f"[bold blue]🔍 Analyzing {len(symbol_data)} symbols (parallel)...[/bold blue]")
-                
-                analysis_start_time = time.time()
-                
-                # Progress callback for streaming analysis
-                def progress_callback(batch_num, total_batches, batch_signals, total_signals):
-                    console.print(f"[dim]Batch {batch_num}/{total_batches} complete - {batch_signals} signals found (total: {total_signals})[/dim]")
-                
+            except Exception as e:
+                console.print(f"[red]Error fetching market data: {e}[/red]")
+                return
+            
+            console.print(f"✅ Retrieved data for {len(symbol_data)}/{len(all_symbols)} symbols")
+            
+            if not symbol_data:
+                console.print("[red]❌ No market data retrieved[/red]")
+                return
+            
+            # Analyze symbols with parallel processing
+            console.print(f"[bold blue]🔍 Analyzing {len(symbol_data)} symbols (parallel)...[/bold blue]")
+            
+            analysis_start_time = asyncio.get_event_loop().time()
+            
+            # Progress callback for streaming analysis
+            def progress_callback(batch_num, total_batches, batch_signals, total_signals):
+                console.print(f"[dim]Batch {batch_num}/{total_batches} complete - {batch_signals} signals found (total: {total_signals})[/dim]")
+            
+            try:
+                # Use parallel analysis from the main analysis service
+                signals = await analysis_service.analyze_symbols_streaming(
+                    symbol_data,
+                    min_score=min_score,
+                    batch_size=100,
+                    callback=progress_callback
+                )
+            except Exception as e:
+                console.print(f"[red]Error during parallel analysis: {e}[/red]")
+                # Fallback to sequential analysis
+                console.print("[yellow]Falling back to sequential analysis...[/yellow]")
+                signals = []
+                for symbol, market_data in symbol_data.items():
+                    try:
+                        result = await analysis_service.analyze_symbol(
+                            market_data,
+                            include_ai_analysis=not fast
+                        )
+                        if result and result.overall_score >= min_score:
+                            signals.append(result)
+                    except Exception:
+                        pass
+            
+            analysis_time = asyncio.get_event_loop().time() - analysis_start_time
+            data_fetch_time = analysis_start_time - start_time
+            
+            # Process signals for continuity tracking
+            if signals and continuity_service:
                 try:
-                    # Use parallel analysis from the main analysis service
-                    signals = await analysis_service.analyze_symbols_streaming(
-                        symbol_data,
-                        min_score=min_score,
-                        batch_size=100,
-                        callback=progress_callback
-                    )
+                    console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
+                    signals = await continuity_service.process_signals_with_continuity(signals)
+                    console.print(f"[green]✅ Signal continuity processing complete[/green]")
                 except Exception as e:
-                    console.print(f"[red]Error during parallel analysis: {e}[/red]")
-                    # Fallback to sequential analysis
-                    console.print("[yellow]Falling back to sequential analysis...[/yellow]")
-                    signals = []
-                    for symbol, market_data in symbol_data.items():
-                        try:
-                            result = await analysis_service.analyze_symbol(
-                                market_data,
-                                include_ai_analysis=not fast
-                            )
-                            if result and result.overall_score >= min_score:
-                                signals.append(result)
-                        except Exception:
-                            pass
-                
-                analysis_time = time.time() - analysis_start_time
-                data_fetch_time = analysis_start_time - start_time
-                
-                # Process signals for continuity tracking (if not done in pipeline)
-                if signals and continuity_service:
-                    try:
-                        console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
-                        signals = await continuity_service.process_signals_with_continuity(signals)
-                        console.print(f"[green]✅ Signal continuity processing complete[/green]")
-                    except Exception as e:
-                        console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
-                
-                # Store signals in database (if not done in pipeline)
-                if signals and database_service.is_available():
-                    try:
-                        stored_count = await database_service.store_signals_batch(signals)
-                        if stored_count > 0:
-                            console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
-                    except Exception as e:
-                        console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
+                    console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
+            
+            # Store signals in database (now with duplicate prevention)
+            if signals and database_service.is_available():
+                try:
+                    # Check for existing duplicates before storing
+                    today = date.today()
+                    duplicate_stats = await database_service.get_duplicate_signals_count(today)
+                    
+                    if duplicate_stats.get('duplicates', 0) > 0:
+                        console.print(f"[yellow]⚠️  Found {duplicate_stats['duplicates']} existing duplicates for today[/yellow]")
+                        console.print("[blue]🧹 Cleaning up existing duplicates before storing new signals...[/blue]")
+                        
+                        cleaned_count = await database_service.cleanup_duplicate_signals(today)
+                        if cleaned_count > 0:
+                            console.print(f"[green]✅ Cleaned up {cleaned_count} duplicate signals[/green]")
+                    
+                    # Store new signals (using upsert to prevent new duplicates)
+                    stored_count = await database_service.store_signals_batch(signals)
+                    if stored_count > 0:
+                        console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
+                        
+                        # Verify no duplicates were created
+                        final_stats = await database_service.get_duplicate_signals_count(today)
+                        if final_stats.get('duplicates', 0) > 0:
+                            console.print(f"[yellow]⚠️  Warning: {final_stats['duplicates']} duplicates still exist[/yellow]")
+                            
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
             
             # Display results
             if signals:
@@ -958,30 +888,17 @@ def scan_all(
                 console.print("[dim]Try lowering the --min-score threshold[/dim]")
             
             # Performance summary
-            total_time = time.time() - start_time
-            symbols_processed = len(all_symbols)
-            symbols_per_second = symbols_processed / total_time if total_time > 0 else 0
+            total_time = data_fetch_time + analysis_time
+            symbols_per_second = len(symbol_data) / total_time if total_time > 0 else 0
             
             # Summary stats
-            console.print(f"\n[bold]📊 Ultra-Optimized Scan Summary:[/bold]")
-            if ticker_service:
-                console.print(f"   🌍 Total symbols in database: {ticker_service.get_ticker_count()}")
+            console.print(f"\n[bold]📊 Full Market Scan Summary:[/bold]")
+            console.print(f"   🌍 Total symbols in database: {ticker_service.get_ticker_count()}")
             console.print(f"   📊 Symbols scanned: {len(all_symbols)}")
+            console.print(f"   ✅ Data successfully retrieved: {len(symbol_data)}")
             console.print(f"   🎯 High-quality signals found: {len(signals)}")
-            console.print(f"   📈 Signal rate: {len(signals)/len(all_symbols)*100:.1f}%")
-            console.print(f"   🔄 Data retrieval success: 97.0%")  # Estimated based on optimized service
-            
-            # Performance metrics
-            console.print(f"\n[bold]⚡ Performance Metrics:[/bold]")
-            console.print(f"   ⏱️  Total time: {total_time:.1f}s")
-            console.print(f"   🚀 Processing speed: {symbols_per_second:.1f} symbols/second")
-            console.print(f"   📊 Profile used: {profile_config.name}")
-            
-            # Cache performance (if available)
-            if 'optimized_data' in locals():
-                cache_stats = optimized_data.get_cache_stats()
-                console.print(f"   💾 Cache hit rate: {cache_stats['cache_hit_rate']:.1f}%")
-                console.print(f"   📥 Average fetch time: {cache_stats['average_fetch_time']*1000:.0f}ms")
+            console.print(f"   📈 Signal rate: {len(signals)/len(symbol_data)*100:.1f}%" if symbol_data else "0%")
+            console.print(f"   🔄 Data retrieval success: {len(symbol_data)/len(all_symbols)*100:.1f}%")
             
             # Signal continuity summary
             if signals and continuity_service:
@@ -1397,71 +1314,6 @@ def paper_demo(
             console.print(f"  📈 Exposure: {summary['exposure_pct']:.1%}")
     
     asyncio.run(_run_demo())
-
-
-@app.command()
-def performance_guide() -> None:
-    """Show performance optimization guide and recommendations."""
-    from volatility_scanner.config.performance_profiles import PerformanceProfiles
-    
-    console.print("[bold blue]🚀 Volatility Scanner Performance Guide[/bold blue]\n")
-    
-    console.print("[bold]Performance Optimization Overview:[/bold]")
-    console.print("The scanner now includes ultra-high performance optimizations that can")
-    console.print("reduce processing time from 25+ minutes to 2-3 minutes with real-time results.\n")
-    
-    if OPTIMIZED_AVAILABLE:
-        # Profile comparison
-        comparison = PerformanceProfiles.get_profile_comparison()
-        
-        table = Table(title="🚀 Performance Profile Comparison")
-        table.add_column("Profile", style="bold cyan")
-        table.add_column("Speed", style="green", justify="right")
-        table.add_column("Time (1000 sym)", style="blue", justify="right")
-        table.add_column("Best For", style="white")
-        
-        for profile_name, info in comparison.items():
-            table.add_row(
-                profile_name.title(),
-                f"{info['estimated_rate_symbols_per_second']:.1f}/s",
-                f"{info['estimated_time_for_1000_symbols_minutes']:.1f}m",
-                info["recommended_for"][0] if info["recommended_for"] else "General use"
-            )
-        
-        console.print(table)
-        
-        console.print(f"\n[bold]Ultra-Optimized Commands:[/bold]")
-        console.print("• [green]ultra-scan --symbols all --profile balanced[/green] - Recommended for most users")
-        console.print("• [yellow]ultra-scan --profile aggressive --max-symbols 500[/yellow] - Maximum speed")
-        console.print("• [cyan]scan-optimized --profile balanced --streaming[/cyan] - Memory efficient")
-        console.print("• [blue]performance-test --count 100[/blue] - Test your system performance")
-        
-        console.print(f"\n[bold]Key Improvements:[/bold]")
-        console.print("✅ [green]Real-time streaming results[/green] - See signals as they're found")
-        console.print("✅ [green]10x+ speed improvement[/green] - From 25min to 2-3min")
-        console.print("✅ [green]Intelligent caching[/green] - 70-90% cache hit rates")
-        console.print("✅ [green]Live progress updates[/green] - Know exactly what's happening")
-        console.print("✅ [green]Memory efficient[/green] - Handle thousands of symbols")
-    else:
-        console.print("[yellow]⚠️  Optimized commands not available. Install dependencies:[/yellow]")
-        console.print("pip install -e .")
-        
-        console.print(f"\n[bold]Standard Commands (Available):[/bold]")
-        console.print("• [cyan]scan-all --min-score 0.6[/cyan] - Full market scan")
-        console.print("• [green]analyze AAPL[/green] - Single symbol analysis")
-        console.print("• [yellow]batch AAPL,MSFT,GOOGL[/yellow] - Multiple symbols")
-    
-    console.print(f"\n[dim]For detailed information, see: docs/volatility-squeeze-scanner/performance-optimization-complete.md[/dim]")
-
-
-# Add optimized commands if available
-if OPTIMIZED_AVAILABLE:
-    try:
-        add_optimized_commands(app)
-        add_ultra_optimized_commands(app)
-    except Exception as e:
-        # Silently fail if optimized commands can't be loaded
-        pass
 
 
 if __name__ == "__main__":
