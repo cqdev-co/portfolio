@@ -1,6 +1,6 @@
 """Signal continuity tracking service for volatility squeeze scanner."""
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Dict, Optional, Set
 from loguru import logger
 
@@ -42,10 +42,11 @@ class SignalContinuityService:
         # Get symbols from new signals
         new_signal_symbols = {signal.symbol for signal in new_signals}
         
-        # Get active signals from previous days (within last 7 days)
+        # Get active signals from previous scans (within last 7 days including today)
         previous_signals = await self._get_recent_active_signals(
             days_back=7,
-            end_date=scan_date - timedelta(days=1)
+            end_date=scan_date,  # Include today to check for same-day continuation
+            exclude_recent_hours=2  # Exclude very recent signals (within 2 hours)
         )
         
         # Group previous signals by symbol (get most recent for each symbol)
@@ -94,7 +95,8 @@ class SignalContinuityService:
     async def _get_recent_active_signals(
         self,
         days_back: int = 7,
-        end_date: date = None
+        end_date: date = None,
+        exclude_recent_hours: int = 0
     ) -> List[Dict]:
         """Get active signals from recent days."""
         if not self.database_service.is_available():
@@ -109,17 +111,29 @@ class SignalContinuityService:
             # Query for active signals in the date range
             query = self.database_service.client.table('volatility_squeeze_signals').select(
                 'symbol, signal_status, days_in_squeeze, first_detected_date, '
-                'last_active_date, scan_date, overall_score'
+                'last_active_date, scan_date, overall_score, created_at'
             ).gte(
-                'last_active_date', start_date.isoformat()
+                'scan_date', start_date.isoformat()
             ).lte(
-                'last_active_date', end_date.isoformat()
+                'scan_date', end_date.isoformat()
             ).in_(
                 'signal_status', ['NEW', 'CONTINUING']
-            ).order('last_active_date', desc=True)
+            ).order('created_at', desc=True)
             
             response = query.execute()
-            return response.data if response.data else []
+            signals = response.data if response.data else []
+            
+            # Filter out very recent signals if requested
+            if exclude_recent_hours > 0:
+                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=exclude_recent_hours)
+                filtered_signals = []
+                for signal in signals:
+                    created_at = datetime.fromisoformat(signal['created_at'].replace('Z', '+00:00'))
+                    if created_at < cutoff_time:
+                        filtered_signals.append(signal)
+                signals = filtered_signals
+            
+            return signals
             
         except Exception as e:
             logger.error(f"Error retrieving recent active signals: {e}")
@@ -191,36 +205,46 @@ class SignalContinuityService:
             if isinstance(previous_last_active, str):
                 previous_last_active = datetime.fromisoformat(previous_last_active).date()
             
-            days_gap = (scan_date - previous_last_active).days
+            previous_scan_date = previous_signal['scan_date']
+            if isinstance(previous_scan_date, str):
+                previous_scan_date = datetime.fromisoformat(previous_scan_date).date()
             
-            if days_gap <= 2:  # Allow 1-2 day gap for weekends/holidays
-                # Signal is continuing
+            # Calculate gaps based on scan dates (more accurate for same-day detection)
+            days_gap = (scan_date - previous_scan_date).days
+            
+            # More permissive continuation logic
+            if days_gap == 0:
+                # Same day - this is definitely continuing
+                squeeze_signal.signal_status = SignalStatus.CONTINUING
+                squeeze_signal.days_in_squeeze = previous_signal.get('days_in_squeeze', 1)
+                continuation_reason = "same day"
+            elif days_gap <= 3:  # Allow up to 3 day gap for weekends/holidays
+                # Multi-day continuation
                 squeeze_signal.signal_status = SignalStatus.CONTINUING
                 squeeze_signal.days_in_squeeze = previous_signal.get('days_in_squeeze', 1) + days_gap
-                
-                # Preserve first detected date
-                first_detected = previous_signal.get('first_detected_date')
-                if isinstance(first_detected, str):
-                    first_detected = datetime.fromisoformat(first_detected).date()
-                squeeze_signal.first_detected_date = first_detected
-                
-                squeeze_signal.last_active_date = scan_date
-                
-                logger.debug(
-                    f"Continuing signal for {symbol} "
-                    f"(day {squeeze_signal.days_in_squeeze}, gap: {days_gap} days)"
-                )
-                
+                continuation_reason = f"{days_gap} day gap"
             else:
-                # Gap is too large - treat as new signal
+                # Gap is too large, treat as new signal
                 squeeze_signal.signal_status = SignalStatus.NEW
                 squeeze_signal.days_in_squeeze = 1
                 squeeze_signal.first_detected_date = scan_date
                 squeeze_signal.last_active_date = scan_date
                 
-                logger.debug(
-                    f"Gap too large for {symbol} ({days_gap} days), treating as new signal"
-                )
+                logger.debug(f"Gap too large for {symbol} ({days_gap} days), treating as new signal")
+                return current_signal
+            
+            # For continuing signals, preserve first detected date
+            first_detected = previous_signal.get('first_detected_date')
+            if isinstance(first_detected, str):
+                first_detected = datetime.fromisoformat(first_detected).date()
+            squeeze_signal.first_detected_date = first_detected
+            
+            squeeze_signal.last_active_date = scan_date
+            
+            logger.debug(
+                f"Continuing signal for {symbol} "
+                f"(day {squeeze_signal.days_in_squeeze}, {continuation_reason})"
+            )
         
         return current_signal
     

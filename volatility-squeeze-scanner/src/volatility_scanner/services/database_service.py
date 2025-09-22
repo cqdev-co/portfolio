@@ -2,7 +2,7 @@
 
 import os
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
 import asyncio
@@ -82,11 +82,31 @@ class DatabaseService:
         try:
             signal_data = self._prepare_signal_data(analysis_result, scan_date)
             
-            # Use upsert to prevent duplicates (INSERT or UPDATE)
-            response = self.client.table('volatility_squeeze_signals').upsert(
-                signal_data,
-                on_conflict='symbol,scan_date'  # Match on symbol and scan_date
-            ).execute()
+            # Check for existing signal from today for this symbol
+            existing_response = self.client.table('volatility_squeeze_signals').select('id, created_at').eq(
+                'symbol', analysis_result.symbol
+            ).eq(
+                'scan_date', scan_date.isoformat()
+            ).order('created_at', desc=True).limit(1).execute()
+            
+            if existing_response.data:
+                # Found existing signal for today - check if it's recent (within 2 hours)
+                existing_record = existing_response.data[0]
+                existing_time = datetime.fromisoformat(existing_record['created_at'].replace('Z', '+00:00'))
+                current_time = datetime.now(timezone.utc)
+                time_diff = (current_time - existing_time).total_seconds() / 3600  # hours
+                
+                if time_diff < 2.0:
+                    # Recent signal exists, update it instead of creating new
+                    response = self.client.table('volatility_squeeze_signals').update(
+                        signal_data
+                    ).eq('id', existing_record['id']).execute()
+                else:
+                    # Older signal exists, create new one (allowing continuation tracking)
+                    response = self.client.table('volatility_squeeze_signals').insert(signal_data).execute()
+            else:
+                # No existing signal for today, create new one
+                response = self.client.table('volatility_squeeze_signals').insert(signal_data).execute()
             
             if response.data:
                 signal_id = response.data[0]['id']

@@ -133,6 +133,44 @@ class SimpleSupabaseStorage:
                 success_count += 1
         
         return success_count
+    
+    async def update_post(self, post: 'RDSDataSource') -> bool:
+        """
+        Update an existing post in the database.
+        
+        Args:
+            post: RDSDataSource model instance to update
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Convert model to dict for update
+            update_data = post.model_dump(exclude={'id'})  # Exclude id from update
+            
+            # Convert lists/dicts to JSON strings for database storage
+            if isinstance(update_data.get('tickers'), list):
+                update_data['tickers'] = json.dumps(update_data['tickers'])
+            if isinstance(update_data.get('claims'), list):
+                update_data['claims'] = json.dumps(update_data['claims'])
+            if isinstance(update_data.get('numeric_data'), dict):
+                update_data['numeric_data'] = json.dumps(update_data['numeric_data'])
+            if isinstance(update_data.get('market_data'), dict):
+                update_data['market_data'] = json.dumps(update_data['market_data'])
+            
+            # Update the post by post_id
+            response = await asyncio.to_thread(
+                lambda: self.table.update(update_data)
+                .eq('post_id', post.post_id)
+                .execute()
+            )
+            
+            logger.debug(f"Updated post {post.post_id} in database")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating post {post.post_id}: {e}")
+            return False
 
     async def get_post(self, post_id: str) -> Optional[Dict[str, Any]]:
         """Get a single post by ID."""

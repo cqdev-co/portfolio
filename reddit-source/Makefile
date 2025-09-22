@@ -25,6 +25,9 @@ ingest-once:
 ingest-watch:
 	poetry run reddit-source ingest --watch
 
+process:
+	poetry run reddit-source process
+
 export:
 	poetry run reddit-source export --date $(shell date +%Y-%m-%d)
 

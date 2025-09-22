@@ -317,8 +317,25 @@ class RedditClient:
     async def download_image(self, url: str, save_path: Path) -> bool:
         """Download image from URL and save to local path."""
         try:
+            # Skip gallery URLs and other complex formats
+            if "gallery" in url or "reddit.com/r/" in url:
+                logger.debug(f"Skipping gallery/complex URL: {url}")
+                return False
+                
+            # Check for null characters in the path string and skip if found
+            path_str = str(save_path)
+            if '\x00' in path_str:
+                logger.warning(f"Skipping image with null character in path: {repr(path_str)}")
+                return False
+                
+            # Clean the save_path to remove any null characters or problematic chars
+            clean_filename = "".join(c for c in save_path.name if c.isprintable() and c not in '\x00\n\r\t')
+            if not clean_filename:
+                clean_filename = f"image_{hash(str(save_path)) % 1000000}.jpg"
+            clean_save_path = save_path.parent / clean_filename
+                
             # Ensure directory exists
-            save_path.parent.mkdir(parents=True, exist_ok=True)
+            clean_save_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Handle different image hosting services
             download_url = self._get_direct_image_url(url)
@@ -337,9 +354,9 @@ class RedditClient:
                         if img.width > 2048 or img.height > 2048:
                             img.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
                         
-                        img.save(save_path, "JPEG", quality=85, optimize=True)
+                        img.save(clean_save_path, "JPEG", quality=85, optimize=True)
                         
-                    logger.debug(f"Downloaded image: {save_path}")
+                    logger.debug(f"Downloaded image: {clean_save_path}")
                     return True
                     
                 except Exception as e:
