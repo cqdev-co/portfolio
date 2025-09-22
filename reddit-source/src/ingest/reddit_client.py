@@ -216,11 +216,13 @@ class RedditClient:
                     image_url = url
             
             # Create PostCore instance
+            created_utc = int(float(data.get("created_utc", 0)))
             post = PostCore(
                 post_id=post_id,
                 subreddit=data.get("subreddit", ""),
                 author=data.get("author"),
-                created_utc=int(float(data.get("created_utc", 0))),
+                created_utc=created_utc,
+                created_datetime=datetime.fromtimestamp(created_utc),
                 title=data.get("title", ""),
                 selftext=data.get("selftext", ""),
                 permalink=data.get("permalink", ""),

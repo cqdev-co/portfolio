@@ -63,13 +63,14 @@ class DatabaseService:
         """Check if database service is available."""
         return self.client is not None
     
-    async def store_signal(self, analysis_result: AnalysisResult) -> Optional[str]:
+    async def store_signal(self, analysis_result: AnalysisResult, scan_date: date = None) -> Optional[str]:
         """
         Store or update a single volatility squeeze signal in the database.
         Uses upsert logic to prevent duplicates for the same symbol on the same date.
         
         Args:
             analysis_result: The analysis result to store
+            scan_date: The date to use for the scan (defaults to today)
             
         Returns:
             The ID of the stored/updated signal, or None if failed
@@ -79,7 +80,7 @@ class DatabaseService:
             return None
         
         try:
-            signal_data = self._prepare_signal_data(analysis_result)
+            signal_data = self._prepare_signal_data(analysis_result, scan_date)
             
             # Use upsert to prevent duplicates (INSERT or UPDATE)
             response = self.client.table('volatility_squeeze_signals').upsert(
@@ -99,12 +100,13 @@ class DatabaseService:
             logger.error(f"Error storing signal for {analysis_result.symbol}: {e}")
             return None
     
-    async def store_signals_batch(self, analysis_results: List[AnalysisResult]) -> int:
+    async def store_signals_batch(self, analysis_results: List[AnalysisResult], scan_date: date = None) -> int:
         """
         Store multiple signals in a batch operation with retry logic.
         
         Args:
             analysis_results: List of analysis results to store
+            scan_date: The date to use for the scan (defaults to today)
             
         Returns:
             Number of successfully stored signals
@@ -123,7 +125,7 @@ class DatabaseService:
         # Process in smaller batches
         for i in range(0, len(analysis_results), batch_size):
             batch = analysis_results[i:i + batch_size]
-            batch_stored = await self._store_batch_with_retry(batch, batch_num=i//batch_size + 1)
+            batch_stored = await self._store_batch_with_retry(batch, scan_date, batch_num=i//batch_size + 1)
             total_stored += batch_stored
             
             # Small delay between batches to avoid overwhelming the connection
@@ -133,13 +135,13 @@ class DatabaseService:
         logger.info(f"✅ Stored {total_stored}/{len(analysis_results)} signals in database")
         return total_stored
     
-    async def _store_batch_with_retry(self, batch: List[AnalysisResult], batch_num: int, max_retries: int = 3) -> int:
+    async def _store_batch_with_retry(self, batch: List[AnalysisResult], scan_date: date, batch_num: int, max_retries: int = 3) -> int:
         """Store a batch with retry logic for SSL/network issues."""
         for attempt in range(max_retries):
             try:
                 # Prepare signal data
                 signals_data = [
-                    self._prepare_signal_data(result) 
+                    self._prepare_signal_data(result, scan_date) 
                     for result in batch
                 ]
                 
@@ -177,7 +179,7 @@ class DatabaseService:
         
         for result in batch:
             try:
-                signal_id = await self.store_signal(result)
+                signal_id = await self.store_signal(result, scan_date)
                 if signal_id:
                     stored_count += 1
                 await asyncio.sleep(0.05)  # Small delay between individual inserts
@@ -187,14 +189,18 @@ class DatabaseService:
         logger.info(f"Fallback stored {stored_count}/{len(batch)} signals from batch {batch_num}")
         return stored_count
     
-    def _prepare_signal_data(self, analysis_result: AnalysisResult) -> Dict[str, Any]:
+    def _prepare_signal_data(self, analysis_result: AnalysisResult, scan_date: date = None) -> Dict[str, Any]:
         """Prepare analysis result data for database storage."""
         squeeze_signal = analysis_result.squeeze_signal
         
+        # Use provided scan_date or default to today
+        if scan_date is None:
+            scan_date = date.today()
+            
         # Convert to database format
         data = {
             'symbol': analysis_result.symbol,
-            'scan_date': date.today().isoformat(),  # Add scan_date for unique constraint
+            'scan_date': scan_date.isoformat(),  # Use the provided scan_date
             'scan_timestamp': datetime.now().isoformat(),
             
             # Price data

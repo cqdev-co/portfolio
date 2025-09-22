@@ -768,7 +768,7 @@ def scan_all(
             if signals and continuity_service:
                 try:
                     console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
-                    signals = await continuity_service.process_signals_with_continuity(signals)
+                    signals = await continuity_service.process_signals_with_continuity(signals, today)
                     console.print(f"[green]✅ Signal continuity processing complete[/green]")
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
@@ -789,7 +789,7 @@ def scan_all(
                             console.print(f"[green]✅ Cleaned up {cleaned_count} duplicate signals[/green]")
                     
                     # Store new signals (using upsert to prevent new duplicates)
-                    stored_count = await database_service.store_signals_batch(signals)
+                    stored_count = await database_service.store_signals_batch(signals, today)
                     if stored_count > 0:
                         console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
                         

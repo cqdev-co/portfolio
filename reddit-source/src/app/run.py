@@ -15,7 +15,7 @@ from rich.table import Table
 
 from ..config.settings import get_settings
 from ..ingest.reddit_client import RedditClient
-from ..storage.supabase_client import get_admin_storage_client, get_storage_client
+from ..storage.simple_storage import get_admin_simple_storage_client
 
 # Initialize Rich console
 console = Console()
@@ -75,7 +75,7 @@ def ingest(
 async def _ingest_posts(once: bool, subreddits: Optional[str], limit: int) -> None:
     """Internal async function for ingesting posts."""
     settings = get_settings()
-    storage = get_admin_storage_client()
+    storage = get_admin_simple_storage_client()
     
     # Override subreddits if provided
     target_subreddits = (
@@ -137,6 +137,7 @@ async def _ingest_posts(once: bool, subreddits: Optional[str], limit: int) -> No
                         console.print("[yellow]No new posts found[/yellow]")
                 
                 if once:
+                    console.print("[green]Single run completed[/green]")
                     break
                 
                 # Wait for next poll cycle
@@ -180,7 +181,7 @@ async def _export_data(
     ticker: Optional[str]
 ) -> None:
     """Internal async function for exporting data."""
-    storage = get_storage_client()
+    storage = get_admin_simple_storage_client()
     
     console.print(f"[green]Exporting data for {export_date.strftime('%Y-%m-%d')}...[/green]")
     
@@ -264,7 +265,7 @@ async def _join_signals(scanner_path: Path, output_path: Path) -> None:
         console.print("[red]Error: pandas is required for join operations[/red]")
         return
     
-    storage = get_storage_client()
+    storage = get_admin_simple_storage_client()
     
     console.print(f"[green]Loading scanner signals from {scanner_path}...[/green]")
     
@@ -362,7 +363,7 @@ def status(
 
 async def _show_status() -> None:
     """Internal async function for showing status."""
-    storage = get_storage_client()
+    storage = get_admin_simple_storage_client()
     
     console.print("[green]Reddit Source System Status[/green]")
     console.print("=" * 50)
