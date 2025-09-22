@@ -2,7 +2,7 @@ version: 2
 updates:
   # Configure updates for npm dependencies
   - package-ecosystem: "bun"
-    directory: "/" # Location of package manifests
+    directory: "/frontend" # Location of package manifests
     schedule:
       interval: "weekly"
     # Set reviewers for pull requests

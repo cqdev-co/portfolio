@@ -764,6 +764,9 @@ def scan_all(
             analysis_time = asyncio.get_event_loop().time() - analysis_start_time
             data_fetch_time = analysis_start_time - start_time
             
+            # Get today's date for continuity tracking and database operations
+            today = date.today()
+            
             # Process signals for continuity tracking
             if signals and continuity_service:
                 try:
@@ -777,7 +780,6 @@ def scan_all(
             if signals and database_service.is_available():
                 try:
                     # Check for existing duplicates before storing
-                    today = date.today()
                     duplicate_stats = await database_service.get_duplicate_signals_count(today)
                     
                     if duplicate_stats.get('duplicates', 0) > 0:

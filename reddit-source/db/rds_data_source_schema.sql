@@ -110,20 +110,55 @@ CREATE TRIGGER update_rds_data_source_updated_at
 
 -- Create a materialized view for analytics
 CREATE MATERIALIZED VIEW rds_analytics AS
+WITH ticker_expanded AS (
+    SELECT 
+        subreddit,
+        DATE(created_datetime) as date,
+        score,
+        num_comments,
+        sentiment,
+        quality_tier,
+        is_image,
+        jsonb_array_elements_text(tickers) as ticker
+    FROM rds_data_source
+    WHERE tickers != '[]'::jsonb
+),
+daily_stats AS (
+    SELECT 
+        subreddit,
+        DATE(created_datetime) as date,
+        COUNT(*) as total_posts,
+        COUNT(*) FILTER (WHERE tickers != '[]'::jsonb) as posts_with_tickers,
+        COUNT(*) FILTER (WHERE sentiment IS NOT NULL) as posts_with_sentiment,
+        COUNT(*) FILTER (WHERE quality_tier = 'valuable') as valuable_posts,
+        COUNT(*) FILTER (WHERE is_image = true) as image_posts,
+        AVG(score) as avg_score,
+        AVG(num_comments) as avg_comments
+    FROM rds_data_source
+    GROUP BY subreddit, DATE(created_datetime)
+),
+unique_tickers_per_day AS (
+    SELECT 
+        subreddit,
+        date,
+        JSONB_AGG(DISTINCT ticker) as unique_tickers
+    FROM ticker_expanded
+    GROUP BY subreddit, date
+)
 SELECT 
-    subreddit,
-    DATE(created_datetime) as date,
-    COUNT(*) as total_posts,
-    COUNT(*) FILTER (WHERE tickers != '[]'::jsonb) as posts_with_tickers,
-    COUNT(*) FILTER (WHERE sentiment IS NOT NULL) as posts_with_sentiment,
-    COUNT(*) FILTER (WHERE quality_tier = 'valuable') as valuable_posts,
-    COUNT(*) FILTER (WHERE is_image = true) as image_posts,
-    AVG(score) as avg_score,
-    AVG(num_comments) as avg_comments,
-    JSONB_AGG(DISTINCT jsonb_array_elements_text(tickers)) FILTER (WHERE tickers != '[]'::jsonb) as unique_tickers
-FROM rds_data_source
-GROUP BY subreddit, DATE(created_datetime)
-ORDER BY subreddit, date DESC;
+    ds.subreddit,
+    ds.date,
+    ds.total_posts,
+    ds.posts_with_tickers,
+    ds.posts_with_sentiment,
+    ds.valuable_posts,
+    ds.image_posts,
+    ds.avg_score,
+    ds.avg_comments,
+    COALESCE(ut.unique_tickers, '[]'::jsonb) as unique_tickers
+FROM daily_stats ds
+LEFT JOIN unique_tickers_per_day ut ON ds.subreddit = ut.subreddit AND ds.date = ut.date
+ORDER BY ds.subreddit, ds.date DESC;
 
 -- Create index on the materialized view
 CREATE INDEX idx_rds_analytics_subreddit_date ON rds_analytics(subreddit, date);
@@ -140,35 +175,3 @@ $$ LANGUAGE plpgsql;
 GRANT ALL ON rds_data_source TO authenticated;
 GRANT ALL ON rds_analytics TO authenticated;
 GRANT USAGE ON SEQUENCE rds_data_source_id_seq TO authenticated;
-
--- Insert a sample row to test the schema
-INSERT INTO rds_data_source (
-    post_id, subreddit, author, created_utc, created_datetime,
-    title, selftext, permalink, score, num_comments,
-    tickers, sentiment, quality_tier
-) VALUES (
-    'test_post_001',
-    'stocks',
-    'test_user',
-    EXTRACT(epoch FROM NOW())::bigint,
-    NOW(),
-    'Test Post - AAPL Analysis',
-    'This is a test post about Apple stock.',
-    '/r/stocks/comments/test_post_001/',
-    42,
-    15,
-    '["AAPL"]'::jsonb,
-    'bull',
-    'valuable'
-);
-
--- Verify the insert worked
-SELECT 
-    post_id, 
-    subreddit, 
-    title, 
-    tickers, 
-    sentiment,
-    ingested_at
-FROM rds_data_source 
-WHERE post_id = 'test_post_001';

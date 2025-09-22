@@ -46,9 +46,15 @@ def setup_logging(debug: bool = False) -> None:
         ]
     )
     
-    # Reduce noise from external libraries
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # Reduce noise from external libraries - be more aggressive
+    logging.getLogger("httpx").setLevel(logging.ERROR)
+    logging.getLogger("httpcore").setLevel(logging.ERROR)
+    logging.getLogger("supabase").setLevel(logging.WARNING)
+    logging.getLogger("postgrest").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("hpack").setLevel(logging.ERROR)  # Suppress HTTP/2 frame debugging
+    logging.getLogger("h2").setLevel(logging.ERROR)     # Suppress HTTP/2 debugging
 
 
 @app.command()
@@ -96,6 +102,7 @@ async def _ingest_posts(once: bool, subreddits: Optional[str], limit: int) -> No
     async with RedditClient() as reddit:
         while True:
             try:
+                # Process posts with progress indicator
                 with Progress(
                     SpinnerColumn(),
                     TextColumn("[progress.description]{task.description}"),
@@ -103,10 +110,12 @@ async def _ingest_posts(once: bool, subreddits: Optional[str], limit: int) -> No
                 ) as progress:
                     task = progress.add_task("Fetching posts...", total=None)
                     
-                    # Get recent posts
-                    posts = await reddit.get_recent_posts(
-                        window_minutes=settings.data.poll_window_minutes,
-                        max_posts=limit
+                    # Get recent posts (all posts, not time-filtered for testing)
+                    posts = await reddit.get_posts_from_multiple_subreddits(
+                        subreddits=target_subreddits,
+                        sort="new",
+                        time_filter="day",  # Get posts from last 24 hours
+                        limit_per_sub=min(limit // len(target_subreddits), 25)  # Distribute limit across subreddits
                     )
                     
                     progress.update(task, description=f"Processing {len(posts)} posts...")
@@ -127,20 +136,23 @@ async def _ingest_posts(once: bool, subreddits: Optional[str], limit: int) -> No
                             task, 
                             description=f"Inserted {inserted_count}/{len(posts)} posts"
                         )
-                        
-                        console.print(
-                            f"[green]✓[/green] Processed {len(posts)} posts, "
-                            f"inserted {inserted_count}, "
-                            f"downloaded {len([p for p in image_posts if p.image_path])} images"
-                        )
-                    else:
-                        console.print("[yellow]No new posts found[/yellow]")
                 
+                # Progress context is now closed, show results
+                if posts:
+                    console.print(
+                        f"[green]✓[/green] Processed {len(posts)} posts, "
+                        f"inserted {inserted_count}, "
+                        f"downloaded {len([p for p in image_posts if p.image_path])} images"
+                    )
+                else:
+                    console.print("[yellow]No new posts found[/yellow]")
+                
+                # Exit immediately if running once (Progress context is fully closed)
                 if once:
                     console.print("[green]Single run completed[/green]")
-                    break
+                    return
                 
-                # Wait for next poll cycle
+                # Only reach here in continuous mode
                 console.print(f"Waiting {settings.data.poll_interval_seconds} seconds...")
                 await asyncio.sleep(settings.data.poll_interval_seconds)
                 

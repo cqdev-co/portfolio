@@ -45,10 +45,12 @@ class SimpleSupabaseStorage:
     async def health_check(self) -> bool:
         """Check if the database connection is working."""
         try:
+            # Simple health check - just try to select from the table
             response = await asyncio.to_thread(
-                lambda: self.table.select("count()").limit(1).execute()
+                lambda: self.table.select("post_id").limit(1).execute()
             )
-            return response.data is not None
+            # Table exists and is accessible if we get a response (even if empty)
+            return True
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
