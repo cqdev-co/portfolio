@@ -13,8 +13,9 @@ from typing import List, Dict, Optional
 from ..config.settings import get_settings
 from ..storage.simple_storage import get_admin_simple_storage_client
 from ..ingest.simple_models import RDSDataSource
-from .ticker_extractor import TickerExtractor
+from .smart_ticker_extractor import SmartTickerExtractor
 from .market_enricher import MarketDataEnricher
+from .data_quality_filter import get_data_quality_filter
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,9 @@ class RedditProcessor:
     def __init__(self):
         self.settings = get_settings()
         self.storage = get_admin_simple_storage_client()
-        self.ticker_extractor = TickerExtractor()
+        self.ticker_extractor = SmartTickerExtractor()
         self.market_enricher = MarketDataEnricher()
+        self.quality_filter = get_data_quality_filter()
         
     async def process_pending_posts(self, limit: int = 100) -> Dict:
         """
@@ -73,12 +75,29 @@ class RedditProcessor:
                 updated_post = await self.process_single_post(post)
                 
                 if updated_post:
-                    # Update in database
-                    await self._update_post_in_db(updated_post)
-                    processed_count += 1
+                    # Apply quality filtering to determine if we should keep this processed post
+                    filter_result = self.quality_filter.should_store_post(updated_post)
                     
-                    if processed_count % 10 == 0:
-                        logger.info(f"Processed {processed_count}/{len(pending_posts)} posts...")
+                    if filter_result.passed:
+                        # Update in database with processed data
+                        await self._update_post_in_db(updated_post)
+                        processed_count += 1
+                        logger.debug(f"Post {updated_post.post_id} passed quality filter with score {filter_result.score:.3f}")
+                        
+                        if processed_count % 10 == 0:
+                            logger.info(f"Processed {processed_count}/{len(pending_posts)} posts...")
+                    else:
+                        # Mark as filtered but keep minimal data for audit trail
+                        updated_post.processing_status = "filtered"
+                        updated_post.error_message = f"Quality filter: {filter_result.reason}"
+                        # Clear processed data to save space
+                        updated_post.tickers = []
+                        updated_post.claims = []
+                        updated_post.numeric_data = {}
+                        updated_post.market_data = {}
+                        await self._update_post_in_db(updated_post)
+                        skipped_count += 1
+                        logger.info(f"Post {updated_post.post_id} filtered out: {filter_result.reason}")
                 else:
                     skipped_count += 1
                     
@@ -165,19 +184,16 @@ class RedditProcessor:
             return post
     
     async def _extract_tickers(self, post: RDSDataSource) -> List[str]:
-        """Extract ticker symbols from post content with enhanced confidence filtering."""
+        """Extract ticker symbols using intelligent NLP and market validation."""
         try:
-            # Use the enhanced ticker extractor with full TickerMatch objects
-            matches = self.ticker_extractor.extract_tickers(post.selftext or "", post.title)
+            # Use the smart ticker extractor with NLP and market validation
+            validated_tickers = await self.ticker_extractor.extract_tickers(
+                post.selftext or "", 
+                post.title or ""
+            )
             
-            # Filter by confidence and return only high-confidence tickers
-            high_confidence_tickers = [
-                match.symbol for match in matches 
-                if match.confidence >= 0.6  # Higher threshold for cleaner results
-            ]
-            
-            logger.debug(f"Post {post.post_id}: Found {len(matches)} total matches, {len(high_confidence_tickers)} high-confidence tickers: {high_confidence_tickers}")
-            return high_confidence_tickers
+            logger.debug(f"Post {post.post_id}: Found {len(validated_tickers)} validated tickers: {validated_tickers}")
+            return validated_tickers
             
         except Exception as e:
             logger.error(f"Error extracting tickers from post {post.post_id}: {e}")

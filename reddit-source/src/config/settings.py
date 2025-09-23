@@ -115,6 +115,19 @@ class QualityConfig(BaseSettings):
         default=0.30, 
         env="VALUE_SCORE_QUARANTINE_THRESHOLD"
     )
+    
+    # Storage filtering thresholds - prevent low-quality data from being stored
+    min_confidence_to_store: float = Field(default=0.3, env="MIN_CONFIDENCE_TO_STORE")
+    min_quality_tiers_to_store: str = Field(default="valuable,soft_quarantine", env="MIN_QUALITY_TIERS_TO_STORE")
+    require_tickers_to_store: bool = Field(default=True, env="REQUIRE_TICKERS_TO_STORE")
+    require_sentiment_to_store: bool = Field(default=False, env="REQUIRE_SENTIMENT_TO_STORE")
+    min_text_length_to_store: int = Field(default=50, env="MIN_TEXT_LENGTH_TO_STORE")
+    max_posts_per_batch: int = Field(default=50, env="MAX_POSTS_PER_BATCH")
+    
+    @property
+    def allowed_quality_tiers(self) -> List[str]:
+        """Get list of allowed quality tiers for storage."""
+        return [tier.strip() for tier in self.min_quality_tiers_to_store.split(",")]
 
 
 class FeatureConfig(BaseSettings):

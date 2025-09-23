@@ -17,6 +17,7 @@ from ..config.settings import get_settings
 from ..ingest.reddit_client import RedditClient
 from ..storage.simple_storage import get_admin_simple_storage_client
 from ..processing.processor import RedditProcessor
+from ..processing.data_quality_filter import get_data_quality_filter
 
 # Initialize Rich console
 console = Console()
@@ -363,6 +364,91 @@ def audit() -> None:
         ])
     except KeyboardInterrupt:
         console.print("\n[yellow]Audit interface stopped[/yellow]")
+
+
+@app.command()
+def quality_stats():
+    """Show data quality filtering statistics."""
+    asyncio.run(_show_quality_stats())
+
+
+async def _show_quality_stats():
+    """Show comprehensive data quality statistics."""
+    storage = get_admin_simple_storage_client()
+    
+    # Test connection
+    if not await storage.health_check():
+        console.print("[red]Error: Cannot connect to database[/red]")
+        return
+    
+    console.print("[green]📊 Data Quality Statistics[/green]\n")
+    
+    try:
+        # Get filtering statistics
+        stats = await storage.get_filtered_posts_stats()
+        
+        if not stats:
+            console.print("[yellow]No statistics available[/yellow]")
+            return
+        
+        # Processing Status Statistics
+        table = Table(title="Processing Status Distribution")
+        table.add_column("Status", style="cyan")
+        table.add_column("Count", justify="right", style="magenta")
+        table.add_column("Percentage", justify="right", style="green")
+        
+        total_posts = sum(count for key, count in stats.items() if key.endswith("_count"))
+        
+        for status in ["completed", "filtered", "pending", "failed"]:
+            count = stats.get(f"{status}_count", 0)
+            percentage = (count / total_posts * 100) if total_posts > 0 else 0
+            table.add_row(status.capitalize(), str(count), f"{percentage:.1f}%")
+        
+        console.print(table)
+        console.print()
+        
+        # Quality Tier Statistics  
+        table = Table(title="Quality Tier Distribution")
+        table.add_column("Quality Tier", style="cyan")
+        table.add_column("Count", justify="right", style="magenta")
+        table.add_column("Percentage", justify="right", style="green")
+        
+        completed_posts = stats.get("completed_count", 0)
+        
+        for tier in ["valuable", "soft_quarantine", "quarantine", "unprocessed"]:
+            count = stats.get(f"{tier}_count", 0)
+            percentage = (count / completed_posts * 100) if completed_posts > 0 else 0
+            table.add_row(tier.replace("_", " ").title(), str(count), f"{percentage:.1f}%")
+        
+        console.print(table)
+        console.print()
+        
+        # High-level summary
+        filtered_count = stats.get("filtered_count", 0)
+        valuable_count = stats.get("valuable_count", 0)
+        
+        console.print(f"[green]✅ High-Quality Posts (Valuable):[/green] {valuable_count}")
+        console.print(f"[yellow]⚠️  Filtered Out (Low Quality):[/yellow] {filtered_count}")
+        
+        if filtered_count + valuable_count > 0:
+            efficiency = filtered_count / (filtered_count + valuable_count) * 100
+            console.print(f"[blue]📈 Quality Filter Efficiency:[/blue] {efficiency:.1f}% filtered out")
+        
+        # Get sample of high-quality posts
+        high_quality_posts = await storage.get_high_quality_posts(limit=5)
+        if high_quality_posts:
+            console.print(f"\n[green]🏆 Sample High-Quality Posts:[/green]")
+            for post in high_quality_posts:
+                tickers = post.get('tickers', '[]')
+                if isinstance(tickers, str):
+                    tickers = tickers.replace('"', '').replace('[', '').replace(']', '')
+                console.print(f"  • {post.get('title', 'N/A')[:60]}... "
+                           f"(Confidence: {post.get('confidence_score', 0):.2f}, "
+                           f"Tickers: {tickers}, "
+                           f"Quality: {post.get('quality_tier', 'N/A')})")
+        
+    except Exception as e:
+        console.print(f"[red]Error fetching statistics: {e}[/red]")
 
 
 @app.command()

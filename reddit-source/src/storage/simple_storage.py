@@ -293,6 +293,67 @@ class SimpleSupabaseStorage:
             logger.error(f"Error getting stats: {e}")
             return {}
 
+    async def get_high_quality_posts(
+        self,
+        min_confidence: float = 0.5,
+        quality_tiers: Optional[List[str]] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetches high-quality posts that passed all filtering criteria.
+        """
+        try:
+            query = self.table.select("*").eq("processing_status", "completed")
+            
+            # Filter by minimum confidence
+            query = query.gte("confidence_score", min_confidence)
+            
+            # Filter by quality tiers
+            if quality_tiers:
+                query = query.filter("quality_tier", "in", tuple(quality_tiers))
+            else:
+                # Default to high-quality tiers only
+                query = query.filter("quality_tier", "in", ("valuable", "soft_quarantine"))
+            
+            # Ensure posts have meaningful content
+            query = query.not_.eq("tickers", "[]")
+            
+            response = await asyncio.to_thread(
+                lambda: query.order("confidence_score", desc=True).limit(limit).execute()
+            )
+            return response.data if response.data else []
+        except Exception as e:
+            logger.error(f"Error fetching high-quality posts: {e}")
+            return []
+
+    async def get_filtered_posts_stats(self) -> Dict[str, int]:
+        """
+        Get statistics on filtered vs stored posts for monitoring data quality.
+        """
+        try:
+            stats = {}
+            
+            # Count by processing status
+            for status in ["completed", "filtered", "pending", "failed"]:
+                response = await asyncio.to_thread(
+                    lambda s=status: self.table.select("post_id", count="exact")
+                    .eq("processing_status", s).execute()
+                )
+                stats[f"{status}_count"] = response.count or 0
+            
+            # Count by quality tier
+            for tier in ["valuable", "soft_quarantine", "quarantine", "unprocessed"]:
+                response = await asyncio.to_thread(
+                    lambda t=tier: self.table.select("post_id", count="exact")
+                    .eq("quality_tier", t).execute()
+                )
+                stats[f"{tier}_count"] = response.count or 0
+            
+            return stats
+        except Exception as e:
+            logger.error(f"Error fetching filtered posts stats: {e}")
+            return {}
+
 
 # Global client instance
 _simple_storage_client: Optional[SimpleSupabaseStorage] = None

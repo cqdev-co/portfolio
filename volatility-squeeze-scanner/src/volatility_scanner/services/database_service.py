@@ -66,7 +66,9 @@ class DatabaseService:
     async def store_signal(self, analysis_result: AnalysisResult, scan_date: date = None) -> Optional[str]:
         """
         Store or update a single volatility squeeze signal in the database.
-        Uses upsert logic to prevent duplicates for the same symbol on the same date.
+        
+        If the analysis_result has an _existing_db_id attribute (set by continuity service),
+        it will update that existing record. Otherwise, it will insert a new record.
         
         Args:
             analysis_result: The analysis result to store
@@ -82,39 +84,33 @@ class DatabaseService:
         try:
             signal_data = self._prepare_signal_data(analysis_result, scan_date)
             
-            # Check for existing signal from today for this symbol
-            existing_response = self.client.table('volatility_squeeze_signals').select('id, created_at').eq(
-                'symbol', analysis_result.symbol
-            ).eq(
-                'scan_date', scan_date.isoformat()
-            ).order('created_at', desc=True).limit(1).execute()
+            # Check if this is an update operation (set by continuity service)
+            existing_db_id = getattr(analysis_result, '_existing_db_id', None)
             
-            if existing_response.data:
-                # Found existing signal for today - check if it's recent (within 2 hours)
-                existing_record = existing_response.data[0]
-                existing_time = datetime.fromisoformat(existing_record['created_at'].replace('Z', '+00:00'))
-                current_time = datetime.now(timezone.utc)
-                time_diff = (current_time - existing_time).total_seconds() / 3600  # hours
+            if existing_db_id:
+                # Update existing record
+                response = self.client.table('volatility_squeeze_signals').update(
+                    signal_data
+                ).eq('id', existing_db_id).execute()
                 
-                if time_diff < 2.0:
-                    # Recent signal exists, update it instead of creating new
-                    response = self.client.table('volatility_squeeze_signals').update(
-                        signal_data
-                    ).eq('id', existing_record['id']).execute()
+                if response.data:
+                    signal_id = response.data[0]['id']
+                    logger.debug(f"Updated existing signal for {analysis_result.symbol}: {signal_id}")
+                    return signal_id
                 else:
-                    # Older signal exists, create new one (allowing continuation tracking)
-                    response = self.client.table('volatility_squeeze_signals').insert(signal_data).execute()
+                    logger.error(f"Failed to update signal for {analysis_result.symbol} (ID: {existing_db_id})")
+                    return None
             else:
-                # No existing signal for today, create new one
+                # Insert new record
                 response = self.client.table('volatility_squeeze_signals').insert(signal_data).execute()
-            
-            if response.data:
-                signal_id = response.data[0]['id']
-                logger.debug(f"Stored/updated signal for {analysis_result.symbol}: {signal_id}")
-                return signal_id
-            else:
-                logger.error(f"Failed to store signal for {analysis_result.symbol}")
-                return None
+                
+                if response.data:
+                    signal_id = response.data[0]['id']
+                    logger.debug(f"Inserted new signal for {analysis_result.symbol}: {signal_id}")
+                    return signal_id
+                else:
+                    logger.error(f"Failed to insert signal for {analysis_result.symbol}")
+                    return None
                 
         except Exception as e:
             logger.error(f"Error storing signal for {analysis_result.symbol}: {e}")
@@ -188,11 +184,11 @@ class DatabaseService:
                     logger.error(f"Batch {batch_num} failed after {max_retries} attempts: {e}")
                     
                     # Try to store individual signals as fallback
-                    return await self._store_individual_fallback(batch, batch_num)
+                    return await self._store_individual_fallback(batch, scan_date, batch_num)
         
         return 0
     
-    async def _store_individual_fallback(self, batch: List[AnalysisResult], batch_num: int) -> int:
+    async def _store_individual_fallback(self, batch: List[AnalysisResult], scan_date: date, batch_num: int) -> int:
         """Fallback: try to store signals individually if batch fails."""
         logger.info(f"Using individual storage fallback for batch {batch_num}")
         stored_count = 0
