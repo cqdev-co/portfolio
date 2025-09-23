@@ -815,11 +815,15 @@ def scan_all(
             # Get today's date for continuity tracking and database operations
             today = date.today()
             
-            # Process signals for continuity tracking
+            # Process signals for continuity tracking (without performance tracking)
             if signals and continuity_service:
                 try:
                     console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
+                    # Temporarily disable performance tracking during continuity processing
+                    original_perf_service = continuity_service.performance_tracking_service
+                    continuity_service.performance_tracking_service = None
                     signals = await continuity_service.process_signals_with_continuity(signals, today)
+                    continuity_service.performance_tracking_service = original_perf_service
                     console.print(f"[green]✅ Signal continuity processing complete[/green]")
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
@@ -850,6 +854,22 @@ def scan_all(
                             
                 except Exception as e:
                     console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
+            
+            # Now handle performance tracking after signals are stored
+            if signals and continuity_service and continuity_service.performance_tracking_service:
+                try:
+                    console.print(f"[bold blue]📈 Processing performance tracking...[/bold blue]")
+                    
+                    # Track NEW signals
+                    new_signals = [s for s in signals if s.squeeze_signal.signal_status.value == 'NEW']
+                    if new_signals:
+                        tracked_count = await continuity_service.performance_tracking_service.track_new_signals(new_signals, today)
+                        if tracked_count > 0:
+                            console.print(f"[green]📊 Started tracking {tracked_count} new signals[/green]")
+                    
+                    console.print(f"[green]✅ Performance tracking complete[/green]")
+                except Exception as e:
+                    console.print(f"[yellow]⚠️  Performance tracking failed: {e}[/yellow]")
             
             # Display results
             if signals:
