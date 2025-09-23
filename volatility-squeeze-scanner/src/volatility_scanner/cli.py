@@ -158,7 +158,7 @@ def batch(
     """Analyze multiple symbols for volatility squeeze signals."""
     
     async def _batch_analyze():
-        data_service, analysis_service, ai_service, _, _, _, _ = get_services()
+        data_service, analysis_service, ai_service, _, _, database_service, continuity_service = get_services()
         
         # Parse comma-separated symbols
         symbol_list = [s.strip().upper() for s in symbols.split(',')]
@@ -195,6 +195,28 @@ def batch(
                     console.print(f"[red]Error analyzing {symbol}: {e}[/red]")
                 
                 progress.update(task, advance=1)
+        
+        # Process signals for continuity tracking
+        if results and continuity_service:
+            try:
+                console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
+                from datetime import date
+                today = date.today()
+                results = await continuity_service.process_signals_with_continuity(results, today)
+                console.print(f"[green]✅ Signal continuity processing complete[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
+        
+        # Store signals in database
+        if results and database_service.is_available():
+            try:
+                from datetime import date
+                today = date.today()
+                stored_count = await database_service.store_signals_batch(results, today)
+                if stored_count > 0:
+                    console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
         
         # Display results
         if results:
