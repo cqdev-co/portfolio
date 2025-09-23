@@ -11,9 +11,10 @@ from volatility_scanner.services.database_service import DatabaseService
 class SignalContinuityService:
     """Service for tracking signal continuity across daily scans."""
     
-    def __init__(self, database_service: DatabaseService):
+    def __init__(self, database_service: DatabaseService, performance_tracking_service=None):
         """Initialize the signal continuity service."""
         self.database_service = database_service
+        self.performance_tracking_service = performance_tracking_service
     
     async def process_signals_with_continuity(
         self,
@@ -82,7 +83,7 @@ class SignalContinuityService:
                     previous_by_symbol[symbol] = signal
         
         # Mark signals that have ended (were active recently but not in current scan)
-        await self._mark_ended_signals(
+        ended_symbols = await self._mark_ended_signals(
             previous_by_symbol,
             new_signal_symbols,
             scan_date
@@ -112,6 +113,21 @@ class SignalContinuityService:
                 )
             
             processed_signals.append(processed_signal)
+        
+        # Track performance for new and ended signals
+        if self.performance_tracking_service:
+            try:
+                # Track new signals for performance
+                new_signals_list = [s for s in processed_signals if s.squeeze_signal.signal_status == SignalStatus.NEW]
+                if new_signals_list:
+                    await self.performance_tracking_service.track_new_signals(new_signals_list, scan_date)
+                
+                # Close performance tracking for ended signals
+                if ended_symbols:
+                    await self.performance_tracking_service.close_ended_signals(ended_symbols, scan_date)
+                    
+            except Exception as e:
+                logger.warning(f"Performance tracking failed: {e}")
         
         logger.info(
             f"Continuity processing complete: "
@@ -281,12 +297,12 @@ class SignalContinuityService:
         previous_by_symbol: Dict,
         current_symbols: Set[str],
         scan_date: date
-    ) -> None:
+    ) -> List[str]:
         """Mark signals as ended if they were active recently but not in current scan."""
         ended_symbols = set(previous_by_symbol.keys()) - current_symbols
         
         if not ended_symbols:
-            return
+            return []
         
         logger.info(f"Marking {len(ended_symbols)} signals as ended: {list(ended_symbols)}")
         
@@ -324,6 +340,8 @@ class SignalContinuityService:
             
         except Exception as e:
             logger.error(f"Error marking ended signals: {e}")
+        
+        return list(ended_symbols)
     
     async def _determine_signal_status(
         self,

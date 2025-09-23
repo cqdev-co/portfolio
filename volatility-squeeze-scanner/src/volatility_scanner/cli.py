@@ -78,13 +78,17 @@ def get_services():
         else:
             console.print("[yellow]⚠️  Database service unavailable - signals won't be stored[/yellow]")
         
-        # Signal continuity service (depends on database service)
+        # Performance tracking and signal continuity services (depend on database service)
         continuity_service = None
         if database_service and database_service.is_available():
             try:
+                from volatility_scanner.services.performance_tracking_service import PerformanceTrackingService
                 from volatility_scanner.services.signal_continuity_service import SignalContinuityService
-                continuity_service = SignalContinuityService(database_service)
+                
+                performance_tracking_service = PerformanceTrackingService(database_service)
+                continuity_service = SignalContinuityService(database_service, performance_tracking_service)
                 console.print("[green]✅ Signal continuity tracking enabled[/green]")
+                console.print("[green]✅ Performance tracking enabled[/green]")
             except Exception as e:
                 console.print(f"[yellow]⚠️  Signal continuity service failed: {e}[/yellow]")
         
@@ -196,13 +200,17 @@ def batch(
                 
                 progress.update(task, advance=1)
         
-        # Process signals for continuity tracking
+        # Process signals for continuity tracking (without performance tracking)
         if results and continuity_service:
             try:
                 console.print(f"[bold blue]🔄 Processing signal continuity tracking...[/bold blue]")
                 from datetime import date
                 today = date.today()
+                # Temporarily disable performance tracking during continuity processing
+                original_perf_service = continuity_service.performance_tracking_service
+                continuity_service.performance_tracking_service = None
                 results = await continuity_service.process_signals_with_continuity(results, today)
+                continuity_service.performance_tracking_service = original_perf_service
                 console.print(f"[green]✅ Signal continuity processing complete[/green]")
             except Exception as e:
                 console.print(f"[yellow]⚠️  Signal continuity processing failed: {e}[/yellow]")
@@ -217,6 +225,24 @@ def batch(
                     console.print(f"[green]💾 Stored/updated {stored_count} signals in database[/green]")
             except Exception as e:
                 console.print(f"[yellow]⚠️  Failed to store signals in database: {e}[/yellow]")
+        
+        # Now handle performance tracking after signals are stored
+        if results and continuity_service and continuity_service.performance_tracking_service:
+            try:
+                console.print(f"[bold blue]📈 Processing performance tracking...[/bold blue]")
+                from datetime import date
+                today = date.today()
+                
+                # Track NEW signals
+                new_signals = [s for s in results if s.squeeze_signal.signal_status.value == 'NEW']
+                if new_signals:
+                    tracked_count = await continuity_service.performance_tracking_service.track_new_signals(new_signals, today)
+                    if tracked_count > 0:
+                        console.print(f"[green]📊 Started tracking {tracked_count} new signals[/green]")
+                
+                console.print(f"[green]✅ Performance tracking complete[/green]")
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Performance tracking failed: {e}[/yellow]")
         
         # Display results
         if results:
