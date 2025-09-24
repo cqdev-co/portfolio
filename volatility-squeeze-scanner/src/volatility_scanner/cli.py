@@ -657,7 +657,7 @@ def cleanup_duplicates(
     """Clean up duplicate signals in the database."""
     
     async def _cleanup_duplicates():
-        _, _, _, _, database_service, _ = get_services()
+        _, _, _, _, _, database_service, _ = get_services()
         
         if not database_service.is_available():
             console.print("[red]❌ Database service not available[/red]")

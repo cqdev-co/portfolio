@@ -36,7 +36,7 @@ Comprehensive guide for traders and users of the system.
 - **Professional analysis** with Bollinger Bands & Keltner Channels
 - **Automated risk management** with stop loss calculation
 - **Live Performance Tracking** with real-time P&L monitoring
-- **Signal continuity tracking** (NEW → CONTINUING → ENDED lifecycle)
+- **Signal continuity tracking** (NEW → CONTINUING → ENDED lifecycle) with duplicate prevention
 
 ## 📊 Performance Highlights
 

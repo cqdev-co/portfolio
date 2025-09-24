@@ -86,8 +86,21 @@ class DatabaseService:
             
             # Check if this is an update operation (set by continuity service)
             existing_db_id = getattr(analysis_result, '_existing_db_id', None)
+            cleanup_scan_date = getattr(analysis_result, '_cleanup_scan_date', None)
             
             if existing_db_id:
+                # If we need to cleanup an existing record for the target scan_date, do it first
+                if cleanup_scan_date:
+                    try:
+                        cleanup_response = self.client.table('volatility_squeeze_signals').delete().eq(
+                            'symbol', analysis_result.symbol
+                        ).eq('scan_date', cleanup_scan_date).execute()
+                        
+                        if cleanup_response.data:
+                            logger.debug(f"Cleaned up existing record for {analysis_result.symbol} on {cleanup_scan_date}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to cleanup existing record for {analysis_result.symbol}: {cleanup_error}")
+                
                 # Update existing record
                 response = self.client.table('volatility_squeeze_signals').update(
                     signal_data

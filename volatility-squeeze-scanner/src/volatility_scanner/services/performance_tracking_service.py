@@ -121,14 +121,25 @@ class PerformanceTrackingService:
                     for record in response.data:
                         entry_price = float(record.get('entry_price', 0))
                         exit_price = float(current_price)
+                        entry_date = date.fromisoformat(record['entry_date'])
+                        days_held = (scan_date - entry_date).days
                         
                         if entry_price > 0:
                             return_pct = (exit_price - entry_price) / entry_price * 100
                             return_absolute = (exit_price - entry_price) * 10  # Assuming $1000 position
-                            days_held = (scan_date - date.fromisoformat(record['entry_date'])).days
                             is_winner = exit_price > entry_price
                             
-                            # Update with calculated metrics
+                            # Filter out meaningless trades (short hold + minimal price change)
+                            is_short_hold = days_held <= 1  # 0 or 1 day
+                            is_minimal_change = abs(return_pct) < 0.1  # Less than 0.1% change
+                            
+                            if is_short_hold and is_minimal_change:
+                                # Delete this performance record instead of closing it
+                                self.database_service.client.table('signal_performance').delete().eq('id', record['id']).execute()
+                                logger.debug(f"Deleted meaningless performance record for {symbol} (same day, no price change)")
+                                continue
+                            
+                            # Update with calculated metrics for meaningful trades
                             final_update = {
                                 'return_pct': round(return_pct, 4),
                                 'return_absolute': round(return_absolute, 4),
@@ -139,9 +150,10 @@ class PerformanceTrackingService:
                             self.database_service.client.table('signal_performance').update(
                                 final_update
                             ).eq('id', record['id']).execute()
+                            
+                            logger.debug(f"Closed performance tracking for {symbol}: {return_pct:.2f}% return in {days_held} days")
                     
                     closed_count += 1
-                    logger.debug(f"Closed performance tracking for {symbol}")
                 else:
                     logger.debug(f"No active performance tracking found for {symbol}")
                     
@@ -152,6 +164,46 @@ class PerformanceTrackingService:
             logger.info(f"Closed performance tracking for {closed_count} ended signals")
         
         return closed_count
+    
+    async def cleanup_meaningless_trades(self) -> int:
+        """Clean up existing meaningless trades (same day, no price change)."""
+        if not self.database_service.is_available():
+            return 0
+        
+        try:
+            # Get all closed performance records
+            response = self.database_service.client.table('signal_performance').select(
+                'id, symbol, entry_date, exit_date, return_pct, days_held'
+            ).eq('status', 'CLOSED').execute()
+            
+            deleted_count = 0
+            
+            for record in response.data:
+                days_held = record.get('days_held', 0)
+                return_pct = record.get('return_pct', 0)
+                
+                # Check if this is a meaningless trade
+                is_short_hold = days_held <= 1  # 0 or 1 day
+                is_minimal_change = abs(return_pct) < 0.1  # Less than 0.1% change
+                
+                if is_short_hold and is_minimal_change:
+                    # Delete this meaningless record
+                    delete_response = self.database_service.client.table('signal_performance').delete().eq(
+                        'id', record['id']
+                    ).execute()
+                    
+                    if delete_response.data:
+                        deleted_count += 1
+                        logger.debug(f"Deleted meaningless trade record for {record['symbol']}")
+            
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} meaningless trade records")
+            
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up meaningless trades: {e}")
+            return 0
     
     def _should_track_signal(self, signal: AnalysisResult) -> bool:
         """Determine if a signal should be tracked for performance."""

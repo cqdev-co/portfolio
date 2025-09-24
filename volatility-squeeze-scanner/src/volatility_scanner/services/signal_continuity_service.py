@@ -94,6 +94,7 @@ class SignalContinuityService:
         for signal in new_signals:
             # Check if this signal already exists for today
             existing_today = today_signals_by_symbol.get(signal.symbol)
+            previous_signal = previous_by_symbol.get(signal.symbol)
             
             if existing_today:
                 # For existing signals today, we need to determine the correct status
@@ -101,14 +102,35 @@ class SignalContinuityService:
                 processed_signal = await self._update_existing_signal_with_continuity(
                     signal,
                     existing_today,
-                    previous_by_symbol.get(signal.symbol),
+                    previous_signal,
                     scan_date
                 )
+            elif previous_signal:
+                # Check if the previous signal is from a different date
+                previous_scan_date = previous_signal.get('scan_date')
+                if isinstance(previous_scan_date, str):
+                    previous_scan_date = datetime.fromisoformat(previous_scan_date).date()
+                
+                # If the previous signal is from a different date, this is a continuation
+                # We should update the existing record to the current scan_date
+                if previous_scan_date != scan_date:
+                    processed_signal = await self._update_continuing_signal(
+                        signal,
+                        previous_signal,
+                        scan_date
+                    )
+                else:
+                    # Previous signal is from the same date, treat as new
+                    processed_signal = await self._determine_signal_status(
+                        signal,
+                        previous_signal,
+                        scan_date
+                    )
             else:
                 # Determine status for new database entry
                 processed_signal = await self._determine_signal_status(
                     signal,
-                    previous_by_symbol.get(signal.symbol),
+                    previous_signal,
                     scan_date
                 )
             
@@ -342,6 +364,48 @@ class SignalContinuityService:
             logger.error(f"Error marking ended signals: {e}")
         
         return list(ended_symbols)
+    
+    async def _update_continuing_signal(
+        self,
+        current_signal: AnalysisResult,
+        previous_signal: Dict,
+        scan_date: date
+    ) -> AnalysisResult:
+        """
+        Update a signal that is continuing from a previous date.
+        This updates the existing database record to have the current scan_date.
+        """
+        symbol = current_signal.symbol
+        squeeze_signal = current_signal.squeeze_signal
+        
+        # This is a continuing signal - update status and increment days
+        squeeze_signal.signal_status = SignalStatus.CONTINUING
+        
+        # Increment days in squeeze
+        existing_days = previous_signal.get('days_in_squeeze', 1)
+        squeeze_signal.days_in_squeeze = existing_days + 1
+        
+        # Preserve first detected date from the original signal
+        first_detected = previous_signal.get('first_detected_date')
+        if first_detected:
+            if isinstance(first_detected, str):
+                first_detected = datetime.fromisoformat(first_detected).date()
+            squeeze_signal.first_detected_date = first_detected
+        else:
+            squeeze_signal.first_detected_date = scan_date
+        
+        squeeze_signal.last_active_date = scan_date
+        
+        # Mark this signal for database update (update the existing record to current scan_date)
+        current_signal._existing_db_id = previous_signal.get('id')
+        
+        # Also mark that we need to clean up any existing record for today's date
+        # This prevents unique constraint violations when updating scan_date
+        current_signal._cleanup_scan_date = scan_date.isoformat()
+        
+        logger.debug(f"Updating continuing signal for {symbol} - changed to CONTINUING (day {squeeze_signal.days_in_squeeze}, from previous run)")
+        
+        return current_signal
     
     async def _determine_signal_status(
         self,
