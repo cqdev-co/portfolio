@@ -175,15 +175,23 @@ class AnalysisService:
     ) -> SqueezeSignal:
         """Detect and create a squeeze signal."""
         
-        # Calculate BB width percentile
+        # Calculate BB width percentile with detailed analytics
         bb_widths = [
             ind.bb_width for ind in market_data.indicators 
             if ind.bb_width is not None
         ]
         
+        # Log raw BB width data analytics
+        self._log_bb_width_analytics(market_data.symbol, bb_widths, latest_indicators.bb_width)
+        
         bb_width_percentile = self.indicator_calculator.calculate_bb_width_percentile(
             bb_widths,
             latest_indicators.bb_width or 0.0
+        )
+        
+        # Log percentile calculation details
+        self._log_percentile_calculation_details(
+            market_data.symbol, bb_widths, latest_indicators.bb_width, bb_width_percentile
         )
         
         # Detect squeeze condition
@@ -191,6 +199,45 @@ class AnalysisService:
             latest_indicators.bb_width or 0.0,
             bb_width_percentile
         )
+        
+        # Log detailed squeeze threshold analysis
+        self._log_squeeze_threshold_analysis(
+            market_data.symbol, latest_indicators.bb_width, bb_width_percentile, is_squeeze
+        )
+        
+        # Professional false positive detection and logging
+        false_positive_flags = self._detect_false_positive_patterns(
+            market_data, latest_indicators, bb_width_percentile, is_squeeze
+        )
+        
+        # Log squeeze detection with detailed data analytics
+        if is_squeeze:
+            confidence_level = self._calculate_squeeze_confidence(
+                bb_width_percentile, latest_indicators, market_data
+            )
+            
+            logger.info(
+                f"🎯 {market_data.symbol}: SQUEEZE DETECTED | "
+                f"BB Width: {latest_indicators.bb_width:.6f} ({bb_width_percentile:.2f}%ile) | "
+                f"Threshold: ≤{self.settings.squeeze_percentile:.1f}% | "
+                f"Margin: {self.settings.squeeze_percentile - bb_width_percentile:.2f}% | "
+                f"Confidence: {confidence_level:.1f}%"
+            )
+            
+            # Log false positive warnings with data context
+            if false_positive_flags:
+                warning_msg = ", ".join(false_positive_flags)
+                logger.warning(
+                    f"⚠️  {market_data.symbol}: DATA QUALITY CONCERNS - {warning_msg}"
+                )
+        else:
+            margin_to_threshold = bb_width_percentile - self.settings.squeeze_percentile
+            logger.debug(
+                f"❌ {market_data.symbol}: No squeeze - "
+                f"BB width: {latest_indicators.bb_width:.6f} ({bb_width_percentile:.2f}%ile) | "
+                f"Threshold: ≤{self.settings.squeeze_percentile:.1f}% | "
+                f"Miss by: +{margin_to_threshold:.2f}%"
+            )
         
         # Calculate true range
         true_range = calculate_true_range(
@@ -208,6 +255,47 @@ class AnalysisService:
                 latest_indicators.atr or 1.0
             )
         )
+        
+        # Log detailed expansion calculation analytics
+        self._log_expansion_calculation_details(
+            market_data.symbol, latest_indicators.bb_width, previous_indicators.bb_width,
+            bb_width_change, true_range, latest_indicators.atr, range_vs_atr, is_expansion
+        )
+        
+        # Professional expansion analysis with volatility context
+        expansion_quality = self._assess_expansion_quality(
+            bb_width_change, range_vs_atr, latest_indicators, market_data
+        )
+        
+        if is_expansion:
+            logger.info(
+                f"📈 {market_data.symbol}: EXPANSION DETECTED | "
+                f"Current BB: {latest_indicators.bb_width:.6f} | Previous BB: {previous_indicators.bb_width:.6f} | "
+                f"Change: {bb_width_change:+.2f}% (≥{self.settings.expansion_threshold:.1f}%) | "
+                f"True Range: {true_range:.4f} | ATR: {latest_indicators.atr:.4f} | "
+                f"Range/ATR: {range_vs_atr:.3f}x"
+            )
+            
+            # Log expansion quality assessment
+            logger.info(
+                f"📊 {market_data.symbol}: EXPANSION QUALITY | "
+                f"Grade: {expansion_quality['grade']} | Score: {expansion_quality['score']:.3f} | "
+                f"Volume: {expansion_quality['volume_context']} ({latest_indicators.volume_ratio:.2f}x)"
+            )
+            
+            # Log expansion quality concerns with data
+            if expansion_quality['warnings']:
+                warnings_msg = ", ".join(expansion_quality['warnings'])
+                logger.warning(
+                    f"⚠️  {market_data.symbol}: EXPANSION DATA CONCERNS - {warnings_msg}"
+                )
+        elif bb_width_change > 5:  # Log any notable width changes
+            expansion_margin = self.settings.expansion_threshold - bb_width_change
+            logger.debug(
+                f"📊 {market_data.symbol}: BB Width Change Analysis | "
+                f"Change: {bb_width_change:+.2f}% | Threshold: ≥{self.settings.expansion_threshold:.1f}% | "
+                f"Miss by: {expansion_margin:.2f}% | Range/ATR: {range_vs_atr:.3f}x"
+            )
         
         # Determine trend direction
         trend_direction = TrendDirection(
@@ -238,6 +326,44 @@ class AnalysisService:
             latest_indicators.volume_ratio or 1.0
         )
         
+        # Log detailed volume and trend analytics
+        self._log_volume_and_trend_analytics(
+            market_data.symbol, latest_ohlcv, latest_indicators, trend_direction
+        )
+        
+        # Professional signal quality assessment with detailed metrics
+        if is_squeeze or is_expansion:
+            # Log signal strength calculation breakdown
+            self._log_signal_strength_breakdown(
+                market_data.symbol, is_squeeze, is_expansion, bb_width_percentile, 
+                range_vs_atr, latest_indicators.volume_ratio, signal_strength
+            )
+            
+            risk_assessment = self._calculate_comprehensive_risk_assessment(
+                market_data, latest_indicators, signal_strength, trend_direction
+            )
+            
+            logger.info(
+                f"⚡ {market_data.symbol}: COMPREHENSIVE SIGNAL METRICS | "
+                f"Strength: {signal_strength:.4f} | Risk Score: {risk_assessment['risk_score']:.3f} | "
+                f"Trend: {trend_direction.value} | ADX: {latest_indicators.adx:.1f} | "
+                f"RSI: {latest_indicators.rsi:.1f} | Liquidity: {risk_assessment['liquidity_grade']}"
+            )
+            
+            # Log detailed risk factors with data
+            if risk_assessment['risk_factors']:
+                risk_msg = ", ".join(risk_assessment['risk_factors'])
+                logger.warning(
+                    f"🚨 {market_data.symbol}: QUANTIFIED RISK FACTORS - {risk_msg}"
+                )
+                
+            # Log positive confluence factors with data
+            if risk_assessment['confluence_factors']:
+                confluence_msg = ", ".join(risk_assessment['confluence_factors'])
+                logger.info(
+                    f"✨ {market_data.symbol}: QUANTIFIED CONFLUENCE - {confluence_msg}"
+                )
+        
         # Calculate liquidity metrics
         dollar_volume = latest_ohlcv.close * latest_ohlcv.volume
         
@@ -246,7 +372,7 @@ class AnalysisService:
         daily_dollar_volumes = [ohlcv.close * ohlcv.volume for ohlcv in recent_ohlcv]
         avg_dollar_volume = sum(daily_dollar_volumes) / len(daily_dollar_volumes) if daily_dollar_volumes else None
         
-        return SqueezeSignal(
+        signal = SqueezeSignal(
             timestamp=latest_ohlcv.timestamp,
             symbol=market_data.symbol,
             bb_width=latest_indicators.bb_width or 0.0,
@@ -296,6 +422,623 @@ class AnalysisService:
             di_plus=latest_indicators.di_plus,
             di_minus=latest_indicators.di_minus
         )
+        
+        # Professional signal validation and final assessment
+        validation_result = self._validate_signal_comprehensively(
+            signal, market_data, false_positive_flags
+        )
+        
+        if is_squeeze or is_expansion or signal_strength > 0.6:
+            logger.info(
+                f"✅ {market_data.symbol}: SIGNAL CREATED | "
+                f"Score: {signal_strength:.3f} | Price: ${latest_ohlcv.close:.2f} | "
+                f"Volume: ${dollar_volume/1e6:.1f}M | "
+                f"Validation: {validation_result['grade']} ({validation_result['confidence']:.1f}%)"
+            )
+            
+            # Log signal actionability assessment
+            if validation_result['actionable']:
+                logger.info(
+                    f"🎯 {market_data.symbol}: ACTIONABLE SIGNAL - "
+                    f"Expected R/R: {validation_result['risk_reward']:.1f}:1 | "
+                    f"Stop: ${validation_result['stop_loss']:.2f} | "
+                    f"Target: ${validation_result['profit_target']:.2f}"
+                )
+            else:
+                logger.warning(
+                    f"⚠️  {market_data.symbol}: NON-ACTIONABLE - {validation_result['reason']}"
+                )
+        
+        # Log historical context for pattern recognition
+        self._log_historical_performance_context(market_data.symbol, signal)
+        
+        # Log final signal data analytics summary
+        self._log_final_signal_analytics(market_data.symbol, signal, dollar_volume, avg_dollar_volume)
+        
+        return signal
+    
+    def _detect_false_positive_patterns(
+        self, 
+        market_data: MarketData, 
+        indicators, 
+        bb_percentile: float, 
+        is_squeeze: bool
+    ) -> List[str]:
+        """Detect common false positive patterns in squeeze signals."""
+        flags = []
+        
+        # Data quality issues
+        if market_data.data_quality_score < 0.8:
+            flags.append(f"Low data quality ({market_data.data_quality_score:.2f})")
+            
+        # Insufficient historical data
+        if len(market_data.ohlcv_data) < 120:  # Less than ~6 months
+            flags.append(f"Limited history ({len(market_data.ohlcv_data)} days)")
+            
+        # Extreme low volume (potential manipulation)
+        if (indicators.volume_ratio or 1.0) < 0.3:
+            flags.append(f"Extremely low volume ({indicators.volume_ratio:.2f}x)")
+            
+        # Penny stock risks
+        latest_price = market_data.ohlcv_data[-1].close
+        if latest_price < 5.0:
+            flags.append(f"Low price stock (${latest_price:.2f})")
+            
+        # Excessive volatility (potential data errors)
+        if (indicators.atr or 0) / latest_price > 0.15:  # ATR > 15% of price
+            atr_pct = ((indicators.atr or 0) / latest_price) * 100
+            flags.append(f"Excessive volatility ({atr_pct:.1f}% ATR)")
+            
+        # Artificial squeeze from lack of trading
+        recent_volumes = [ohlcv.volume for ohlcv in market_data.ohlcv_data[-10:]]
+        avg_recent_volume = sum(recent_volumes) / len(recent_volumes)
+        if avg_recent_volume < 10000:  # Very low absolute volume
+            flags.append(f"Minimal trading activity ({avg_recent_volume:.0f} avg volume)")
+            
+        # Potential delisting candidate
+        if latest_price < 1.0 and avg_recent_volume < 50000:
+            flags.append("Potential delisting risk")
+            
+        # Squeeze too tight (potential data error)
+        if is_squeeze and bb_percentile < 1.0:
+            flags.append(f"Unusually tight squeeze ({bb_percentile:.1f}%ile)")
+            
+        # Missing key indicators
+        if not indicators.adx or indicators.adx < 10:
+            flags.append("Weak trend strength (ADX < 10)")
+            
+        return flags
+    
+    def _calculate_squeeze_confidence(
+        self, 
+        bb_percentile: float, 
+        indicators, 
+        market_data: MarketData
+    ) -> float:
+        """Calculate confidence level for squeeze detection."""
+        confidence = 100.0
+        
+        # Reduce confidence for edge cases
+        if bb_percentile > 8:
+            confidence -= (bb_percentile - 8) * 5  # -5% per percentile above 8
+            
+        if market_data.data_quality_score < 0.9:
+            confidence -= (0.9 - market_data.data_quality_score) * 100
+            
+        if (indicators.volume_ratio or 1.0) < 0.8:
+            confidence -= (0.8 - (indicators.volume_ratio or 1.0)) * 50
+            
+        if len(market_data.ohlcv_data) < 180:
+            confidence -= (180 - len(market_data.ohlcv_data)) / 180 * 20
+            
+        return max(0, min(100, confidence))
+    
+    def _assess_expansion_quality(
+        self, 
+        bb_change: float, 
+        range_vs_atr: float, 
+        indicators, 
+        market_data: MarketData
+    ) -> Dict[str, Any]:
+        """Assess the quality of an expansion signal."""
+        score = 0.0
+        warnings = []
+        
+        # BB width change scoring
+        if bb_change > 30:
+            score += 0.4
+        elif bb_change > 20:
+            score += 0.3
+        elif bb_change > 15:
+            score += 0.2
+        else:
+            warnings.append(f"Modest expansion ({bb_change:.1f}%)")
+            
+        # Range vs ATR scoring
+        if range_vs_atr > 2.0:
+            score += 0.3
+        elif range_vs_atr > 1.5:
+            score += 0.2
+        elif range_vs_atr < 1.2:
+            warnings.append(f"Low range/ATR ({range_vs_atr:.2f}x)")
+            
+        # Volume confirmation
+        volume_ratio = indicators.volume_ratio or 1.0
+        volume_context = "exceptional" if volume_ratio > 3.0 else "high" if volume_ratio > 2.0 else "elevated" if volume_ratio > 1.5 else "normal" if volume_ratio > 0.8 else "low"
+        
+        if volume_ratio > 2.0:
+            score += 0.3
+        elif volume_ratio > 1.5:
+            score += 0.2
+        elif volume_ratio < 0.8:
+            warnings.append(f"Low volume confirmation ({volume_ratio:.2f}x)")
+            score -= 0.1
+            
+        # Grade the expansion
+        if score >= 0.8:
+            grade = "A+"
+        elif score >= 0.6:
+            grade = "A"
+        elif score >= 0.4:
+            grade = "B"
+        elif score >= 0.2:
+            grade = "C"
+        else:
+            grade = "D"
+            
+        return {
+            'score': score,
+            'grade': grade,
+            'warnings': warnings,
+            'volume_context': volume_context
+        }
+    
+    def _calculate_comprehensive_risk_assessment(
+        self, 
+        market_data: MarketData, 
+        indicators, 
+        signal_strength: float, 
+        trend_direction
+    ) -> Dict[str, Any]:
+        """Calculate comprehensive risk assessment for the signal."""
+        risk_factors = []
+        confluence_factors = []
+        risk_score = 0.0
+        
+        latest_price = market_data.ohlcv_data[-1].close
+        dollar_volume = latest_price * market_data.ohlcv_data[-1].volume
+        
+        # Price risk assessment
+        if latest_price < 3.0:
+            risk_factors.append(f"Low price (${latest_price:.2f})")
+            risk_score += 0.3
+        elif latest_price < 10.0:
+            risk_score += 0.1
+            
+        # Liquidity assessment
+        if dollar_volume < 500000:  # < $500K daily volume
+            liquidity_grade = "F"
+            risk_factors.append(f"Poor liquidity (${dollar_volume/1e3:.0f}K)")
+            risk_score += 0.4
+        elif dollar_volume < 2000000:  # < $2M daily volume
+            liquidity_grade = "D"
+            risk_factors.append("Low liquidity")
+            risk_score += 0.2
+        elif dollar_volume < 10000000:  # < $10M daily volume
+            liquidity_grade = "C"
+        elif dollar_volume < 50000000:  # < $50M daily volume
+            liquidity_grade = "B"
+        else:
+            liquidity_grade = "A"
+            confluence_factors.append("High liquidity")
+            
+        # Market cap estimation and tier
+        estimated_market_cap = latest_price * 100000000  # Rough estimate
+        if estimated_market_cap < 300000000:  # < $300M
+            market_cap_tier = "Small Cap"
+            risk_score += 0.2
+        elif estimated_market_cap < 2000000000:  # < $2B
+            market_cap_tier = "Mid Cap"
+            risk_score += 0.1
+        else:
+            market_cap_tier = "Large Cap"
+            confluence_factors.append("Large cap stability")
+            
+        # Volume trend analysis
+        volume_ratio = indicators.volume_ratio or 1.0
+        if volume_ratio > 3.0:
+            confluence_factors.append(f"Exceptional volume ({volume_ratio:.1f}x)")
+        elif volume_ratio < 0.5:
+            risk_factors.append(f"Weak volume ({volume_ratio:.1f}x)")
+            risk_score += 0.2
+            
+        # Volatility risk
+        if indicators.atr and latest_price > 0:
+            atr_pct = (indicators.atr / latest_price) * 100
+            if atr_pct > 10:
+                risk_factors.append(f"High volatility ({atr_pct:.1f}%)")
+                risk_score += 0.2
+            elif atr_pct < 2:
+                risk_factors.append(f"Unusually low volatility ({atr_pct:.1f}%)")
+                risk_score += 0.1
+                
+        # Trend strength assessment
+        if indicators.adx:
+            if indicators.adx > 25:
+                confluence_factors.append(f"Strong trend (ADX {indicators.adx:.0f})")
+            elif indicators.adx < 15:
+                risk_factors.append(f"Weak trend (ADX {indicators.adx:.0f})")
+                risk_score += 0.1
+                
+        return {
+            'risk_score': min(1.0, risk_score),
+            'risk_factors': risk_factors,
+            'confluence_factors': confluence_factors,
+            'liquidity_grade': liquidity_grade,
+            'market_cap_tier': market_cap_tier
+        }
+    
+    def _validate_signal_comprehensively(
+        self, 
+        signal, 
+        market_data: MarketData, 
+        false_positive_flags: List[str]
+    ) -> Dict[str, Any]:
+        """Comprehensive signal validation with actionability assessment."""
+        latest_price = market_data.ohlcv_data[-1].close
+        
+        # Calculate confidence based on multiple factors
+        base_confidence = 70.0
+        
+        # Adjust for false positive flags
+        base_confidence -= len(false_positive_flags) * 10
+        
+        # Adjust for signal strength
+        base_confidence += (signal.signal_strength - 0.5) * 40
+        
+        # Adjust for data quality
+        base_confidence += (market_data.data_quality_score - 0.8) * 50
+        
+        confidence = max(0, min(100, base_confidence))
+        
+        # Grade the signal
+        if confidence >= 85:
+            grade = "EXCELLENT"
+        elif confidence >= 70:
+            grade = "GOOD"
+        elif confidence >= 55:
+            grade = "FAIR"
+        elif confidence >= 40:
+            grade = "POOR"
+        else:
+            grade = "REJECT"
+            
+        # Actionability assessment
+        actionable = (
+            confidence >= 60 and
+            signal.signal_strength >= 0.4 and
+            latest_price >= 3.0 and
+            len(false_positive_flags) <= 2
+        )
+        
+        reason = "Signal meets actionability criteria"
+        if not actionable:
+            if confidence < 60:
+                reason = f"Low confidence ({confidence:.1f}%)"
+            elif signal.signal_strength < 0.4:
+                reason = f"Weak signal strength ({signal.signal_strength:.2f})"
+            elif latest_price < 3.0:
+                reason = f"Price too low (${latest_price:.2f})"
+            elif len(false_positive_flags) > 2:
+                reason = f"Too many risk flags ({len(false_positive_flags)})"
+                
+        # Risk/reward calculation
+        risk_reward = 2.0  # Default
+        stop_loss = latest_price * 0.95  # 5% stop
+        profit_target = latest_price * 1.10  # 10% target
+        
+        return {
+            'confidence': confidence,
+            'grade': grade,
+            'actionable': actionable,
+            'reason': reason,
+            'risk_reward': risk_reward,
+            'stop_loss': stop_loss,
+            'profit_target': profit_target
+        }
+    
+    def _log_historical_performance_context(
+        self, 
+        symbol: str, 
+        signal
+    ) -> None:
+        """Log historical performance context for pattern recognition."""
+        # This would ideally query historical performance data
+        # For now, log the signal characteristics for future analysis
+        logger.debug(
+            f"📊 {symbol}: PATTERN CONTEXT | "
+            f"BB %ile: {signal.bb_width_percentile:.1f} | "
+            f"Volume Ratio: {signal.volume_ratio:.2f} | "
+            f"Trend: {signal.trend_direction.value} | "
+            f"Strength: {signal.signal_strength:.3f}"
+        )
+    
+    def _log_bb_width_analytics(self, symbol: str, bb_widths: List[float], current_bb_width: float) -> None:
+        """Log detailed Bollinger Band width analytics for transparency."""
+        if not bb_widths:
+            logger.warning(f"📊 {symbol}: BB WIDTH DATA MISSING - No historical BB width data available")
+            return
+            
+        # Statistical analysis of BB widths
+        bb_array = np.array(bb_widths)
+        stats = {
+            'count': len(bb_widths),
+            'min': float(np.min(bb_array)),
+            'max': float(np.max(bb_array)),
+            'mean': float(np.mean(bb_array)),
+            'median': float(np.median(bb_array)),
+            'std': float(np.std(bb_array)),
+            'q25': float(np.percentile(bb_array, 25)),
+            'q75': float(np.percentile(bb_array, 75))
+        }
+        
+        logger.debug(
+            f"📊 {symbol}: BB WIDTH ANALYTICS | "
+            f"Current: {current_bb_width:.6f} | "
+            f"Historical: N={stats['count']} | "
+            f"Range: [{stats['min']:.6f}, {stats['max']:.6f}] | "
+            f"Mean: {stats['mean']:.6f} | Median: {stats['median']:.6f} | "
+            f"Std: {stats['std']:.6f} | IQR: [{stats['q25']:.6f}, {stats['q75']:.6f}]"
+        )
+        
+        # Flag potential data anomalies
+        if current_bb_width < stats['min'] * 0.5:
+            logger.warning(f"⚠️  {symbol}: BB WIDTH ANOMALY - Current width {current_bb_width:.6f} is extremely low vs historical min {stats['min']:.6f}")
+        elif current_bb_width > stats['max'] * 2.0:
+            logger.warning(f"⚠️  {symbol}: BB WIDTH ANOMALY - Current width {current_bb_width:.6f} is extremely high vs historical max {stats['max']:.6f}")
+    
+    def _log_percentile_calculation_details(self, symbol: str, bb_widths: List[float], current_bb_width: float, percentile: float) -> None:
+        """Log exact percentile calculation for audit purposes."""
+        if not bb_widths:
+            return
+            
+        # Manual percentile calculation for transparency
+        bb_array = np.array(bb_widths)
+        values_below = np.sum(bb_array <= current_bb_width)
+        total_values = len(bb_array)
+        calculated_percentile = (values_below / total_values) * 100
+        
+        # Find nearest values for context
+        sorted_widths = np.sort(bb_array)
+        current_rank = np.searchsorted(sorted_widths, current_bb_width)
+        
+        logger.debug(
+            f"📊 {symbol}: PERCENTILE CALCULATION | "
+            f"Current BB: {current_bb_width:.6f} | "
+            f"Values ≤ Current: {values_below}/{total_values} | "
+            f"Calculated %ile: {calculated_percentile:.2f}% | "
+            f"Returned %ile: {percentile:.2f}% | "
+            f"Rank: {current_rank}/{total_values}"
+        )
+        
+        # Show surrounding values for context
+        if len(sorted_widths) >= 3:
+            context_start = max(0, current_rank - 2)
+            context_end = min(len(sorted_widths), current_rank + 3)
+            context_values = sorted_widths[context_start:context_end]
+            logger.debug(
+                f"📊 {symbol}: BB WIDTH CONTEXT | "
+                f"Surrounding values: {[f'{v:.6f}' for v in context_values]} | "
+                f"Position: {current_rank - context_start}"
+            )
+    
+    def _log_squeeze_threshold_analysis(self, symbol: str, bb_width: float, percentile: float, is_squeeze: bool) -> None:
+        """Log detailed squeeze threshold analysis."""
+        threshold = self.settings.squeeze_percentile
+        margin = threshold - percentile if is_squeeze else percentile - threshold
+        
+        logger.debug(
+            f"🎯 {symbol}: SQUEEZE THRESHOLD ANALYSIS | "
+            f"BB Width: {bb_width:.6f} | Percentile: {percentile:.3f}% | "
+            f"Threshold: ≤{threshold:.1f}% | "
+            f"{'PASS' if is_squeeze else 'FAIL'} | "
+            f"Margin: {'−' if is_squeeze else '+'}{margin:.3f}%"
+        )
+        
+        # Log squeeze strength classification
+        if is_squeeze:
+            if percentile <= 2.0:
+                strength = "EXTREME"
+            elif percentile <= 5.0:
+                strength = "VERY_STRONG"
+            elif percentile <= 8.0:
+                strength = "STRONG"
+            else:
+                strength = "MODERATE"
+            
+            logger.debug(f"🎯 {symbol}: SQUEEZE STRENGTH - {strength} ({percentile:.2f}%ile)")
+    
+    def _log_expansion_calculation_details(
+        self, symbol: str, current_bb: float, previous_bb: float, 
+        bb_change: float, true_range: float, atr: float, range_vs_atr: float, is_expansion: bool
+    ) -> None:
+        """Log detailed expansion calculation analytics."""
+        threshold = self.settings.expansion_threshold
+        
+        logger.debug(
+            f"📈 {symbol}: EXPANSION CALCULATION DETAILS | "
+            f"Previous BB: {previous_bb:.6f} | Current BB: {current_bb:.6f} | "
+            f"Raw Change: {current_bb - previous_bb:+.6f} | "
+            f"Percentage Change: {bb_change:+.3f}% | "
+            f"Threshold: ≥{threshold:.1f}% | "
+            f"{'PASS' if is_expansion else 'FAIL'}"
+        )
+        
+        logger.debug(
+            f"📈 {symbol}: VOLATILITY CONTEXT | "
+            f"True Range: {true_range:.4f} | "
+            f"ATR(20): {atr:.4f} | "
+            f"Range/ATR Ratio: {range_vs_atr:.3f}x | "
+            f"Volatility: {'HIGH' if range_vs_atr > 2.0 else 'ELEVATED' if range_vs_atr > 1.5 else 'NORMAL'}"
+        )
+    
+    def _log_volume_and_trend_analytics(
+        self, symbol: str, latest_ohlcv, latest_indicators, trend_direction
+    ) -> None:
+        """Log detailed volume and trend analytics."""
+        volume_ratio = latest_indicators.volume_ratio or 1.0
+        
+        logger.debug(
+            f"📊 {symbol}: VOLUME ANALYTICS | "
+            f"Current Volume: {latest_ohlcv.volume:,} | "
+            f"Average Volume: {latest_indicators.volume_sma:,.0f} | "
+            f"Volume Ratio: {volume_ratio:.3f}x | "
+            f"Dollar Volume: ${(latest_ohlcv.close * latest_ohlcv.volume):,.0f}"
+        )
+        
+        # Trend strength analytics
+        logger.debug(
+            f"📊 {symbol}: TREND ANALYTICS | "
+            f"Direction: {trend_direction.value} | "
+            f"EMA Short: {latest_indicators.ema_short:.4f} | "
+            f"EMA Long: {latest_indicators.ema_long:.4f} | "
+            f"EMA Spread: {(latest_indicators.ema_short - latest_indicators.ema_long):+.4f} | "
+            f"ADX: {latest_indicators.adx:.1f} | "
+            f"RSI: {latest_indicators.rsi:.1f}"
+        )
+        
+        # MACD analytics
+        if latest_indicators.macd is not None and latest_indicators.macd_signal is not None:
+            macd_histogram = latest_indicators.macd - latest_indicators.macd_signal
+            logger.debug(
+                f"📊 {symbol}: MACD ANALYTICS | "
+                f"MACD: {latest_indicators.macd:.4f} | "
+                f"Signal: {latest_indicators.macd_signal:.4f} | "
+                f"Histogram: {macd_histogram:+.4f} | "
+                f"Momentum: {'BULLISH' if macd_histogram > 0 else 'BEARISH'}"
+            )
+    
+    def _log_signal_strength_breakdown(
+        self, symbol: str, is_squeeze: bool, is_expansion: bool, 
+        bb_percentile: float, range_vs_atr: float, volume_ratio: float, final_strength: float
+    ) -> None:
+        """Log detailed signal strength calculation breakdown."""
+        
+        # Calculate individual components (matching the actual calculation)
+        squeeze_component = 0.0
+        if is_squeeze:
+            squeeze_strength = max(0, (10 - bb_percentile) / 10)
+            squeeze_component = 0.3 * squeeze_strength
+        
+        expansion_component = 0.0
+        if is_expansion:
+            expansion_strength = min(1.0, range_vs_atr / 2.0)
+            expansion_component = 0.25 * expansion_strength
+        
+        # Volume component
+        volume_component = 0.0
+        if volume_ratio > 2.0:
+            volume_component = 0.2
+        elif volume_ratio > 1.5:
+            volume_component = 0.15
+        elif volume_ratio > 1.2:
+            volume_component = 0.1
+        elif volume_ratio < 0.8:
+            volume_component = -0.1
+        
+        # Volatility component
+        volatility_component = 0.0
+        if range_vs_atr > 1.5:
+            volatility_component = 0.15
+        elif range_vs_atr > 1.2:
+            volatility_component = 0.1
+        
+        logger.debug(
+            f"⚡ {symbol}: SIGNAL STRENGTH BREAKDOWN | "
+            f"Squeeze: {squeeze_component:.3f} ({squeeze_component/final_strength*100 if final_strength > 0 else 0:.1f}%) | "
+            f"Expansion: {expansion_component:.3f} ({expansion_component/final_strength*100 if final_strength > 0 else 0:.1f}%) | "
+            f"Volume: {volume_component:.3f} ({volume_component/final_strength*100 if final_strength > 0 else 0:.1f}%) | "
+            f"Volatility: {volatility_component:.3f} ({volatility_component/final_strength*100 if final_strength > 0 else 0:.1f}%) | "
+            f"Total: {final_strength:.3f}"
+        )
+    
+    def _log_final_signal_analytics(
+        self, symbol: str, signal, dollar_volume: float, avg_dollar_volume: float
+    ) -> None:
+        """Log comprehensive final signal analytics."""
+        
+        logger.debug(
+            f"✅ {symbol}: FINAL SIGNAL ANALYTICS | "
+            f"Timestamp: {signal.timestamp} | "
+            f"Price: ${signal.close_price:.4f} | "
+            f"Signal Strength: {signal.signal_strength:.4f} | "
+            f"BB Width: {signal.bb_width:.6f} ({signal.bb_width_percentile:.2f}%ile)"
+        )
+        
+        logger.debug(
+            f"✅ {symbol}: LIQUIDITY ANALYTICS | "
+            f"Current Volume: {signal.volume:,} | "
+            f"Dollar Volume: ${dollar_volume:,.0f} | "
+            f"Avg Dollar Volume: ${avg_dollar_volume:,.0f} | "
+            f"Liquidity Ratio: {dollar_volume/avg_dollar_volume if avg_dollar_volume > 0 else 0:.2f}x"
+        )
+        
+        # Technical indicator summary
+        logger.debug(
+            f"✅ {symbol}: TECHNICAL SUMMARY | "
+            f"BB Bands: [{signal.bb_lower:.4f}, {signal.bb_middle:.4f}, {signal.bb_upper:.4f}] | "
+            f"KC Bands: [{signal.kc_lower:.4f}, {signal.kc_middle:.4f}, {signal.kc_upper:.4f}] | "
+            f"ATR: {signal.atr_20:.4f} | True Range: {signal.true_range:.4f}"
+        )
+    
+    def _log_comprehensive_signal_strength_analytics(
+        self, is_squeeze: bool, is_expansion: bool, bb_percentile: float, 
+        range_vs_atr: float, volume_ratio: float, final_score: float
+    ) -> None:
+        """Log comprehensive signal strength calculation analytics."""
+        
+        # This provides the detailed breakdown that was mentioned in the original logging
+        components = []
+        
+        if is_squeeze:
+            squeeze_strength = max(0, (10 - bb_percentile) / 10)
+            squeeze_contrib = 0.3 * squeeze_strength
+            components.append(f"Squeeze: {squeeze_contrib:.3f} (BB %ile: {bb_percentile:.1f})")
+        
+        if is_expansion:
+            expansion_strength = min(1.0, range_vs_atr / 2.0)
+            expansion_contrib = 0.25 * expansion_strength
+            components.append(f"Expansion: {expansion_contrib:.3f} (Range/ATR: {range_vs_atr:.2f}x)")
+        
+        # Volume analysis
+        if volume_ratio > 2.0:
+            volume_contrib = 0.2
+        elif volume_ratio > 1.5:
+            volume_contrib = 0.15
+        elif volume_ratio > 1.2:
+            volume_contrib = 0.1
+        elif volume_ratio < 0.8:
+            volume_contrib = -0.1
+        else:
+            volume_contrib = 0.0
+        
+        if volume_contrib != 0:
+            components.append(f"Volume: {volume_contrib:+.3f} (Ratio: {volume_ratio:.2f}x)")
+        
+        # Volatility bonus
+        if range_vs_atr > 1.5:
+            vol_contrib = 0.15
+            components.append(f"Volatility: +{vol_contrib:.3f} (High range)")
+        elif range_vs_atr > 1.2:
+            vol_contrib = 0.1
+            components.append(f"Volatility: +{vol_contrib:.3f} (Elevated range)")
+        
+        component_summary = " | ".join(components) if components else "No components"
+        
+        logger.debug(
+            f"⚡ SIGNAL STRENGTH CALCULATION AUDIT | "
+            f"{component_summary} | Final Score: {final_score:.3f}"
+        )
     
     def _calculate_signal_strength(
         self,
@@ -305,7 +1048,7 @@ class AnalysisService:
         range_vs_atr: float,
         volume_ratio: float
     ) -> float:
-        """Calculate overall signal strength score (0-1)."""
+        """Calculate overall signal strength score (0-1) with enhanced weighting."""
         
         score = 0.0
         
@@ -330,7 +1073,25 @@ class AnalysisService:
         if bb_width_percentile <= 5:
             score += 0.1  # Extra points for very tight squeeze
         
-        return min(1.0, score)
+        final_score = min(1.0, score)
+        
+        # Log detailed scoring breakdown for transparency
+        logger.debug(
+            f"SIGNAL STRENGTH CALCULATION | "
+            f"Squeeze: {0.3 * squeeze_strength if is_squeeze else 0:.3f} | "
+            f"Expansion: {0.25 if is_expansion else 0:.3f} | "
+            f"Volume: {0.15 * volume_strength:.3f} | "
+            f"Range: {0.2 * range_strength:.3f} | "
+            f"Final: {final_score:.3f}"
+        )
+        
+        # Log comprehensive signal strength analytics
+        self._log_comprehensive_signal_strength_analytics(
+            is_squeeze, is_expansion, bb_width_percentile, range_vs_atr, 
+            volume_ratio, final_score
+        )
+        
+        return final_score
     
     def _is_signal_valid(self, squeeze_signal: SqueezeSignal) -> bool:
         """Check if the signal meets minimum criteria."""

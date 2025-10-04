@@ -25,9 +25,9 @@ class SupabaseConfig:
     """Supabase configuration."""
     
     def __init__(self):
-        self.url = os.getenv("SUPABASE_URL", "")
-        self.key = os.getenv("SUPABASE_KEY", "")
-        self.service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        self.url = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
+        self.key = os.getenv("NEXT_PUBLIC_SUPABASE_KEY", "")
+        self.service_key = os.getenv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY")
 
 
 class DataConfig:

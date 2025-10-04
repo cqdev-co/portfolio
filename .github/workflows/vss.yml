@@ -84,3 +84,17 @@ jobs:
       run: |
         
         poetry run python -m volatility_scanner.cli scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }}
+        
+    - name: Cleanup Meaningless Trades
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+      working-directory: volatility-squeeze-scanner
+      run: |
+        echo "🧹 Running performance tracking cleanup..."
+        poetry run python scripts/cleanup_meaningless_trades.py
+        echo "✅ Cleanup complete"

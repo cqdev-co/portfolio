@@ -134,12 +134,12 @@ class DataService:
         
         # Check cache first
         if not force_refresh and self._is_cache_valid(cache_key):
-            logger.info(f"Returning cached data for {symbol}")
+            logger.debug(f"Returning cached data for {symbol}")
             return self.cache[cache_key]
         
         try:
             # Fetch data from yfinance with retry logic
-            logger.info(f"Fetching market data for {symbol} (period: {period})")
+            logger.debug(f"Fetching market data for {symbol} (period: {period})")
             
             async def fetch_data():
                 ticker = yf.Ticker(symbol)
@@ -211,7 +211,7 @@ class DataService:
             self.cache[cache_key] = market_data
             self.cache_timestamps[cache_key] = datetime.now()
             
-            logger.info(
+            logger.debug(
                 f"Successfully fetched {len(ohlcv_data)} data points for {symbol}"
             )
             return market_data
@@ -258,7 +258,7 @@ class DataService:
                 symbols_to_fetch.append(symbol)
         
         if cache_hits:
-            logger.info(f"Cache hits: {len(cache_hits)}/{len(symbols)} symbols")
+            logger.debug(f"Cache hits: {len(cache_hits)}/{len(symbols)} symbols")
         
         if not symbols_to_fetch:
             return cache_hits
@@ -279,13 +279,14 @@ class DataService:
                     return symbol, None
         
         # Execute all requests concurrently
-        logger.info(f"Fetching {len(symbols_to_fetch)} symbols with {max_concurrent} concurrent requests")
+        logger.debug(f"Fetching {len(symbols_to_fetch)} symbols with {max_concurrent} concurrent requests")
         tasks = [fetch_single(symbol) for symbol in symbols_to_fetch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Process results
         data_dict = cache_hits.copy()
         successful_fetches = 0
+        failed_symbols = []
         
         for result in results:
             if isinstance(result, Exception):
@@ -296,10 +297,18 @@ class DataService:
             if data is not None:
                 data_dict[symbol] = data
                 successful_fetches += 1
+            else:
+                failed_symbols.append(symbol)
         
+        # Log summary with more meaningful information
+        total_success = successful_fetches + len(cache_hits)
         logger.info(
-            f"Successfully fetched {successful_fetches} new + {len(cache_hits)} cached = {len(data_dict)}/{len(symbols)} symbols"
+            f"📊 Data fetch complete: {total_success}/{len(symbols)} symbols "
+            f"({successful_fetches} new, {len(cache_hits)} cached)"
         )
+        
+        if failed_symbols:
+            logger.warning(f"⚠️ Failed to fetch {len(failed_symbols)} symbols: {', '.join(failed_symbols[:5])}{'...' if len(failed_symbols) > 5 else ''}")
         return data_dict
     
     async def get_multiple_symbols_chunked(
@@ -334,7 +343,7 @@ class DataService:
             chunk = symbols[i:i + chunk_size]
             chunk_num = i // chunk_size + 1
             
-            logger.info(f"Processing chunk {chunk_num}/{total_chunks} ({len(chunk)} symbols)")
+            logger.info(f"📦 Processing chunk {chunk_num}/{total_chunks} ({len(chunk)} symbols)")
             
             try:
                 chunk_data = await self.get_multiple_symbols(

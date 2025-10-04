@@ -579,8 +579,8 @@ def main():
     parser.add_argument(
         '--max-tickers',
         type=int,
-        default=5000,
-        help='Maximum number of tickers to store (default: 5000)'
+        default=2000,
+        help='Maximum number of tickers to store (default: 2000)'
     )
     
     args = parser.parse_args()

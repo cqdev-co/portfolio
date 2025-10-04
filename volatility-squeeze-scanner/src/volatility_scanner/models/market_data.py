@@ -206,3 +206,60 @@ class MarketData(BaseModel):
         lows = [item.low for item in recent_data]
         
         return min(lows), max(highs)
+    
+    @property
+    def data_quality_score(self) -> float:
+        """Calculate data quality score based on completeness and consistency."""
+        if not self.ohlcv_data or not self.indicators:
+            return 0.0
+        
+        # Base score starts at 1.0
+        score = 1.0
+        
+        # Check data completeness (minimum 50 data points for reliable analysis)
+        min_required_points = 50
+        ohlcv_count = len(self.ohlcv_data)
+        indicators_count = len(self.indicators)
+        
+        if ohlcv_count < min_required_points:
+            score *= (ohlcv_count / min_required_points)
+        
+        if indicators_count < min_required_points:
+            score *= (indicators_count / min_required_points)
+        
+        # Check for data consistency (no missing critical indicators)
+        if indicators_count > 0:
+            latest_indicators = self.indicators[-1]
+            critical_indicators = [
+                latest_indicators.bb_width,
+                latest_indicators.bb_upper,
+                latest_indicators.bb_lower,
+                latest_indicators.atr_20,
+                latest_indicators.volume_sma
+            ]
+            
+            # Count non-None critical indicators
+            valid_indicators = sum(1 for ind in critical_indicators if ind is not None)
+            indicator_completeness = valid_indicators / len(critical_indicators)
+            score *= indicator_completeness
+        
+        # Check for data gaps (should have consistent timestamps)
+        if len(self.ohlcv_data) > 1:
+            timestamps = [ohlcv.timestamp for ohlcv in self.ohlcv_data]
+            timestamps.sort()
+            
+            # Calculate average time delta
+            time_deltas = []
+            for i in range(1, len(timestamps)):
+                delta = (timestamps[i] - timestamps[i-1]).days
+                time_deltas.append(delta)
+            
+            if time_deltas:
+                avg_delta = sum(time_deltas) / len(time_deltas)
+                # Penalize if there are significant gaps (more than 2x average)
+                large_gaps = sum(1 for delta in time_deltas if delta > avg_delta * 2)
+                gap_penalty = large_gaps / len(time_deltas)
+                score *= (1.0 - gap_penalty * 0.2)  # Max 20% penalty for gaps
+        
+        # Ensure score is between 0.0 and 1.0
+        return max(0.0, min(1.0, score))

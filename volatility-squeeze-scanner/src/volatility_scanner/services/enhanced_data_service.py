@@ -251,7 +251,7 @@ class EnhancedDataService:
                     return symbol, None
         
         # Execute all fetches concurrently
-        logger.info(f"Fetching {len(symbols)} symbols individually with {max_concurrent} concurrency")
+        logger.debug(f"Fetching {len(symbols)} symbols individually with {max_concurrent} concurrency")
         tasks = [fetch_single_optimized(symbol) for symbol in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         

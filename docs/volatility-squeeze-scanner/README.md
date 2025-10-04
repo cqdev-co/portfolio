@@ -15,6 +15,15 @@ Detailed technical documentation for developers and advanced users.
 ### [User Guide](./user-guide.md)
 Comprehensive guide for traders and users of the system.
 
+### [Improved Logging Strategy](./improved-logging-strategy.md)
+Enhanced logging system that provides meaningful strategy insights and reduces operational noise.
+
+### [Professional Logging System](./professional-logging-system.md)
+Advanced false positive detection and professional-grade signal validation with comprehensive risk assessment.
+
+### [Data Analytics Logging](./data-analytics-logging.md)
+Complete transparency into calculations, thresholds, and decision points with detailed audit trails for discrepancy detection.
+
 ## 🚀 Quick Start
 
 ### For Traders

@@ -8,6 +8,8 @@ This directory contains utility scripts for maintaining and managing the volatil
 |--------|---------|--------------|
 | `clean_signals.py` | Clean signals by score threshold | Score-based filtering, comprehensive analysis, safe deletion |
 | `clean_table.py` | Clean duplicate entries | Duplicate detection, ticker deduplication, date-based cleanup |
+| `cleanup_meaningless_trades.py` | Clean 0.0% return trades | Performance dashboard cleanup, GitHub Actions integration |
+| `fix_duplicate_signals.py` | Fix signal duplicates | Signal continuity repair, cross-date duplicate resolution |
 
 ## clean_signals.py
 
@@ -235,3 +237,145 @@ This script complements the scanner's built-in duplicate prevention:
 - **Cleanup Script**: Removes any duplicates that may have occurred due to race conditions or system issues
 
 The combination ensures data integrity and optimal database performance.
+
+## cleanup_meaningless_trades.py
+
+A specialized script for cleaning meaningless trades (0.0% return) from the performance tracking system. This script is designed to keep the performance dashboard clean and meaningful by removing trades that provide no actionable insights.
+
+### Features
+
+- **Zero-Return Filtering**: Removes trades with exactly 0.0% return regardless of hold time
+- **Dashboard Cleanup**: Keeps performance metrics clean and meaningful
+- **GitHub Actions Integration**: Designed to run automatically in CI/CD pipeline
+- **Dry Run Support**: Preview what would be cleaned without making changes
+- **Safe Operations**: Detailed logging and error handling
+- **Comprehensive Reporting**: Shows before/after statistics
+
+### Usage
+
+```bash
+# Activate the virtual environment first
+cd volatility-squeeze-scanner
+source ../venv/bin/activate
+
+# Show help
+python scripts/cleanup_meaningless_trades.py --help
+
+# BASIC USAGE
+# Preview cleanup (safe)
+python scripts/cleanup_meaningless_trades.py --dry-run
+
+# Actually clean meaningless trades
+python scripts/cleanup_meaningless_trades.py
+
+# POETRY USAGE (recommended)
+# Preview cleanup
+poetry run python scripts/cleanup_meaningless_trades.py --dry-run
+
+# Run cleanup
+poetry run python scripts/cleanup_meaningless_trades.py
+```
+
+### GitHub Actions Integration
+
+This script is automatically integrated into the volatility squeeze scanner workflow (`vss.yml`) and runs after each market scan to keep the performance dashboard clean:
+
+```yaml
+- name: Cleanup Meaningless Trades
+  env:
+    NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+  working-directory: volatility-squeeze-scanner
+  run: |
+    echo "🧹 Running performance tracking cleanup..."
+    poetry run python scripts/cleanup_meaningless_trades.py
+    echo "✅ Cleanup complete"
+```
+
+### What Gets Cleaned
+
+The script removes performance tracking records where:
+- **Return percentage is exactly 0.0%** (within 0.01% tolerance)
+- **Any hold time** (0 days, 1 day, or longer)
+- **Status is CLOSED** (doesn't affect active trades)
+
+### Output Example
+
+```
+🧹 PERFORMANCE TRACKING CLEANUP
+==================================================
+Mode: LIVE CLEANUP
+
+📊 ANALYSIS RESULTS:
+  Total closed trades: 25
+  Meaningful trades: 20
+  Meaningless trades (0.0% return): 5
+
+❌ MEANINGLESS TRADES TO REMOVE:
+  • PC: $8.32 → $8.32 (+0.00%) in 0d [2025-09-24]
+  • EGG: $6.26 → $6.26 (+0.00%) in 0d [2025-09-24]
+  • ADCT: $3.52 → $3.52 (+0.00%) in 1d [2025-09-24]
+  • SRI: $8.06 → $8.06 (+0.00%) in 0d [2025-09-24]
+  • MSA: $169.97 → $169.97 (+0.00%) in 0d [2025-09-24]
+
+🗑️  REMOVING MEANINGLESS TRADES...
+    ✅ Deleted PC
+    ✅ Deleted EGG
+    ✅ Deleted ADCT
+    ✅ Deleted SRI
+    ✅ Deleted MSA
+
+✅ CLEANUP COMPLETE:
+  Successfully deleted: 5/5 trades
+  Remaining meaningful trades: 20
+
+📈 SAMPLE MEANINGFUL TRADES:
+  • BBGI: +2.48% in 0d
+  • ABVC: -1.24% in 0d
+  • NMG: +2.44% in 0d
+  • TE: +0.22% in 0d
+  • CLCO: +0.54% in 0d
+
+✅ CLEANUP COMPLETE: 5 meaningless trades removed
+```
+
+### Why This Matters
+
+**Before Cleanup:**
+- Performance dashboard cluttered with 0.0% trades
+- Misleading win rates and average returns
+- Difficult to identify meaningful patterns
+- Poor user experience
+
+**After Cleanup:**
+- Clean, actionable performance data
+- Accurate win rates and return metrics
+- Clear identification of profitable strategies
+- Professional presentation of results
+
+### Integration with Performance Tracking
+
+This script works in conjunction with the enhanced performance tracking service:
+
+1. **Prevention**: Updated `PerformanceTrackingService` prevents most 0.0% trades from being created
+2. **Cleanup**: This script removes any that slip through or were created before the prevention logic
+3. **Automation**: GitHub Actions ensures cleanup happens after every scan
+4. **Maintenance**: Can be run manually for historical cleanup
+
+### Best Practices
+
+1. **Run after major scans**: Especially useful after full market scans
+2. **Monitor output**: Check logs to understand what's being cleaned
+3. **Test first**: Use `--dry-run` when running manually
+4. **Regular automation**: Let GitHub Actions handle routine cleanup
+5. **Historical cleanup**: Run manually on historical data as needed
+
+### Environment Requirements
+
+Same as other scripts:
+- Python 3.8+
+- Poetry environment with scanner dependencies
+- Supabase credentials in environment variables
+
+This script ensures your **Live Performance Tracking** dashboard shows only meaningful, actionable trade data! 🎯

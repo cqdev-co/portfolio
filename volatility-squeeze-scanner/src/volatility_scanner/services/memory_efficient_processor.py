@@ -105,7 +105,7 @@ class MemoryEfficientProcessor:
             chunk_num = i // chunk_size + 1
             total_chunks = (len(symbols) + chunk_size - 1) // chunk_size
             
-            logger.info(f"Processing chunk {chunk_num}/{total_chunks} ({len(chunk_symbols)} symbols)")
+            logger.info(f"📊 Processing chunk {chunk_num}/{total_chunks} ({len(chunk_symbols)} symbols)")
             
             # Memory check before processing
             memory_stats = self._get_memory_stats()
