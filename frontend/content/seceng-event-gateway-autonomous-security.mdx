@@ -1,0 +1,505 @@
+---
+title: >
+  SecEng: Event Gateway Backend
+publishedAt: "2025-10-03"
+summary: >
+  The story of how we built a FastAPI event gateway to solve our CSPM
+  false positive problem, turning 200+ daily alerts into intelligent,
+  automated security responses that outperform traditional SOAR
+  platforms.
+image: "/wallpapers/Cyera_Red_Background.png"
+tags: ["Security", "Automation", "FastAPI", "DevSecOps", "SOAR", "CSPM"]
+---
+
+![SecEng Event Gateway](/wallpapers/Cyera_Red_Background.png)
+
+## Introduction
+
+Every morning at 9 AM, our Security Engineering team would gather for our
+daily standup, and the conversation always started the same way: "How many
+CSPM alerts came in overnight?" The answer was consistently
+depressing, anywhere from 50 to 200+ alerts, a vast majority being
+false positives that would consume hours of our day.
+
+As a Security Engineer at Cyera, I watched my team burn out from the
+constant noise. We were spending 60% of our time investigating alerts that
+turned out to be benign configuration changes or expected behavior.
+Meanwhile, the few real threats were getting lost in the sea of false
+positives, creating a dangerous situation where our response times were
+suffering.
+
+I remember thinking: *"There has to be a better way. We're security
+engineers, not alert triagers."* That frustration sparked an idea, what if
+I
+could build something that would intelligently filter these alerts and
+respond automatically to real threats? This is the story of how I built my
+own solution: a FastAPI-based Security Event Gateway, which transformed our
+security operations from reactive alert triage to proactive, automated
+threat response.
+
+## The Problem
+
+Our Cloud Security Posture Management (CSPM) tool was supposed to be
+our shield against cloud threats. Instead, it had become our biggest
+operational burden. The numbers were brutal: **100+ alerts per week**
+during
+peak periods with an **85% false positive rate** based on my manual
+analysis. Each alert took **15+ minutes** to triage, meaning we were
+spending **1-2 hours daily** on false positive investigation. Our **Mean
+Time to Containment (MTTC)** for legitimate security incidents was
+averaging **45+ minutes**, with real threats often buried in noise for
+hours.
+
+The timing made everything worse. Since our engineering team was primarily
+on the eastern side of the world, most alerts came during our night hours.
+Real threats or false positives would sit in our queue for **6-8 hours**
+without any response until someone came online the next morning. We weren't
+getting paged for these alerts, but the backlog was overwhelming and the
+delayed response to genuine threats was unacceptable.
+
+The human cost was severe. My security engineering colleagues were burning
+out from constant context switching between alerts. We'd investigate a
+"critical" S3 bucket exposure only to discover it was a legitimate data
+science team accessing their own resources. We'd spend hours on "suspicious
+CloudTrail activity" that turned out to be automated backup processes. When
+real threats did occur, we were so fatigued from false positives that our
+response was slower and less focused than it should have been.
+
+## Challenges
+
+As I started sketching out the solution, I realized I was facing several
+technical and business challenges simultaneously. From a **business
+perspective**, I needed to prove that custom automation could deliver
+measurable ROI while positioning our team for fully autonomous security
+operations. I kept asking myself: *"How do I build something that not only
+solves today's problem but proves we can scale this approach across all our
+security tools?"*
+
+The technical requirements were equally demanding: **sub-100ms internal
+processing** (because real-time response matters), **intelligent false
+positive filtering** based on our specific environment, **24/7 automated
+response** to solve our time zone delays, and a **developer-friendly
+architecture** that my team could actually maintain and extend.
+
+I spent a lot of time thinking about the architectural decisions. Why
+FastAPI? Because I needed excellent async support and automatic
+documentation that would make onboarding other engineers easier. Why Google
+Pub/Sub? Because I wanted reliable message queuing without managing
+infrastructure. Why Cloud Run? Because the pay-per-use pricing model meant
+I could prove the concept without significant upfront costs. I remember
+thinking: *"If this fails, at least it won't be because we spent too much
+money on infrastructure."*
+
+## The Solution
+
+I decided to build my own **Security Engineering Event Gateway** using
+modern
+cloud-native technologies. The core idea was simple: create a FastAPI
+service that could receive Upwind webhooks, intelligently process them, and
+trigger automated responses for real threats while filtering out false
+positives.
+
+This PoC was designed to prove that the Event Gateway concept could scale
+into a solution that defines what our team could become: **fully autonomous
+security**. By gathering real performance data and measuring the impact, I
+could evaluate whether this approach was worth expanding into a
+comprehensive security automation platform.
+
+### Architecture Overview
+
+![SecEng Event Gateway](/images/event-gateway-architecture.png)
+
+
+## Technical Implementation
+
+I started with a focused proof-of-concept: **CSPM Webhook
+Processing**. The goal seemed simple: receive CSPM alerts, intelligently
+filter them, and automate responses for real threats. *How hard could it
+be?*
+
+### The Challenge That Humbled Me
+
+My first major hurdle wasn't architectural: it was dealing with our CSPM's
+webhook format. In September 2025, I discovered that our CSPM vendor sends
+webhooks
+with `Content-Type: application/octet-stream` instead of the expected
+`application/json`. This caused FastAPI to reject every webhook with
+cryptic 422 errors.
+
+I remember staring at the logs thinking: *"This should be working. The JSON
+looks fine, the endpoint is correct... what am I missing?"* It took me
+hours to realize that FastAPI's automatic JSON parsing was failing because
+of the content type. Sometimes the simplest problems are the most
+frustrating.
+
+```python
+# Problem
+@router.post("/upwind")  # This failed!
+async def upwind_webhook(payload: dict = Body(...)):
+    # Never reached due to content-type issues
+    pass
+
+# Solution
+@router.api_route("/upwind", methods=["POST"])
+async def upwind_webhook_handler(request: Request):
+    # Read raw body and parse manually
+    body = await request.body()
+    try:
+        payload = json.loads(body.decode())
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    
+    # Now we can process the webhook
+    return await process_upwind_event(payload)
+
+```
+
+### The Upwind Event Processor
+
+My PoC focuses on two types of Upwind events:
+1. **Threat Detections**: Active security threats and suspicious activity
+2. **Configuration Findings**: Misconfigurations and policy violations
+
+Here's how I process these events:
+
+```python
+async def process_event(self, 
+                        payload: Dict[str, Any])
+                        -> Dict[str, Any]:
+                        
+        # Parse the Upwind event 
+        # (either threat detection or config finding)
+        event_type = payload.get("category", "").lower()
+        
+        if "threat" in event_type or "config" in event_type:
+            event = UpwindThreatDetectionEvent.parse_obj(payload)
+        else:
+            event = UpwindConfigurationFindingEvent.parse_obj(payload)
+        
+        # Extract key information
+        cloud_info = {
+            "cloud_provider": event.resource.cloud_provider,
+            "cloud_account_id": event.resource.cloud_account_id,
+            "resource_name": event.resource.name,
+            "resource_type": event.resource.type,
+            "region": event.resource.region or "unknown"
+        }
+        
+        # Execute my security playbook
+        await self._execute_security_playbook(
+            event_id=event.id,
+            title=event.title,
+            description=event.description,
+            severity=event.severity,
+            cloud_info=cloud_info,
+            payload=payload
+        )
+        
+        return {"status": "processed", "event_id": event.id}
+```
+
+### The Playbook
+
+This is where the real magic happens. My PoC implements an intelligent
+security playbook that handles both threat detections and configuration
+findings. I wanted to build something that could make the same decisions I
+would make, but faster and more consistently:
+
+```python
+async def _execute_security_playbook(
+    self, event_id: str, title: str, description: str, 
+    severity: str, cloud_info: Dict[str, str], payload: Dict[str, Any]
+):
+    """Execute my automated security response playbook."""
+    
+    # Step 1: Check Cloud Asset Exceptions (Google Sheets integration)
+    is_exception = await self._check_cloud_asset_exceptions(cloud_info)
+    
+    if is_exception:
+        # Auto-archive if it's a known exception
+        await self._archive_threat_in_upwind(event_id)
+        return {"status": "archived", "reason": "known_exception"}
+    
+    # Step 2: Follow analyst playbook for real findings
+    actions = [
+        {
+            "type": "send_slack_notification",
+            "status": "in_progress",
+            "description": "Sending Slack notification to user"
+        },
+        {
+            "type": "create_jira_ticket",
+            "status": "pending", 
+            "description": "Creating JIRA ticket for tracking"
+        }
+    ]
+    
+    # Step 3: Send Slack notification to the user
+    upwind_console_link = payload.get(
+        "upwind_console_link",
+        f"https://console.upwind.io/threats?selectedDetectionId={event_id}"
+    )
+    
+    event_details = {
+        "cloud_provider": cloud_info["cloud_provider"],
+        "account_id": cloud_info["cloud_account_id"], 
+        "resource_name": cloud_info["resource_name"],
+        "resource_type": cloud_info["resource_type"],
+        "region": cloud_info["region"],
+        "upwind_link": upwind_console_link
+    }
+    
+    # Send Slack notification informing user of misconfiguration/threat
+    await self.slack_notifier.post_security_event(
+        event_id=event_id,
+        source="upwind",
+        severity=severity,
+        title=title,
+        description=description,
+        details=event_details,
+        actions=actions
+    )
+    
+    # Step 4: Create JIRA ticket for status tracking
+    await self._create_jira_ticket(event_id, title, description, severity)
+```
+
+## The Results
+
+After deploying my Event Gateway PoC, the transformation was measurable and
+immediate. I'll be honest, I was nervous about whether this would actually
+work in production. But the data exceeded my expectations. Here's what I
+presented to leadership:
+
+**SecEng Event Gateway: 2-Week Performance Analysis**
+- **Time Savings**: ~2 weeks of analyst time saved through automation
+- **Financial Impact**: $1,000 saved in 2 weeks, projected $2.1k/month,
+                        $25k/year if trend holds
+- **Event Processing**: 120 cloud security events processed with 90% noise
+                        reduction
+- **Performance**: Gateway internal processing <100ms; total E2E ~3.6s
+                   (remainder is downstream I/O to Slack/BigQuery)
+- **Infrastructure Cost**: $0.51/day for the entire platform
+- **Reliability**: 100% uptime since deployment
+
+### Impact
+**Before**: Our team spent 2+ hours each morning triaging overnight alerts.
+With our time zone challenges, real threats would sit unaddressed for 6-8
+hours. Engineers were burning out from constant context switching between
+false positives, spending 60% of their time on repetitive investigation
+work.
+
+**After**: The **90% noise reduction** transformed our daily operations.
+Instead of drowning in 200+ alerts, analysts now review fewer than 20
+pre-filtered, actionable events. Response times dropped from 45+ minutes to
+under 30 seconds for automated responses. Most importantly, we freed up
+**~2 weeks of analyst time** in just the first month, allowing the team to
+focus on strategic security initiatives rather than alert triage.
+
+## Key Realizations
+
+Looking back, starting small and focused was crucial, I didn't try to solve
+every security automation problem at once. I kept reminding myself:
+*"Perfect is the enemy of good. Get something working first, then make it
+better."* Focusing on our biggest pain point (CSPM false positives)
+allowed me to prove the concept quickly, learn from real production data,
+build confidence with the team, and iterate based on actual usage.
+
+The real-time webhook approach was a game-changer that I didn't fully
+appreciate until I saw it in action. Unlike traditional approaches that
+poll APIs every few minutes, my webhook-based approach provides **instant
+notifications** when threats occur, **no polling delays** or API rate
+limiting issues, **lower infrastructure costs** (no constant API calls),
+and a **better user experience** with immediate Slack alerts. I remember
+the first time I saw a real threat get processed and responded to in under
+30 seconds, it felt like magic.
+
+Building with FastAPI and Python was a strategic choice that paid off. It
+gave me **proper testing** with pytest and comprehensive test coverage,
+**version control** with Git and proper code review processes, **CI/CD
+integration** with automated deployments, **easy debugging** with
+structured logging and error handling, and **team knowledge sharing** since
+everyone on the team knows Python. I thought: *"If I get hit by a bus
+tomorrow, someone else should be able to maintain this."*
+
+## The Future
+
+The PoC proved that custom security automation can deliver
+measurable business value while positioning our team for fully autonomous
+operations. Based on this success, I'm expanding the Event Gateway to
+handle additional security tools and use cases.
+
+My immediate focus is on **EDR integration** for automated
+endpoint threat containment, **IAM integration** for identity-based threat
+response, and **VM integration**. Each integration follows the same
+pattern: 
+intelligent filtering, automated response for high-severity events, and 
+comprehensive audit trails.
+
+The broader vision is creating a unified security automation platform that
+can handle any security tool's webhooks, apply consistent business logic
+for threat assessment, and execute appropriate response playbooks; all
+while
+maintaining the sub-100ms internal processing performance that makes
+real-time response possible. 
+
+*Note: These roadmap items are subject to
+change based on business priorities and threat landscape evolution.*
+
+## Lessons Learned
+
+Building my Event Gateway taught me valuable lessons about security
+automation; some through success, others through frustration. What worked
+really well was **starting with the biggest pain point** (CSPM false
+positives gave immediate ROI), **real-time webhooks** (much faster and more
+reliable than polling-based approaches), **comprehensive testing** (my
+regression test suite prevented production issues), **structured logging**
+(made debugging and monitoring much easier), and **modular architecture**
+(easy to add new integrations without breaking existing ones).
+
+The challenges I overcame were humbling. **Webhook format issues**
+(Upwind's `application/octet-stream` content type caught me off guard),
+**route registration conflicts** (FastAPI's auto-discovery conflicted with
+my manual routes in ways I didn't expect), **error handling** (generic 422
+errors provided no debugging information initially, I learned to hate
+these), and **false positive tuning** (required more iterative refinement
+based on real production data than I anticipated).
+
+If I were starting over, I'd do several things differently: **start with
+webhook format validation** (test content types and parsing early, would
+have saved me hours), **build a configuration UI** (make it easier for
+non-developers to tune false positive filters), **add more comprehensive
+metrics** (better visibility into automation effectiveness), and
+**implement gradual rollout** (deploy new playbooks to staging environments
+first). The biggest lesson? *Always assume the vendor's documentation is
+incomplete.*
+
+## Why not go with SOAR?
+
+After proving the concept with measurable results, it's worth comparing
+this approach to traditional SOAR platforms I evaluated.
+
+**Cost Economics**: Enterprise SOAR platforms cost $50,000-200,000+
+annually, while my Event Gateway runs on $0.51/day ($186/year) with better
+performance. When you factor in the $25k/year in analyst time savings, the
+ROI is compelling.
+
+**Performance & Control**: Commercial platforms often have complex
+workflows and vendor-imposed limitations, while my solution achieves
+sub-100ms internal processing with full control over business logic. I can
+optimize for our specific use cases and integrate with any tool that
+supports webhooks.
+
+**Development Velocity**: Visual workflow builders become unmaintainable at
+scale, while clean Python code with proper testing, version control, and
+CI/CD scales with the team's growing automation needs. The modular
+architecture makes adding new integrations straightforward without breaking
+existing functionality.
+
+## Getting Started
+
+If you're a Engineer, Manager, or Architect considering a similar
+approach, think beyond the technical implementation. The real value lies in
+**transforming your team's operational model** from reactive alert triage
+to proactive threat hunting and strategic security initiatives.
+
+**Start with Business Impact**: Identify your highest-cost manual
+processes. For us, it was CSPM false positive investigation consuming 60%
+of analyst time. Calculate the financial impact—if each analyst spends 3
+hours daily on false positives at $100/hour, that's $78k annually per
+analyst. Even a 50% reduction in false positives delivers immediate ROI.
+
+**Prove the Concept with Data**: Build a simple PoC that measures
+everything from day one. Track processing times, false positive rates, time
+saved per analyst, and infrastructure costs. Present these metrics to
+leadership in terms they understand—analyst time freed up for strategic
+work, cost per event processed, and reliability metrics.
+
+**Design for Scale**: Choose technologies that can grow with your
+automation ambitions. Real-time webhooks scale better than polling,
+cloud-native infrastructure adapts to demand, and clean code with proper
+testing enables rapid iteration. The goal isn't just solving today's
+problem—it's building the foundation for fully autonomous security
+operations.
+
+**Think Platform, Not Point Solutions**: Each integration should follow
+consistent patterns for authentication, logging, error handling, and
+response workflows. This modular approach makes adding new security tools
+straightforward and maintains operational consistency across your entire
+security stack.
+
+
+## Conclusion
+
+Six months ago, our security team was drowning in false positives from our
+CSPM tool. We were spending more time investigating benign alerts than
+actually securing our infrastructure. Today, we have an intelligent Event
+Gateway that processes security events faster and more accurately than any
+human could.
+
+### What I Achieved
+- **Transformed our daily routine**: From 2+ hours of alert triage to 15
+                                     minutes of strategic review
+- **Eliminated alert fatigue**: 95.85% noise reduction and 90% reduction in
+                                false positive investigation time
+- **Solved the time zone problem**: 24/7 automated response instead of 6-8
+                                    hour delays
+- **Accelerated response times**: From 45+ minutes to under 30 seconds for
+                                  real threats
+- **Saved significant costs**: 99.9% cost reduction compared to enterprise
+                               SOAR platforms (~$10/month vs $50K+)
+- **Improved team morale**: Engineers focused on strategic security work
+                            instead of repetitive tasks
+
+### The Bigger Picture
+
+My Event Gateway proves that small security teams don't need expensive SOAR
+platforms to achieve world-class automation. With modern cloud
+technologies, thoughtful architecture, and a focus on solving real
+problems, you can build something better than what vendors are selling.
+
+What makes this even more compelling is how **AI-powered coding tools** are
+democratizing software development. Tools like GitHub Copilot, Claude, and
+ChatGPT are making it easier than ever to build custom solutions that
+perfectly fit your organization's needs. Complex integrations that once
+required months of development can now be prototyped in days. I used AI
+assistance while building this gateway, and it accelerated my
+development significantly.
+
+**However, a critical warning**: As engineers, we must be
+extremely careful about blindly trusting LLM-generated code. I always
+review every line of AI-suggested code, especially around authentication,
+input validation, and data handling. LLMs can introduce subtle security
+vulnerabilities or make assumptions about your environment that aren't
+valid. *Never deploy AI-generated security code without thorough review and
+testing.*
+
+The future of security operations isn't about having humans manually triage
+every alert; it's about building intelligent systems that can distinguish
+real threats from noise, respond faster than any human could, and free up
+engineers or analysts to focus on the strategic work that actually requires
+human judgment. With AI coding assistance (used responsibly), every
+security team can become a development team, building exactly the
+automation they need rather than settling for vendor limitations.
+
+If you're facing similar challenges with security alert fatigue, I
+encourage you to consider building your own solution. The learning curve is
+worth it, and you'll end up with something perfectly tailored to your
+organization's needs. My journey from CSPM chaos to autonomous security
+response shows that with the right approach, small teams can achieve
+enterprise-grade security automation without enterprise-grade budgets.
+
+Key takeaways: **Start with your biggest pain point** (don't try to
+automate everything at once), **real-time webhooks beat polling** (faster,
+more reliable, and cost-effective), **custom solutions can outperform
+vendors** (when you control the logic, you can optimize for your specific
+needs), **developer-friendly approaches scale better** (clean code, proper
+testing, and version control matter), and **measure everything** (track
+metrics to prove ROI and identify areas for improvement).
+
+---
+
+*Interested in learning more about my security automation approach?
+Connect with me on [LinkedIn](https://linkedin.com/in/conorgquinlan).*
+
+
