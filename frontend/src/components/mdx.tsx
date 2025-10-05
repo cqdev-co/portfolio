@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 import { cn } from "@/lib/utils";
+import { ExpandableImage } from "@/components/expandable-image";
 
 type TableProps = {
   data: { 
@@ -69,26 +69,26 @@ function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   );
 }
 
-function RoundedImage(props: Omit<React.ComponentProps<typeof Image>, "alt"> & { 
-  alt: string;
-}) {
-  return (
-    <div className="my-6 overflow-hidden rounded-lg border bg-secondary/20 max-w-full">
-      <Image 
-        {...props}
-        alt={props.alt}
-        width={props.width || 1200}
-        height={props.height || 630}
-        className={cn("w-full h-auto object-contain max-w-full", props.className)}
-        style={{ 
-          maxWidth: '100%', 
-          height: 'auto',
-          display: 'block'
-        }}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-      />
-    </div>
-  );
+type ImageProps = {
+  src?: string;
+  alt?: string;
+  width?: number;
+  height?: number;
+  className?: string;
+  [key: string]: unknown;
+};
+
+function RoundedImage(props: ImageProps) {
+  // Handle both img element props and Next.js Image props
+  const imageProps = {
+    src: props.src || "",
+    alt: props.alt || "",
+    width: props.width || 1200,
+    height: props.height || 630,
+    className: props.className,
+  };
+  
+  return <ExpandableImage {...imageProps} />;
 }
 
 // Function to create a slug from heading text
@@ -169,7 +169,8 @@ export const globalComponents = {
   h4: createHeading(4),
   h5: createHeading(5),
   h6: createHeading(6),
-  Image: RoundedImage,
+  img: RoundedImage,  // react-markdown uses 'img' not 'Image'
+  Image: RoundedImage, // Keep this for compatibility
   a: CustomLink,
   Table,
   pre: CodeBlock,
