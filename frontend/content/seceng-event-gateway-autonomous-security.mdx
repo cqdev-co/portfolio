@@ -23,7 +23,8 @@ from 20-100+ alerts that needed our attention and analysis.
 As a Security Engineer at Cyera, I recognized this as a common challenge
 in the security industry: distinguishing signal from noise in our security
 tooling. We were spending significant time investigating alerts that
-turned out to be benign configuration changes or expected business activity.
+turned out to be benign configuration changes or expected business
+activity.
 Meanwhile, the genuine security events that required immediate attention
 were sometimes delayed in our response queue, which wasn't the level of
 security operations we wanted to maintain.
@@ -45,19 +46,28 @@ powerful for detecting potential security issues, but they often generate
 high volumes of alerts that require human analysis to distinguish between 
 genuine threats and expected business activity.
 
-Our situation was typical of fast-growing companies: **100+ alerts per week**
-during peak periods, with what I estimated to be an **85% rate of alerts requiring no action** after investigation. Each alert took **15+ minutes** to properly triage, meaning we were spending **1-2 hours daily** on alert investigation. 
+Our situation was typical of fast-growing companies: **100+ alerts per
+week**
+during peak periods, with what I estimated to be an **85% rate of alerts
+requiring no action** after investigation. Each alert took **15+ minutes**
+to properly triage, meaning we were spending **1-2 hours daily** on alert
+investigation. 
 
 The timing challenge was another problem. With our engineering team
 primarily in Eastern time zones, routine alerts generated during off-hours
-would accumulate in our queue until the next business day. While we maintained
-appropriate escalation procedures for critical threats, the volume of routine
+would accumulate in our queue until the next business day. While we
+maintained
+appropriate escalation procedures for critical threats, the volume of
+routine
 alerts was creating operational overhead that we wanted to optimize.
 
-The human impact was what concerned me most. My security engineering colleagues
-were spending significant time on repetitive alert triage instead of strategic
+The human impact was what concerned me most. My security engineering
+colleagues
+were spending significant time on repetitive alert triage instead of
+strategic
 security work. We'd investigate "critical" findings that turned out to be 
-legitimate business activities such as data science teams accessing their own 
+legitimate business activities such as data science teams accessing their
+own 
 resources, automated backup processes triggering CloudTrail alerts, or 
 expected configuration changes flagged as policy violations. This 
 context switching was reducing our efficiency and job satisfaction.
@@ -234,7 +244,8 @@ async def _execute_security_playbook(
     # Step 3: Send notification to the user
     console_link = payload.get(
         "console_link",
-        f"https://console.example.com/threats?selectedDetectionId={event_id}"
+        f"https://console.example.com/
+        threats?selectedDetectionId={event_id}"
     )
     
     event_details = {
@@ -282,7 +293,8 @@ presented to leadership:
 ### Impact
 **Before**: Our team spent 2+ hours each morning triaging overnight alerts.
 The volume of routine alerts was creating operational overhead, with
-engineers spending significant time on repetitive investigation work instead
+engineers spending significant time on repetitive investigation work
+instead
 of strategic security initiatives.
 
 **After**: The **90% noise reduction** transformed our daily operations.
@@ -383,7 +395,8 @@ time savings, the ROI was compelling for our situation.
 **Customization & Performance**: Commercial platforms offer comprehensive
 features but sometimes include complexity we didn't need. My solution
 achieves sub-100ms internal processing with full control over business
-logic, optimized specifically for our environment and use cases. The ability
+logic, optimized specifically for our environment and use cases. The
+ability
 to integrate with any tool that supports webhooks gave us flexibility.
 
 **Development Approach**: While visual workflow builders in commercial SOAR
@@ -437,7 +450,8 @@ our team to focus on high-value security work.
                                      minutes of strategic review
 - **Eliminated alert fatigue**: 95.85% noise reduction and 90% reduction in
                                 false positive investigation time
-- **Optimized global operations**: 24/7 automated response for routine events
+- **Optimized global operations**: 24/7 automated response for routine
+                                   events
 - **Accelerated response times**: Automated responses now handle routine
                                   events in under 30 seconds
 - **Saved significant costs**: 99.9% cost reduction compared to enterprise
@@ -454,7 +468,8 @@ have specific requirements and development capabilities. With modern cloud
 technologies and thoughtful architecture, teams can build solutions
 perfectly tailored to their unique environments.
 
-What makes this even more compelling is how modern development practices and
+What makes this even more compelling is how modern development practices
+and
 cloud-native technologies are making it easier than ever to build custom
 solutions that perfectly fit your organization's needs. Complex
 integrations that once required months of development can now be prototyped
@@ -477,7 +492,8 @@ enterprise-grade security automation without enterprise-grade budgets.
 Key takeaways: **Start with your biggest pain point** (don't try to
 automate everything at once), **real-time webhooks beat polling** (faster,
 more reliable, and cost-effective), **custom solutions can complement
-commercial tools** (when you control the logic, you can optimize for your specific
+commercial tools** (when you control the logic, you can optimize for your
+specific
 needs), **developer-friendly approaches scale better** (clean code, proper
 testing, and version control matter), and **measure everything** (track
 metrics to prove ROI and identify areas for improvement).
