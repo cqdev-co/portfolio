@@ -83,6 +83,10 @@ class TechnicalIndicators(BaseModel):
         None,
         description="Average True Range"
     )
+    atr_20: Optional[float] = Field(  # New field to match expected usage
+        None,
+        description="20-period Average True Range (defaults to atr if not specified)"
+    )
     ema_short: Optional[float] = Field(
         None,
         description="Short-period EMA (e.g., 20-day)"
@@ -129,6 +133,11 @@ class TechnicalIndicators(BaseModel):
         None,
         description="Negative Directional Indicator"
     )
+
+    # Post-init to default atr_20 to atr if not set
+    def __post_init__(self):
+        if self.atr_20 is None and self.atr is not None:
+            self.atr_20 = self.atr
 
 
 class MarketData(BaseModel):

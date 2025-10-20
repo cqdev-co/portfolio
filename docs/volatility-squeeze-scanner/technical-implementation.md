@@ -529,4 +529,8 @@ async def monitor_performance(request: Request, call_next):
    - Significant changes in win rate
    - System-wide stop loss triggers
 
+## Recent Fixes and Improvements
+
+- **Fixed ATR Attribute Error (October 2025)**: Added `atr_20` field to `TechnicalIndicators` model in `src/volatility_scanner/models/market_data.py` to resolve `'TechnicalIndicators' object has no attribute 'atr_20'` errors during analysis. This defaults to the existing `atr` value (20-period calculation) and prevents scan failures across symbols. Ensures consistent signal generation without altering core strategy logic.
+
 This technical implementation provides a robust, scalable foundation for the volatility squeeze scanner with comprehensive monitoring, performance tracking, and real-time capabilities.
