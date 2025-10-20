@@ -1,9 +1,10 @@
 """Performance tracking service for volatility squeeze signals."""
 
 from datetime import datetime, date, timezone
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from loguru import logger
 from decimal import Decimal
+import itertools
 
 from volatility_scanner.models.analysis import AnalysisResult, SignalStatus
 from volatility_scanner.services.database_service import DatabaseService

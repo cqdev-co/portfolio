@@ -25,6 +25,7 @@ class SqueezeDetectionConfig:
     expansion_threshold: Decimal = Decimal('0.20')
     volume_threshold: Decimal = Decimal('1.2')
     min_data_quality: Decimal = Decimal('0.8')
+    timeframes: List[str] = None # Added for multi-timeframe confirmation
 
 
 @dataclass
@@ -184,6 +185,17 @@ class VolatilitySqueezeDetectorService(IVolatilitySqueezeDetector):
         
         # Validate signal quality
         if not signal.is_valid_signal():
+            return None
+        
+        # Multi-timeframe confirmation
+        timeframes = config.timeframes or ['1d']
+        confirmed_squeezes = []
+        for timeframe in timeframes:
+            tf_data = await self.get_market_data_for_timeframe(market_data.symbol, timeframe)
+            if tf_data and self.detect_squeeze_condition(tf_data.latest_indicators.bb_width, tf_data.bb_width_percentile):
+                confirmed_squeezes.append(timeframe)
+        
+        if len(confirmed_squeezes) < len(timeframes) // 2 + 1:
             return None
         
         return signal

@@ -215,6 +215,10 @@ class EnhancedSettings(BaseSettings):
     enable_backtesting: bool = Field(True, description="Enable backtesting features")
     enable_real_time_alerts: bool = Field(False, description="Enable real-time alerting")
     enable_paper_trading: bool = Field(False, description="Enable paper trading simulation")
+    timeframes: List[str] = Field(['1d', '1wk'], description="Timeframes for multi-confirmation")
+    volume_anomaly_threshold: float = Field(2.0, description="Z-score threshold for volume anomaly")
+    enable_sentiment: bool = Field(False, description="Enable sentiment analysis integration")
+    ml_local_only: bool = Field(True, description="Run ML ranking locally only")
     
     @validator('squeeze_percentile')
     def validate_squeeze_percentile(cls, v):

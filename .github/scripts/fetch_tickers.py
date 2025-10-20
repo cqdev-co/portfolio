@@ -173,9 +173,16 @@ class TickerFetcher:
                     
                 values = line.split(',')
                 if len(values) >= 3:
+                    symbol = values[0].strip()
+                    name = values[1].strip()
+                    
+                    # Skip tickers with missing required fields
+                    if not symbol or not name:
+                        continue
+                    
                     ticker = TickerInfo(
-                        symbol=values[0].strip(),
-                        name=values[1].strip(),
+                        symbol=symbol,
+                        name=name,
                         exchange=values[2].strip() if len(values) > 2 else None,
                         country='US',  # Alpha Vantage is primarily US
                         currency='USD',
@@ -209,9 +216,16 @@ class TickerFetcher:
             data = response.json()
             
             for item in data:
+                symbol = item.get('symbol', '').strip() if item.get('symbol') else ''
+                name = item.get('name', '').strip() if item.get('name') else ''
+                
+                # Skip tickers with missing required fields
+                if not symbol or not name:
+                    continue
+                
                 ticker = TickerInfo(
-                    symbol=item.get('symbol', ''),
-                    name=item.get('name', ''),
+                    symbol=symbol,
+                    name=name,
                     exchange=item.get('exchange'),
                     currency=item.get('currency'),
                     ticker_type='stock'
@@ -439,21 +453,38 @@ class TickerFetcher:
         try:
             # Prepare data for batch insert
             ticker_data = []
+            skipped_count = 0
+            
             for ticker in tickers:
+                # Skip tickers with null or empty names (required field)
+                if not ticker.name or ticker.name.strip() == '':
+                    self.logger.warning(f"Skipping ticker {ticker.symbol}: missing or empty name")
+                    skipped_count += 1
+                    continue
+                
+                # Skip tickers with null or empty symbols (required field)
+                if not ticker.symbol or ticker.symbol.strip() == '':
+                    self.logger.warning(f"Skipping ticker with empty symbol: name={ticker.name}")
+                    skipped_count += 1
+                    continue
+                
                 data = {
-                    'symbol': ticker.symbol,
-                    'name': ticker.name,
-                    'exchange': ticker.exchange,
-                    'country': ticker.country,
-                    'currency': ticker.currency,
-                    'sector': ticker.sector,
-                    'industry': ticker.industry,
+                    'symbol': ticker.symbol.strip(),
+                    'name': ticker.name.strip(),
+                    'exchange': ticker.exchange.strip() if ticker.exchange else None,
+                    'country': ticker.country.strip() if ticker.country else None,
+                    'currency': ticker.currency.strip() if ticker.currency else None,
+                    'sector': ticker.sector.strip() if ticker.sector else None,
+                    'industry': ticker.industry.strip() if ticker.industry else None,
                     'market_cap': ticker.market_cap,
-                    'ticker_type': ticker.ticker_type,
+                    'ticker_type': ticker.ticker_type or 'stock',
                     'is_active': True,
                     'last_fetched': datetime.now(timezone.utc).isoformat()
                 }
                 ticker_data.append(data)
+            
+            if skipped_count > 0:
+                self.logger.info(f"Skipped {skipped_count} tickers due to missing required fields")
             
             # Insert in batches to avoid timeouts
             batch_size = 1000
@@ -579,8 +610,8 @@ def main():
     parser.add_argument(
         '--max-tickers',
         type=int,
-        default=2000,
-        help='Maximum number of tickers to store (default: 2000)'
+        default=2500,
+        help='Maximum number of tickers to store (default: 2500)'
     )
     
     args = parser.parse_args()

@@ -372,6 +372,8 @@ class AnalysisService:
         daily_dollar_volumes = [ohlcv.close * ohlcv.volume for ohlcv in recent_ohlcv]
         avg_dollar_volume = sum(daily_dollar_volumes) / len(daily_dollar_volumes) if daily_dollar_volumes else None
         
+        volume_anomaly = self._calculate_volume_anomaly(market_data)
+        
         signal = SqueezeSignal(
             timestamp=latest_ohlcv.timestamp,
             symbol=market_data.symbol,
@@ -420,7 +422,8 @@ class AnalysisService:
             macd_signal=latest_indicators.macd_signal,
             adx=latest_indicators.adx,
             di_plus=latest_indicators.di_plus,
-            di_minus=latest_indicators.di_minus
+            di_minus=latest_indicators.di_minus,
+            volume_anomaly=volume_anomaly
         )
         
         # Professional signal validation and final assessment
@@ -1818,3 +1821,13 @@ class AnalysisService:
             "bulk_scan_batch_size": self.settings.bulk_scan_batch_size,
             "bulk_scan_concurrency": self.settings.bulk_scan_concurrency
         }
+
+    def _calculate_volume_anomaly(self, market_data: MarketData, periods: int = 20) -> float:
+        volumes = [ohlcv.volume for ohlcv in market_data.ohlcv_data[-periods:]]
+        if len(volumes) < 2:
+            return 0.0
+        mean_vol = np.mean(volumes)
+        std_vol = np.std(volumes)
+        current_vol = market_data.ohlcv_data[-1].volume
+        z_score = (current_vol - mean_vol) / std_vol if std_vol > 0 else 0.0
+        return z_score

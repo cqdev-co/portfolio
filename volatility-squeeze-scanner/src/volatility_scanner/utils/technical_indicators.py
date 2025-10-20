@@ -304,7 +304,8 @@ class TechnicalIndicatorCalculator:
     def detect_squeeze_condition(
         self,
         bb_width: float,
-        bb_width_percentile: float
+        bb_width_percentile: float,
+        adx: Optional[float] = None
     ) -> bool:
         """
         Detect if squeeze condition is met.
@@ -316,7 +317,16 @@ class TechnicalIndicatorCalculator:
         Returns:
             True if squeeze condition is detected
         """
-        return bb_width_percentile <= self.settings.squeeze_percentile
+        if adx is not None:
+            if adx < 20:
+                effective_threshold = 20.0
+            elif adx > 30:
+                effective_threshold = 5.0
+            else:
+                effective_threshold = self.settings.squeeze_percentile
+        else:
+            effective_threshold = self.settings.squeeze_percentile
+        return bb_width_percentile <= effective_threshold
     
     def detect_expansion_condition(
         self,

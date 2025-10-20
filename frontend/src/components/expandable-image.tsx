@@ -79,6 +79,8 @@ export function ExpandableImage({
             <Image 
               src={props.src}
               alt={props.alt}
+              width={props.width || 1200}
+              height={props.height || 630}
               className="rounded-lg max-w-full max-h-full object-contain"
               style={{ 
                 maxWidth: 'calc(100vw - 8rem)', 
