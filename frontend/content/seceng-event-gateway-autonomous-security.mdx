@@ -99,13 +99,15 @@ money on infrastructure."*
 ## The Solution
 
 I decided to build my own **Security Engineering Event Gateway** using
-modern cloud-native technologies. The core idea was simple: create a FastAPI
+modern cloud-native technologies. The core idea was simple: create a
+FastAPI
 service that could receive CSPM webhooks, intelligently process them, and
 trigger automated responses for real threats while filtering out false
 positives.
 
 This proof-of-concept was designed to demonstrate that the Event Gateway
-concept could scale into a solution that defines what our team could become:
+concept could scale into a solution that defines what our team could
+become:
 **fully autonomous security**. By gathering performance data and measuring
 the impact in a controlled environment, I could evaluate whether this
 approach was worth expanding into a comprehensive security automation
@@ -282,7 +284,8 @@ presented to leadership:
 - **Time Savings**: ~2 weeks of analyst time saved through automation
 - **Financial Impact**: ~$1,000 saved in 2 weeks, projected ~$2,000/month,
                         ~$25,000/year if trend holds
-- **Event Processing**: ~120 cloud security events processed with ~90% noise
+- **Event Processing**: ~120 cloud security events processed with ~90%
+                        noise
                         reduction
 - **Performance**: Gateway internal processing <100ms; total E2E ~4 seconds
                    (remainder is downstream I/O to Slack/BigQuery)
@@ -386,7 +389,7 @@ prototype, it's worth comparing this custom approach to traditional SOAR
 platforms I evaluated.
 
 **Cost Considerations**: Enterprise SOAR platforms typically cost
-$50,000-200,000+ annually, while my Event Gateway runs on ~$0.50/day
+$50,000-200,000+ annually, while my Event Gateway runs on $0.50/day
 (~$200/year). For our specific use case and team size, the custom solution
 provided better cost efficiency. When factoring in the ~$25,000/year in
 analyst time savings, the ROI was compelling for our situation.
@@ -453,7 +456,7 @@ our team to focus on high-value security work.
                                    events
 - **Accelerated response times**: Automated responses now handle routine
                                   events in under 30 seconds
-- **Saved significant costs**: ~99% cost reduction compared to enterprise
+- **Saved significant costs**: 99% cost reduction compared to enterprise
                                SOAR platforms (~$200/year vs $50K+)
 - **Improved team morale**: Engineers focused on strategic security work
                             instead of repetitive tasks
