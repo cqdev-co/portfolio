@@ -1,8 +1,45 @@
 # Frontend Documentation
 
+## Recent Updates
+
+### Content Refinements (October 2025)
+Updated the Security Event Gateway article to align with professional standards:
+- **Language Refinement**: Replaced "alert fatigue" terminology with more neutral, growth-focused language about "high alert volume challenging efficiency"
+- **Metrics Standardization**: Rounded all financial figures and performance metrics to avoid implying precise internal data (e.g., "$1,000" → "~$1,000", "90%" → "~90%")
+- **Result Framing**: Added disclaimers framing results as "illustrative" or "based on internal analysis" to clarify the nature of the data
+- **Deployment Clarity**: Clarified that the system is a proof-of-concept/prototype rather than production deployment
+
+## Scanner Navigation Structure
+
+The portfolio now features a unified scanner navigation system that provides users with access to multiple trading analysis tools:
+
+### Scanner Hub (`/scanners`)
+- **Centralized Access**: Single entry point for all available scanners
+- **Minimalistic Design**: Clean, simple list layout with scanner titles and win rates
+- **Simple Link Styling**: Traditional underlined links with hover effects for clarity
+- **Visual Separation**: Horizontal divider between title and scanner list
+- **Performance Indicators**: Win rate statistics displayed where applicable in monospace badges
+- **Responsive Layout**: Optimized for all screen sizes with focused content
+
+### Available Scanners
+1. **Volatility Squeeze Scanner** (`/volatility-squeeze-scanner`)
+   - Status: Active
+   - Focus: Technical analysis using Bollinger Bands and Keltner Channels
+   - Win Rate: 68% with 2.1% average returns
+
+2. **Unusual Options Scanner** (`/unusual-options-scanner`)
+   - Status: Active  
+   - Focus: Insider detection through options flow analysis
+   - Features: Real-time data with 0DTE exclusion filters
+
+### Navigation Updates
+- **Dock Icon**: Scanner icon now points to `/scanners` instead of directly to volatility squeeze scanner
+- **Label Change**: Updated from "Scanner" to "Scanners" to reflect multiple options
+- **User Experience**: Improved discoverability of all available analysis tools
+
 ## Public Access Model
 
-The Volatility Squeeze Scanner is now fully public and accessible to all users without authentication requirements. This change was implemented based on user feedback to remove barriers and encourage more users to utilize the professional trading tool.
+All scanners are fully public and accessible to all users without authentication requirements. This change was implemented based on user feedback to remove barriers and encourage more users to utilize the professional trading tools.
 
 ## Open Graph Images with WP-Service Backgrounds
 

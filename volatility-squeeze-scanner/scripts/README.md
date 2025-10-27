@@ -6,10 +6,182 @@ This directory contains utility scripts for maintaining and managing the volatil
 
 | Script | Purpose | Key Features |
 |--------|---------|--------------|
+| `export_signals_data.py` | Export signals and performance data | Date filtering, JSON export, multiple data sources |
 | `clean_signals.py` | Clean signals by score threshold | Score-based filtering, comprehensive analysis, safe deletion |
 | `clean_table.py` | Clean duplicate entries | Duplicate detection, ticker deduplication, date-based cleanup |
 | `cleanup_meaningless_trades.py` | Clean 0.0% return trades | Performance dashboard cleanup, GitHub Actions integration |
 | `fix_duplicate_signals.py` | Fix signal duplicates | Signal continuity repair, cross-date duplicate resolution |
+
+## export_signals_data.py
+
+A comprehensive data export utility for extracting unusual options signals, signal performance data, and volatility squeeze signals from the database. This script provides flexible date filtering and exports data to well-formatted JSON files for analysis, reporting, or backup purposes.
+
+### Features
+
+- **Multiple Data Sources**: Export unusual options signals, signal performance data, and volatility squeeze signals
+- **Flexible Date Filtering**: Filter by days back, specific date ranges, or export all data
+- **JSON Export**: Clean, formatted JSON output with proper date serialization
+- **Progress Tracking**: Real-time progress indicators and detailed summaries
+- **Error Handling**: Robust error handling with detailed logging
+- **CLI Interface**: Easy-to-use command-line interface with comprehensive options
+
+### Usage
+
+```bash
+# Activate the virtual environment first
+source ../venv/bin/activate
+
+# Show help
+python export_signals_data.py --help
+
+# BASIC USAGE
+# Export last 7 days of data (default if no filter specified)
+python export_signals_data.py --days 7
+
+# Export last 30 days of data
+python export_signals_data.py --days 30
+
+# Export specific date range
+python export_signals_data.py --start-date 2024-01-01 --end-date 2024-01-31
+
+# Export all available data (use with caution for large datasets)
+python export_signals_data.py --all
+
+# SELECTIVE EXPORTS
+# Export only unusual options signals
+python export_signals_data.py --days 7 --unusual-options-only
+
+# Export only signal performance data
+python export_signals_data.py --days 7 --performance-only
+
+# Export only volatility squeeze signals
+python export_signals_data.py --days 7 --volatility-squeeze-only
+
+# CUSTOM OUTPUT
+# Specify custom output directory
+python export_signals_data.py --days 7 --output ./my_exports
+
+# Enable verbose logging
+python export_signals_data.py --days 7 --verbose
+```
+
+### Output Files
+
+The script generates timestamped JSON files in the specified output directory:
+
+- `unusual_options_signals_YYYYMMDD_HHMMSS.json` - Unusual options activity data
+- `signal_performance_YYYYMMDD_HHMMSS.json` - Signal performance tracking data
+- `volatility_squeeze_signals_YYYYMMDD_HHMMSS.json` - Volatility squeeze signals data
+
+### Data Sources
+
+**Unusual Options Signals** (`unusual_options_signals` table):
+- Option contract details (strike, expiry, type)
+- Volume and open interest metrics
+- Premium flow and aggressive order data
+- Detection flags and scoring
+- Risk assessment and market context
+
+**Signal Performance** (`signal_performance` table):
+- Entry and exit data for tracked signals
+- Forward returns (1d, 5d, 30d)
+- Win/loss classification
+- Performance metrics and risk data
+
+**Volatility Squeeze Signals** (`volatility_squeeze_signals` table):
+- Squeeze detection and analysis
+- Technical indicators and price data
+- AI analysis and recommendations
+- Signal continuity tracking
+
+### Output Example
+
+```
+📊 DATA EXPORT SUMMARY
+============================================================
+📅 Date Range: Last 7 days (from 2024-10-22)
+🔍 Unusual Options Signals: 1,234 records
+📈 Signal Performance Data: 456 records
+🎯 Volatility Squeeze Signals: 789 records
+📊 Total Records Exported: 2,479
+============================================================
+📁 Files exported to: /Users/user/exports
+```
+
+### Sample JSON Structure
+
+**Unusual Options Signals:**
+```json
+{
+  "signal_id": "uuid",
+  "ticker": "AAPL",
+  "option_symbol": "AAPL241025C00225000",
+  "detection_timestamp": "2024-10-22T14:30:00Z",
+  "strike": 225.00,
+  "expiry": "2024-10-25",
+  "option_type": "call",
+  "current_volume": 5000,
+  "volume_ratio": 15.2,
+  "overall_score": 0.85,
+  "grade": "A"
+}
+```
+
+**Signal Performance:**
+```json
+{
+  "id": "uuid",
+  "symbol": "AAPL",
+  "entry_date": "2024-10-15",
+  "entry_price": 220.50,
+  "exit_price": 225.75,
+  "return_pct": 2.38,
+  "days_held": 3,
+  "is_winner": true,
+  "status": "CLOSED"
+}
+```
+
+### Environment Requirements
+
+- Python 3.8+
+- Virtual environment with scanner dependencies
+- Supabase credentials in environment variables:
+  - `NEXT_PUBLIC_SUPABASE_URL` or `SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### Best Practices
+
+1. **Start Small**: Begin with short date ranges to test connectivity and performance
+2. **Use Selective Exports**: Export only the data you need to reduce file sizes
+3. **Monitor Progress**: Use `--verbose` for detailed logging during large exports
+4. **Organize Outputs**: Use descriptive output directory names for different export purposes
+5. **Regular Exports**: Set up regular exports for backup and analysis purposes
+
+### Use Cases
+
+- **Data Analysis**: Export data for external analysis tools (Python, R, Excel)
+- **Reporting**: Generate reports for stakeholders or compliance
+- **Backup**: Create regular backups of critical signal data
+- **Integration**: Feed data into other systems or dashboards
+- **Research**: Historical analysis of signal performance and market conditions
+
+### Troubleshooting
+
+**Connection Issues:**
+- Verify Supabase credentials are correctly set
+- Check network connectivity
+- Ensure credentials have read permissions
+
+**Large Datasets:**
+- Use date filtering to reduce data size
+- Consider selective exports for specific data types
+- Monitor available disk space for output files
+
+**No Data Found:**
+- Verify the date range contains data
+- Check if the specific data tables exist
+- Ensure proper database permissions
 
 ## clean_signals.py
 

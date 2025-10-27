@@ -57,3 +57,8 @@ wp-service/src/__pycache__/
 wp-service/src/**/__pycache__/
 *.pyc
 *.pyo
+
+# volatility squeeze scanner exports
+volatility-squeeze-scanner/exports/
+volatility-squeeze-scanner/__pycache__/
+volatility-squeeze-scanner/src/**/__pycache__/

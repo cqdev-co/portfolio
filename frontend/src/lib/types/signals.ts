@@ -78,6 +78,7 @@ export interface SignalFilters {
   max_overall_score?: number;
   min_score?: number;
   max_score?: number;
+  scan_date?: string; // Add date filtering support
 }
 
 export interface SignalSortConfig {

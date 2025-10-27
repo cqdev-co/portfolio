@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import type { VolatilitySqueezeSignal, SignalFilters, SignalSortConfig } from "@/lib/types/signals";
-import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
+import { fetchVolatilitySignals, fetchLatestSignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
 import { fetchPerformanceDashboard } from "@/lib/api/performance";
 import type { PerformanceDashboard } from "@/lib/types/performance";
 import Link from "next/link";
@@ -124,12 +124,13 @@ export default function VolatilitySqueezeScanner() {
       setError(null);
       
       // Load signals, stats, and performance data in parallel
+      const today = new Date().toISOString().split('T')[0];
       const [signalsResponse, statsData, performanceData] = await Promise.all([
         fetchVolatilitySignals({
           limit: 100,
           sortBy: sortConfig.field,
           sortOrder: sortConfig.direction,
-          filters,
+          filters: { ...filters, scan_date: today }, // Filter by today's date to avoid duplicates
           searchTerm
         }),
         fetchSignalStats(),

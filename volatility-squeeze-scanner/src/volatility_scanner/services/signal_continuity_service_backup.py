@@ -1,4 +1,4 @@
-"""Fixed Signal continuity tracking service for volatility squeeze scanner."""
+"""Signal continuity tracking service for volatility squeeze scanner."""
 
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Dict, Optional, Set, Tuple
@@ -24,11 +24,11 @@ class SignalContinuityService:
         """
         Process new signals and determine their continuity status.
         
-        FIXED LOGIC:
+        The logic works as follows:
         1. Check if each signal exists in the database for today's scan_date
         2. If exists for today, update it (don't create duplicate)
         3. If doesn't exist for today, check if it existed recently (within 3 days)
-        4. If existed recently, mark as CONTINUING with proper days calculation
+        4. If existed recently, mark as CONTINUING
         5. If never existed or gap too large, mark as NEW
         6. Mark signals that were active recently but not in current scan as ENDED
         
@@ -55,10 +55,10 @@ class SignalContinuityService:
         today_signals = await self._get_signals_for_date(scan_date)
         today_signals_by_symbol = {s['symbol']: s for s in today_signals}
         
-        # Get recent active signals (excluding today to avoid confusion)
+        # Get recent active signals (including today to check for continuation from previous runs)
         previous_signals = await self._get_recent_active_signals(
             days_back=7,
-            end_date=scan_date - timedelta(days=1)  # Exclude today
+            end_date=scan_date  # Include today to find signals from previous runs
         )
         
         # Group previous signals by symbol (get most recent for each symbol)
@@ -97,13 +97,35 @@ class SignalContinuityService:
             previous_signal = previous_by_symbol.get(signal.symbol)
             
             if existing_today:
-                # Update existing signal for today
+                # For existing signals today, we need to determine the correct status
+                # based on previous signals, not just preserve the existing status
                 processed_signal = await self._update_existing_signal_with_continuity(
                     signal,
                     existing_today,
                     previous_signal,
                     scan_date
                 )
+            elif previous_signal:
+                # Check if the previous signal is from a different date
+                previous_scan_date = previous_signal.get('scan_date')
+                if isinstance(previous_scan_date, str):
+                    previous_scan_date = datetime.fromisoformat(previous_scan_date).date()
+                
+                # If the previous signal is from a different date, this is a continuation
+                # We should update the existing record to the current scan_date
+                if previous_scan_date != scan_date:
+                    processed_signal = await self._update_continuing_signal(
+                        signal,
+                        previous_signal,
+                        scan_date
+                    )
+                else:
+                    # Previous signal is from the same date, treat as new
+                    processed_signal = await self._determine_signal_status(
+                        signal,
+                        previous_signal,
+                        scan_date
+                    )
             else:
                 # Determine status for new database entry
                 processed_signal = await self._determine_signal_status(
@@ -165,7 +187,8 @@ class SignalContinuityService:
     ) -> AnalysisResult:
         """
         Update an existing signal for today, determining the correct status based on continuity logic.
-        FIXED: Properly handle status transitions and days_in_squeeze calculations.
+        This handles cases where a signal was created in a previous run and should now be updated
+        to CONTINUING status.
         """
         symbol = current_signal.symbol
         squeeze_signal = current_signal.squeeze_signal
@@ -177,71 +200,80 @@ class SignalContinuityService:
         # If updated_at is different from created_at, this signal has been seen in multiple runs
         is_from_previous_run = existing_updated_at != existing_created_at
         
-        # FIXED LOGIC: Determine proper status based on whether this is truly the first occurrence
-        if previous_signal and not is_from_previous_run:
-            # This signal has a history and this is the first time we're seeing it today
-            # Calculate proper days_in_squeeze based on date progression
-            previous_last_active = previous_signal['last_active_date']
-            if isinstance(previous_last_active, str):
-                previous_last_active = datetime.fromisoformat(previous_last_active).date()
+        # If this is the same signal from a previous run, it should be CONTINUING
+        if is_from_previous_run or existing_signal.get('signal_status') == 'NEW':
+            # This signal existed before and is being detected again - mark as CONTINUING
+            squeeze_signal.signal_status = SignalStatus.CONTINUING
             
-            days_gap = (scan_date - previous_last_active).days
+            # Increment days in squeeze
+            existing_days = existing_signal.get('days_in_squeeze', 1)
+            squeeze_signal.days_in_squeeze = existing_days + 1
             
-            if days_gap <= 3:  # Allow up to 3 day gap for weekends/holidays
-                # This is a continuation
-                squeeze_signal.signal_status = SignalStatus.CONTINUING
-                
-                # FIXED: Calculate days_in_squeeze based on first_detected_date, not previous days
-                first_detected = previous_signal.get('first_detected_date')
-                if first_detected:
-                    if isinstance(first_detected, str):
-                        first_detected = datetime.fromisoformat(first_detected).date()
-                    # Calculate total days from first detection to current scan
-                    squeeze_signal.days_in_squeeze = (scan_date - first_detected).days + 1
-                    squeeze_signal.first_detected_date = first_detected
-                else:
-                    # Fallback if no first_detected_date
-                    squeeze_signal.days_in_squeeze = days_gap + 1
-                    squeeze_signal.first_detected_date = previous_last_active
-                
-                squeeze_signal.last_active_date = scan_date
-                
-                logger.debug(
-                    f"Updating signal for {symbol} - CONTINUING "
-                    f"(day {squeeze_signal.days_in_squeeze}, {days_gap} day gap from {previous_last_active})"
-                )
+            # Preserve first detected date from the original signal
+            first_detected = existing_signal.get('first_detected_date')
+            if first_detected:
+                if isinstance(first_detected, str):
+                    first_detected = datetime.fromisoformat(first_detected).date()
+                squeeze_signal.first_detected_date = first_detected
             else:
-                # Gap too large, treat as new
-                squeeze_signal.signal_status = SignalStatus.NEW
-                squeeze_signal.days_in_squeeze = 1
                 squeeze_signal.first_detected_date = scan_date
-                squeeze_signal.last_active_date = scan_date
-                
-                logger.debug(f"Gap too large for {symbol} ({days_gap} days), treating as new signal")
-        else:
-            # This is either a brand new signal or same-day update
-            existing_status = existing_signal.get('signal_status', 'NEW')
-            
-            if existing_status == 'NEW':
-                # Preserve NEW status for same-day updates
-                squeeze_signal.signal_status = SignalStatus.NEW
-                squeeze_signal.days_in_squeeze = 1
-                squeeze_signal.first_detected_date = scan_date
-            else:
-                # Preserve existing status for same-day updates
-                squeeze_signal.signal_status = SignalStatus(existing_status)
-                squeeze_signal.days_in_squeeze = existing_signal.get('days_in_squeeze', 1)
-                
-                # Preserve first detected date
-                first_detected = existing_signal.get('first_detected_date')
-                if first_detected:
-                    if isinstance(first_detected, str):
-                        first_detected = datetime.fromisoformat(first_detected).date()
-                    squeeze_signal.first_detected_date = first_detected
             
             squeeze_signal.last_active_date = scan_date
             
-            logger.debug(f"Updating existing signal for {symbol} (preserving status: {existing_status})")
+            logger.debug(
+                f"Updating existing signal for {symbol} - changed to CONTINUING "
+                f"(day {squeeze_signal.days_in_squeeze}, from previous run)"
+            )
+        else:
+            # This is a true same-time update, preserve existing status
+            existing_status = existing_signal.get('signal_status', 'NEW')
+            squeeze_signal.signal_status = SignalStatus(existing_status)
+            squeeze_signal.days_in_squeeze = existing_signal.get('days_in_squeeze', 1)
+            
+            # Preserve first detected date
+            first_detected = existing_signal.get('first_detected_date')
+            if first_detected:
+                if isinstance(first_detected, str):
+                    first_detected = datetime.fromisoformat(first_detected).date()
+                squeeze_signal.first_detected_date = first_detected
+            
+            squeeze_signal.last_active_date = scan_date
+            
+            logger.debug(f"Updating existing signal for {symbol} - preserving status: {existing_status}")
+        
+        # Mark this signal for database update rather than insert
+        current_signal._existing_db_id = existing_signal.get('id')
+        
+        return current_signal
+    
+    async def _update_existing_signal(
+        self,
+        current_signal: AnalysisResult,
+        existing_signal: Dict,
+        scan_date: date
+    ) -> AnalysisResult:
+        """
+        Update an existing signal that was already found for today.
+        This preserves the existing status for true same-day updates (multiple scans per day).
+        """
+        symbol = current_signal.symbol
+        squeeze_signal = current_signal.squeeze_signal
+        
+        # Preserve the existing status and continuity information
+        existing_status = existing_signal.get('signal_status', 'NEW')
+        squeeze_signal.signal_status = SignalStatus(existing_status)
+        squeeze_signal.days_in_squeeze = existing_signal.get('days_in_squeeze', 1)
+        
+        # Preserve first detected date
+        first_detected = existing_signal.get('first_detected_date')
+        if first_detected:
+            if isinstance(first_detected, str):
+                first_detected = datetime.fromisoformat(first_detected).date()
+            squeeze_signal.first_detected_date = first_detected
+        
+        squeeze_signal.last_active_date = scan_date
+        
+        logger.debug(f"Updating existing signal for {symbol} (preserving status: {existing_status})")
         
         # Mark this signal for database update rather than insert
         current_signal._existing_db_id = existing_signal.get('id')
@@ -333,6 +365,48 @@ class SignalContinuityService:
         
         return list(ended_symbols)
     
+    async def _update_continuing_signal(
+        self,
+        current_signal: AnalysisResult,
+        previous_signal: Dict,
+        scan_date: date
+    ) -> AnalysisResult:
+        """
+        Update a signal that is continuing from a previous date.
+        This updates the existing database record to have the current scan_date.
+        """
+        symbol = current_signal.symbol
+        squeeze_signal = current_signal.squeeze_signal
+        
+        # This is a continuing signal - update status and increment days
+        squeeze_signal.signal_status = SignalStatus.CONTINUING
+        
+        # Increment days in squeeze
+        existing_days = previous_signal.get('days_in_squeeze', 1)
+        squeeze_signal.days_in_squeeze = existing_days + 1
+        
+        # Preserve first detected date from the original signal
+        first_detected = previous_signal.get('first_detected_date')
+        if first_detected:
+            if isinstance(first_detected, str):
+                first_detected = datetime.fromisoformat(first_detected).date()
+            squeeze_signal.first_detected_date = first_detected
+        else:
+            squeeze_signal.first_detected_date = scan_date
+        
+        squeeze_signal.last_active_date = scan_date
+        
+        # Mark this signal for database update (update the existing record to current scan_date)
+        current_signal._existing_db_id = previous_signal.get('id')
+        
+        # Also mark that we need to clean up any existing record for today's date
+        # This prevents unique constraint violations when updating scan_date
+        current_signal._cleanup_scan_date = scan_date.isoformat()
+        
+        logger.debug(f"Updating continuing signal for {symbol} - changed to CONTINUING (day {squeeze_signal.days_in_squeeze}, from previous run)")
+        
+        return current_signal
+    
     async def _determine_signal_status(
         self,
         current_signal: AnalysisResult,
@@ -342,9 +416,9 @@ class SignalContinuityService:
         """
         Determine the continuity status of a signal.
         
-        FIXED LOGIC:
+        Logic:
         - If no previous signal exists, mark as NEW
-        - If previous signal exists and gap <= 3 days, mark as CONTINUING with proper days calculation
+        - If previous signal exists and gap <= 3 days, mark as CONTINUING  
         - If previous signal exists but gap > 3 days, mark as NEW (fresh start)
         """
         symbol = current_signal.symbol
@@ -371,25 +445,19 @@ class SignalContinuityService:
             if days_gap <= 3:  # Allow up to 3 day gap for weekends/holidays
                 # This is a continuation of the previous signal
                 squeeze_signal.signal_status = SignalStatus.CONTINUING
+                squeeze_signal.days_in_squeeze = previous_signal.get('days_in_squeeze', 1) + days_gap
                 
-                # FIXED: Calculate days_in_squeeze based on first_detected_date, not adding to previous
+                # Preserve first detected date from the original signal
                 first_detected = previous_signal.get('first_detected_date')
-                if first_detected:
-                    if isinstance(first_detected, str):
-                        first_detected = datetime.fromisoformat(first_detected).date()
-                    # Calculate total days from first detection to current scan
-                    squeeze_signal.days_in_squeeze = (scan_date - first_detected).days + 1
-                    squeeze_signal.first_detected_date = first_detected
-                else:
-                    # Fallback if no first_detected_date in previous signal
-                    squeeze_signal.days_in_squeeze = days_gap + 1
-                    squeeze_signal.first_detected_date = previous_last_active
+                if isinstance(first_detected, str):
+                    first_detected = datetime.fromisoformat(first_detected).date()
+                squeeze_signal.first_detected_date = first_detected
                 
                 squeeze_signal.last_active_date = scan_date
                 
                 logger.debug(
                     f"Continuing signal for {symbol} "
-                    f"(day {squeeze_signal.days_in_squeeze}, {days_gap} day gap, first detected: {squeeze_signal.first_detected_date})"
+                    f"(day {squeeze_signal.days_in_squeeze}, {days_gap} day gap)"
                 )
             else:
                 # Gap is too large, treat as a completely new signal

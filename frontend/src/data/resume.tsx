@@ -32,7 +32,7 @@ export const DATA = {
   navbar: [
     { href: "/", icon: HomeIcon, label: "Home" },
     { href: "/blog", icon: NotebookIcon, label: "Blog" },
-    { href: "/volatility-squeeze-scanner", icon: Activity, label: "Scanner" },
+    { href: "/scanners", icon: Activity, label: "Scanners" },
   ],
   contact: {
     email: "conorquinlan@cloud.com",

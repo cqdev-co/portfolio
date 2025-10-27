@@ -2,7 +2,7 @@
 title: >
   Building a Security Event Gateway: From Alert Fatigue 
   to Autonomous Response
-publishedAt: "2025-10-07"
+publishedAt: "2025-10-27"
 summary: >
   The story of how we built a FastAPI event gateway to optimize our CSPM
   alert processing, turning high-volume alerts into intelligent,
@@ -40,17 +40,18 @@ threat response.
 
 ## The Problem
 
-Like many security teams, we were facing the classic CSPM challenge: 
-**alert fatigue**. Cloud Security Posture Management tools are incredibly
-powerful for detecting potential security issues, but they often generate 
-high volumes of alerts that require human analysis to distinguish between 
-genuine threats and expected business activity.
+Like many growing security teams, we faced a high alert volume that
+challenged our efficiency. Cloud Security Posture Management tools are
+incredibly powerful for detecting potential security issues, but they often
+generate high volumes of alerts that require human analysis to distinguish
+between genuine threats and expected business activity. Some lower-risk
+events took time to analyze while higher-priority ones required smarter
+prioritization.
 
-Our situation was typical of fast-growing companies: **100+ alerts per
-week**
-during peak periods, with what I estimated to be an **85% rate of alerts
-requiring no action** after investigation. Each alert took **15+ minutes**
-to properly triage, meaning we were spending **1-2 hours daily** on alert
+Our situation was typical of fast-growing companies: **~100 alerts per
+week** during peak periods, with an estimated **~85% of alerts requiring
+no action** after investigation. Each alert took **~15 minutes** to
+properly triage, meaning we were spending **1-2 hours daily** on alert
 investigation. 
 
 The timing challenge was another problem. With our engineering team
@@ -61,16 +62,14 @@ appropriate escalation procedures for critical threats, the volume of
 routine
 alerts was creating operational overhead that we wanted to optimize.
 
-The human impact was what concerned me most. My security engineering
-colleagues
-were spending significant time on repetitive alert triage instead of
-strategic
-security work. We'd investigate "critical" findings that turned out to be 
-legitimate business activities such as data science teams accessing their
-own 
-resources, automated backup processes triggering CloudTrail alerts, or 
-expected configuration changes flagged as policy violations. This 
-context switching was reducing our efficiency and job satisfaction.
+The operational impact was what concerned me most. My security engineering
+colleagues were spending significant time on repetitive alert triage
+instead of strategic security work. We'd investigate "critical" findings
+that turned out to be legitimate business activities such as data science
+teams accessing their own resources, automated backup processes triggering
+CloudTrail alerts, or expected configuration changes flagged as policy
+violations. This context switching was reducing our efficiency and focus
+on higher-priority security initiatives.
 
 ## Challenges
 
@@ -100,17 +99,17 @@ money on infrastructure."*
 ## The Solution
 
 I decided to build my own **Security Engineering Event Gateway** using
-modern
-cloud-native technologies. The core idea was simple: create a FastAPI
+modern cloud-native technologies. The core idea was simple: create a FastAPI
 service that could receive CSPM webhooks, intelligently process them, and
 trigger automated responses for real threats while filtering out false
 positives.
 
-This PoC was designed to prove that the Event Gateway concept could scale
-into a solution that defines what our team could become: **fully autonomous
-security**. By gathering real performance data and measuring the impact, I
-could evaluate whether this approach was worth expanding into a
-comprehensive security automation platform.
+This proof-of-concept was designed to demonstrate that the Event Gateway
+concept could scale into a solution that defines what our team could become:
+**fully autonomous security**. By gathering performance data and measuring
+the impact in a controlled environment, I could evaluate whether this
+approach was worth expanding into a comprehensive security automation
+platform.
 
 ### Architecture Overview
 
@@ -279,29 +278,28 @@ immediate. I'll be honest, I was nervous about whether this would actually
 work in production. But the data exceeded my expectations. Here's what I
 presented to leadership:
 
-**SecEng Event Gateway: 2-Week Performance Analysis**
+**SecEng Event Gateway: Performance Analysis (Illustrative)**
 - **Time Savings**: ~2 weeks of analyst time saved through automation
-- **Financial Impact**: $1,000 saved in 2 weeks, projected $2.1k/month,
-                        $25k/year if trend holds
-- **Event Processing**: 120 cloud security events processed with 90% noise
+- **Financial Impact**: ~$1,000 saved in 2 weeks, projected ~$2,000/month,
+                        ~$25,000/year if trend holds
+- **Event Processing**: ~120 cloud security events processed with ~90% noise
                         reduction
-- **Performance**: Gateway internal processing <100ms; total E2E ~3.6s
+- **Performance**: Gateway internal processing <100ms; total E2E ~4 seconds
                    (remainder is downstream I/O to Slack/BigQuery)
-- **Infrastructure Cost**: $0.51/day for the entire platform
-- **Reliability**: 100% uptime since deployment
+- **Infrastructure Cost**: ~$0.50/day for the entire platform
+- **Reliability**: 100% uptime during testing period
 
-### Impact
+### Impact (Based on Internal Analysis)
 **Before**: Our team spent 2+ hours each morning triaging overnight alerts.
 The volume of routine alerts was creating operational overhead, with
 engineers spending significant time on repetitive investigation work
-instead
-of strategic security initiatives.
+instead of strategic security initiatives.
 
-**After**: The **90% noise reduction** transformed our daily operations.
-Instead of processing 200+ alerts, analysts now review fewer than 20
+**After**: The **~90% noise reduction** transformed our daily operations.
+Instead of processing ~200 alerts, analysts now review fewer than ~20
 pre-filtered, actionable events. Automated responses now handle routine
 events in under 30 seconds. Most importantly, we freed up **~2 weeks of
-analyst time** in just the first month, allowing the team to focus on
+analyst time** in the first month, allowing the team to focus on
 strategic security initiatives rather than alert triage.
 
 ## Key Realizations
@@ -383,14 +381,15 @@ incomplete.*
 
 ## Why Build vs Buy?
 
-After proving the concept with measurable results, it's worth comparing
-this custom approach to traditional SOAR platforms I evaluated.
+After demonstrating the concept with measurable results from this
+prototype, it's worth comparing this custom approach to traditional SOAR
+platforms I evaluated.
 
 **Cost Considerations**: Enterprise SOAR platforms typically cost
-$50,000-200,000+ annually, while my Event Gateway runs on $0.51/day
-($186/year). For our specific use case and team size, the custom solution
-provided better cost efficiency. When factoring in the $25k/year in analyst
-time savings, the ROI was compelling for our situation.
+$50,000-200,000+ annually, while my Event Gateway runs on ~$0.50/day
+(~$200/year). For our specific use case and team size, the custom solution
+provided better cost efficiency. When factoring in the ~$25,000/year in
+analyst time savings, the ROI was compelling for our situation.
 
 **Customization & Performance**: Commercial platforms offer comprehensive
 features but sometimes include complexity we didn't need. My solution
@@ -446,16 +445,16 @@ intelligent Event Gateway that automates the routine analysis and allows
 our team to focus on high-value security work.
 
 ### What I Achieved
-- **Transformed our daily routine**: From 2+ hours of alert triage to 15
+- **Transformed our daily routine**: From 2+ hours of alert triage to ~15
                                      minutes of strategic review
-- **Eliminated alert fatigue**: 95.85% noise reduction and 90% reduction in
-                                false positive investigation time
+- **Reduced alert volume**: ~95% noise reduction and ~90% reduction in
+                             false positive investigation time
 - **Optimized global operations**: 24/7 automated response for routine
                                    events
 - **Accelerated response times**: Automated responses now handle routine
                                   events in under 30 seconds
-- **Saved significant costs**: 99.9% cost reduction compared to enterprise
-                               SOAR platforms (~$10/month vs $50K+)
+- **Saved significant costs**: ~99% cost reduction compared to enterprise
+                               SOAR platforms (~$200/year vs $50K+)
 - **Improved team morale**: Engineers focused on strategic security work
                             instead of repetitive tasks
 

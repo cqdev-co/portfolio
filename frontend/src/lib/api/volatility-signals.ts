@@ -89,6 +89,10 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
       query = query.lte('overall_score', filters.max_score);
     }
 
+    if (filters.scan_date !== undefined) {
+      query = query.eq('scan_date', filters.scan_date);
+    }
+
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -132,6 +136,9 @@ export async function fetchVolatilitySignals(options: SignalQueryOptions = {}): 
           }
           if (filters.max_overall_score !== undefined) {
             fallbackQuery = fallbackQuery.lte('overall_score', filters.max_overall_score);
+          }
+          if (filters.scan_date !== undefined) {
+            fallbackQuery = fallbackQuery.eq('scan_date', filters.scan_date);
           }
 
           fallbackQuery = fallbackQuery.order(sortBy, { ascending: sortOrder === 'asc' });
