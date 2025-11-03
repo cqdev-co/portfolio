@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         working-directory: unusual-options-service
         run: |
-          poetry install --no-interaction --no-root
+          poetry install --only=main
       
       - name: Run scanner with continuity tracking
         working-directory: unusual-options-service
@@ -78,25 +78,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-      
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: scan-logs-${{ github.run_number }}
-          path: unusual-options-service/logs/
-          retention-days: 7
-        continue-on-error: true
-      
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "::error::Unusual Options scan failed. Check logs for details."
-          # Add Discord/Slack notification here if desired
-      
-      - name: Display scan summary
-        if: success()
-        run: |
-          echo "✅ Unusual Options scan completed successfully"
-          echo "Signals stored with continuity tracking (deduplication enabled)"
 

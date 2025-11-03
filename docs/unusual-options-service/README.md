@@ -48,11 +48,10 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **Options Sellers**: See [High IV Opportunities](signal-interpretation.md#selling-premium)
 
 ### For Automation
-- **Hourly Cron Jobs**: See [Hourly Cron Setup](hourly-cron-setup.md)
-- **GitHub Actions**: See [GitHub Actions Setup](hourly-cron-setup.md#github-actions-setup)
-- **Deduplication**: See [Deduplication Strategy](hourly-cron-setup.md#deduplication-strategy)
-- **Signal Lifecycle**: See [Signal Lifecycle](hourly-cron-setup.md#signal-lifecycle)
-- **Troubleshooting**: See [Continuity Tracking Fix](continuity-tracking-fix.md) - Common issues and solutions
+- **GitHub Actions Workflow**: See [GitHub Actions Setup](github-actions-setup.md) - Complete automated scanning guide
+- **Signal Lifecycle**: See [Signal Lifecycle](github-actions-setup.md#signal-lifecycle) - How signals are tracked over time
+- **Deduplication**: See [How It Works](github-actions-setup.md#how-it-works) - Prevents duplicate signals
+- **Troubleshooting**: See [Troubleshooting](github-actions-setup.md#-troubleshooting) - Common issues and solutions
 
 ### For Developers
 - **Integration**: See [Python API](python-api.md)
@@ -69,15 +68,18 @@ All documentation follows these principles:
 
 ## 🔄 Recent Updates
 
-**November 2, 2025**
-- **Continuity Tracking Fix**: Fixed timestamp issue causing all signals to be marked inactive
+**November 3, 2025**
+- **GitHub Actions Fix**: Fixed `--no-root` installation issue preventing CLI from running
+- **Timezone Fix**: Resolved UTC timestamp mismatch causing false inactive signals
 - **Diagnostic Tool**: Added comprehensive diagnostics script for continuity verification
+- **Complete Documentation**: New [GitHub Actions Setup Guide](github-actions-setup.md)
+
+**November 2, 2025**
 - **Hourly Cron Job System**: Complete automated scanning setup
 - **Signal Deduplication**: Prevents duplicate signals on every run
 - **Continuity Tracking**: Tracks signal lifecycle (NEW → CONTINUING → INACTIVE)
 - **Enhanced Database Schema**: Added signal continuity fields and functions
 - **GitHub Actions Workflow**: Automated hourly execution during market hours
-- **Comprehensive Documentation**: Full setup guide with troubleshooting
 
 **October 30, 2025**
 - Added Grouped Ticker View documentation
