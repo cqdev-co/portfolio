@@ -57,10 +57,15 @@ jobs:
       - name: Install dependencies
         working-directory: unusual-options-service
         run: |
-          poetry install --only=main
+          poetry install --no-interaction
       
       - name: Run scanner with continuity tracking
         working-directory: unusual-options-service
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           # Set parameters
           MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
@@ -73,9 +78,4 @@ jobs:
           else
             poetry run unusual-options scan-all --min-grade $MIN_GRADE --store
           fi
-        env:
-          PYTHONUNBUFFERED: 1
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 
