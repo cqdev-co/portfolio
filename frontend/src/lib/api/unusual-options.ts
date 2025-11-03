@@ -116,7 +116,20 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
       query = query.eq('detection_timestamp::date', filters.detection_date);
     }
 
-    // Apply sorting
+    // Continuity filters (NEW for cron job support)
+    if (filters.is_active !== undefined) {
+      query = query.eq('is_active', filters.is_active);
+    }
+
+    if (filters.is_new_signal !== undefined) {
+      query = query.eq('is_new_signal', filters.is_new_signal);
+    }
+
+    if (filters.min_detection_count !== undefined) {
+      query = query.gte('detection_count', filters.min_detection_count);
+    }
+
+    // Apply sorting (prefer last_detected_at for active signals)
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
     // Apply pagination
@@ -156,19 +169,32 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
 
 /**
  * Fetch latest signals from recent scans (last 7 days)
+ * Now filters for active signals only by default
  */
-export async function fetchLatestUnusualOptions(limit: number = 50): Promise<SignalResponse> {
+export async function fetchLatestUnusualOptions(
+  limit: number = 50, 
+  activeOnly: boolean = true
+): Promise<SignalResponse> {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dateStr = sevenDaysAgo.toISOString();
     
-    const { data, error, count } = await supabase
+    let query = supabase
       .from('unusual_options_signals')
       .select('*', { count: 'exact' })
-      .gte('detection_timestamp', dateStr)
-      .order('premium_flow', { ascending: false })
+      .gte('detection_timestamp', dateStr);
+
+    // Filter for active signals only (default)
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+
+    query = query
+      .order('last_detected_at', { ascending: false })
       .limit(limit);
+
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('Error fetching latest unusual options:', error);
@@ -202,18 +228,26 @@ export async function fetchLatestUnusualOptions(limit: number = 50): Promise<Sig
 
 /**
  * Fetch signal statistics for dashboard
+ * Now filters for active signals only
  */
-export async function fetchUnusualOptionsStats(): Promise<UnusualOptionsStats | null> {
+export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Promise<UnusualOptionsStats | null> {
   try {
     // Get recent signals (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dateStr = sevenDaysAgo.toISOString();
 
-    const { data: signals, error } = await supabase
+    let query = supabase
       .from('unusual_options_signals')
       .select('grade, option_type, risk_level, premium_flow, overall_score, detection_timestamp')
       .gte('detection_timestamp', dateStr);
+
+    // Filter for active signals only (default)
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data: signals, error } = await query;
 
     if (error) {
       console.error('Error fetching unusual options stats:', error);

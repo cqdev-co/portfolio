@@ -25,6 +25,9 @@ Enterprise-grade unusual options activity detection system for identifying poten
 - **Signal Grading System**: S/A/B/C/D/F tier classification based on conviction
 - **Risk Scoring**: Multi-factor risk assessment for each signal
 - **Alert System**: Configurable notifications for high-conviction signals
+- **🤖 Automated Hourly Scanning**: GitHub Actions + cron job support with deduplication
+- **📊 Signal Continuity Tracking**: Tracks signal lifecycle (NEW → CONTINUING → INACTIVE)
+- **🔄 Smart Deduplication**: Prevents duplicate signals, tracks re-detections
 
 ## 📊 Signal Detection
 
@@ -176,6 +179,31 @@ unusual-options scan --watchlist watchlists/tech.txt
 # Continuous monitoring (refresh every 5 minutes)
 unusual-options scan AAPL --watch --interval 300
 ```
+
+### Automated Hourly Scanning (NEW! 🚀)
+
+Run automated scans every hour with smart deduplication:
+
+```bash
+# Run hourly scan manually
+poetry run python scripts/cron_scanner.py --scan-all --min-grade B
+
+# Set up GitHub Actions (recommended)
+# See docs/unusual-options-service/hourly-cron-setup.md
+
+# Set up local cron job
+30 9-16 * * 1-5 cd /path/to/unusual-options-service && \
+  poetry run python scripts/cron_scanner.py --scan-all --min-grade B
+```
+
+**Key Features:**
+- ✅ Automatic deduplication (no duplicate signals)
+- ✅ Continuity tracking (NEW/CONTINUING badges)
+- ✅ Stale signal cleanup (marks inactive signals)
+- ✅ GitHub Actions integration
+- ✅ Complete audit trail
+
+**See:** [Hourly Cron Setup Guide](../docs/unusual-options-service/hourly-cron-setup.md)
 
 ### Advanced Analysis
 

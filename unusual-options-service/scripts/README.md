@@ -15,7 +15,91 @@ poetry run python scripts/trade_sizing.py --account-size 500000
 poetry run python scripts/signal_correlation.py --days 14
 ```
 
-## 📊 Available Scripts
+## 🛠️ Utility Scripts
+
+### **Database Cleanup Tool** (`cleanup_database.py`)
+**Purpose**: Clean unusual options data for fresh testing of continuity tracking
+
+**Quick Usage**:
+```bash
+# Interactive cleanup (with confirmation)
+python scripts/cleanup_database.py
+
+# Auto-confirm (no prompt)
+python scripts/cleanup_database.py --yes
+
+# Dry run (see what would be deleted)
+python scripts/cleanup_database.py --dry-run
+
+# Clean specific table
+python scripts/cleanup_database.py --table signals --yes
+```
+
+**Use Cases**:
+- Testing NEW badge functionality
+- Verifying signal continuity tracking
+- Resetting between test runs
+- Clearing test data
+
+**See**: [DATABASE_CLEANUP.md](DATABASE_CLEANUP.md) for detailed documentation
+
+### **Continuity Diagnostics Tool** (`diagnose_continuity.py`)
+**Purpose**: Verify that signal continuity tracking and deduplication are working correctly
+
+**Quick Usage**:
+```bash
+# Run full diagnostic suite
+python scripts/diagnose_continuity.py
+
+# Verbose output with details
+python scripts/diagnose_continuity.py --verbose
+
+# Check specific ticker
+python scripts/diagnose_continuity.py --ticker AAPL
+```
+
+**What It Checks**:
+- ✅ **Deduplication**: Ensures no duplicate signals (same ticker/option/expiry)
+- ✅ **Detection Counts**: Verifies signals are incrementing when re-detected
+- ✅ **Timestamps**: Checks consistency between detection and storage times
+- ✅ **Active Status**: Validates active vs inactive signal distribution
+- ✅ **History Tracking**: Confirms continuity records are being created
+
+**Example Output**:
+```
+🔍 Checking for duplicate signals...
+✓ No duplicate signals found - deduplication working!
+
+🔢 Checking detection counts...
+✓ Found 45 re-detected signals
+Top Re-Detected Signals:
+  AAPL 270C: Count=5, Active=✓
+  AMD 260C: Count=4, Active=✓
+
+⏰ Checking timestamp consistency...
+✓ All timestamps consistent!
+
+🟢 Checking active/inactive status...
+✓ 293 active signals ready for frontend!
+
+✓ All checks passed! Continuity tracking is working properly.
+```
+
+**Use Cases**:
+- After deploying hourly cron job
+- Verifying deduplication is working
+- Troubleshooting "all signals inactive" issues
+- Testing after schema changes
+- Validating timestamp handling
+
+**Exit Codes**:
+- `0`: All checks passed
+- `1`: Critical issues found (duplicates or all signals inactive)
+- `130`: Interrupted by user
+
+---
+
+## 📊 Analysis Scripts
 
 ### 1. **Signal Analysis Tool** (`analyze_results.py`)
 **Purpose**: Comprehensive statistical analysis of unusual options signals

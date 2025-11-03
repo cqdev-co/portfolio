@@ -7,18 +7,49 @@ from datetime import datetime, timedelta
 console = Console()
 
 
-async def store_signals(config: dict, signals: list) -> None:
-    """Store signals in database."""
-    from .storage.database import get_storage
+async def store_signals(config: dict, signals: list, use_continuity: bool = True) -> None:
+    """
+    Store signals in database with optional continuity tracking.
+    
+    Args:
+        config: Configuration dictionary
+        signals: List of signals to store
+        use_continuity: Use deduplication and continuity tracking (default: True)
+    """
+    if not signals:
+        console.print("[yellow]No signals to store[/yellow]")
+        return
     
     try:
-        storage = get_storage(config)
-        success = await storage.store_signals(signals)
-        
-        if success:
-            console.print(f"[green]✓ Stored {len(signals)} signals in database[/green]")
+        if use_continuity:
+            # Use continuity service for smart deduplication
+            from .storage.continuity_service import create_continuity_service
+            
+            console.print(f"[cyan]Processing {len(signals)} signals with continuity tracking...[/cyan]")
+            
+            continuity_service = await create_continuity_service(config)
+            
+            # Process signals with deduplication
+            stats = await continuity_service.process_signals(signals)
+            
+            # Mark stale signals as inactive
+            stale_count = await continuity_service.mark_stale_signals(hours_threshold=3)
+            
+            if stats['failed_signals'] == 0:
+                console.print(f"[green]✓ Stored {stats['new_signals']} new, updated {stats['updated_signals']}, marked {stale_count} inactive[/green]")
+            else:
+                console.print(f"[yellow]⚠ Stored {stats['new_signals']} new, updated {stats['updated_signals']}, {stats['failed_signals']} failed[/yellow]")
         else:
-            console.print("[red]✗ Failed to store signals in database[/red]")
+            # Legacy: Direct storage without continuity tracking
+            from .storage.database import get_storage
+            
+            storage = get_storage(config)
+            success = await storage.store_signals(signals)
+            
+            if success:
+                console.print(f"[green]✓ Stored {len(signals)} signals in database[/green]")
+            else:
+                console.print("[red]✗ Failed to store signals in database[/red]")
             
     except Exception as e:
         console.print(f"[red]✗ Database storage error: {e}[/red]")

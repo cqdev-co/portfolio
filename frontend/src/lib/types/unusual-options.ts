@@ -64,6 +64,14 @@ export interface UnusualOptionsSignalDB {
   detection_version: string | null;
   raw_detection_data: Record<string, unknown>; // JSONB
   
+  // Signal Continuity (for cron job deduplication)
+  is_new_signal: boolean;
+  signal_group_id: string | null;
+  first_detected_at: string | null;
+  last_detected_at: string | null;
+  detection_count: number;
+  is_active: boolean;
+  
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -99,6 +107,10 @@ export interface UnusualOptionsFilters {
   has_sweep?: boolean;
   has_block_trade?: boolean;
   detection_date?: string;
+  // Continuity filters
+  is_active?: boolean;
+  is_new_signal?: boolean;
+  min_detection_count?: number;
 }
 
 export interface UnusualOptionsSortConfig {
@@ -174,5 +186,140 @@ export function parseNumericField(value: string | number | null): number | null 
   if (typeof value === 'number') return value;
   const parsed = parseFloat(value);
   return isNaN(parsed) ? null : parsed;
+}
+
+// Helper function to get time since last detection
+export function getTimeSinceDetection(lastDetectedAt: string | null): string {
+  if (!lastDetectedAt) return 'Unknown';
+  
+  const now = new Date();
+  const detected = new Date(lastDetectedAt);
+  const diffMs = now.getTime() - detected.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  if (diffHours < 1) {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return `${diffMinutes}m ago`;
+  } else if (diffHours < 24) {
+    return `${Math.floor(diffHours)}h ago`;
+  } else {
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  }
+}
+
+// Helper function to get active status badge color
+export function getActiveStatusColor(isActive: boolean): string {
+  return isActive
+    ? 'bg-green-500/10 text-green-500 border-green-500/20'
+    : 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+}
+
+// Helper function to format detection count
+export function formatDetectionCount(count: number): string {
+  if (count === 1) return 'First detection';
+  if (count === 2) return 'Detected 2x';
+  return `Detected ${count}x`;
+}
+
+// Grouped ticker data for table display
+export interface GroupedTickerSignals {
+  ticker: string;
+  signals: UnusualOptionsSignal[];
+  signalCount: number;
+  totalPremiumFlow: number;
+  highestGrade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+  callCount: number;
+  putCount: number;
+  dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  avgConfidence: number;
+  hasHighConviction: boolean;
+  latestDetection: string;
+}
+
+// Helper function to group signals by ticker
+export function groupSignalsByTicker(
+  signals: UnusualOptionsSignal[]
+): GroupedTickerSignals[] {
+  const grouped = new Map<string, UnusualOptionsSignal[]>();
+  
+  // Group signals by ticker
+  signals.forEach(signal => {
+    const existing = grouped.get(signal.ticker) || [];
+    existing.push(signal);
+    grouped.set(signal.ticker, existing);
+  });
+  
+  // Transform to GroupedTickerSignals
+  const result: GroupedTickerSignals[] = [];
+  
+  grouped.forEach((tickerSignals, ticker) => {
+    const totalPremiumFlow = tickerSignals.reduce(
+      (sum, s) => sum + (s.premium_flow || 0), 0
+    );
+    
+    const callCount = tickerSignals.filter(
+      s => s.option_type === 'call'
+    ).length;
+    const putCount = tickerSignals.length - callCount;
+    
+    // Determine highest grade (S > A > B > C > D > F)
+    const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+    const highestGrade = tickerSignals.reduce((best, signal) => {
+      return gradeOrder[signal.grade] > gradeOrder[best] ? signal.grade : best;
+    }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F');
+    
+    // Determine dominant sentiment
+    const bullishCount = tickerSignals.filter(
+      s => s.sentiment === 'BULLISH'
+    ).length;
+    const bearishCount = tickerSignals.filter(
+      s => s.sentiment === 'BEARISH'
+    ).length;
+    let dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+    if (bullishCount > bearishCount) {
+      dominantSentiment = 'BULLISH';
+    } else if (bearishCount > bullishCount) {
+      dominantSentiment = 'BEARISH';
+    }
+    
+    // Calculate average confidence
+    const confidences = tickerSignals
+      .map(s => s.confidence)
+      .filter((c): c is number => c !== null);
+    const avgConfidence = confidences.length > 0
+      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+      : 0;
+    
+    // Check if has high conviction (S or A grade)
+    const hasHighConviction = tickerSignals.some(
+      s => s.grade === 'S' || s.grade === 'A'
+    );
+    
+    // Get latest detection timestamp
+    const latestDetection = tickerSignals.reduce((latest, signal) => {
+      return signal.detection_timestamp > latest 
+        ? signal.detection_timestamp 
+        : latest;
+    }, tickerSignals[0].detection_timestamp);
+    
+    result.push({
+      ticker,
+      signals: tickerSignals.sort(
+        (a, b) => (b.premium_flow || 0) - (a.premium_flow || 0)
+      ),
+      signalCount: tickerSignals.length,
+      totalPremiumFlow,
+      highestGrade,
+      callCount,
+      putCount,
+      dominantSentiment,
+      avgConfidence,
+      hasHighConviction,
+      latestDetection
+    });
+  });
+  
+  return result;
 }
 

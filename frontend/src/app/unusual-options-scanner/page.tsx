@@ -14,8 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
-import type { UnusualOptionsSignal, UnusualOptionsSortConfig, UnusualOptionsFilters } from "@/lib/types/unusual-options";
-import { formatPremiumFlow, getGradeColor } from "@/lib/types/unusual-options";
+import type { UnusualOptionsSignal, UnusualOptionsFilters, GroupedTickerSignals } from "@/lib/types/unusual-options";
+import { formatPremiumFlow, getGradeColor, groupSignalsByTicker } from "@/lib/types/unusual-options";
 import { fetchUnusualOptionsSignals, fetchUnusualOptionsStats, subscribeToUnusualOptionsUpdates } from "@/lib/api/unusual-options";
 import type { UnusualOptionsStats } from "@/lib/types/unusual-options";
 import { cn } from "@/lib/utils";
@@ -45,41 +45,23 @@ function getYahooFinanceUrl(symbol: string): string {
   return `https://finance.yahoo.com/quote/${symbol}`;
 }
 
-// Helper function to get option type styling
-function getOptionTypeColor(optionType: string) {
-  return optionType === 'call' 
-    ? 'bg-green-500/10 text-green-500 border-green-500/20' 
-    : 'bg-red-500/10 text-red-500 border-red-500/20';
-}
-
-// Helper function to get suspicion level based on grade and premium
-function getSuspicionLevel(signal: UnusualOptionsSignal): string {
-  const factors = [];
-  
-  if (signal.grade === 'S' || signal.grade === 'A') factors.push('High Conviction');
-  if (signal.premium_flow && signal.premium_flow >= 5_000_000) factors.push('LARGE BET');
-  if (signal.days_to_expiry && signal.days_to_expiry <= 7) factors.push('URGENT');
-  if (signal.aggressive_order_pct && signal.aggressive_order_pct >= 70) factors.push('Aggressive'); // Database stores as percentage (0-100)
-  if (signal.moneyness === 'ITM' || signal.moneyness === 'ATM') factors.push('Conviction');
-  if (signal.has_sweep) factors.push('Sweep');
-  if (signal.has_block_trade) factors.push('Block Trade');
-  
-  return factors.length > 0 ? factors.join(' | ') : 'Standard';
-}
-
 export default function UnusualOptionsScanner() {
-  const [signals, setSignals] = useState<UnusualOptionsSignal[]>([]);
+  const [groupedTickers, setGroupedTickers] = useState<GroupedTickerSignals[]>([]);
   const [stats, setStats] = useState<UnusualOptionsStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters] = useState<UnusualOptionsFilters>({});
-  const [sortConfig, setSortConfig] = useState<UnusualOptionsSortConfig>({
-    field: "premium_flow",
+  const [sortConfig, setSortConfig] = useState<{ 
+    field: keyof GroupedTickerSignals; 
+    direction: "asc" | "desc" 
+  }>({
+    field: "totalPremiumFlow",
     direction: "desc"
   });
   const [error, setError] = useState<string | null>(null);
-  const [selectedSignal, setSelectedSignal] = useState<UnusualOptionsSignal | null>(null);
+  const [selectedTicker, setSelectedTicker] = useState<GroupedTickerSignals | null>(null);
+  const [currentSignalIndex, setCurrentSignalIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Load data
@@ -91,9 +73,9 @@ export default function UnusualOptionsScanner() {
       // Load signals and stats in parallel
       const [signalsResponse, statsData] = await Promise.all([
         fetchUnusualOptionsSignals({
-          limit: 100,
-          sortBy: sortConfig.field,
-          sortOrder: sortConfig.direction,
+          limit: 500, // Increased limit to get more signals for grouping
+          sortBy: 'premium_flow' as keyof UnusualOptionsSignal,
+          sortOrder: 'desc',
           filters,
           searchTerm
         }),
@@ -103,7 +85,28 @@ export default function UnusualOptionsScanner() {
       if (signalsResponse.error) {
         setError(signalsResponse.error);
       } else {
-        setSignals(signalsResponse.data);
+        // Group signals by ticker
+        const grouped = groupSignalsByTicker(signalsResponse.data);
+        
+        // Sort grouped data
+        const sorted = [...grouped].sort((a, b) => {
+          const aVal = a[sortConfig.field];
+          const bVal = b[sortConfig.field];
+          
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortConfig.direction === 'desc' ? bVal - aVal : aVal - bVal;
+          }
+          
+          if (typeof aVal === 'string' && typeof bVal === 'string') {
+            return sortConfig.direction === 'desc' 
+              ? bVal.localeCompare(aVal) 
+              : aVal.localeCompare(bVal);
+          }
+          
+          return 0;
+        });
+        
+        setGroupedTickers(sorted);
       }
       
       setStats(statsData);
@@ -136,7 +139,7 @@ export default function UnusualOptionsScanner() {
   // Handle keyboard navigation in sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!sidebarOpen || !selectedSignal) return;
+      if (!sidebarOpen || !selectedTicker) return;
 
       if (e.key === 'Escape') {
         closeSidebar();
@@ -145,53 +148,47 @@ export default function UnusualOptionsScanner() {
 
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const currentIndex = signals.findIndex(signal => signal.id === selectedSignal.id);
         
-        if (currentIndex === -1) return;
-
-        let nextIndex;
+        // Navigate between signals within the selected ticker
+        const maxIndex = selectedTicker.signals.length - 1;
+        
         if (e.key === 'ArrowUp') {
-          nextIndex = currentIndex > 0 ? currentIndex - 1 : signals.length - 1;
+          setCurrentSignalIndex(prev => prev > 0 ? prev - 1 : maxIndex);
         } else {
-          nextIndex = currentIndex < signals.length - 1 ? currentIndex + 1 : 0;
-        }
-
-        const nextSignal = signals[nextIndex];
-        if (nextSignal) {
-          setSelectedSignal(nextSignal);
+          setCurrentSignalIndex(prev => prev < maxIndex ? prev + 1 : 0);
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sidebarOpen, selectedSignal, signals]);
+  }, [sidebarOpen, selectedTicker]);
 
-  const handleSort = (field: keyof UnusualOptionsSignal) => {
+  const handleSort = (field: keyof GroupedTickerSignals) => {
     setSortConfig(prev => ({
       field,
       direction: prev.field === field && prev.direction === "desc" ? "asc" : "desc"
     }));
   };
 
-  const getSortIcon = (field: keyof UnusualOptionsSignal) => {
+  const getSortIcon = (field: keyof GroupedTickerSignals) => {
     if (sortConfig.field !== field) return <ArrowUpDown className="ml-1 h-4 w-4" />;
     return sortConfig.direction === "desc" 
       ? <ArrowDown className="ml-1 h-4 w-4" /> 
       : <ArrowUp className="ml-1 h-4 w-4" />;
   };
 
-  const handleRowClick = (signal: UnusualOptionsSignal) => {
-    setSelectedSignal(signal);
+  const handleRowClick = (tickerGroup: GroupedTickerSignals) => {
+    setSelectedTicker(tickerGroup);
+    setCurrentSignalIndex(0); // Reset to first signal
     setSidebarOpen(true);
   };
 
   const closeSidebar = () => {
     setSidebarOpen(false);
-    setSelectedSignal(null);
+    setSelectedTicker(null);
+    setCurrentSignalIndex(0);
   };
-
-  const displaySignals = signals;
 
   if (loading) {
     return (
@@ -263,38 +260,42 @@ export default function UnusualOptionsScanner() {
         </div>
 
         {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                <span className="text-caption text-muted-foreground">Total Signals</span>
-              </div>
-              <p className="text-lg font-medium mt-1">{stats.total_signals || 0}</p>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                <span className="text-caption text-muted-foreground">High Conviction</span>
-              </div>
-              <p className="text-lg font-medium mt-1">{stats.high_conviction_count || 0}</p>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-3 w-3 text-green-500" />
-                <span className="text-caption text-muted-foreground">Calls</span>
-              </div>
-              <p className="text-lg font-medium mt-1">{stats.by_type?.calls || 0}</p>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-red-500"></div>
-                <span className="text-caption text-muted-foreground">Puts</span>
-              </div>
-              <p className="text-lg font-medium mt-1">{stats.by_type?.puts || 0}</p>
-            </Card>
-          </div>
-        )}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <Target className="h-3 w-3 text-blue-500" />
+              <span className="text-caption text-muted-foreground">Unique Tickers</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{groupedTickers.length || 0}</p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500"></div>
+              <span className="text-caption text-muted-foreground">Total Signals</span>
+            </div>
+            <p className="text-lg font-medium mt-1">{stats?.total_signals || 0}</p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-purple-500"></div>
+              <span className="text-caption text-muted-foreground">High Conviction</span>
+            </div>
+            <p className="text-lg font-medium mt-1">
+              {groupedTickers.filter(t => t.hasHighConviction).length || 0}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 text-green-500" />
+              <span className="text-caption text-muted-foreground">Total Premium</span>
+            </div>
+            <p className="text-lg font-medium mt-1">
+              {formatPremiumFlow(
+                groupedTickers.reduce((sum, t) => sum + t.totalPremiumFlow, 0)
+              )}
+            </p>
+          </Card>
+        </div>
       </section>
 
       {/* Search and Filters */}
@@ -335,7 +336,7 @@ export default function UnusualOptionsScanner() {
         </section>
       )}
 
-      {/* Signals Table */}
+      {/* Grouped Tickers Table */}
       <section aria-labelledby="signals-table-title">
         <h2 id="signals-table-title" className="sr-only">Live Unusual Options Signals</h2>
         <div className="rounded-md border" role="region" aria-label="Options signals data table">
@@ -353,28 +354,36 @@ export default function UnusualOptionsScanner() {
                 </TableHead>
                 <TableHead 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort("grade")}
+                  onClick={() => handleSort("highestGrade")}
                 >
                   <div className="flex items-center gap-2">
                     Grade
-                    {getSortIcon("grade")}
+                    {getSortIcon("highestGrade")}
                   </div>
                 </TableHead>
                 <TableHead 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort("premium_flow")}
+                  onClick={() => handleSort("totalPremiumFlow")}
                 >
                   <div className="flex items-center gap-2">
                     Premium Flow
-                    {getSortIcon("premium_flow")}
+                    {getSortIcon("totalPremiumFlow")}
                   </div>
                 </TableHead>
-                <TableHead>Contract</TableHead>
-                <TableHead>Suspicion Level</TableHead>
+                <TableHead>Contract Split</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort("signalCount")}
+                >
+                  <div className="flex items-center gap-2">
+                    Signals
+                    {getSortIcon("signalCount")}
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displaySignals.length === 0 ? (
+              {groupedTickers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <div className="text-muted-foreground">
@@ -384,25 +393,27 @@ export default function UnusualOptionsScanner() {
                   </TableCell>
                 </TableRow>
               ) : (
-                displaySignals.slice(0, 100).map((signal) => {
-                  const suspicionLevel = getSuspicionLevel(signal);
-                  const premiumDisplay = formatPremiumFlow(signal.premium_flow);
-                  const isSelected = selectedSignal?.id === signal.id;
+                groupedTickers.slice(0, 100).map((tickerGroup) => {
+                  const premiumDisplay = formatPremiumFlow(
+                    tickerGroup.totalPremiumFlow
+                  );
+                  const isSelected = selectedTicker?.ticker === tickerGroup.ticker;
                   
                   return (
                     <TableRow 
-                      key={signal.id}
+                      key={tickerGroup.ticker}
                       className={cn(
                         "hover:bg-muted/50 cursor-pointer transition-colors",
                         isSelected && "bg-muted"
                       )}
-                      onClick={() => handleRowClick(signal)}
+                      onClick={() => handleRowClick(tickerGroup)}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          {signal.ticker}
-                          {(signal.grade === 'S' || signal.grade === 'A') && (
-                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                          {tickerGroup.ticker}
+                          {tickerGroup.hasHighConviction && (
+                            <div className="h-2 w-2 rounded-full bg-green-500" 
+                              title="High Conviction Signal"></div>
                           )}
                         </div>
                       </TableCell>
@@ -410,9 +421,12 @@ export default function UnusualOptionsScanner() {
                       <TableCell>
                         <Badge 
                           variant="outline" 
-                          className={cn("text-xs", getGradeColor(signal.grade))}
+                          className={cn(
+                            "text-xs", 
+                            getGradeColor(tickerGroup.highestGrade)
+                          )}
                         >
-                          {signal.grade}
+                          {tickerGroup.highestGrade}
                         </Badge>
                       </TableCell>
 
@@ -423,21 +437,27 @@ export default function UnusualOptionsScanner() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant="outline" 
-                            className={cn("text-xs", getOptionTypeColor(signal.option_type))}
-                          >
-                            {signal.option_type === 'call' ? 'Call' : 'Put'}
-                          </Badge>
-                          <span className="text-sm">${safeParseNumber(signal.strike).toFixed(0)}</span>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={cn(
+                            "flex items-center gap-1",
+                            tickerGroup.callCount > 0 && "text-green-600"
+                          )}>
+                            {tickerGroup.callCount}C
+                          </span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className={cn(
+                            "flex items-center gap-1",
+                            tickerGroup.putCount > 0 && "text-red-600"
+                          )}>
+                            {tickerGroup.putCount}P
+                          </span>
                         </div>
                       </TableCell>
 
                       <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {suspicionLevel.split(' | ').slice(0, 1)[0] || 'Standard'}
-                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {tickerGroup.signalCount} signal{tickerGroup.signalCount !== 1 ? 's' : ''}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   );
@@ -449,7 +469,7 @@ export default function UnusualOptionsScanner() {
       </section>
 
       {/* Signal Details Sidebar */}
-      {sidebarOpen && selectedSignal && (
+      {sidebarOpen && selectedTicker && (
         <>
           {/* Backdrop */}
           <div 
@@ -469,19 +489,25 @@ export default function UnusualOptionsScanner() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => window.open(getYahooFinanceUrl(selectedSignal.ticker), '_blank')}
+                      onClick={() => window.open(
+                        getYahooFinanceUrl(selectedTicker.ticker), 
+                        '_blank'
+                      )}
                       className="flex items-center gap-1.5 text-base font-semibold hover:text-blue-600 transition-colors cursor-pointer group"
-                      title={`View ${selectedSignal.ticker} on Yahoo Finance`}
+                      title={`View ${selectedTicker.ticker} on Yahoo Finance`}
                     >
-                      <span>{selectedSignal.ticker}</span>
+                      <span>{selectedTicker.ticker}</span>
                       <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
                     </button>
-                    {(selectedSignal.grade === 'S' || selectedSignal.grade === 'A') && (
+                    {selectedTicker.hasHighConviction && (
                       <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
                     )}
                   </div>
-                  <Badge className={cn("text-xs", getGradeColor(selectedSignal.grade))}>
-                    Grade {selectedSignal.grade}
+                  <Badge className={cn(
+                    "text-xs", 
+                    getGradeColor(selectedTicker.highestGrade)
+                  )}>
+                    Grade {selectedTicker.highestGrade}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -492,139 +518,235 @@ export default function UnusualOptionsScanner() {
                 </div>
               </div>
 
+              {/* Signal Counter */}
+              <div className="px-4 py-3 bg-muted/30 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">
+                    Signal {currentSignalIndex + 1} of {selectedTicker.signalCount}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setCurrentSignalIndex(
+                        prev => prev > 0 ? prev - 1 : selectedTicker.signals.length - 1
+                      )}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setCurrentSignalIndex(
+                        prev => prev < selectedTicker.signals.length - 1 ? prev + 1 : 0
+                      )}
+                      className="h-7 w-7 p-0"
+                    >
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
-                {/* Contract Details */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contract Details</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Option Type</p>
-                      <p className="text-sm font-semibold capitalize">{selectedSignal.option_type}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Strike Price</p>
-                      <p className="text-sm font-semibold">${safeParseNumber(selectedSignal.strike).toFixed(2)}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Days to Expiry</p>
-                      <p className="text-xs font-medium">{selectedSignal.days_to_expiry} days</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Moneyness</p>
-                      <p className="text-xs font-medium">{selectedSignal.moneyness || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  const signal = selectedTicker.signals[currentSignalIndex];
+                  if (!signal) return null;
+                  
+                  return (
+                    <>
+                      {/* Contract Details */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Contract Details
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">Option Type</p>
+                            <p className="text-sm font-semibold capitalize">
+                              {signal.option_type}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">Strike Price</p>
+                            <p className="text-sm font-semibold">
+                              ${safeParseNumber(signal.strike).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">Days to Expiry</p>
+                            <p className="text-xs font-medium">
+                              {signal.days_to_expiry} days
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">Moneyness</p>
+                            <p className="text-xs font-medium">
+                              {signal.moneyness || 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
 
-                <Separator />
+                      <Separator />
 
-                {/* Signal Analysis */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Signal Analysis</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Premium Flow</span>
-                      <span className="text-xs font-semibold text-green-600">{formatPremiumFlow(selectedSignal.premium_flow)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Overall Score</span>
-                      <span className="text-xs font-semibold">{(safeParseNumber(selectedSignal.overall_score) * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Confidence</span>
-                      <span className="text-xs font-semibold">{selectedSignal.confidence ? `${(selectedSignal.confidence * 100).toFixed(0)}%` : 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Risk Level</span>
-                      <Badge variant="outline" className="text-xs h-5 px-2">
-                        {selectedSignal.risk_level}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
+                      {/* Signal Analysis */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Signal Analysis
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Premium Flow</span>
+                            <span className="text-xs font-semibold text-green-600">
+                              {formatPremiumFlow(signal.premium_flow)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Overall Score</span>
+                            <span className="text-xs font-semibold">
+                              {(safeParseNumber(signal.overall_score) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Confidence</span>
+                            <span className="text-xs font-semibold">
+                              {signal.confidence 
+                                ? `${(signal.confidence * 100).toFixed(0)}%` 
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Risk Level</span>
+                            <Badge variant="outline" className="text-xs h-5 px-2">
+                              {signal.risk_level}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
 
-                <Separator />
+                      <Separator />
 
-                {/* Volume & OI Analysis */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Volume & Open Interest</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Current Volume</span>
-                      <span className="text-xs font-semibold">{selectedSignal.current_volume?.toLocaleString() || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Average Volume</span>
-                      <span className="text-xs font-medium">{selectedSignal.average_volume?.toLocaleString() || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Volume Ratio</span>
-                      <span className="text-xs font-medium">{selectedSignal.volume_ratio ? `${selectedSignal.volume_ratio.toFixed(1)}x` : 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Open Interest</span>
-                      <span className="text-xs font-semibold">{selectedSignal.current_oi?.toLocaleString() || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">OI Change</span>
-                      <span className="text-xs font-medium">
-                        {selectedSignal.oi_change_pct ? `${selectedSignal.oi_change_pct > 0 ? '+' : ''}${selectedSignal.oi_change_pct.toFixed(1)}%` : 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                      {/* Volume & OI Analysis */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Volume & Open Interest
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Current Volume</span>
+                            <span className="text-xs font-semibold">
+                              {signal.current_volume?.toLocaleString() || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Average Volume</span>
+                            <span className="text-xs font-medium">
+                              {signal.average_volume?.toLocaleString() || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Volume Ratio</span>
+                            <span className="text-xs font-medium">
+                              {signal.volume_ratio 
+                                ? `${signal.volume_ratio.toFixed(1)}x` 
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Open Interest</span>
+                            <span className="text-xs font-semibold">
+                              {signal.current_oi?.toLocaleString() || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">OI Change</span>
+                            <span className="text-xs font-medium">
+                              {signal.oi_change_pct 
+                                ? `${signal.oi_change_pct > 0 ? '+' : ''}${signal.oi_change_pct.toFixed(1)}%` 
+                                : 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                <Separator />
+                      <Separator />
 
-                {/* Detection Flags */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Detection Flags</h3>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedSignal.has_volume_anomaly && (
-                      <Badge variant="secondary" className="text-xs">Volume Anomaly</Badge>
-                    )}
-                    {selectedSignal.has_oi_spike && (
-                      <Badge variant="secondary" className="text-xs">OI Spike</Badge>
-                    )}
-                    {selectedSignal.has_premium_flow && (
-                      <Badge variant="secondary" className="text-xs">Premium Flow</Badge>
-                    )}
-                    {selectedSignal.has_sweep && (
-                      <Badge variant="secondary" className="text-xs">Sweep</Badge>
-                    )}
-                    {selectedSignal.has_block_trade && (
-                      <Badge variant="secondary" className="text-xs">Block Trade</Badge>
-                    )}
-                  </div>
-                </div>
+                      {/* Detection Flags */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Detection Flags
+                        </h3>
+                        <div className="flex flex-wrap gap-1">
+                          {signal.has_volume_anomaly && (
+                            <Badge variant="secondary" className="text-xs">
+                              Volume Anomaly
+                            </Badge>
+                          )}
+                          {signal.has_oi_spike && (
+                            <Badge variant="secondary" className="text-xs">
+                              OI Spike
+                            </Badge>
+                          )}
+                          {signal.has_premium_flow && (
+                            <Badge variant="secondary" className="text-xs">
+                              Premium Flow
+                            </Badge>
+                          )}
+                          {signal.has_sweep && (
+                            <Badge variant="secondary" className="text-xs">
+                              Sweep
+                            </Badge>
+                          )}
+                          {signal.has_block_trade && (
+                            <Badge variant="secondary" className="text-xs">
+                              Block Trade
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
 
-                <Separator />
+                      <Separator />
 
-                {/* Market Context */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Market Context</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Underlying Price</span>
-                      <span className="text-xs font-semibold">${safeParseNumber(selectedSignal.underlying_price).toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Implied Volatility</span>
-                      <span className="text-xs font-medium">{selectedSignal.implied_volatility ? `${(selectedSignal.implied_volatility * 100).toFixed(1)}%` : 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Sentiment</span>
-                      <span className="text-xs font-medium">{selectedSignal.sentiment || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Detection Time</span>
-                      <span className="text-xs font-medium">
-                        {new Date(selectedSignal.detection_timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                      {/* Market Context */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Market Context
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Underlying Price</span>
+                            <span className="text-xs font-semibold">
+                              ${safeParseNumber(signal.underlying_price).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Implied Volatility</span>
+                            <span className="text-xs font-medium">
+                              {signal.implied_volatility 
+                                ? `${(signal.implied_volatility * 100).toFixed(1)}%` 
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Sentiment</span>
+                            <span className="text-xs font-medium">
+                              {signal.sentiment || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Detection Time</span>
+                            <span className="text-xs font-medium">
+                              {new Date(signal.detection_timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
           </div>
         </>

@@ -19,6 +19,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Scanning Strategies](scanning-strategies.md) - How to scan effectively for different trading styles
 - [Signal Interpretation](signal-interpretation.md) - How to read and act on signals
 - [Watchlist Management](watchlist-management.md) - Creating and managing ticker watchlists
+- [Grouped Ticker View](grouped-ticker-view.md) - Frontend UI for aggregated signal display
 
 ### Technical Documentation
 - [Architecture](architecture.md) - System design and components
@@ -32,6 +33,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Alert Configuration](alerts.md) - Setting up notifications
 - [Custom Indicators](custom-indicators.md) - Extending the detection system
 - [0DTE and Meme Stock Filtering](0dte-meme-stock-filtering.md) - Enhanced noise reduction system
+- [Hourly Cron Job Setup](hourly-cron-setup.md) - Automated scanning with deduplication and continuity tracking
 
 ### Research & Analysis
 - [Options Flow Patterns](options-flow-patterns.md) - Common patterns and their meanings
@@ -44,6 +46,13 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **Day Traders**: See [Intraday Scanning](scanning-strategies.md#intraday-scanning)
 - **Swing Traders**: See [Multi-Day Signals](scanning-strategies.md#swing-trading)
 - **Options Sellers**: See [High IV Opportunities](signal-interpretation.md#selling-premium)
+
+### For Automation
+- **Hourly Cron Jobs**: See [Hourly Cron Setup](hourly-cron-setup.md)
+- **GitHub Actions**: See [GitHub Actions Setup](hourly-cron-setup.md#github-actions-setup)
+- **Deduplication**: See [Deduplication Strategy](hourly-cron-setup.md#deduplication-strategy)
+- **Signal Lifecycle**: See [Signal Lifecycle](hourly-cron-setup.md#signal-lifecycle)
+- **Troubleshooting**: See [Continuity Tracking Fix](continuity-tracking-fix.md) - Common issues and solutions
 
 ### For Developers
 - **Integration**: See [Python API](python-api.md)
@@ -59,6 +68,21 @@ All documentation follows these principles:
 4. **Up-to-date**: Documentation updated with each feature release
 
 ## 🔄 Recent Updates
+
+**November 2, 2025**
+- **Continuity Tracking Fix**: Fixed timestamp issue causing all signals to be marked inactive
+- **Diagnostic Tool**: Added comprehensive diagnostics script for continuity verification
+- **Hourly Cron Job System**: Complete automated scanning setup
+- **Signal Deduplication**: Prevents duplicate signals on every run
+- **Continuity Tracking**: Tracks signal lifecycle (NEW → CONTINUING → INACTIVE)
+- **Enhanced Database Schema**: Added signal continuity fields and functions
+- **GitHub Actions Workflow**: Automated hourly execution during market hours
+- **Comprehensive Documentation**: Full setup guide with troubleshooting
+
+**October 30, 2025**
+- Added Grouped Ticker View documentation
+- Frontend UI enhancement for signal aggregation
+- Improved user experience for multi-signal analysis
 
 **October 2025**
 - Initial documentation structure created

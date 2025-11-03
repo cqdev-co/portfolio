@@ -1,0 +1,102 @@
+name: Unusual Options Hourly Scan
+
+on:
+  schedule:
+    # Run every hour during market hours (9:30 AM - 4:30 PM ET)
+    # Market hours: Mon-Fri, 9:30 AM - 4:30 PM ET (14:30-21:30 UTC)
+    - cron: '30 14-21 * * 1-5'  # Every hour at :30 during market hours
+  
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      min_grade:
+        description: 'Minimum signal grade'
+        required: false
+        default: 'B'
+        type: choice
+        options:
+          - S
+          - A
+          - B
+          - C
+          - D
+          - F
+      limit:
+        description: 'Max tickers to scan (optional)'
+        required: false
+        type: number
+
+jobs:
+  scan-unusual-options:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: unusual-options-service/.venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+      
+      - name: Install dependencies
+        working-directory: unusual-options-service
+        run: |
+          poetry install --no-interaction --no-root
+      
+      - name: Run scanner with continuity tracking
+        working-directory: unusual-options-service
+        run: |
+          # Set parameters
+          MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
+          LIMIT="${{ github.event.inputs.limit }}"
+          
+          # Build command - Use normal CLI with --store flag
+          # Continuity tracking is enabled by default
+          if [ -n "$LIMIT" ]; then
+            poetry run unusual-options scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
+          else
+            poetry run unusual-options scan-all --min-grade $MIN_GRADE --store
+          fi
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-logs-${{ github.run_number }}
+          path: unusual-options-service/logs/
+          retention-days: 7
+        continue-on-error: true
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Unusual Options scan failed. Check logs for details."
+          # Add Discord/Slack notification here if desired
+      
+      - name: Display scan summary
+        if: success()
+        run: |
+          echo "✅ Unusual Options scan completed successfully"
+          echo "Signals stored with continuity tracking (deduplication enabled)"
+

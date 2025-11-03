@@ -15,3 +15,29 @@ updates:
     # so CI must pass before merging
     allow:
       - dependency-type: "all" 
+
+  - package-ecosystem: "python"
+    directory: "/unusual-options-service"
+    schedule:
+      interval: "weekly"
+    # Set reviewers for pull requests
+    reviewers:
+      - "cqdev-co"
+    # Open pull requests for version updates
+    open-pull-requests-limit: 10
+    # Configure auto-merge behavior (optional)
+    # auto-merge will respect your branch protection rules
+    # so CI must pass before merging
+
+  - package-ecosystem: "python"
+    directory: "/rds-ticker-analysis"
+    schedule:
+      interval: "weekly"
+    # Set reviewers for pull requests
+    reviewers:
+      - "cqdev-co"
+    # Open pull requests for version updates
+    open-pull-requests-limit: 10
+    # Configure auto-merge behavior (optional)
+    # auto-merge will respect your branch protection rules
+    # so CI must pass before merging
