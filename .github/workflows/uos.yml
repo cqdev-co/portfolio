@@ -71,11 +71,11 @@ jobs:
           MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
           LIMIT="${{ github.event.inputs.limit }}"
           
-          # Build command - Use normal CLI with --store flag
+          # Build command - Use python -m for proper module imports
           # Continuity tracking is enabled by default
           if [ -n "$LIMIT" ]; then
-            poetry run unusual-options scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
+            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
           else
-            poetry run unusual-options scan-all --min-grade $MIN_GRADE --store
+            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --store
           fi
 
