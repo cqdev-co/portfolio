@@ -41,9 +41,9 @@ ENV/
 logs/
 *.log
 
-# Data
-data/
-cache/
+# Data (but NOT src/unusual_options/data source code!)
+/data/
+/cache/
 *.parquet
 *.csv
 *.json
