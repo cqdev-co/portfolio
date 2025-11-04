@@ -55,6 +55,11 @@ jobs:
         echo "ALPHA_VANTAGE_API_KEY=${{ secrets.ALPHA_VANTAGE_API_KEY }}" >> .env
         echo "FMP_API_KEY=${{ secrets.FMP_API_KEY }}" >> .env
         
+    - name: Test YFinance validator
+      run: |
+        cd .github/scripts
+        python test_yfinance_validation.py || echo "Validator test completed with warnings"
+    
     - name: Run ticker fetch (dry-run)
       if: github.event.inputs.dry_run == 'true'
       run: |

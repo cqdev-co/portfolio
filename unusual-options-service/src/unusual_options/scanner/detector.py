@@ -1,11 +1,14 @@
 """Anomaly detection algorithms for unusual options activity."""
 
-from typing import List, Optional, Dict, Any
-from dataclasses import dataclass
+from typing import List, Optional, Dict, Any, Tuple
+from dataclasses import dataclass, field
 from datetime import datetime
 from loguru import logger
 
 from ..data.models import OptionsChain, OptionsContract, HistoricalData
+from .spread_detector import (
+    SpreadDetector, SpreadAnalysis, enrich_detections_with_spread_analysis
+)
 
 
 @dataclass
@@ -17,6 +20,9 @@ class Detection:
     metrics: Dict[str, Any]
     confidence: float
     timestamp: datetime
+    
+    # Spread detection metadata (added in Phase 1)
+    spread_analysis: Optional[SpreadAnalysis] = field(default=None)
 
 
 class AnomalyDetector:
@@ -30,6 +36,10 @@ class AnomalyDetector:
         self.min_option_volume = config.get('MIN_OPTION_VOLUME', 200)  # Increased from 100
         self.min_heuristic_volume = config.get('MIN_HEURISTIC_VOLUME', 2000)  # New threshold
         self.min_heuristic_oi = config.get('MIN_HEURISTIC_OI', 10000)  # New threshold
+        
+        # Spread detection (Phase 1: Conservative)
+        self.enable_spread_detection = config.get('ENABLE_SPREAD_DETECTION', True)
+        self.spread_detector = SpreadDetector(config) if self.enable_spread_detection else None
     
     def detect_anomalies(
         self,
@@ -79,6 +89,36 @@ class AnomalyDetector:
             detections.append(pc_ratio_detection)
         
         logger.info(f"Found {len(detections)} anomalies for {options_chain.ticker}")
+        
+        # 6. Analyze for spread patterns (Phase 1: Conservative tagging)
+        if self.enable_spread_detection and detections:
+            detections = self._enrich_with_spread_analysis(detections)
+        
+        return detections
+    
+    def _enrich_with_spread_analysis(self, detections: List[Detection]) -> List[Detection]:
+        """
+        Analyze detections for spread patterns and enrich with metadata.
+        
+        Phase 1: Non-destructive tagging only (no filtering)
+        """
+        spread_analyses = self.spread_detector.analyze_all_signals(detections)
+        
+        # Attach spread analysis to each detection
+        for detection in detections:
+            symbol = detection.contract.symbol
+            if symbol in spread_analyses:
+                detection.spread_analysis = spread_analyses[symbol]
+                
+                # Log high-confidence spreads
+                analysis = spread_analyses[symbol]
+                if analysis.is_likely_spread:
+                    logger.warning(
+                        f"⚠️  Likely spread detected: {symbol} "
+                        f"({analysis.spread_confidence:.0%} confidence) - "
+                        f"{analysis.spread_type} - {analysis.reasoning}"
+                    )
+        
         return detections
     
     def _detect_volume_anomaly(

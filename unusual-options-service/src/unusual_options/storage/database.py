@@ -97,6 +97,14 @@ class SupabaseStorage:
                     'has_premium_flow': signal.has_premium_flow,
                     'data_provider': signal.data_provider,
                     'detection_timestamp': signal.detection_timestamp.isoformat(),
+                    # Spread detection fields (Phase 1)
+                    'is_likely_spread': signal.is_likely_spread,
+                    'spread_confidence': float(signal.spread_confidence) if signal.spread_confidence else None,
+                    'spread_type': signal.spread_type,
+                    'matched_leg_symbols': signal.matched_leg_symbols if signal.matched_leg_symbols else None,
+                    'spread_strike_width': float(signal.spread_strike_width) if signal.spread_strike_width else None,
+                    'spread_detection_reason': signal.spread_detection_reason,
+                    'spread_net_premium': float(signal.spread_net_premium) if signal.spread_net_premium else None,
                 }
                 signal_data.append(data)
             

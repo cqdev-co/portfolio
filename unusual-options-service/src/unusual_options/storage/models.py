@@ -97,6 +97,15 @@ class UnusualOptionsSignal:
     forward_return_30d: Optional[float] = None
     win: Optional[bool] = None
     
+    # Spread Detection (Phase 1)
+    is_likely_spread: bool = False
+    spread_confidence: Optional[float] = None
+    spread_type: Optional[str] = None
+    matched_leg_symbols: List[str] = field(default_factory=list)
+    spread_strike_width: Optional[float] = None
+    spread_detection_reason: Optional[str] = None
+    spread_net_premium: Optional[float] = None
+    
     # Metadata
     data_provider: str = ""
     detection_version: str = "0.1.0"

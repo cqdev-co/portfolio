@@ -72,6 +72,15 @@ export interface UnusualOptionsSignalDB {
   detection_count: number;
   is_active: boolean;
   
+  // Spread Detection (Phase 1)
+  is_likely_spread: boolean;
+  spread_confidence: number | null;
+  spread_type: string | null;
+  matched_leg_symbols: string[] | null;
+  spread_strike_width: number | null;
+  spread_detection_reason: string | null;
+  spread_net_premium: number | null;
+  
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -237,6 +246,37 @@ export function formatDetectionCount(count: number): string {
   if (count === 1) return 'First detection';
   if (count === 2) return 'Detected 2x';
   return `Detected ${count}x`;
+}
+
+// Helper function to get spread badge color
+export function getSpreadBadgeColor(confidence: number | null): string {
+  if (!confidence) return '';
+  if (confidence >= 0.80) return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+  if (confidence >= 0.60) return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+  return '';
+}
+
+// Helper function to format spread type for display
+export function formatSpreadType(spreadType: string | null): string {
+  if (!spreadType) return '';
+  
+  const typeMap: Record<string, string> = {
+    'VERTICAL_CALL_SPREAD': 'Call Spread',
+    'VERTICAL_PUT_SPREAD': 'Put Spread',
+    'CALENDAR_SPREAD': 'Calendar',
+    'IRON_CONDOR': 'Iron Condor',
+    'STRADDLE': 'Straddle',
+    'STRANGLE': 'Strangle',
+    'POSSIBLE_SPREAD': 'Possible Spread',
+  };
+  
+  return typeMap[spreadType] || spreadType;
+}
+
+// Helper function to format spread confidence percentage
+export function formatSpreadConfidence(confidence: number | null): string {
+  if (!confidence) return '';
+  return `${Math.round(confidence * 100)}%`;
 }
 
 // Grouped ticker data for table display

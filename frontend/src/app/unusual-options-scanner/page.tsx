@@ -27,7 +27,10 @@ import {
   createAggregatedSummary,
   groupSignalsByStrike,
   groupSignalsByExpiry,
-  groupSignalsByDate
+  groupSignalsByDate,
+  getSpreadBadgeColor,
+  formatSpreadType,
+  formatSpreadConfidence
 } from "@/lib/types/unusual-options";
 import { fetchUnusualOptionsSignals, fetchUnusualOptionsStats, subscribeToUnusualOptionsUpdates } from "@/lib/api/unusual-options";
 import type { UnusualOptionsStats } from "@/lib/types/unusual-options";
@@ -44,6 +47,7 @@ import {
   TrendingUp,
   Filter
 } from "lucide-react";
+import { PriceChart } from "@/components/unusual-options/price-chart";
 
 // Helper function to generate Yahoo Finance URL
 function getYahooFinanceUrl(symbol: string): string {
@@ -70,7 +74,6 @@ export default function UnusualOptionsScanner() {
   const [activeTab, setActiveTab] = useState<'overview' | 'strikes' | 'expiries' | 'timeline' | 'all'>('overview');
   const [expandedStrike, setExpandedStrike] = useState<number | null>(null);
   const [expandedExpiry, setExpandedExpiry] = useState<string | null>(null);
-  const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
   // Load data
   const loadData = useCallback(async (showRefreshing = false) => {
@@ -177,7 +180,6 @@ export default function UnusualOptionsScanner() {
           setActiveTab('overview');
           setExpandedStrike(null);
           setExpandedExpiry(null);
-          setExpandedDate(null);
         }
       }
     };
@@ -205,7 +207,6 @@ export default function UnusualOptionsScanner() {
     setActiveTab('overview'); // Default to overview
     setExpandedStrike(null);
     setExpandedExpiry(null);
-    setExpandedDate(null);
     setSidebarOpen(true);
   };
 
@@ -215,7 +216,6 @@ export default function UnusualOptionsScanner() {
     setActiveTab('overview');
     setExpandedStrike(null);
     setExpandedExpiry(null);
-    setExpandedDate(null);
   };
 
   if (loading) {
@@ -539,7 +539,6 @@ export default function UnusualOptionsScanner() {
                           setActiveTab('overview');
                           setExpandedStrike(null);
                           setExpandedExpiry(null);
-                          setExpandedDate(null);
                         }
                       }}
                       className="h-4 w-5 p-0 hover:bg-muted"
@@ -563,7 +562,6 @@ export default function UnusualOptionsScanner() {
                           setActiveTab('overview');
                           setExpandedStrike(null);
                           setExpandedExpiry(null);
-                          setExpandedDate(null);
                         }
                       }}
                       className="h-4 w-5 p-0 hover:bg-muted"
@@ -1076,80 +1074,168 @@ export default function UnusualOptionsScanner() {
                   </div>
                 )}
 
-                {/* Timeline Tab */}
+                {/* Timeline Tab (with Chart) */}
                 {activeTab === 'timeline' && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-foreground tracking-tight mb-2">
-                      Signals by Detection Time
-                    </h3>
-                    {dateGroups.map((dateGroup) => (
-                      <div key={dateGroup.date} className="border border-border/50 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                        <button
-                          onClick={() => setExpandedDate(
-                            expandedDate === dateGroup.date 
-                              ? null 
-                              : dateGroup.date
-                          )}
-                          className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-semibold text-base">
-                              {new Date(dateGroup.date).toLocaleDateString()}
-                            </span>
-                            <span className="text-xs text-muted-foreground font-medium">
-                              {dateGroup.callCount}C / {dateGroup.putCount}P
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-green-600">
-                              {formatPremiumFlow(
-                                dateGroup.totalPremiumFlow
-                              )}
-                            </span>
-                            <span className="text-xs text-muted-foreground font-medium">
-                              {dateGroup.signalCount}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {expandedDate === dateGroup.date ? '▼' : '▶'}
-                            </span>
-                          </div>
-                        </button>
-                        {expandedDate === dateGroup.date && (
-                          <div className="border-t border-border/50 p-4 space-y-2 bg-muted/5">
-                            {dateGroup.signals.slice(0, 10).map((signal) => (
-                              <div 
-                                key={signal.signal_id}
-                                className="p-3 bg-background rounded-lg border border-border/50 text-xs space-y-1.5 hover:shadow-sm transition-shadow"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium">
-                                    ${signal.strike} {signal.option_type}
+                  <div className="space-y-6">
+                    {/* Price Chart */}
+                    <PriceChart 
+                      ticker={selectedTicker.ticker} 
+                      signals={selectedTicker.signals}
+                      onSignalClick={(signalId) => {
+                        // Scroll directly to the signal (no expansion needed)
+                        const element = document.getElementById(
+                          `signal-${signalId}`
+                        );
+                        if (element) {
+                          element.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center' 
+                          });
+                          
+                          // Flash highlight with ring and background
+                          element.classList.add(
+                            'ring-2', 
+                            'ring-primary',
+                            'bg-primary/5'
+                          );
+                          
+                          setTimeout(() => {
+                            element.classList.remove(
+                              'ring-2', 
+                              'ring-primary',
+                              'bg-primary/5'
+                            );
+                          }, 2000);
+                        }
+                      }}
+                    />
+                    
+                    <Separator />
+                    
+                    {/* Timeline Table - Flat List */}
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-semibold text-foreground tracking-tight">
+                        Signal Details ({selectedTicker.signalCount})
+                      </h3>
+                      
+                      {/* Flat list with date headers */}
+                      <div className="space-y-2">
+                        {dateGroups.map((dateGroup) => (
+                          <div key={dateGroup.date} className="space-y-2">
+                            {/* Date Header */}
+                            <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 py-2 border-b border-border/30">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {new Date(dateGroup.date).toLocaleDateString('en-US', {
+                                      weekday: 'short',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
                                   </span>
-                                  <span className="font-semibold text-green-600">
-                                    {formatPremiumFlow(signal.premium_flow)}
+                                  <span className="text-[10px] text-muted-foreground/60">
+                                    {dateGroup.callCount}C / {dateGroup.putCount}P
                                   </span>
                                 </div>
-                                <div className="flex items-center justify-between text-muted-foreground">
-                                  <span>
-                                    {new Date(
-                                      signal.detection_timestamp
-                                    ).toLocaleTimeString()}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-semibold text-green-600">
+                                    {formatPremiumFlow(dateGroup.totalPremiumFlow)}
                                   </span>
-                                  <span>
-                                    {signal.days_to_expiry}d to expiry
+                                  <span className="text-[10px] text-muted-foreground/60">
+                                    {dateGroup.signalCount} signal{dateGroup.signalCount > 1 ? 's' : ''}
                                   </span>
                                 </div>
                               </div>
-                            ))}
-                            {dateGroup.signalCount > 10 && (
-                              <div className="text-xs text-center text-muted-foreground pt-2">
-                                +{dateGroup.signalCount - 10} more signals
-                              </div>
-                            )}
+                            </div>
+                            
+                            {/* Signal Cards */}
+                            <div className="space-y-1.5">
+                              {dateGroup.signals.map((signal) => (
+                                <div 
+                                  key={signal.signal_id}
+                                  id={`signal-${signal.signal_id}`}
+                                  className="p-3 bg-muted/10 hover:bg-muted/20 rounded-lg border border-border/30 text-xs space-y-1.5 transition-all scroll-mt-20 cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-sm">
+                                        ${signal.strike}
+                                      </span>
+                                      <span className={cn(
+                                        "text-xs font-medium capitalize",
+                                        signal.option_type === 'call' 
+                                          ? 'text-green-500' 
+                                          : 'text-red-500'
+                                      )}>
+                                        {signal.option_type}
+                                      </span>
+                                      <Badge className={cn(
+                                        "text-[9px] px-1.5 py-0 h-4",
+                                        getGradeColor(signal.grade)
+                                      )}>
+                                        {signal.grade}
+                                      </Badge>
+                                    </div>
+                                    <span className="text-xs font-semibold text-green-600">
+                                      {formatPremiumFlow(signal.premium_flow)}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
+                                    <div className="flex items-center gap-2">
+                                      <span>
+                                        {new Date(signal.detection_timestamp).toLocaleTimeString('en-US', {
+                                          hour: 'numeric',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                      <span className="text-muted-foreground/40">•</span>
+                                      <span>
+                                        {signal.days_to_expiry}d to expiry
+                                      </span>
+                                    </div>
+                                    <span>
+                                      Score: {(signal.overall_score * 100).toFixed(0)}%
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Moneyness and Volume indicators */}
+                                  {signal.moneyness && (
+                                    <div className="flex items-center gap-1.5 pt-0.5">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground/70">
+                                        {signal.moneyness}
+                                      </span>
+                                      {signal.has_sweep && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600">
+                                          Sweep
+                                        </span>
+                                      )}
+                                      {signal.has_block_trade && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                                          Block
+                                        </span>
+                                      )}
+                                      {/* Spread Detection Badge */}
+                                      {signal.is_likely_spread && signal.spread_confidence && (
+                                        <span 
+                                          className={cn(
+                                            "text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1",
+                                            getSpreadBadgeColor(signal.spread_confidence)
+                                          )}
+                                          title={signal.spread_detection_reason || undefined}
+                                        >
+                                          ⚠️ {formatSpreadType(signal.spread_type)} ({formatSpreadConfidence(signal.spread_confidence)})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
 
@@ -1228,7 +1314,8 @@ export default function UnusualOptionsScanner() {
                           {(signal.has_volume_anomaly || 
                             signal.has_oi_spike || 
                             signal.has_sweep || 
-                            signal.has_block_trade) && (
+                            signal.has_block_trade ||
+                            signal.is_likely_spread) && (
                             <div className="flex flex-wrap gap-1">
                               {signal.has_volume_anomaly && (
                                 <Badge 
@@ -1260,6 +1347,19 @@ export default function UnusualOptionsScanner() {
                                   className="text-[10px] font-medium rounded-full"
                                 >
                                   Block
+                                </Badge>
+                              )}
+                              {/* Spread Detection Warning */}
+                              {signal.is_likely_spread && signal.spread_confidence && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={cn(
+                                    "text-[10px] font-medium rounded-full",
+                                    getSpreadBadgeColor(signal.spread_confidence)
+                                  )}
+                                  title={signal.spread_detection_reason || undefined}
+                                >
+                                  ⚠️ {formatSpreadType(signal.spread_type)} ({formatSpreadConfidence(signal.spread_confidence)})
                                 </Badge>
                               )}
                             </div>

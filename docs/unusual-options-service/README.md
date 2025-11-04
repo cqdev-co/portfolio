@@ -20,6 +20,9 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Signal Interpretation](signal-interpretation.md) - How to read and act on signals
 - [Watchlist Management](watchlist-management.md) - Creating and managing ticker watchlists
 - [Grouped Ticker View](grouped-ticker-view.md) - Frontend UI for aggregated signal display
+- [Price Chart Visualization](price-chart-visualization.md) - Interactive charts with option detection overlay
+- [Spread Detection](spread-detection.md) - Multi-leg strategy detection system
+- [Frontend Spread Updates](frontend-spread-detection-updates.md) - UI changes for spread visualization
 
 ### Technical Documentation
 - [Architecture](architecture.md) - System design and components
@@ -67,6 +70,18 @@ All documentation follows these principles:
 4. **Up-to-date**: Documentation updated with each feature release
 
 ## 🔄 Recent Updates
+
+**November 4, 2025**
+- **Price Chart Visualization**: Interactive stock price charts with option detection overlay
+- **Unified Timeline View**: Merged chart and signal details into single interactive tab
+- **Click-to-Pin Tooltips**: Click detection dots to pin tooltips for easy interaction
+- **Pinned Tooltip Management**: Close with X button, ESC key, or click outside
+- **Flat Signal Display**: Streamlined signal list with sticky date headers
+- **Multi-Signal Detection**: Smart handling of grouped options at same timestamp
+- **Click-to-Navigate**: Click tooltip signals to jump to detail view in table
+- **Robinhood/Perplexity-Style Design**: Clean, minimal charts with modern aesthetic
+- **Multi-Timeframe Analysis**: Support for 1D, 1W, 1M, 3M, 1Y, 5Y, MAX ranges
+- **Yahoo Finance Integration**: Real-time price data without API keys
 
 **November 3, 2025**
 - **GitHub Actions Fix**: Fixed `--no-root` installation issue preventing CLI from running
