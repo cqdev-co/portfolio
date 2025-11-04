@@ -2,9 +2,24 @@ name: Unusual Options Hourly Scan
 
 on:
   schedule:
-    # Run every hour during market hours (9:30 AM - 4:30 PM ET)
-    # Market hours: Mon-Fri, 9:30 AM - 4:30 PM ET (14:30-21:30 UTC)
-    - cron: '30 14-21 * * 1-5'  # Every hour at :30 during market hours
+    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
+    # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
+    # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
+    # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges
+    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
+    - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
+    - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
+    - cron: '0 15 * * 1-5'   # 11:00 AM EDT (15:00 UTC)
+    - cron: '30 15 * * 1-5'  # 11:30 AM EDT (15:30 UTC)
+    - cron: '0 16 * * 1-5'   # 12:00 PM EDT (16:00 UTC)
+    - cron: '30 16 * * 1-5'  # 12:30 PM EDT (16:30 UTC)
+    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (17:00 UTC)
+    - cron: '30 17 * * 1-5'  # 1:30 PM EDT (17:30 UTC)
+    - cron: '0 18 * * 1-5'   # 2:00 PM EDT (18:00 UTC)
+    - cron: '30 18 * * 1-5'  # 2:30 PM EDT (18:30 UTC)
+    - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
+    - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
+    - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
   
   workflow_dispatch:  # Allow manual triggering
     inputs:
