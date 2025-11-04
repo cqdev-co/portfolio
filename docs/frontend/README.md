@@ -2,6 +2,99 @@
 
 ## Recent Updates
 
+### Signal Aggregation & Smart Summary View (November 2025)
+Completely redesigned the Unusual Options Scanner sidebar to solve the "75 signals problem" by implementing intelligent signal aggregation with a modern, polished UI:
+
+#### The Problem
+Previously, when a ticker like AMD had 75 unusual options signals, users had to manually click through each signal one-by-one using arrow navigation. This was tedious and prevented users from quickly understanding the "big picture" of what was happening with the ticker.
+
+#### The Solution: Tabbed Smart Summary Interface
+Replaced single-signal navigation with a 5-tab aggregated view:
+
+**1. Overview Tab (Default)**
+- **Smart Summary Metrics**: Total premium flow, dominant sentiment (BULLISH/BEARISH/NEUTRAL), call/put split, high conviction count
+- **Top Strikes**: 5 most active strike prices by premium flow with grade badges, signal counts, and call/put distribution
+- **Top Expiries**: 5 most active expiration dates with days to expiry and premium flow
+- **Detection Patterns**: Aggregated counts of volume anomalies, OI spikes, sweeps, and block trades
+- **Time Range**: First and latest detection timestamps
+- **Clickable Navigation**: Click any strike/expiry to jump to detailed view in corresponding tab
+
+**2. By Strike Tab**
+- Groups all signals by strike price
+- Shows total premium flow, call/put split, highest grade, and signal count per strike
+- Expandable sections showing up to 10 individual signals per strike
+- Sorted by total premium flow (highest first)
+
+**3. By Expiry Tab**
+- Groups all signals by expiration date
+- Shows days to expiry, call/put split, total premium flow per expiry
+- Expandable sections with individual signal details
+- Sorted by days to expiry (nearest first)
+
+**4. Timeline Tab**
+- Groups signals by detection date
+- Shows daily signal counts, call/put split, and premium flow
+- Helps identify when unusual activity occurred
+- Sorted by date (most recent first)
+
+**5. All Signals Tab**
+- Shows top 20 signals by premium flow
+- Compact card view with key metrics (strike, type, grade, score, volume ratio, detection flags)
+- Useful for power users who want to audit individual signals
+- Clear messaging when showing subset: "Showing top 20 of 75 signals"
+
+#### Technical Implementation
+- **Aggregation Helpers**: Created `createAggregatedSummary()`, `groupSignalsByStrike()`, `groupSignalsByExpiry()`, and `groupSignalsByDate()` helper functions
+- **TypeScript Interfaces**: Added `AggregatedSignalSummary`, `SignalsByStrike`, `SignalsByExpiry`, and `SignalsByDate` interfaces
+- **State Management**: Uses React state for active tab and expanded sections (strikes/expiries/dates)
+- **Wider Sidebar**: Increased sidebar width from 384px to 600px to accommodate richer data visualizations
+- **Performance**: Efficient aggregation using Map data structures and single-pass algorithms
+
+#### Modern UI Design
+- **Compact Sidebar**: 480px width for focused viewing without overwhelming the screen
+- **Refined Spacing**: Compact padding (p-3, p-4) with tight gaps for efficient use of space
+- **Sophisticated Shadows**: Subtle shadow-sm with hover:shadow-md transitions for depth
+- **Polished Borders**: Semi-transparent borders (border-border/50) for softer visual separation
+- **Rounded Corners**: Consistent rounded-lg throughout for modern look
+- **Minimalist Tabs**: 
+  - Clean underline indicator (0.5px primary color line)
+  - No button backgrounds or borders
+  - Text-only design with color transitions
+  - Active state: foreground color, Inactive: muted-foreground
+- **Compact Typography**: 
+  - Small, efficient text sizing (text-[10px] to text-lg)
+  - Font-medium for labels with tracking-tight for professional appearance
+  - Uppercase labels with tracking-wide for section headers
+- **Refined Badges**: Rounded-full pills with proper font-weight
+- **Smooth Transitions**: transition-all for buttery hover states
+- **Layered Backgrounds**: bg-muted/20, bg-muted/30 with subtle opacity for visual hierarchy
+- **Hover States**: Subtle border and shadow changes on interactive elements
+
+#### User Benefits
+- **Instant Understanding**: See the complete story in one glance rather than clicking through 75 signals
+- **Pattern Recognition**: Easily identify if activity is concentrated in specific strikes, expiries, or dates
+- **Flexible Exploration**: Choose the view that matches your analysis needs (overview, strike-focused, time-based, etc.)
+- **Better UX**: No more tedious arrow-key navigation through dozens of similar signals
+- **Modern Aesthetic**: Clean, professional design matching portfolio standards (480px sidebar, compact text sizing)
+- **Keyboard Navigation**: 
+  - Arrow Up/Down: Navigate between different tickers
+  - ESC: Close sidebar
+- **Visual Navigation**: Compact up/down arrow buttons in sidebar header for ticker navigation
+
+This represents a fundamental shift from "signal-by-signal navigation" to "aggregated insights with drill-down capability" wrapped in a sleek, modern interface.
+
+### Unusual Options Scanner UX Improvements (November 2025)
+Enhanced the Unusual Options Scanner sidebar with critical usability improvements:
+- **Fixed Sidebar Scrolling**: Restructured the sidebar as a proper flex container to enable independent scrolling within the sidebar content area, preventing the entire page from scrolling when navigating signal details
+- **Robinhood Quick Access**: Added a dedicated Robinhood icon button next to the ticker name in the sidebar header, providing instant access to trade on Robinhood
+- **Visual Enhancement**: The Robinhood button uses the official Robinhood logo (robinhood-svgrepo-com.svg) with hover effects, maintaining a clean and professional appearance alongside the existing Yahoo Finance link
+- **Premium Flow Formatting**: Enhanced the `formatPremiumFlow()` function to properly handle all number ranges:
+  - Billions: $1.00B+ (2 decimal places for precision)
+  - Millions: $1.0M+ (1 decimal place)
+  - Thousands: $1K+ (no decimals)
+  - Sub-thousand: $500 (exact amount)
+  - Properly handles negative values with sign prefix
+
 ### Content Refinements (October 2025)
 Updated the Security Event Gateway article to align with professional standards:
 - **Language Refinement**: Replaced "alert fatigue" terminology with more neutral, growth-focused language about "high alert volume challenging efficiency"

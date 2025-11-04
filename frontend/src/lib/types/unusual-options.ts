@@ -148,13 +148,30 @@ export interface UnusualOptionsStats {
 export function formatPremiumFlow(amount: number | null): string {
   if (!amount || amount === 0) return '-';
   
-  const millions = amount / 1_000_000;
-  if (millions >= 1) {
-    return `$${millions.toFixed(1)}M`;
+  const absAmount = Math.abs(amount);
+  const isNegative = amount < 0;
+  const sign = isNegative ? '-' : '';
+  
+  // Handle billions (1B+)
+  const billions = absAmount / 1_000_000_000;
+  if (billions >= 1) {
+    return `${sign}$${billions.toFixed(2)}B`;
   }
   
-  const thousands = amount / 1_000;
-  return `$${thousands.toFixed(0)}K`;
+  // Handle millions (1M+)
+  const millions = absAmount / 1_000_000;
+  if (millions >= 1) {
+    return `${sign}$${millions.toFixed(1)}M`;
+  }
+  
+  // Handle thousands (1K+)
+  const thousands = absAmount / 1_000;
+  if (thousands >= 1) {
+    return `${sign}$${thousands.toFixed(0)}K`;
+  }
+  
+  // Handle smaller amounts (< 1K)
+  return `${sign}$${absAmount.toFixed(0)}`;
 }
 
 // Helper function to get grade color
@@ -235,6 +252,57 @@ export interface GroupedTickerSignals {
   avgConfidence: number;
   hasHighConviction: boolean;
   latestDetection: string;
+}
+
+// Aggregated signal data for smart summary view
+export interface SignalsByStrike {
+  strike: number;
+  signals: UnusualOptionsSignal[];
+  signalCount: number;
+  totalPremiumFlow: number;
+  callCount: number;
+  putCount: number;
+  avgScore: number;
+  highestGrade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+}
+
+export interface SignalsByExpiry {
+  expiry: string;
+  signals: UnusualOptionsSignal[];
+  signalCount: number;
+  totalPremiumFlow: number;
+  callCount: number;
+  putCount: number;
+  daysToExpiry: number;
+}
+
+export interface SignalsByDate {
+  date: string;
+  signals: UnusualOptionsSignal[];
+  signalCount: number;
+  totalPremiumFlow: number;
+  callCount: number;
+  putCount: number;
+}
+
+export interface AggregatedSignalSummary {
+  totalSignals: number;
+  totalPremiumFlow: number;
+  callCount: number;
+  putCount: number;
+  highConvictionCount: number;
+  dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  avgConfidence: number;
+  dateRange: { earliest: string; latest: string };
+  topStrikes: SignalsByStrike[];
+  topExpiries: SignalsByExpiry[];
+  detectionFlags: {
+    volumeAnomaly: number;
+    oiSpike: number;
+    premiumFlow: number;
+    sweep: number;
+    blockTrade: number;
+  };
 }
 
 // Helper function to group signals by ticker
@@ -321,5 +389,273 @@ export function groupSignalsByTicker(
   });
   
   return result;
+}
+
+// Helper function to create aggregated summary from signals
+export function createAggregatedSummary(
+  signals: UnusualOptionsSignal[]
+): AggregatedSignalSummary {
+  if (signals.length === 0) {
+    return {
+      totalSignals: 0,
+      totalPremiumFlow: 0,
+      callCount: 0,
+      putCount: 0,
+      highConvictionCount: 0,
+      dominantSentiment: 'NEUTRAL',
+      avgConfidence: 0,
+      dateRange: { earliest: '', latest: '' },
+      topStrikes: [],
+      topExpiries: [],
+      detectionFlags: {
+        volumeAnomaly: 0,
+        oiSpike: 0,
+        premiumFlow: 0,
+        sweep: 0,
+        blockTrade: 0,
+      },
+    };
+  }
+
+  // Basic metrics
+  const totalSignals = signals.length;
+  const totalPremiumFlow = signals.reduce(
+    (sum, s) => sum + (s.premium_flow || 0), 
+    0
+  );
+  const callCount = signals.filter(s => s.option_type === 'call').length;
+  const putCount = signals.length - callCount;
+  const highConvictionCount = signals.filter(
+    s => s.grade === 'S' || s.grade === 'A'
+  ).length;
+
+  // Determine dominant sentiment
+  const bullishCount = signals.filter(
+    s => s.sentiment === 'BULLISH'
+  ).length;
+  const bearishCount = signals.filter(
+    s => s.sentiment === 'BEARISH'
+  ).length;
+  let dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+  if (bullishCount > bearishCount) {
+    dominantSentiment = 'BULLISH';
+  } else if (bearishCount > bullishCount) {
+    dominantSentiment = 'BEARISH';
+  }
+
+  // Calculate average confidence
+  const confidences = signals
+    .map(s => s.confidence)
+    .filter((c): c is number => c !== null);
+  const avgConfidence = confidences.length > 0
+    ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+    : 0;
+
+  // Date range
+  const timestamps = signals.map(s => s.detection_timestamp).sort();
+  const dateRange = {
+    earliest: timestamps[0],
+    latest: timestamps[timestamps.length - 1],
+  };
+
+  // Group by strike
+  const strikeMap = new Map<number, UnusualOptionsSignal[]>();
+  signals.forEach(signal => {
+    const existing = strikeMap.get(signal.strike) || [];
+    existing.push(signal);
+    strikeMap.set(signal.strike, existing);
+  });
+
+  const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+  const topStrikes: SignalsByStrike[] = Array.from(strikeMap.entries())
+    .map(([strike, strikeSignals]) => ({
+      strike,
+      signals: strikeSignals,
+      signalCount: strikeSignals.length,
+      totalPremiumFlow: strikeSignals.reduce(
+        (sum, s) => sum + (s.premium_flow || 0), 
+        0
+      ),
+      callCount: strikeSignals.filter(
+        s => s.option_type === 'call'
+      ).length,
+      putCount: strikeSignals.filter(
+        s => s.option_type === 'put'
+      ).length,
+      avgScore: strikeSignals.reduce(
+        (sum, s) => sum + s.overall_score, 
+        0
+      ) / strikeSignals.length,
+      highestGrade: strikeSignals.reduce((best, signal) => {
+        return gradeOrder[signal.grade] > gradeOrder[best] 
+          ? signal.grade 
+          : best;
+      }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'),
+    }))
+    .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow)
+    .slice(0, 5);
+
+  // Group by expiry
+  const expiryMap = new Map<string, UnusualOptionsSignal[]>();
+  signals.forEach(signal => {
+    const existing = expiryMap.get(signal.expiry) || [];
+    existing.push(signal);
+    expiryMap.set(signal.expiry, existing);
+  });
+
+  const topExpiries: SignalsByExpiry[] = Array.from(expiryMap.entries())
+    .map(([expiry, expirySignals]) => ({
+      expiry,
+      signals: expirySignals,
+      signalCount: expirySignals.length,
+      totalPremiumFlow: expirySignals.reduce(
+        (sum, s) => sum + (s.premium_flow || 0), 
+        0
+      ),
+      callCount: expirySignals.filter(
+        s => s.option_type === 'call'
+      ).length,
+      putCount: expirySignals.filter(
+        s => s.option_type === 'put'
+      ).length,
+      daysToExpiry: expirySignals[0]?.days_to_expiry || 0,
+    }))
+    .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow)
+    .slice(0, 5);
+
+  // Detection flags
+  const detectionFlags = {
+    volumeAnomaly: signals.filter(s => s.has_volume_anomaly).length,
+    oiSpike: signals.filter(s => s.has_oi_spike).length,
+    premiumFlow: signals.filter(s => s.has_premium_flow).length,
+    sweep: signals.filter(s => s.has_sweep).length,
+    blockTrade: signals.filter(s => s.has_block_trade).length,
+  };
+
+  return {
+    totalSignals,
+    totalPremiumFlow,
+    callCount,
+    putCount,
+    highConvictionCount,
+    dominantSentiment,
+    avgConfidence,
+    dateRange,
+    topStrikes,
+    topExpiries,
+    detectionFlags,
+  };
+}
+
+// Helper function to group signals by strike
+export function groupSignalsByStrike(
+  signals: UnusualOptionsSignal[]
+): SignalsByStrike[] {
+  const strikeMap = new Map<number, UnusualOptionsSignal[]>();
+  
+  signals.forEach(signal => {
+    const existing = strikeMap.get(signal.strike) || [];
+    existing.push(signal);
+    strikeMap.set(signal.strike, existing);
+  });
+
+  const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+  
+  return Array.from(strikeMap.entries())
+    .map(([strike, strikeSignals]) => ({
+      strike,
+      signals: strikeSignals.sort(
+        (a, b) => (b.premium_flow || 0) - (a.premium_flow || 0)
+      ),
+      signalCount: strikeSignals.length,
+      totalPremiumFlow: strikeSignals.reduce(
+        (sum, s) => sum + (s.premium_flow || 0), 
+        0
+      ),
+      callCount: strikeSignals.filter(
+        s => s.option_type === 'call'
+      ).length,
+      putCount: strikeSignals.filter(
+        s => s.option_type === 'put'
+      ).length,
+      avgScore: strikeSignals.reduce(
+        (sum, s) => sum + s.overall_score, 
+        0
+      ) / strikeSignals.length,
+      highestGrade: strikeSignals.reduce((best, signal) => {
+        return gradeOrder[signal.grade] > gradeOrder[best] 
+          ? signal.grade 
+          : best;
+      }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'),
+    }))
+    .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow);
+}
+
+// Helper function to group signals by expiry
+export function groupSignalsByExpiry(
+  signals: UnusualOptionsSignal[]
+): SignalsByExpiry[] {
+  const expiryMap = new Map<string, UnusualOptionsSignal[]>();
+  
+  signals.forEach(signal => {
+    const existing = expiryMap.get(signal.expiry) || [];
+    existing.push(signal);
+    expiryMap.set(signal.expiry, existing);
+  });
+
+  return Array.from(expiryMap.entries())
+    .map(([expiry, expirySignals]) => ({
+      expiry,
+      signals: expirySignals.sort(
+        (a, b) => (b.premium_flow || 0) - (a.premium_flow || 0)
+      ),
+      signalCount: expirySignals.length,
+      totalPremiumFlow: expirySignals.reduce(
+        (sum, s) => sum + (s.premium_flow || 0), 
+        0
+      ),
+      callCount: expirySignals.filter(
+        s => s.option_type === 'call'
+      ).length,
+      putCount: expirySignals.filter(
+        s => s.option_type === 'put'
+      ).length,
+      daysToExpiry: expirySignals[0]?.days_to_expiry || 0,
+    }))
+    .sort((a, b) => a.daysToExpiry - b.daysToExpiry);
+}
+
+// Helper function to group signals by date
+export function groupSignalsByDate(
+  signals: UnusualOptionsSignal[]
+): SignalsByDate[] {
+  const dateMap = new Map<string, UnusualOptionsSignal[]>();
+  
+  signals.forEach(signal => {
+    const date = signal.detection_timestamp.split('T')[0];
+    const existing = dateMap.get(date) || [];
+    existing.push(signal);
+    dateMap.set(date, existing);
+  });
+
+  return Array.from(dateMap.entries())
+    .map(([date, dateSignals]) => ({
+      date,
+      signals: dateSignals.sort(
+        (a, b) => (b.premium_flow || 0) - (a.premium_flow || 0)
+      ),
+      signalCount: dateSignals.length,
+      totalPremiumFlow: dateSignals.reduce(
+        (sum, s) => sum + (s.premium_flow || 0), 
+        0
+      ),
+      callCount: dateSignals.filter(
+        s => s.option_type === 'call'
+      ).length,
+      putCount: dateSignals.filter(
+        s => s.option_type === 'put'
+      ).length,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
