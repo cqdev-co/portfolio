@@ -143,11 +143,12 @@ class TickerFetcher:
                 min_data_completeness=0.85,
                 max_gap_ratio=0.10,
                 recency_days=5,
-                max_workers=10
+                max_workers=3,  # Reduced to avoid rate limiting
+                request_delay=0.5  # 500ms delay between requests
             )
             self.logger.info(
-                "YFinance validation enabled: will test data accessibility "
-                "and quality before storing tickers"
+                "YFinance validation enabled with conservative rate limiting "
+                "(3 workers, 0.5s delay) to avoid API errors"
             )
         else:
             self.yfinance_validator = None

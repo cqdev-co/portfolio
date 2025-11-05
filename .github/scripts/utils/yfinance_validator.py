@@ -8,6 +8,7 @@ Ensures scanners won't encounter empty data, OHLC violations, or missing fields.
 
 import logging
 import asyncio
+import time
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,8 @@ class YFinanceValidator:
         min_data_completeness: float = 0.85,  # 85% data completeness
         max_gap_ratio: float = 0.10,  # Max 10% gaps allowed
         recency_days: int = 5,  # Must have data within last 5 days
-        max_workers: int = 10
+        max_workers: int = 3,  # Reduced to avoid rate limiting
+        request_delay: float = 0.5  # Delay between requests
     ):
         self.min_history_days = min_history_days
         self.min_volume = min_volume
@@ -69,141 +72,189 @@ class YFinanceValidator:
         self.max_gap_ratio = max_gap_ratio
         self.recency_days = recency_days
         self.max_workers = max_workers
+        self.request_delay = request_delay
+        self.request_count = 0
+        self.last_request_time = time.time()
         
+    def _rate_limit_delay(self):
+        """Apply rate limiting delay to avoid overwhelming Yahoo Finance"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.request_delay:
+            sleep_time = self.request_delay - time_since_last
+            time.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
+        self.request_count += 1
+    
     def validate_ticker(
         self, 
         symbol: str, 
-        period: str = "6mo"
+        period: str = "6mo",
+        max_retries: int = 3
     ) -> YFinanceValidation:
         """
-        Validate a single ticker's YFinance data quality.
+        Validate a single ticker's YFinance data quality with retry logic.
         
         Args:
             symbol: Ticker symbol to validate
             period: Historical period to check (default: 6mo)
+            max_retries: Maximum retry attempts (default: 3)
             
         Returns:
             YFinanceValidation result
         """
         result = YFinanceValidation(symbol=symbol, is_valid=False)
         
-        try:
-            ticker = yf.Ticker(symbol)
-            
-            # 1. Check ticker info availability
+        for attempt in range(max_retries):
             try:
-                info = ticker.info
-                if info and len(info) > 5:  # Valid info dict
-                    result.has_info = True
-                else:
-                    result.validation_issues.append(
-                        "Insufficient ticker info"
-                    )
-            except Exception as e:
-                result.validation_issues.append(
-                    f"Cannot fetch ticker info: {str(e)[:50]}"
-                )
-                info = {}
-            
-            # 2. Check historical data
-            try:
-                hist = ticker.history(period=period)
+                # Rate limiting
+                self._rate_limit_delay()
                 
-                if hist.empty:
-                    result.validation_issues.append("No historical data")
+                # Add small random delay to spread out requests
+                time.sleep(random.uniform(0.1, 0.3))
+                
+                ticker = yf.Ticker(symbol)
+                
+                # 1. Check historical data FIRST (most important)
+                try:
+                    hist = ticker.history(period=period)
+                    
+                    if hist.empty:
+                        result.validation_issues.append("No historical data")
+                        return result
+                    
+                    result.min_history_days = len(hist)
+                    
+                    # Validate minimum history
+                    if len(hist) < self.min_history_days:
+                        result.validation_issues.append(
+                            f"Insufficient history: {len(hist)} days "
+                            f"(need {self.min_history_days})"
+                        )
+                        return result
+                    
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    # Check if it's a rate limit or auth error (retry-able)
+                    if any(keyword in error_msg for keyword in [
+                        'crumb', '401', 'unauthorized', 'rate limit', '429'
+                    ]):
+                        if attempt < max_retries - 1:
+                            wait_time = (attempt + 1) * 2  # Exponential backoff
+                            logger.debug(
+                                f"Rate limit hit for {symbol}, "
+                                f"retrying in {wait_time}s (attempt {attempt + 1})"
+                            )
+                            time.sleep(wait_time)
+                            continue
+                    
+                    result.validation_issues.append(
+                        f"Cannot fetch historical data: {str(e)[:50]}"
+                    )
                     return result
                 
-                result.min_history_days = len(hist)
+                # 2. Check ticker info availability (optional, don't fail if missing)
+                try:
+                    info = ticker.info
+                    if info and len(info) > 5:  # Valid info dict
+                        result.has_info = True
+                except Exception as e:
+                    # Don't fail validation if info fetch fails
+                    logger.debug(f"Could not fetch info for {symbol}: {e}")
+                    result.has_info = False
                 
-                # Validate minimum history
-                if len(hist) < self.min_history_days:
+                # 3. Check data recency
+                last_date = hist.index[-1]
+                days_since_last = (
+                    datetime.now() - last_date.to_pydatetime()
+                ).days
+                
+                if days_since_last > self.recency_days:
                     result.validation_issues.append(
-                        f"Insufficient history: {len(hist)} days "
-                        f"(need {self.min_history_days})"
+                        f"Stale data: last update {days_since_last} days ago"
                     )
                     return result
                 
+                result.has_recent_data = True
+                
+                # 4. Validate OHLC data quality
+                ohlc_quality, ohlc_issues = self._validate_ohlc_quality(hist)
+                result.ohlc_quality = ohlc_quality
+                result.validation_issues.extend(ohlc_issues)
+                
+                if ohlc_quality < 0.80:  # Less than 80% valid OHLC data
+                    return result
+                
+                # 5. Check price data
+                recent_prices = hist['Close'].tail(10)
+                if recent_prices.isnull().all():
+                    result.validation_issues.append("No valid price data")
+                    return result
+                
+                last_price = recent_prices.iloc[-1]
+                result.last_price = float(last_price)
+                result.has_price_data = True
+                
+                # Validate price range
+                if not (self.min_price <= last_price <= self.max_price):
+                    result.validation_issues.append(
+                        f"Price ${last_price:.2f} outside valid range "
+                        f"(${self.min_price}-${self.max_price})"
+                    )
+                    return result
+                
+                # 6. Check volume data
+                recent_volume = hist['Volume'].tail(20)
+                if recent_volume.isnull().all() or (recent_volume == 0).all():
+                    result.validation_issues.append("No valid volume data")
+                    return result
+                
+                avg_volume = recent_volume.mean()
+                result.avg_daily_volume = float(avg_volume)
+                result.has_volume = True
+                
+                if avg_volume < self.min_volume:
+                    result.validation_issues.append(
+                        f"Insufficient volume: {avg_volume:,.0f} "
+                        f"(need {self.min_volume:,.0f})"
+                    )
+                    return result
+                
+                # 7. Check data completeness (gaps)
+                completeness, gap_ratio = self._check_data_completeness(hist)
+                result.data_completeness = completeness
+                
+                if gap_ratio > self.max_gap_ratio:
+                    result.validation_issues.append(
+                        f"Too many data gaps: {gap_ratio:.1%}"
+                    )
+                    return result
+                
+                # All checks passed!
+                result.is_valid = True
+                return result  # Success, exit retry loop
+                
             except Exception as e:
+                error_msg = str(e).lower()
+                # Check if it's a rate limit or auth error (retry-able)
+                if any(keyword in error_msg for keyword in [
+                    'crumb', '401', 'unauthorized', 'rate limit', '429'
+                ]) and attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2  # Exponential backoff
+                    logger.debug(
+                        f"Rate limit hit for {symbol}, "
+                        f"retrying in {wait_time}s (attempt {attempt + 1})"
+                    )
+                    time.sleep(wait_time)
+                    continue
+                
                 result.validation_issues.append(
-                    f"Cannot fetch historical data: {str(e)[:50]}"
+                    f"Validation error: {str(e)[:100]}"
                 )
+                logger.debug(f"Error validating {symbol}: {e}")
                 return result
-            
-            # 3. Check data recency
-            last_date = hist.index[-1]
-            days_since_last = (
-                datetime.now() - last_date.to_pydatetime()
-            ).days
-            
-            if days_since_last > self.recency_days:
-                result.validation_issues.append(
-                    f"Stale data: last update {days_since_last} days ago"
-                )
-                return result
-            
-            result.has_recent_data = True
-            
-            # 4. Validate OHLC data quality
-            ohlc_quality, ohlc_issues = self._validate_ohlc_quality(hist)
-            result.ohlc_quality = ohlc_quality
-            result.validation_issues.extend(ohlc_issues)
-            
-            if ohlc_quality < 0.80:  # Less than 80% valid OHLC data
-                return result
-            
-            # 5. Check price data
-            recent_prices = hist['Close'].tail(10)
-            if recent_prices.isnull().all():
-                result.validation_issues.append("No valid price data")
-                return result
-            
-            last_price = recent_prices.iloc[-1]
-            result.last_price = float(last_price)
-            result.has_price_data = True
-            
-            # Validate price range
-            if not (self.min_price <= last_price <= self.max_price):
-                result.validation_issues.append(
-                    f"Price ${last_price:.2f} outside valid range "
-                    f"(${self.min_price}-${self.max_price})"
-                )
-                return result
-            
-            # 6. Check volume data
-            recent_volume = hist['Volume'].tail(20)
-            if recent_volume.isnull().all() or (recent_volume == 0).all():
-                result.validation_issues.append("No valid volume data")
-                return result
-            
-            avg_volume = recent_volume.mean()
-            result.avg_daily_volume = float(avg_volume)
-            result.has_volume = True
-            
-            if avg_volume < self.min_volume:
-                result.validation_issues.append(
-                    f"Insufficient volume: {avg_volume:,.0f} "
-                    f"(need {self.min_volume:,.0f})"
-                )
-                return result
-            
-            # 7. Check data completeness (gaps)
-            completeness, gap_ratio = self._check_data_completeness(hist)
-            result.data_completeness = completeness
-            
-            if gap_ratio > self.max_gap_ratio:
-                result.validation_issues.append(
-                    f"Too many data gaps: {gap_ratio:.1%}"
-                )
-                return result
-            
-            # All checks passed!
-            result.is_valid = True
-            
-        except Exception as e:
-            result.validation_issues.append(
-                f"Validation error: {str(e)[:100]}"
-            )
-            logger.debug(f"Error validating {symbol}: {e}")
         
         return result
     
@@ -298,15 +349,17 @@ class YFinanceValidator:
         self, 
         symbols: List[str], 
         period: str = "6mo",
-        verbose: bool = False
+        verbose: bool = False,
+        batch_size: int = 100
     ) -> Dict[str, YFinanceValidation]:
         """
-        Validate multiple tickers in parallel.
+        Validate multiple tickers in batches with rate limiting.
         
         Args:
             symbols: List of ticker symbols
             period: Historical period to check
             verbose: Enable progress logging
+            batch_size: Number of symbols per batch
             
         Returns:
             Dictionary mapping symbol to validation result
@@ -315,42 +368,63 @@ class YFinanceValidator:
         
         logger.info(
             f"Validating {len(symbols)} tickers on YFinance "
-            f"(workers: {self.max_workers})"
+            f"(workers: {self.max_workers}, batch_size: {batch_size})"
+        )
+        logger.warning(
+            "Note: Validation may take 10-20 minutes due to rate limiting"
         )
         
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Submit all validation tasks
-            future_to_symbol = {
-                executor.submit(
-                    self.validate_ticker, symbol, period
-                ): symbol
-                for symbol in symbols
-            }
+        # Process in batches to avoid overwhelming Yahoo Finance
+        for batch_num, batch_start in enumerate(range(0, len(symbols), batch_size)):
+            batch_symbols = symbols[batch_start:batch_start + batch_size]
+            batch_results = {}
             
-            completed = 0
-            for future in as_completed(future_to_symbol):
-                symbol = future_to_symbol[future]
-                try:
-                    result = future.result()
-                    results[symbol] = result
-                    
-                    completed += 1
-                    if verbose and completed % 100 == 0:
-                        valid_count = sum(
-                            1 for r in results.values() if r.is_valid
-                        )
-                        logger.info(
-                            f"Progress: {completed}/{len(symbols)} "
-                            f"({valid_count} valid so far)"
-                        )
+            logger.info(
+                f"Processing batch {batch_num + 1}/{(len(symbols) + batch_size - 1) // batch_size} "
+                f"({len(batch_symbols)} tickers)"
+            )
+            
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # Submit all validation tasks for this batch
+                future_to_symbol = {
+                    executor.submit(
+                        self.validate_ticker, symbol, period
+                    ): symbol
+                    for symbol in batch_symbols
+                }
+                
+                completed = 0
+                for future in as_completed(future_to_symbol):
+                    symbol = future_to_symbol[future]
+                    try:
+                        result = future.result()
+                        batch_results[symbol] = result
                         
-                except Exception as e:
-                    logger.error(f"Error validating {symbol}: {e}")
-                    results[symbol] = YFinanceValidation(
-                        symbol=symbol,
-                        is_valid=False,
-                        validation_issues=[f"Validation failed: {e}"]
-                    )
+                        completed += 1
+                        if verbose and completed % 25 == 0:
+                            valid_count = sum(
+                                1 for r in batch_results.values() if r.is_valid
+                            )
+                            logger.info(
+                                f"Batch progress: {completed}/{len(batch_symbols)} "
+                                f"({valid_count} valid so far)"
+                            )
+                            
+                    except Exception as e:
+                        logger.error(f"Error validating {symbol}: {e}")
+                        batch_results[symbol] = YFinanceValidation(
+                            symbol=symbol,
+                            is_valid=False,
+                            validation_issues=[f"Validation failed: {e}"]
+                        )
+            
+            results.update(batch_results)
+            
+            # Pause between batches to avoid rate limiting
+            if batch_start + batch_size < len(symbols):
+                pause_time = 5
+                logger.info(f"Pausing {pause_time}s before next batch...")
+                time.sleep(pause_time)
         
         # Summary statistics
         valid_count = sum(1 for r in results.values() if r.is_valid)

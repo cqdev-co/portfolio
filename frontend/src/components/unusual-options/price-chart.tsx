@@ -60,7 +60,11 @@ export function PriceChart({
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pinnedTooltipData, setPinnedTooltipData] = useState<ChartDataPoint | null>(null);
+  const [pinnedTooltip, setPinnedTooltip] = useState<{
+    data: ChartDataPoint;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -100,20 +104,20 @@ export function PriceChart({
 
   // Clear pinned tooltip when time range changes
   useEffect(() => {
-    setPinnedTooltipData(null);
+    setPinnedTooltip(null);
   }, [selectedRange]);
 
   // Handle escape key to close pinned tooltip
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && pinnedTooltipData) {
-        setPinnedTooltipData(null);
+      if (e.key === 'Escape' && pinnedTooltip) {
+        setPinnedTooltip(null);
       }
     };
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [pinnedTooltipData]);
+  }, [pinnedTooltip]);
 
   const chartData = useMemo<ChartDataPoint[]>(() => {
     if (priceData.length === 0) return [];
@@ -177,12 +181,13 @@ export function PriceChart({
     active?: boolean; 
     payload?: Array<{ payload: ChartDataPoint }> 
   }) => {
-    // Show pinned tooltip if we have one, otherwise show hover tooltip
-    const data = pinnedTooltipData || (active && payload && payload.length > 0 ? payload[0].payload as ChartDataPoint : null);
-    if (!data) return null;
-
+    // Don't show hover tooltip if something is pinned
+    if (pinnedTooltip !== null) return null;
+    
+    if (!active || !payload || payload.length === 0) return null;
+    
+    const data = payload[0].payload as ChartDataPoint;
     const hasDetections = data.detections && data.detections.length > 0;
-    const isPinned = pinnedTooltipData !== null;
 
     return (
       <div className="relative group">
@@ -190,10 +195,7 @@ export function PriceChart({
         <div className="absolute inset-0 -inset-y-4 -inset-x-2" />
         
         <div 
-          className={cn(
-            "relative bg-background/95 backdrop-blur-lg border rounded shadow-xl p-2 min-w-[150px] animate-in fade-in-0 duration-100",
-            isPinned ? "border-primary/50" : "border-border/30"
-          )}
+          className="relative bg-background/95 backdrop-blur-lg border border-border/30 rounded shadow-xl p-2 min-w-[150px] animate-in fade-in-0 duration-100"
         >
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
@@ -210,18 +212,7 @@ export function PriceChart({
                 {formatPrice(data.price)}
               </div>
             </div>
-            {isPinned ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPinnedTooltipData(null);
-                }}
-                className="text-muted-foreground/50 hover:text-foreground transition-colors"
-                title="Close (ESC)"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            ) : hasDetections && (
+            {hasDetections && (
               <div className="text-[7px] text-muted-foreground/40 italic">
                 Click dot to pin
               </div>
@@ -321,8 +312,12 @@ export function PriceChart({
         onClick={(e) => {
           e.stopPropagation();
           // Pin the tooltip at this location
-          if (props.payload) {
-            setPinnedTooltipData(data);
+          if (props.payload && cx && cy) {
+            setPinnedTooltip({
+              data: data,
+              x: cx,
+              y: cy
+            });
           }
         }}
       >
@@ -459,8 +454,8 @@ export function PriceChart({
         onClick={(e) => {
           // Close pinned tooltip when clicking on chart background
           const target = e.target as HTMLElement;
-          if (target.tagName === 'DIV' && pinnedTooltipData) {
-            setPinnedTooltipData(null);
+          if (target.tagName === 'DIV' && pinnedTooltip) {
+            setPinnedTooltip(null);
           }
         }}
       >
@@ -579,6 +574,93 @@ export function PriceChart({
             className="absolute top-3 right-8 text-[9px] text-muted-foreground/50 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded border border-border/20"
           >
             Prev close: {formatPrice(priceData[0]?.price || 0)}
+          </div>
+        )}
+
+        {/* Pinned Tooltip */}
+        {pinnedTooltip && (
+          <div 
+            className="absolute pointer-events-auto z-50"
+            style={{
+              left: `${pinnedTooltip.x}px`,
+              top: `${pinnedTooltip.y}px`,
+              transform: 'translate(-50%, -100%)',
+              marginTop: '-20px'
+            }}
+          >
+            <div className="relative">
+              <div className="bg-background/95 backdrop-blur-lg border border-primary/50 rounded shadow-xl p-2 min-w-[150px]">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="text-[8px] text-muted-foreground/50 font-medium">
+                        {new Date(pinnedTooltip.data.time).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                      <div className="text-xs font-bold">
+                        {formatPrice(pinnedTooltip.data.price)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPinnedTooltip(null);
+                      }}
+                      className="text-muted-foreground/50 hover:text-foreground transition-colors"
+                      title="Close (ESC)"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {pinnedTooltip.data.detections && pinnedTooltip.data.detections.length > 0 && (
+                    <>
+                      <div className="pt-1 mt-1 border-t border-border/10">
+                        <div className="text-[8px] font-semibold mb-1 flex items-center gap-1 text-muted-foreground/50 uppercase tracking-wider">
+                          <Activity className="h-1.5 w-1.5" />
+                          <span>
+                            {pinnedTooltip.data.detections.length} Option{pinnedTooltip.data.detections.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
+                          {pinnedTooltip.data.detections.map(({ signal }) => (
+                            <button
+                              key={signal.signal_id}
+                              onClick={() => onSignalClick?.(signal.signal_id)}
+                              className="w-full text-xs p-1 bg-muted/5 rounded hover:bg-muted/20 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className={cn(
+                                  "text-[9px] font-semibold capitalize",
+                                  signal.option_type === 'call' 
+                                    ? 'text-green-500' 
+                                    : 'text-red-500'
+                                )}>
+                                  ${signal.strike} {signal.option_type}
+                                </span>
+                                <Badge className={cn(
+                                  "text-[7px] px-1 py-0 h-3",
+                                  getGradeColor(signal.grade)
+                                )}>
+                                  {signal.grade}
+                                </Badge>
+                              </div>
+                              <div className="text-[8px] font-semibold text-green-600">
+                                {formatPremiumFlow(signal.premium_flow)}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
