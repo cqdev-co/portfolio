@@ -1,170 +1,215 @@
-# Documentation Index
+# Portfolio Documentation
 
-This directory contains comprehensive documentation for all services and components in the portfolio project.
+This directory contains comprehensive documentation for all services and 
+components in the portfolio project.
 
-## 📋 Table of Contents
+## 📁 Service Documentation
 
-### Core Services
+### Trading & Analysis Services
 
-#### Volatility Squeeze Scanner
-- [System Overview](volatility-squeeze-scanner/system-overview.md) - Architecture and design
-- [Technical Implementation](volatility-squeeze-scanner/technical-implementation.md) - Code details
-- [User Guide](volatility-squeeze-scanner/user-guide.md) - How to use the scanner
-- [README](volatility-squeeze-scanner/README.md) - Quick reference
+#### [Unusual Options Service](unusual-options-service/)
+Detect unusual options activity that may indicate insider information or 
+smart money positioning.
 
-#### Unusual Options Service
-- [System Overview](unusual-options-service/system-overview.md) - Architecture and design
-- [Technical Implementation](unusual-options-service/technical-implementation.md) - Code details
-- [Quick Start](unusual-options-service/quick-start.md) - Getting started guide
-- [Spread Detection](unusual-options-service/spread-detection.md) - Spread detection feature
-- [Understanding Unusual Activity](unusual-options-service/understanding-unusual-activity.md)
+**Key Features:**
+- Real-time unusual options activity detection
+- Signal grading system (S, A, B, C, D, F)
+- Spread detection (vertical spreads, iron condors, etc.)
+- **Advanced Filter System** - Filter by date, grade, option type, premium 
+  flow, and detection patterns
+- Interactive price charts with signal overlay
+- Automated hourly scanning with signal continuity
+- Frontend dashboard with grouped ticker view
+- RLS (Row Level Security) policies for data protection
+
+**Quick Links:**
+- [System Overview](unusual-options-service/system-overview.md)
+- [Quick Start Guide](unusual-options-service/quick-start.md)
+- [Filter System Guide](unusual-options-service/filter-system.md) ⭐ NEW
 - [Database Schema](unusual-options-service/database-schema.md)
-- [Price Chart Visualization](unusual-options-service/price-chart-visualization.md)
-- [Frontend Changes Example](unusual-options-service/FRONTEND_CHANGES_EXAMPLE.md)
-- [Project Summary](unusual-options-service/project-summary.md)
-- [README](unusual-options-service/README.md) - Quick reference
+- [Technical Implementation](unusual-options-service/technical-implementation.md)
+- [Troubleshooting RLS](unusual-options-service/troubleshooting-rls.md)
 
-#### RDS Ticker Analysis
-- [System Overview](rds-ticker-analysis/system-overview.md) - Architecture and design
-- [README](rds-ticker-analysis/README.md) - Quick reference
+#### [Analyze Options Service](analyze-options-service/) ✅ Phase 2+ Complete
+Enterprise-grade options analysis system with high-confidence trade filtering.
 
-#### Reddit Source Processing
-- [README](reddit-source/README.md) - Reddit data collection and processing
+**Status:** Phase 2+ Complete - Best-of-Best Command Added
 
-#### Penny Stocks Service
-- [System Overview](pennystocks/system-overview.md) - Architecture and design
-- [Technical Implementation](pennystocks/technical-implementation.md) - Code details
-- [Advice](pennystocks/ADVICE1.md) - Best practices
-- [README](pennystocks/README.md) - Quick reference
+**Key Features:**
+- 🏆 **`analyze best`** - Get only high-confidence opportunities (top 1-2% of signals)
+- 🎯 Automated vertical spread vs naked option comparison
+- 📊 Intelligent position sizing and risk management  
+- 🔍 Multi-layer quality filtering (technical + strategy + quality gates)
+- 📈 Black-Scholes probability estimation
+- 💰 Account-based risk allocation (conservative/moderate/aggressive)
+- ⚡ Fast execution: 408 signals → 5 actionable trades in 2 minutes
 
-### Infrastructure & Tools
+**Quick Links:**
+- [Quick Start Guide](../analyze-options-service/QUICK_START.md) ⭐
+- [Command Guide](../analyze-options-service/COMMAND_GUIDE.md) - Which command when?
+- [Best Command Explained](../analyze-options-service/BEST_COMMAND.md) - High-confidence filtering
+- [Architecture](analyze-options-service/architecture.md)
+- [Trade Strategies](analyze-options-service/trade-strategies.md)
+- [Phase 2 Complete](../analyze-options-service/PHASE_2_COMPLETE.md)
 
-#### Database
-- [Database README](db/README.md) - Database schemas and migrations
+#### [RDS Ticker Analysis](rds-ticker-analysis/)
+Reddit sentiment analysis combined with AI-powered investment insights.
 
-#### Frontend
-- [Frontend README](frontend/README.md) - Next.js frontend documentation
+**Key Features:**
+- Reddit sentiment analysis from multiple subreddits
+- AI-generated investment thesis
+- Technical analysis integration
+- Risk assessment
+- Fast analysis mode for debugging
+
+**Quick Links:**
+- [System Overview](rds-ticker-analysis/system-overview.md)
+
+#### [Volatility Squeeze Scanner](volatility-squeeze-scanner/)
+TTM Squeeze indicator scanner for identifying consolidation breakouts.
+
+**Key Features:**
+- Real-time volatility squeeze detection
+- Historical backtesting capabilities
+- Multi-timeframe analysis
+- GitHub Actions CI/CD integration
+- Professional logging system
+
+**Quick Links:**
+- [System Overview](volatility-squeeze-scanner/system-overview.md)
+- [Technical Implementation](volatility-squeeze-scanner/technical-implementation.md)
+- [User Guide](volatility-squeeze-scanner/user-guide.md)
+
+#### [Penny Stocks Service](pennystocks/)
+Small-cap stock screening and analysis system.
+
+**Quick Links:**
+- [System Overview](pennystocks/system-overview.md)
+- [Technical Implementation](pennystocks/technical-implementation.md)
+
+### Frontend
+
+#### [Frontend Documentation](frontend/)
+Next.js frontend application with Vercel deployment.
+
+**Key Features:**
+- Modern React with TypeScript
+- Responsive design with Tailwind CSS
+- Real-time data updates via Supabase
+- Interactive data visualizations
+- Advanced filtering system for options signals
+
+**Quick Links:**
 - [Vercel Build Fixes](frontend/vercel-build-fixes.md)
 - [Volatility Squeeze Scanner UI](frontend/volatility-squeeze-scanner.md)
 
-#### Library & Utilities
-- [Library README](lib/README.md) - Shared utilities and types
+### Utilities
 
-#### WordPress Service
-- [WP Service README](wp-service/README.md) - WordPress integration
+#### [Database](db/)
+Shared database schemas and migrations for all services.
 
-### System Documentation
+**Quick Links:**
+- [Database README](db/README.md)
 
-#### Performance & Optimization
-- [Performance Optimization Complete](performance-optimization-complete.md) - System-wide optimizations
-- [Data Analytics Logging](volatility-squeeze-scanner/data-analytics-logging.md)
-- [Improved Logging Strategy](volatility-squeeze-scanner/improved-logging-strategy.md)
-- [Professional Logging System](volatility-squeeze-scanner/professional-logging-system.md)
+#### [Library](lib/)
+Shared types and utilities across services.
 
-#### Quality & Reliability
-- **[Ticker Fetch Improvements](ticker-fetch-improvements.md)** ⭐ NEW - Enhanced data quality validation
-- [Database Fields Null Values Fixed](database-fields-null-values-fixed.md)
-- [Analysis Service Consolidation](analysis-service-consolidation.md)
+**Quick Links:**
+- [Library README](lib/README.md)
 
-### Components
+## 🎯 Getting Started
 
-#### UI Components
-- [Expandable Image Component](components/expandable-image.md)
+### For Traders
+1. Start with the [Unusual Options Quick Start](unusual-options-service/quick-start.md)
+2. Learn about [Signal Interpretation](unusual-options-service/signal-interpretation.md)
+3. Use the [Filter System](unusual-options-service/filter-system.md) to find 
+   signals that match your strategy
+4. Set up [Scanning Strategies](unusual-options-service/scanning-strategies.md)
 
-## 🔍 Quick Links by Topic
+### For Developers
+1. Review [Architecture](unusual-options-service/architecture.md)
+2. Set up [Database Schema](unusual-options-service/database-schema.md)
+3. Understand the [Filter System Architecture](unusual-options-service/filter-system.md)
+4. Follow [Technical Implementation](unusual-options-service/technical-implementation.md)
 
-### Getting Started
-- [Volatility Scanner Quick Start](volatility-squeeze-scanner/README.md)
-- [Unusual Options Quick Start](unusual-options-service/quick-start.md)
-- [Frontend Setup](frontend/README.md)
+## 📊 Recent Updates
 
-### Architecture & Design
-- [Volatility Scanner System](volatility-squeeze-scanner/system-overview.md)
-- [Unusual Options System](unusual-options-service/system-overview.md)
-- [RDS Analysis System](rds-ticker-analysis/system-overview.md)
-- [Penny Stocks System](pennystocks/system-overview.md)
+### November 2024
 
-### Technical Implementation
-- [Volatility Scanner Code](volatility-squeeze-scanner/technical-implementation.md)
-- [Unusual Options Code](unusual-options-service/technical-implementation.md)
-- [Penny Stocks Code](pennystocks/technical-implementation.md)
+#### Filter System Enhancement (Latest) ⭐
+- Implemented modular, scalable filter system for unusual options scanner
+- Date-based filtering with quick presets
+- Multi-select grade and option type filters
+- Premium flow range filtering
+- Detection pattern toggles (volume anomaly, OI spike, sweep, block trade)
+- Slide-out filter panel with active filter count
+- Full documentation in [filter-system.md](unusual-options-service/filter-system.md)
 
-### Database & Schema
-- [Database Overview](db/README.md)
-- [Unusual Options Schema](unusual-options-service/database-schema.md)
+#### Spread Detection System
+- Phase 1 implementation for vertical spreads, iron condors, etc.
+- Confidence scoring and reasoning
+- Frontend visualization with warning badges
+- Comprehensive documentation in [spread-detection.md](unusual-options-service/spread-detection.md)
 
-### Data Quality & Reliability
-- **[Ticker Fetch Improvements](ticker-fetch-improvements.md)** - YFinance validation layer
-- [Database Null Values Fix](database-fields-null-values-fixed.md)
-- [Performance Optimizations](performance-optimization-complete.md)
+#### Signal Continuity & Cron Jobs
+- Automated hourly scanning
+- Signal deduplication
+- Active signal tracking
+- Detection count metrics
 
-### User Guides
-- [Volatility Scanner Usage](volatility-squeeze-scanner/user-guide.md)
-- [Understanding Unusual Activity](unusual-options-service/understanding-unusual-activity.md)
+#### RLS & Security
+- Row Level Security policies implemented
+- Anonymous access controls
+- Premium account distinction
+- Frontend fixes for authentication
 
-## 📚 Documentation Standards
+## 🔧 Technical Stack
 
-All documentation in this project follows these standards:
+### Backend
+- **Python 3.12+** - Core services
+- **Poetry** - Dependency management
+- **Supabase** - PostgreSQL database with real-time features
+- **FastAPI** - API framework (where applicable)
 
-1. **Markdown Format**: All docs use GitHub-flavored Markdown
-2. **Code Examples**: Include practical, runnable examples
-3. **Architecture Diagrams**: ASCII art or Mermaid diagrams where applicable
-4. **Version Tracking**: Document changes and updates
-5. **Cross-References**: Link to related documentation
-6. **Best Practices**: Include recommendations and gotchas
+### Frontend
+- **Next.js 14** - React framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Bun** - Package manager
+- **Recharts** - Data visualization
 
-## 🔄 Recent Updates
+### Infrastructure
+- **Vercel** - Frontend hosting
+- **GitHub Actions** - CI/CD
+- **Supabase** - Backend as a Service
 
-### November 2025
-- **✨ NEW**: [Ticker Fetch Improvements](ticker-fetch-improvements.md) - Added YFinance validation layer to prevent downstream data quality issues
-- Updated unusual options service documentation with spread detection
-- Enhanced frontend visualization documentation
-- Performance optimization documentation
+## 📝 Documentation Standards
+
+All service documentation should include:
+- System overview and purpose
+- Technical architecture
+- Setup and configuration
+- Usage examples
+- API references (where applicable)
+- Performance considerations
+- Troubleshooting guide
 
 ## 🤝 Contributing
 
-When adding new documentation:
+When making changes:
+1. Update relevant documentation
+2. Follow existing code style
+3. Add tests for new features
+4. Update the changelog in docs
 
-1. Follow the existing structure
-2. Update this README with links
-3. Include code examples
-4. Add cross-references
-5. Keep it up to date with code changes
+## 📧 Support
 
-## 📝 Documentation Template
-
-```markdown
-# [Feature/Service Name]
-
-## Overview
-Brief description of what this is and why it exists.
-
-## Architecture
-High-level architecture and design decisions.
-
-## Implementation
-Technical details and code structure.
-
-## Usage
-How to use this feature/service.
-
-## Configuration
-Available options and settings.
-
-## Troubleshooting
-Common issues and solutions.
-
-## Related Documentation
-Links to related docs.
-```
-
-## 🔗 External Resources
-
-- [Project Repository](https://github.com/[your-repo])
-- [API Documentation](https://[your-api-docs])
-- [Production Dashboard](https://[your-dashboard])
+For questions or issues:
+- Check the relevant service documentation
+- Review troubleshooting guides
+- Check GitHub issues
 
 ---
 
-*Last Updated: November 2025*
-
+**Last Updated:** November 2024  
+**Maintained by:** Portfolio Project Team

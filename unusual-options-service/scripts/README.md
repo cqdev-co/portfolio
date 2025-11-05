@@ -17,6 +17,70 @@ poetry run python scripts/signal_correlation.py --days 14
 
 ## 🛠️ Utility Scripts
 
+### **Signal Reactivation Tool** (`reactivate_valid_signals.py`)
+**Purpose**: Identify and reactivate signals that were falsely marked inactive due to the 3-hour rule bug (before the expiry logic fix)
+
+**Quick Usage**:
+```bash
+# Check what signals would be reactivated
+python scripts/reactivate_valid_signals.py --dry-run
+
+# Reactivate falsely inactive signals
+python scripts/reactivate_valid_signals.py
+
+# Show detailed information
+python scripts/reactivate_valid_signals.py --verbose
+
+# Look back 14 days instead of default 7
+python scripts/reactivate_valid_signals.py --days 14
+```
+
+**What It Fixes**:
+- Signals marked inactive after 3 hours (old bug)
+- Options that haven't expired yet but were marked inactive
+- Recently detected signals that should still be active
+
+**Example Output**:
+```
+Current Database Status:
+  • Active signals: 633
+  • Inactive (expired): 245
+  • Inactive (NOT expired): 150  ← These need fixing!
+
+Falsely Inactive Signals (150 found)
+┌────────┬─────────────────┬───────┬────────────┬──────────────────┐
+│ Ticker │ Contract        │ Grade │ Expiry     │ Days to Expiry   │
+├────────┼─────────────────┼───────┼────────────┼──────────────────┤
+│ AAPL   │ AAPL251121C...  │ S     │ 2025-11-21 │ 16               │
+│ AMD    │ AMD251114P...   │ A     │ 2025-11-14 │ 9                │
+└────────┴─────────────────┴───────┴────────────┴──────────────────┘
+
+✓ Successfully reactivated 150 signals
+
+New Database Status:
+  • Active signals: 783
+  • Inactive (NOT expired): 0  ← Fixed!
+```
+
+**Use Cases**:
+- After applying the continuity tracking fix
+- When frontend shows fewer signals than expected
+- Recovering from the 3-hour rule bug
+- Periodic database health checks
+
+**When to Run**:
+- **Once** after applying `fix_continuity_expiry_logic.sql`
+- Anytime you notice active signals decreasing unexpectedly
+- Part of database maintenance routine
+
+**Safety**:
+- Dry-run mode shows changes without applying them
+- Requires explicit confirmation before reactivating
+- Only affects signals with valid (non-expired) options
+- Checks last_detected_at to avoid reactivating old signals
+
+---
+
 ### **Database Cleanup Tool** (`cleanup_database.py`)
 **Purpose**: Clean unusual options data for fresh testing of continuity tracking
 

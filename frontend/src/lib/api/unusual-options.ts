@@ -113,7 +113,15 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
     }
 
     if (filters.detection_date) {
-      query = query.eq('detection_timestamp::date', filters.detection_date);
+      // Filter for signals detected on or after the specified date
+      const startOfDay = new Date(filters.detection_date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filters.detection_date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('detection_timestamp', startOfDay.toISOString())
+        .lte('detection_timestamp', endOfDay.toISOString());
     }
 
     // Continuity filters (NEW for cron job support)

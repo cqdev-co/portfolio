@@ -43,14 +43,28 @@ $$ LANGUAGE plpgsql;
 -- while should_remain_active signals will stay active regardless of last_detected_at
 -- ================================================
 
--- Optionally reactivate any signals that were incorrectly marked inactive
--- (signals that expired in the future but were marked inactive due to 3-hour rule)
+-- ================================================
+-- REACTIVATE FALSELY INACTIVE SIGNALS
+-- ================================================
+-- Signals that were marked inactive due to 3-hour rule
+-- but option hasn't expired yet should be reactivated
+
+-- Show what will be reactivated
+SELECT 
+    'Signals to Reactivate' as info,
+    COUNT(*) as count
+FROM unusual_options_signals
+WHERE is_active = FALSE
+    AND expiry >= CURRENT_DATE
+    AND last_detected_at > NOW() - INTERVAL '7 days';
+
+-- Reactivate them
 UPDATE unusual_options_signals
 SET is_active = TRUE,
     updated_at = NOW()
 WHERE is_active = FALSE
-    AND expiry >= CURRENT_DATE
-    AND last_detected_at > NOW() - INTERVAL '24 hours';
+    AND expiry >= CURRENT_DATE  -- Option not expired
+    AND last_detected_at > NOW() - INTERVAL '7 days';  -- Recently detected
 
 -- Show summary of changes
 SELECT 
@@ -60,4 +74,10 @@ SELECT
     COUNT(*) FILTER (WHERE is_active = TRUE AND expiry < CURRENT_DATE) as needs_cleanup,
     COUNT(*) FILTER (WHERE is_active = FALSE AND expiry >= CURRENT_DATE) as incorrectly_inactive
 FROM unusual_options_signals;
+
+-- Expected results:
+-- active_valid: All non-expired signals (should be > 600)
+-- inactive_expired: Actually expired contracts
+-- needs_cleanup: Expired but still marked active (mark_expired_signals() will fix)
+-- incorrectly_inactive: Should be 0 after this migration!
 

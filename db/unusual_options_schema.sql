@@ -387,6 +387,81 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ================================================
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- ================================================
+
+-- Enable RLS on all tables
+ALTER TABLE unusual_options_signals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE unusual_options_signal_continuity ENABLE ROW LEVEL SECURITY;
+ALTER TABLE unusual_options_signal_performance ENABLE ROW LEVEL SECURITY;
+
+-- Signals table: Allow public read, authenticated write
+CREATE POLICY "Allow public read access to signals" 
+    ON unusual_options_signals
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Allow authenticated insert on signals" 
+    ON unusual_options_signals
+    FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated update on signals" 
+    ON unusual_options_signals
+    FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated delete on signals" 
+    ON unusual_options_signals
+    FOR DELETE
+    USING (true);
+
+-- Continuity table: Allow public read, authenticated write
+CREATE POLICY "Allow public read access to continuity" 
+    ON unusual_options_signal_continuity
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Allow authenticated insert on continuity" 
+    ON unusual_options_signal_continuity
+    FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated update on continuity" 
+    ON unusual_options_signal_continuity
+    FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated delete on continuity" 
+    ON unusual_options_signal_continuity
+    FOR DELETE
+    USING (true);
+
+-- Performance table: Allow public read, authenticated write
+CREATE POLICY "Allow public read access to performance" 
+    ON unusual_options_signal_performance
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Allow authenticated insert on performance" 
+    ON unusual_options_signal_performance
+    FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated update on performance" 
+    ON unusual_options_signal_performance
+    FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated delete on performance" 
+    ON unusual_options_signal_performance
+    FOR DELETE
+    USING (true);
+
+-- ================================================
 -- SCHEMA COMPLETE
 -- ================================================
 

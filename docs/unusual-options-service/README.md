@@ -20,6 +20,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Signal Interpretation](signal-interpretation.md) - How to read and act on signals
 - [Watchlist Management](watchlist-management.md) - Creating and managing ticker watchlists
 - [Grouped Ticker View](grouped-ticker-view.md) - Frontend UI for aggregated signal display
+- [Filter System](filter-system.md) - Comprehensive filtering and search capabilities
 - [Price Chart Visualization](price-chart-visualization.md) - Interactive charts with option detection overlay
 - [Spread Detection](spread-detection.md) - Multi-leg strategy detection system
 - [Frontend Spread Updates](frontend-spread-detection-updates.md) - UI changes for spread visualization
@@ -58,6 +59,11 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **Deduplication**: See [How It Works](github-actions-setup.md#how-it-works) - Prevents duplicate signals
 - **Troubleshooting**: See [Troubleshooting](github-actions-setup.md#-troubleshooting) - Common issues and solutions
 
+### Troubleshooting
+- **Frontend Not Showing Signals**: See [RLS Troubleshooting](troubleshooting-rls.md) - Fix Row Level Security issues
+- **Signals Disappearing**: Check continuity tracking and expiry logic
+- **Database Connection Issues**: Verify Supabase credentials
+
 ### For Developers
 - **Integration**: See [Python API](python-api.md)
 - **Contributing**: See [Development Guide](development.md)
@@ -74,6 +80,11 @@ All documentation follows these principles:
 ## 🔄 Recent Updates
 
 **November 5, 2025**
+- **Row Level Security Fix**: Added RLS policies for frontend access
+  - Frontend can now read signals from database
+  - Issue: Tables had RLS enabled but no policies configured
+  - Fix: Added public read policies for all unusual options tables
+  - Run migration: `db/migrations/add_rls_policies_unusual_options.sql`
 - **Continuity Tracking Fix**: Fixed signals being marked inactive after 3 hours
   - Signals now only marked inactive when option contract actually expires
   - Previously: Marked inactive if not detected in last 3 hours

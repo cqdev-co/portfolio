@@ -32,7 +32,7 @@ import {
   formatSpreadType,
   formatSpreadConfidence
 } from "@/lib/types/unusual-options";
-import { fetchUnusualOptionsSignals, fetchUnusualOptionsStats, subscribeToUnusualOptionsUpdates } from "@/lib/api/unusual-options";
+import { fetchUnusualOptionsSignals, subscribeToUnusualOptionsUpdates } from "@/lib/api/unusual-options";
 import type { UnusualOptionsStats } from "@/lib/types/unusual-options";
 import { cn } from "@/lib/utils";
 import { 
@@ -48,6 +48,7 @@ import {
   Filter
 } from "lucide-react";
 import { PriceChart } from "@/components/unusual-options/price-chart";
+import { FilterPanel } from "@/components/unusual-options/filters";
 
 // Helper function to generate Yahoo Finance URL
 function getYahooFinanceUrl(symbol: string): string {
@@ -60,7 +61,8 @@ export default function UnusualOptionsScanner() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filters] = useState<UnusualOptionsFilters>({});
+  const [filters, setFilters] = useState<UnusualOptionsFilters>({});
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ 
     field: keyof GroupedTickerSignals; 
     direction: "asc" | "desc" 
@@ -81,17 +83,14 @@ export default function UnusualOptionsScanner() {
     try {
       setError(null);
       
-      // Load signals and stats in parallel
-      const [signalsResponse, statsData] = await Promise.all([
-        fetchUnusualOptionsSignals({
-          limit: 500, // Increased limit to get more signals for grouping
-          sortBy: 'premium_flow' as keyof UnusualOptionsSignal,
-          sortOrder: 'desc',
-          filters,
-          searchTerm
-        }),
-        fetchUnusualOptionsStats()
-      ]);
+      // Load signals with filters applied
+      const signalsResponse = await fetchUnusualOptionsSignals({
+        limit: 5000, // High limit to capture all active signals
+        sortBy: 'premium_flow' as keyof UnusualOptionsSignal,
+        sortOrder: 'desc',
+        filters,
+        searchTerm
+      });
 
       if (signalsResponse.error) {
         setError(signalsResponse.error);
@@ -118,9 +117,12 @@ export default function UnusualOptionsScanner() {
         });
         
         setGroupedTickers(sorted);
+        
+        // Calculate stats from filtered signals instead of separate API call
+        // This ensures stats reflect the current filters
+        const filteredStats = calculateStatsFromSignals(signalsResponse.data);
+        setStats(filteredStats);
       }
-      
-      setStats(statsData);
     } catch (error) {
       console.error("Failed to load data:", error);
       setError("Failed to load unusual options signals");
@@ -129,6 +131,73 @@ export default function UnusualOptionsScanner() {
       if (showRefreshing) setRefreshing(false);
     }
   }, [sortConfig, filters, searchTerm]);
+
+  // Helper function to calculate stats from filtered signals
+  const calculateStatsFromSignals = (
+    signals: UnusualOptionsSignal[]
+  ): UnusualOptionsStats => {
+    if (signals.length === 0) {
+      return {
+        total_signals: 0,
+        by_grade: { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 },
+        by_type: { calls: 0, puts: 0 },
+        by_risk: { LOW: 0, MEDIUM: 0, HIGH: 0, EXTREME: 0 },
+        total_premium_flow: 0,
+        average_score: 0,
+        latest_detection_date: new Date().toISOString().split('T')[0],
+        high_conviction_count: 0
+      };
+    }
+
+    const by_grade = {
+      S: signals.filter(s => s.grade === 'S').length,
+      A: signals.filter(s => s.grade === 'A').length,
+      B: signals.filter(s => s.grade === 'B').length,
+      C: signals.filter(s => s.grade === 'C').length,
+      D: signals.filter(s => s.grade === 'D').length,
+      F: signals.filter(s => s.grade === 'F').length,
+    };
+
+    const by_type = {
+      calls: signals.filter(s => s.option_type === 'call').length,
+      puts: signals.filter(s => s.option_type === 'put').length,
+    };
+
+    const by_risk = {
+      LOW: signals.filter(s => s.risk_level === 'LOW').length,
+      MEDIUM: signals.filter(s => s.risk_level === 'MEDIUM').length,
+      HIGH: signals.filter(s => s.risk_level === 'HIGH').length,
+      EXTREME: signals.filter(s => s.risk_level === 'EXTREME').length,
+    };
+
+    const total_premium_flow = signals.reduce(
+      (sum, s) => sum + (s.premium_flow || 0), 
+      0
+    );
+
+    const average_score = signals.reduce(
+      (sum, s) => sum + (s.overall_score || 0), 
+      0
+    ) / signals.length;
+
+    const latest_detection_date = signals
+      .map(s => s.detection_timestamp)
+      .sort()
+      .reverse()[0]?.split('T')[0] || new Date().toISOString().split('T')[0];
+
+    const high_conviction_count = by_grade.S + by_grade.A;
+
+    return {
+      total_signals: signals.length,
+      by_grade,
+      by_type,
+      by_risk,
+      total_premium_flow,
+      average_score,
+      latest_detection_date,
+      high_conviction_count
+    };
+  };
 
   // Initial load
   useEffect(() => {
@@ -319,7 +388,7 @@ export default function UnusualOptionsScanner() {
             </div>
             <p className="text-lg font-medium mt-1">
               {formatPremiumFlow(
-                groupedTickers.reduce((sum, t) => sum + t.totalPremiumFlow, 0)
+                stats?.total_premium_flow || groupedTickers.reduce((sum, t) => sum + t.totalPremiumFlow, 0)
               )}
             </p>
           </Card>
@@ -350,9 +419,23 @@ export default function UnusualOptionsScanner() {
             <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setFilterPanelOpen(true)}
+            className="flex items-center gap-2"
+          >
             <Filter className="h-4 w-4" />
             Filters
+            {Object.keys(filters).filter(
+              k => filters[k as keyof UnusualOptionsFilters] !== undefined
+            ).length > 0 && (
+              <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full h-4 w-4 flex items-center justify-center">
+                {Object.keys(filters).filter(
+                  k => filters[k as keyof UnusualOptionsFilters] !== undefined
+                ).length}
+              </span>
+            )}
           </Button>
         </div>
       </section>
@@ -495,6 +578,15 @@ export default function UnusualOptionsScanner() {
           </Table>
         </div>
       </section>
+
+      {/* Filter Panel */}
+      <FilterPanel
+        isOpen={filterPanelOpen}
+        onClose={() => setFilterPanelOpen(false)}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onApply={() => loadData(true)}
+      />
 
       {/* Signal Details Sidebar */}
       {sidebarOpen && selectedTicker && (() => {
