@@ -20,6 +20,98 @@ class StrategyRecommendation(Enum):
     SKIP = "Skip (Risk Too High)"
 
 
+class RecommendationTier(Enum):
+    """
+    Signal quality tiers for recommendation strength.
+    
+    STRONG_BUY: High conviction, excellent setup (score >= 85)
+    BUY: Good setup, moderate conviction (score 70-84)
+    CONSIDER: Marginal setup, needs extra research (score 50-69)
+    SKIP: Don't trade, too risky (score < 50)
+    """
+    STRONG_BUY = "STRONG BUY"
+    BUY = "BUY"
+    CONSIDER = "CONSIDER"
+    SKIP = "SKIP"
+    
+    @classmethod
+    def from_score(cls, score: float) -> 'RecommendationTier':
+        """Determine tier from composite score."""
+        if score >= 85:
+            return cls.STRONG_BUY
+        elif score >= 70:
+            return cls.BUY
+        elif score >= 50:
+            return cls.CONSIDER
+        else:
+            return cls.SKIP
+    
+    def get_emoji(self) -> str:
+        """Get emoji for this tier."""
+        return {
+            self.STRONG_BUY: "🚀",
+            self.BUY: "✅",
+            self.CONSIDER: "⚠️",
+            self.SKIP: "❌"
+        }.get(self, "")
+    
+    def get_color(self) -> str:
+        """Get Rich color for this tier."""
+        return {
+            self.STRONG_BUY: "bright_green",
+            self.BUY: "green",
+            self.CONSIDER: "yellow",
+            self.SKIP: "red"
+        }.get(self, "white")
+
+
+class SkipReason(Enum):
+    """
+    Detailed reasons for skipping a signal.
+    
+    Provides actionable feedback on why a signal doesn't meet criteria.
+    """
+    # Cost-related
+    PREMIUM_TOO_EXPENSIVE = "Premium too expensive (>${threshold}/contract)"
+    CAPITAL_REQUIREMENT_HIGH = "Capital requirement exceeds risk tolerance"
+    
+    # Probability-related
+    LOW_PROBABILITY = "Low probability of profit (<{threshold}%)"
+    POOR_RISK_REWARD = "Unfavorable risk/reward ratio (<{threshold}:1)"
+    
+    # Technical-related
+    RSI_OVERBOUGHT = "RSI overbought ({value}), poor entry point"
+    RSI_OVERSOLD = "RSI oversold ({value}), bearish momentum"
+    WEAK_TREND = "Weak or unfavorable price trend"
+    LOW_VOLUME = "Below average volume, liquidity concern"
+    
+    # Volatility-related
+    IV_TOO_HIGH = "IV rank too high ({value}), overpaying for volatility"
+    IV_TOO_LOW = "IV too low, limited profit potential"
+    
+    # Timing-related
+    TOO_CLOSE_TO_EXPIRY = "Too close to expiry (<{threshold} DTE), theta risk"
+    TOO_FAR_FROM_EXPIRY = "Too far from expiry (>{threshold} DTE), capital efficiency"
+    EARNINGS_TOO_CLOSE = "Earnings in {days} days, IV crush risk"
+    
+    # Strategy-related
+    NO_VIABLE_STRIKES = "No suitable strike prices available"
+    SPREAD_TOO_NARROW = "Strike width too narrow for adequate profit"
+    ILLIQUID_OPTIONS = "Low options volume/OI, wide spreads"
+    
+    # Score-related
+    SCORE_TOO_LOW = "Both strategies scored below threshold (spread: {spread}, naked: {naked})"
+    SIGNAL_GRADE_LOW = "Signal grade too low for current risk tolerance"
+    
+    # General
+    BETTER_OPPORTUNITIES = "Other signals have significantly better setup"
+    INSUFFICIENT_DATA = "Unable to fetch required market data"
+    
+    def format(self, **kwargs) -> str:
+        """Format the skip reason with specific values."""
+        return self.value.format(**kwargs)
+
+
 @dataclass
 class VerticalSpreadAnalysis:
     """Analysis results for a vertical spread strategy."""
@@ -152,6 +244,8 @@ class StrategyComparison:
     # Recommendation
     recommended_strategy: StrategyRecommendation = StrategyRecommendation.SKIP
     recommendation_reason: str = ""
+    recommendation_tier: Optional[RecommendationTier] = None
+    skip_reasons: List[str] = field(default_factory=list)
     
     # Position sizing
     suggested_contracts: int = 0
@@ -172,4 +266,38 @@ class StrategyComparison:
         elif self.naked.score > self.spread.score:
             return "naked"
         return "equal"
+    
+    def update_tier(self):
+        """
+        Update recommendation tier based on composite score.
+        Should be called after score is calculated.
+        """
+        self.recommendation_tier = RecommendationTier.from_score(
+            self.composite_score
+        )
+    
+    def add_skip_reason(self, reason: SkipReason, **kwargs):
+        """
+        Add a formatted skip reason.
+        
+        Args:
+            reason: SkipReason enum value
+            **kwargs: Values to format into the reason string
+        """
+        formatted = reason.format(**kwargs)
+        if formatted not in self.skip_reasons:
+            self.skip_reasons.append(formatted)
+    
+    @property
+    def is_worth_trading(self) -> bool:
+        """
+        Check if signal is worth trading (BUY or STRONG_BUY).
+        """
+        return (
+            self.recommendation_tier 
+            and self.recommendation_tier in [
+                RecommendationTier.BUY, 
+                RecommendationTier.STRONG_BUY
+            ]
+        )
 

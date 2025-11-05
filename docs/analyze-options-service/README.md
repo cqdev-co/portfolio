@@ -1,25 +1,58 @@
 # Analyze Options Service - Documentation Index
 
 **Last Updated:** November 5, 2025  
-**Version:** 1.0.0 (Phase 1 Complete!)  
-**Status:** ✅ Phase 1 PRODUCTION READY - Core infrastructure built and tested!
+**Version:** 2.0.0 (NEW FEATURES!)  
+**Status:** ✅ PRODUCTION READY with Comprehensive Signal Analysis!
 
 ---
 
-## 🎯 What is Analyze Options Service?
+## 🆕 NEW FEATURES (November 2025)
 
-The **Analyze Options Service** transforms unusual options signals (from your 
-unusual-options-service) into actionable trades by:
+### 1. 🔍 Analyze ALL Signals - Comprehensive Overview
 
-1. **Analyzing strategies**: Comparing vertical spreads vs naked options
-2. **Assessing risk/reward**: Calculating probability, expected value, Greeks
-3. **Sizing positions**: Using Kelly Criterion and portfolio risk management
-4. **Ranking opportunities**: Scoring signals by quality and expected return
-5. **Generating recommendations**: Ready-to-execute trade plans
+Get honest buy/skip recommendations for EVERY signal:
+
+```bash
+poetry run analyze all --days 7
+```
+
+**What's New:**
+- ✅ Evaluates ALL signals (not just pre-filtered ones)
+- 🎯 4-tier recommendation system (STRONG BUY, BUY, CONSIDER, SKIP)
+- 🚫 Detailed skip reasons for rejected signals
+- 📊 Summary statistics showing quality rate
+
+### 2. 🤔 Q&A System - Ask About Signals
+
+Ask questions and get intelligent answers:
+
+```bash
+poetry run analyze ask "Why should I trade AAPL?"
+poetry run analyze ask "What are the risks for TSLA?"
+poetry run analyze ask "Compare GOOGL vs MSFT"
+```
+
+**Ask About:**
+- Why a signal is worth trading (or not)
+- Risk analysis for specific signals
+- Side-by-side comparisons
+- Best opportunities ranked
+
+### 3. ❌ Enhanced Skip Recommendations
+
+Every SKIP now includes specific reasons:
+- "Premium too expensive (>$500/contract)"
+- "RSI overbought (78), poor entry point"
+- "IV rank too high (89), overpaying"
+- "Risk/reward unfavorable (<1.5:1)"
+
+Learn what to avoid and why!
 
 ---
 
 ## 📚 Documentation
+
+**⭐ [User Guide](./user-guide.md)** - **START HERE** - Complete usage guide
 
 ### 🏗 Architecture & Design
 

@@ -344,20 +344,26 @@ score = (
 ### Commands
 
 ```bash
-# Quick analysis of recent signals
+# 🆕 Analyze ALL signals - Comprehensive overview with buy/skip recommendations
+poetry run analyze all --days 7
+
+# 🆕 Ask questions about signals - Get intelligent answers
+poetry run analyze ask "Why should I trade AAPL?"
+poetry run analyze ask "What are the risks for TSLA?"
+poetry run analyze ask "Compare GOOGL vs MSFT"
+poetry run analyze ask "What's the best signal?"
+
+# Quick analysis of recent signals (with technical filtering)
 poetry run analyze scan --days 7 --min-grade A
 
-# Deep dive on specific ticker
-poetry run analyze ticker AAPL --strategy all
+# Show ONLY the best opportunities (high conviction only)
+poetry run analyze best --top-n 5
 
-# Compare strategies for a signal
-poetry run analyze compare <signal_id>
+# Strategy analysis (compare spreads vs naked options)
+poetry run analyze strategies --days 7 --top-n 10
 
-# Portfolio mode: Show best opportunities for X capital
-poetry run analyze portfolio --capital 10000 --max-positions 5
-
-# Watch mode: Monitor and alert on new opportunities
-poetry run analyze watch --interval 3600 --alert-threshold 80
+# Show configuration
+poetry run analyze info
 ```
 
 ### Example Output
@@ -573,6 +579,119 @@ analyze = "analyze_options.cli:cli"
 - [ ] Alert system
 - [ ] Web dashboard (optional)
 - [ ] Performance tracking
+
+---
+
+## 🏆 NEW: Recommendation Tier System
+
+The service now uses a **four-tier recommendation system** to honestly evaluate every signal:
+
+### Recommendation Tiers
+
+| Tier | Score Range | Description | Action |
+|------|-------------|-------------|--------|
+| 🚀 **STRONG BUY** | 85-100 | Excellent setup, high conviction | Trade immediately with full position size |
+| ✅ **BUY** | 70-84 | Good setup, moderate conviction | Viable trade with standard position |
+| ⚠️ **CONSIDER** | 50-69 | Marginal setup, risky | Only trade with extra research & conviction |
+| ❌ **SKIP** | 0-49 | Poor setup, don't trade | Wait for better opportunities |
+
+### Honest Skip Recommendations
+
+Every SKIP recommendation includes **detailed reasons** explaining why the signal doesn't meet quality standards:
+
+**Example Skip Reasons:**
+- "Premium too expensive (>$500/contract)"
+- "Low probability of profit (<40%)"
+- "RSI overbought (78), poor entry point"
+- "IV rank too high (89), overpaying for volatility"
+- "Risk/reward ratio unfavorable (<1.5:1)"
+- "Too close to expiry (<14 DTE), theta risk"
+
+This helps you understand **why** a signal should be skipped and what to look for in better setups.
+
+---
+
+## 🆕 NEW: Analyze All Command
+
+The `analyze all` command provides a **comprehensive view of ALL signals** with honest buy/skip recommendations:
+
+```bash
+poetry run analyze all --days 7
+```
+
+**What it does:**
+1. Fetches ALL unusual options signals (B+ grade and above)
+2. Analyzes each signal for strategy viability
+3. Categorizes into STRONG BUY, BUY, CONSIDER, SKIP tiers
+4. Shows detailed skip reasons for rejected signals
+5. Provides summary statistics
+
+**Example Output:**
+```
+╭─────────────────── ALL SIGNALS ANALYSIS ───────────────────╮
+│ Analyzed 47 signals from last 7 days                       │
+│ 🚀 8 STRONG BUY | ✅ 12 BUY | ⚠️  15 CONSIDER | ❌ 12 SKIP  │
+╰─────────────────────────────────────────────────────────────╯
+
+🚀 STRONG BUY - High Conviction (8 signals)
+┌────────┬───────┬───────┬─────────────────┬──────┬────────┬─────┐
+│ Ticker │ Grade │ Score │ Strategy        │ Cost │ P(Win) │ R:R │
+├────────┼───────┼───────┼─────────────────┼──────┼────────┼─────┤
+│ NUAI   │   S   │  92   │ Naked Call      │ $65  │  45%   │ 1:6 │
+│ GOOGL  │   A   │  87   │ Bull Call Spread│ $250 │  58%   │ 1:3 │
+└────────┴───────┴───────┴─────────────────┴──────┴────────┴─────┘
+
+❌ SKIP - Don't Trade (12 signals)
+┌────────┬───────┬───────┬──────────────────────────────────────┐
+│ Ticker │ Grade │ Score │ Skip Reasons                          │
+├────────┼───────┼───────┼──────────────────────────────────────┤
+│ XYZ    │   B   │  42   │ IV too high (rank 89), overpaying   │
+│ ABC    │   A   │  38   │ RSI overbought (78), poor entry     │
+└────────┴───────┴───────┴──────────────────────────────────────┘
+```
+
+---
+
+## 🆕 NEW: Q&A System
+
+The `analyze ask` command lets you **ask questions about signals** and get intelligent answers:
+
+```bash
+poetry run analyze ask "Why should I trade AAPL?"
+poetry run analyze ask "What are the risks for TSLA?"
+poetry run analyze ask "Compare GOOGL vs MSFT"
+poetry run analyze ask "What's the best signal?"
+```
+
+**Supported Question Types:**
+- **Why trade X?** - Get detailed analysis of why a signal is (or isn't) worth trading
+- **Risks for X?** - Comprehensive risk breakdown including max loss, theta decay, probability
+- **Compare X vs Y** - Side-by-side comparison of two signals
+- **Best signal?** - Get top 3 opportunities ranked by score
+
+**Example Q&A:**
+```
+🤔 Signal Q&A
+Question: Why should I trade NUAI?
+
+╭─────────── 💡 Answer [Confidence: 90%] ───────────╮
+│ ✅ NUAI is worth considering! Here's why:         │
+│                                                    │
+│ 📊 Signal Quality:                                │
+│   • Grade: S                                      │
+│   • Score: 92/100 (STRONG BUY)                   │
+│   • Premium Flow: $850,000                        │
+│                                                    │
+│ 🎯 Strategy: Naked Call                          │
+│   • Cost: $65/contract                            │
+│   • Potential: Unlimited upside                   │
+│   • Risk/Reward: 1:6                              │
+│   • Probability: 45%                              │
+│                                                    │
+│ 💡 Why it's good: S-grade + strong score         │
+│ ⏰ Catalyst: Earnings in 12 days                 │
+╰────────────────────────────────────────────────────╯
+```
 
 ---
 

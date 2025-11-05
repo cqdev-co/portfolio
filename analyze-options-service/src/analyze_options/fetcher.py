@@ -123,4 +123,81 @@ class SignalFetcher:
         )
         
         return approved_signals, filtered_signals
+    
+    def fetch_all_signals_for_analysis(
+        self,
+        lookback_days: int = None,
+        min_grade: str = "B",
+        min_dte: int = None,
+        max_dte: int = None
+    ) -> List[Tuple[EnrichedSignal, TechnicalIndicators]]:
+        """
+        Fetch ALL signals for comprehensive analysis, including those that
+        would normally be filtered out. This is for the "analyze all" command.
+        
+        Args:
+            lookback_days: Days to look back (uses config default if None)
+            min_grade: Minimum signal grade (default "B")
+            min_dte: Minimum days to expiry (uses config default if None)
+            max_dte: Maximum days to expiry (uses config default if None)
+            
+        Returns:
+            List of (signal, technical) tuples
+        """
+        # Use config defaults if not provided
+        lookback_days = lookback_days or self.config.default_lookback_days
+        min_dte = min_dte or self.config.min_dte
+        max_dte = max_dte or self.config.max_dte
+        
+        logger.info(
+            f"Fetching ALL signals for analysis: "
+            f"grade={min_grade}+, days={lookback_days}, dte={min_dte}-{max_dte}"
+        )
+        
+        # Fetch ALL signals with specified grade or better (cast wide net)
+        signals = self.db.get_signals(
+            min_grade=min_grade,
+            lookback_days=lookback_days,
+            min_premium_flow=50000,  # Lower threshold for comprehensive view
+            min_dte=min_dte,
+            max_dte=max_dte
+        )
+        
+        if not signals:
+            logger.warning("No signals found matching criteria")
+            return []
+        
+        logger.info(f"Found {len(signals)} total signals from database")
+        
+        # Get unique tickers for batch fetching
+        unique_tickers = list(set(s.ticker for s in signals))
+        logger.info(f"Fetching market data for {len(unique_tickers)} unique tickers")
+        
+        # Batch fetch technical indicators
+        technical_data = self.market.batch_get_technical_indicators(unique_tickers)
+        
+        # Combine signals with technical data
+        result = []
+        skipped_count = 0
+        
+        for signal in signals:
+            # Get technical data for this ticker
+            technical = technical_data.get(signal.ticker)
+            
+            if not technical:
+                logger.debug(f"No technical data for {signal.ticker}, skipping")
+                skipped_count += 1
+                continue
+            
+            # Update signal with fresh price
+            signal.current_price = technical.price
+            
+            result.append((signal, technical))
+        
+        logger.info(
+            f"Results: {len(result)} signals with technical data, "
+            f"{skipped_count} skipped (no market data)"
+        )
+        
+        return result
 

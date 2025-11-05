@@ -9,7 +9,9 @@ from ..models.strategy import (
     StrategyComparison,
     StrategyRecommendation,
     VerticalSpreadAnalysis,
-    NakedOptionAnalysis
+    NakedOptionAnalysis,
+    RecommendationTier,
+    SkipReason
 )
 from .spread_analyzer import VerticalSpreadAnalyzer
 from .naked_analyzer import NakedOptionAnalyzer
@@ -87,27 +89,43 @@ class StrategyRecommender:
     ) -> StrategyComparison:
         """
         Determine which strategy to recommend based on scores and risk tolerance.
+        Now with detailed skip reasons.
         """
         spread = comparison.spread
         naked = comparison.naked
         
-        # If neither strategy available, skip
+        # If neither strategy available, skip with reason
         if not spread and not naked:
             comparison.recommended_strategy = StrategyRecommendation.SKIP
             comparison.recommendation_reason = "No viable strategies found"
+            comparison.add_skip_reason(SkipReason.NO_VIABLE_STRIKES)
+            comparison.composite_score = 0.0
+            comparison.update_tier()
             return comparison
         
-        # If only one available, use that
+        # If only one available, evaluate it
         if not spread:
-            comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
-            comparison.recommendation_reason = "Only naked option available"
             comparison.composite_score = naked.score
+            if naked.score >= 50:
+                comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
+                comparison.recommendation_reason = "Only naked option available"
+            else:
+                comparison.recommended_strategy = StrategyRecommendation.SKIP
+                comparison.recommendation_reason = "Naked option scored too low"
+                self._add_skip_reasons_from_analysis(comparison, naked, None)
+            comparison.update_tier()
             return comparison
         
         if not naked:
-            comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
-            comparison.recommendation_reason = "Only vertical spread available"
             comparison.composite_score = spread.score
+            if spread.score >= 50:
+                comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
+                comparison.recommendation_reason = "Only vertical spread available"
+            else:
+                comparison.recommended_strategy = StrategyRecommendation.SKIP
+                comparison.recommendation_reason = "Vertical spread scored too low"
+                self._add_skip_reasons_from_analysis(comparison, None, spread)
+            comparison.update_tier()
             return comparison
         
         # Both available - apply decision logic
@@ -116,6 +134,14 @@ class StrategyRecommender:
         if spread.score < 40 and naked.score < 40:
             comparison.recommended_strategy = StrategyRecommendation.SKIP
             comparison.recommendation_reason = "Both strategies scored too low"
+            comparison.composite_score = max(spread.score, naked.score)
+            comparison.add_skip_reason(
+                SkipReason.SCORE_TOO_LOW, 
+                spread=f"{spread.score:.0f}",
+                naked=f"{naked.score:.0f}"
+            )
+            self._add_skip_reasons_from_analysis(comparison, naked, spread)
+            comparison.update_tier()
             return comparison
         
         # Rule 2: Apply risk tolerance preference
@@ -128,13 +154,13 @@ class StrategyRecommender:
                 if score_diff > 15:
                     comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
                     comparison.recommendation_reason = (
-                        f"Naked option scores significantly higher ({naked.score} vs {spread.score})"
+                        f"Naked option scores significantly higher ({naked.score:.0f} vs {spread.score:.0f})"
                     )
                     comparison.composite_score = naked.score
                 else:
                     comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
                     comparison.recommendation_reason = (
-                        f"Defined risk preferred (Conservative) - Score: {spread.score}"
+                        f"Defined risk preferred (Conservative) - Score: {spread.score:.0f}"
                     )
                     comparison.composite_score = spread.score
             else:
@@ -142,16 +168,18 @@ class StrategyRecommender:
                 if naked.score >= 70:
                     comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
                     comparison.recommendation_reason = (
-                        f"Naked option has excellent score ({naked.score})"
+                        f"Naked option has excellent score ({naked.score:.0f})"
                     )
                     comparison.composite_score = naked.score
                 elif spread.score > naked.score:
                     comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
-                    comparison.recommendation_reason = f"Spread scores higher ({spread.score} vs {naked.score})"
+                    comparison.recommendation_reason = f"Spread scores higher ({spread.score:.0f} vs {naked.score:.0f})"
                     comparison.composite_score = spread.score
                 else:
                     comparison.recommended_strategy = StrategyRecommendation.SKIP
                     comparison.recommendation_reason = "Scores too mediocre for conservative risk tolerance"
+                    comparison.composite_score = max(spread.score, naked.score)
+                    comparison.add_skip_reason(SkipReason.SIGNAL_GRADE_LOW)
                     
         elif self.risk_tolerance == "moderate":
             # Moderate: Use highest score, with slight preference for spreads if close
@@ -159,16 +187,16 @@ class StrategyRecommender:
                 # Scores close - prefer spread for defined risk
                 comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
                 comparison.recommendation_reason = (
-                    f"Scores similar, prefer defined risk - Spread: {spread.score}, Naked: {naked.score}"
+                    f"Scores similar, prefer defined risk - Spread: {spread.score:.0f}, Naked: {naked.score:.0f}"
                 )
                 comparison.composite_score = spread.score
             elif naked.score > spread.score:
                 comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
-                comparison.recommendation_reason = f"Naked option scores higher ({naked.score} vs {spread.score})"
+                comparison.recommendation_reason = f"Naked option scores higher ({naked.score:.0f} vs {spread.score:.0f})"
                 comparison.composite_score = naked.score
             else:
                 comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
-                comparison.recommendation_reason = f"Spread scores higher ({spread.score} vs {naked.score})"
+                comparison.recommendation_reason = f"Spread scores higher ({spread.score:.0f} vs {naked.score:.0f})"
                 comparison.composite_score = spread.score
                 
         else:  # aggressive
@@ -176,34 +204,92 @@ class StrategyRecommender:
             if naked.score >= 60:
                 comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
                 comparison.recommendation_reason = (
-                    f"Naked option preferred (Aggressive) - Score: {naked.score}"
+                    f"Naked option preferred (Aggressive) - Score: {naked.score:.0f}"
                 )
                 comparison.composite_score = naked.score
             elif spread.score > naked.score + 10:
                 # Spread much better
                 comparison.recommended_strategy = StrategyRecommendation.VERTICAL_SPREAD
                 comparison.recommendation_reason = (
-                    f"Spread significantly better ({spread.score} vs {naked.score})"
+                    f"Spread significantly better ({spread.score:.0f} vs {naked.score:.0f})"
                 )
                 comparison.composite_score = spread.score
             elif naked.score >= 50:
                 comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
-                comparison.recommendation_reason = f"Naked option acceptable - Score: {naked.score}"
+                comparison.recommendation_reason = f"Naked option acceptable - Score: {naked.score:.0f}"
                 comparison.composite_score = naked.score
             else:
                 comparison.recommended_strategy = StrategyRecommendation.SKIP
                 comparison.recommendation_reason = "Scores too low even for aggressive strategy"
+                comparison.composite_score = max(spread.score, naked.score)
+                comparison.add_skip_reason(SkipReason.SIGNAL_GRADE_LOW)
         
         # Rule 3: Grade-based overrides
         # S-grade signals with high premium flow favor naked options
         if signal.grade == 'S' and signal.premium_flow > 2000000 and naked and naked.score >= 65:
             comparison.recommended_strategy = StrategyRecommendation.NAKED_OPTION
             comparison.recommendation_reason = (
-                f"S-grade + $2M+ flow + strong score ({naked.score}) → Naked option"
+                f"S-grade + $2M+ flow + strong score ({naked.score:.0f}) → Naked option"
             )
             comparison.composite_score = naked.score
         
+        # Update recommendation tier
+        comparison.update_tier()
+        
+        # Add skip reasons if we're skipping
+        if comparison.recommended_strategy == StrategyRecommendation.SKIP:
+            self._add_skip_reasons_from_analysis(comparison, naked, spread)
+        
         return comparison
+    
+    def _add_skip_reasons_from_analysis(
+        self,
+        comparison: StrategyComparison,
+        naked: Optional[NakedOptionAnalysis],
+        spread: Optional[VerticalSpreadAnalysis]
+    ):
+        """
+        Add detailed skip reasons based on strategy analysis warnings.
+        """
+        # Collect warnings from both strategies
+        all_warnings = []
+        
+        if naked and naked.warnings:
+            all_warnings.extend(naked.warnings)
+        
+        if spread and spread.warnings:
+            all_warnings.extend(spread.warnings)
+        
+        # Convert common warnings to structured skip reasons
+        for warning in all_warnings:
+            warning_lower = warning.lower()
+            
+            if "premium" in warning_lower and "expensive" in warning_lower:
+                comparison.add_skip_reason(
+                    SkipReason.PREMIUM_TOO_EXPENSIVE,
+                    threshold="500"
+                )
+            elif "probability" in warning_lower and "low" in warning_lower:
+                prob = naked.probability_profit if naked else spread.probability_profit
+                comparison.add_skip_reason(
+                    SkipReason.LOW_PROBABILITY,
+                    threshold=f"{prob:.0f}" if prob else "40"
+                )
+            elif "risk/reward" in warning_lower or "r:r" in warning_lower:
+                rr = naked.risk_reward_ratio if naked else spread.risk_reward_ratio
+                comparison.add_skip_reason(
+                    SkipReason.POOR_RISK_REWARD,
+                    threshold=f"{rr:.1f}" if rr else "1.5"
+                )
+            elif "dte" in warning_lower or "expiry" in warning_lower:
+                dte = naked.days_to_expiry if naked else spread.days_to_expiry
+                if dte and dte < 14:
+                    comparison.add_skip_reason(
+                        SkipReason.TOO_CLOSE_TO_EXPIRY,
+                        threshold="14"
+                    )
+            elif "spread" in warning_lower and "narrow" in warning_lower:
+                comparison.add_skip_reason(SkipReason.SPREAD_TOO_NARROW)
     
     def _calculate_position_size(
         self,
@@ -262,22 +348,30 @@ class StrategyRecommender:
     
     def rank_opportunities(
         self,
-        comparisons: list[StrategyComparison]
+        comparisons: list[StrategyComparison],
+        include_skipped: bool = False
     ) -> list[StrategyComparison]:
         """
         Rank all strategy comparisons by composite score.
         
         Args:
             comparisons: List of strategy comparisons
+            include_skipped: If True, includes SKIP signals in ranking
             
         Returns:
             Ranked list (highest score first)
         """
-        # Filter out skipped strategies
-        viable = [c for c in comparisons if c.recommended_strategy != StrategyRecommendation.SKIP]
+        # Optionally filter out skipped strategies
+        if include_skipped:
+            to_rank = comparisons
+        else:
+            to_rank = [
+                c for c in comparisons 
+                if c.recommended_strategy != StrategyRecommendation.SKIP
+            ]
         
         # Sort by composite score (descending)
-        ranked = sorted(viable, key=lambda x: x.composite_score, reverse=True)
+        ranked = sorted(to_rank, key=lambda x: x.composite_score, reverse=True)
         
         # Assign ranks
         for i, comparison in enumerate(ranked, 1):

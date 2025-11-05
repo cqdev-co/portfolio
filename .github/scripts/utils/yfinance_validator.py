@@ -117,58 +117,29 @@ class YFinanceValidator:
                 
                 ticker = yf.Ticker(symbol)
                 
-                # 1. Check historical data FIRST (most important)
-                try:
-                    hist = ticker.history(period=period)
-                    
-                    if hist.empty:
-                        result.validation_issues.append("No historical data")
-                        return result
-                    
-                    result.min_history_days = len(hist)
-                    
-                    # Validate minimum history
-                    if len(hist) < self.min_history_days:
-                        result.validation_issues.append(
-                            f"Insufficient history: {len(hist)} days "
-                            f"(need {self.min_history_days})"
-                        )
-                        return result
-                    
-                except Exception as e:
-                    error_msg = str(e).lower()
-                    # Check if it's a rate limit or auth error (retry-able)
-                    if any(keyword in error_msg for keyword in [
-                        'crumb', '401', 'unauthorized', 'rate limit', '429'
-                    ]):
-                        if attempt < max_retries - 1:
-                            wait_time = (attempt + 1) * 2  # Exponential backoff
-                            logger.debug(
-                                f"Rate limit hit for {symbol}, "
-                                f"retrying in {wait_time}s (attempt {attempt + 1})"
-                            )
-                            time.sleep(wait_time)
-                            continue
-                    
+                # 1. Fetch historical data
+                hist = ticker.history(period=period)
+                
+                if hist.empty:
+                    result.validation_issues.append("No historical data")
+                    return result
+                
+                result.min_history_days = len(hist)
+                
+                # 2. Validate minimum history
+                if len(hist) < self.min_history_days:
                     result.validation_issues.append(
-                        f"Cannot fetch historical data: {str(e)[:50]}"
+                        f"Insufficient history: {len(hist)} days "
+                        f"(need {self.min_history_days})"
                     )
                     return result
                 
-                # 2. Check ticker info availability (optional, don't fail if missing)
-                try:
-                    info = ticker.info
-                    if info and len(info) > 5:  # Valid info dict
-                        result.has_info = True
-                except Exception as e:
-                    # Don't fail validation if info fetch fails
-                    logger.debug(f"Could not fetch info for {symbol}: {e}")
-                    result.has_info = False
-                
                 # 3. Check data recency
                 last_date = hist.index[-1]
+                # Convert to naive datetime for comparison
+                last_date_naive = last_date.to_pydatetime().replace(tzinfo=None)
                 days_since_last = (
-                    datetime.now() - last_date.to_pydatetime()
+                    datetime.now() - last_date_naive
                 ).days
                 
                 if days_since_last > self.recency_days:
@@ -232,15 +203,27 @@ class YFinanceValidator:
                     )
                     return result
                 
+                # 8. Check ticker info (optional, don't fail if missing)
+                try:
+                    info = ticker.info
+                    if info and len(info) > 5:  # Valid info dict
+                        result.has_info = True
+                except Exception as e:
+                    # Don't fail validation if info fetch fails
+                    logger.debug(f"Could not fetch info for {symbol}: {e}")
+                    result.has_info = False
+                
                 # All checks passed!
                 result.is_valid = True
                 return result  # Success, exit retry loop
                 
             except Exception as e:
                 error_msg = str(e).lower()
+                
                 # Check if it's a rate limit or auth error (retry-able)
                 if any(keyword in error_msg for keyword in [
-                    'crumb', '401', 'unauthorized', 'rate limit', '429'
+                    'crumb', '401', 'unauthorized', 'rate limit', '429', 
+                    'too many requests'
                 ]) and attempt < max_retries - 1:
                     wait_time = (attempt + 1) * 2  # Exponential backoff
                     logger.debug(
@@ -250,12 +233,18 @@ class YFinanceValidator:
                     time.sleep(wait_time)
                     continue
                 
-                result.validation_issues.append(
-                    f"Validation error: {str(e)[:100]}"
-                )
+                # Not a retry-able error or out of retries
+                if "no data found" in error_msg or "delisted" in error_msg:
+                    result.validation_issues.append("No historical data")
+                else:
+                    result.validation_issues.append(
+                        f"Cannot fetch data: {str(e)[:100]}"
+                    )
                 logger.debug(f"Error validating {symbol}: {e}")
                 return result
         
+        # Exhausted all retries
+        result.validation_issues.append("Max retries exceeded")
         return result
     
     def _validate_ohlc_quality(

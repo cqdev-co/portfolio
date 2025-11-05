@@ -6,7 +6,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from rich import box
-from typing import Optional
+from typing import Optional, Annotated
 from loguru import logger
 import sys
 
@@ -14,8 +14,13 @@ from .config import load_config
 from .fetcher import SignalFetcher
 from .models.signal import EnrichedSignal
 from .models.analysis import TechnicalIndicators
-from .models.strategy import StrategyComparison, StrategyRecommendation
+from .models.strategy import (
+    StrategyComparison, 
+    StrategyRecommendation,
+    RecommendationTier
+)
 from .analyzers.strategy_recommender import StrategyRecommender
+from .analyzers.signal_qa import SignalQAEngine
 
 # Configure logger
 logger.remove()
@@ -34,15 +39,16 @@ def scan(
     min_grade: str = "A",
 ):
     """
-    Scan for trade opportunities with technical analysis filtering.
+    Scan for trade opportunities with full analysis (Phase 1 + Phase 2).
+    
+    Shows technical filtering AND strategy recommendations for each signal.
     
     Example:
         analyze scan --days 7 --min-grade A
     """
-    # For now, always show filtered signals summary
     show_filtered = False
-    console.print("\n[bold blue]🎯 Analyze Options Service[/bold blue]")
-    console.print("[dim]Scanning for safe, high-conviction opportunities...[/dim]\n")
+    console.print("\n[bold blue]🎯 Analyze Options Service - Full Analysis[/bold blue]")
+    console.print("[dim]Scanning and analyzing strategies...[/dim]\n")
     
     try:
         # Load configuration
@@ -51,31 +57,64 @@ def scan(
         # Create fetcher
         fetcher = SignalFetcher(config)
         
-        # Fetch and filter signals
+        # Fetch and filter signals (Phase 1)
         approved, filtered = fetcher.fetch_filtered_signals(
             min_grade=min_grade,
             lookback_days=days,
             show_filtered=show_filtered
         )
         
-        # Display approved signals
-        if approved:
-            console.print(f"\n[bold green]✅ {len(approved)} Safe Opportunities Found[/bold green]\n")
-            
-            for i, (signal, technical, filter_result) in enumerate(approved, 1):
-                display_signal(i, signal, technical, filter_result)
-        else:
+        if not approved:
             console.print("[yellow]No opportunities found matching criteria[/yellow]")
+            return
         
-        # Display filtered signals if requested
-        if show_filtered and filtered:
-            console.print(f"\n[bold red]🚫 {len(filtered)} Signals Filtered Out[/bold red]\n")
-            
-            for signal, technical, filter_result in filtered:
-                display_filtered_signal(signal, technical, filter_result)
+        console.print(f"[green]✅ {len(approved)} safe opportunities found[/green]")
+        console.print(f"[cyan]🔄 Analyzing strategies...[/cyan]\n")
         
-        elif filtered and not show_filtered:
-            # Show summary of filtered signals
+        # Create strategy recommender (Phase 2)
+        recommender = StrategyRecommender(
+            account_size=config.default_account_size,
+            risk_per_trade_pct=config.default_risk_pct,
+            risk_tolerance=config.risk_tolerance
+        )
+        
+        # Analyze strategies for each approved signal
+        comparisons_data = []
+        for signal, technical, filter_result in approved:
+            comparison = recommender.recommend(signal, technical)
+            comparisons_data.append((comparison, signal, technical, filter_result))
+        
+        # Rank all opportunities
+        all_comparisons = [c[0] for c in comparisons_data]
+        ranked = recommender.rank_opportunities(all_comparisons)
+        
+        # Create lookup for display
+        comparison_lookup = {id(comp): (comp, sig, tech, filt) for comp, sig, tech, filt in comparisons_data}
+        
+        # Display all opportunities with strategy analysis
+        console.print(f"[bold green]🏆 ALL OPPORTUNITIES (Ranked by Score):[/bold green]\n")
+        
+        for comparison in ranked:
+            lookup_data = comparison_lookup.get(id(comparison))
+            if lookup_data:
+                _, signal, technical, filter_result = lookup_data
+                display_signal(comparison.rank, signal, technical, filter_result, comparison)
+        
+        console.print(f"[dim]💡 Tip: Run 'analyze best' to see only high-confidence trades (score ≥ 85)[/dim]\n")
+        
+        # Summary stats
+        console.print(f"[bold]📊 SUMMARY:[/bold]")
+        console.print(f"  • Total Analyzed: {len(ranked)}")
+        console.print(f"  • Average Score: {sum(c.composite_score for c in ranked)/len(ranked):.0f}/100")
+        
+        spread_count = sum(1 for c in ranked if c.recommended_strategy == StrategyRecommendation.VERTICAL_SPREAD)
+        naked_count = sum(1 for c in ranked if c.recommended_strategy == StrategyRecommendation.NAKED_OPTION)
+        
+        console.print(f"  • Vertical Spreads: {spread_count}")
+        console.print(f"  • Naked Options: {naked_count}")
+        
+        # Show filtered summary
+        if filtered:
             console.print(f"\n[dim]🚫 Filtered {len(filtered)} signals for safety[/dim]")
             
             # Group by reason
@@ -84,8 +123,8 @@ def scan(
                 reason = result.reason or "Unknown"
                 reasons[reason] = reasons.get(reason, 0) + 1
             
-            console.print("\n[bold yellow]📋 Reasons signals were filtered:[/bold yellow]")
-            for reason, count in sorted(reasons.items(), key=lambda x: -x[1]):
+            console.print("\n[bold yellow]📋 Top filter reasons:[/bold yellow]")
+            for reason, count in list(sorted(reasons.items(), key=lambda x: -x[1]))[:3]:
                 console.print(f"  • {count}x: {reason}")
         
         console.print()
@@ -104,14 +143,16 @@ def display_signal(
     rank: int,
     signal: EnrichedSignal,
     technical: TechnicalIndicators,
-    filter_result
+    filter_result,
+    comparison: Optional[StrategyComparison] = None
 ):
-    """Display an approved signal with full context."""
+    """Display an approved signal with full context and optional strategy analysis."""
     
     # Create panel title
+    score_text = f" - Score: {comparison.composite_score:.0f}/100" if comparison else ""
     title = (
         f"#{rank} - {signal.ticker} - "
-        f"Grade {signal.grade} - {signal.sentiment.value}"
+        f"Grade {signal.grade} - {signal.sentiment.value}{score_text}"
     )
     
     # Build content
@@ -143,15 +184,45 @@ def display_signal(
         f"{price_indicator} ({price_change:+.1f}% since signal)"
     )
     
-    content.append("")
-    content.append("[dim]💡 Full analysis coming in Phase 2[/dim]")
-    content.append("[dim]   Will show: Spread vs Naked, Position Size, P(Profit), R:R[/dim]")
+    # Add strategy recommendation if available
+    if comparison:
+        content.append("")
+        
+        # Recommendation
+        rec_emoji = {
+            StrategyRecommendation.VERTICAL_SPREAD: "🎯",
+            StrategyRecommendation.NAKED_OPTION: "🚀",
+            StrategyRecommendation.SKIP: "⏭️"
+        }
+        emoji = rec_emoji.get(comparison.recommended_strategy, "")
+        content.append(f"[bold cyan]{emoji} RECOMMENDED: {comparison.recommended_strategy.value}[/bold cyan]")
+        
+        # Quick metrics based on strategy
+        if comparison.recommended_strategy == StrategyRecommendation.VERTICAL_SPREAD and comparison.spread:
+            spread = comparison.spread
+            content.append(f"[dim]Strategy: {spread.strategy_type.value}[/dim]")
+            content.append(f"[dim]Cost: ${spread.cost_per_contract:.0f} | Max Profit: ${spread.profit_per_contract:.0f} | R:R 1:{spread.risk_reward_ratio:.1f}[/dim]")
+            content.append(f"[dim]Probability: {spread.probability_profit:.0f}% | Contracts: {comparison.suggested_contracts}[/dim]")
+        elif comparison.recommended_strategy == StrategyRecommendation.NAKED_OPTION and comparison.naked:
+            naked = comparison.naked
+            content.append(f"[dim]Strategy: {naked.strategy_type.value}[/dim]")
+            content.append(f"[dim]Cost: ${naked.cost_per_contract:.0f} | Target: ${naked.potential_profit * 100:.0f} | R:R 1:{naked.risk_reward_ratio:.1f}[/dim]")
+            content.append(f"[dim]Probability: {naked.probability_profit:.0f}% | Contracts: {comparison.suggested_contracts}[/dim]")
+        elif comparison.recommended_strategy == StrategyRecommendation.SKIP:
+            content.append(f"[dim]Reason: {comparison.recommendation_reason}[/dim]")
     
     # Create panel
+    border_color = "green"
+    if comparison:
+        if comparison.composite_score >= 85:
+            border_color = "bright_green"
+        elif comparison.recommended_strategy == StrategyRecommendation.SKIP:
+            border_color = "yellow"
+    
     panel = Panel(
         "\n".join(content),
         title=title,
-        border_style="green",
+        border_style=border_color,
         box=box.ROUNDED
     )
     
@@ -531,6 +602,296 @@ def info():
         
     except Exception as e:
         console.print(f"[bold red]Error loading config: {e}[/bold red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="all")
+def all_cmd(
+    days: int = 7,
+    min_grade: str = "B"
+):
+    """
+    Analyze ALL unusual options signals - comprehensive overview.
+    
+    Shows honest buy/skip recommendations for every signal.
+    Categorizes signals into STRONG BUY, BUY, CONSIDER, and SKIP tiers.
+    
+    Example:
+        analyze all --days 7 --min-grade B
+        analyze all --days 3 --min-grade A
+    """
+    # Always show skip signals for comprehensive view
+    show_skip = True
+    console.print("\n[bold blue]🔍 Comprehensive Signal Analysis - ALL Signals[/bold blue]")
+    console.print("[dim]Evaluating every signal with honest buy/skip recommendations...[/dim]\n")
+    
+    try:
+        # Load configuration
+        config = load_config()
+        
+        # Create fetcher
+        fetcher = SignalFetcher(config)
+        
+        # Fetch ALL signals (no filtering yet)
+        all_signals = fetcher.fetch_all_signals_for_analysis(
+            lookback_days=days,
+            min_grade=min_grade
+        )
+        
+        if not all_signals:
+            console.print("[yellow]No signals found in database[/yellow]")
+            return
+        
+        console.print(f"[cyan]Analyzing {len(all_signals)} signals...[/cyan]\n")
+        
+        # Create strategy recommender
+        recommender = StrategyRecommender(
+            account_size=config.default_account_size,
+            risk_per_trade_pct=config.default_risk_pct,
+            risk_tolerance=config.risk_tolerance
+        )
+        
+        # Analyze each signal
+        all_comparisons = []
+        for signal, technical in all_signals:
+            comparison = recommender.recommend(signal, technical)
+            all_comparisons.append((comparison, signal, technical))
+        
+        # Categorize by tier
+        by_tier = {
+            RecommendationTier.STRONG_BUY: [],
+            RecommendationTier.BUY: [],
+            RecommendationTier.CONSIDER: [],
+            RecommendationTier.SKIP: []
+        }
+        
+        for comparison, signal, technical in all_comparisons:
+            tier = comparison.recommendation_tier or RecommendationTier.SKIP
+            by_tier[tier].append((comparison, signal, technical))
+        
+        # Display summary header
+        display_all_signals_summary(by_tier, days)
+        
+        # Display each tier
+        if by_tier[RecommendationTier.STRONG_BUY]:
+            console.print(f"\n[bold bright_green]🚀 STRONG BUY - High Conviction ({len(by_tier[RecommendationTier.STRONG_BUY])} signals)[/bold bright_green]")
+            console.print("[dim]These are excellent setups worth immediate consideration[/dim]\n")
+            display_tier_table(by_tier[RecommendationTier.STRONG_BUY], show_details=True)
+        
+        if by_tier[RecommendationTier.BUY]:
+            console.print(f"\n[bold green]✅ BUY - Good Opportunities ({len(by_tier[RecommendationTier.BUY])} signals)[/bold green]")
+            console.print("[dim]Viable trades with moderate conviction[/dim]\n")
+            display_tier_table(by_tier[RecommendationTier.BUY], show_details=True)
+        
+        if by_tier[RecommendationTier.CONSIDER]:
+            console.print(f"\n[bold yellow]⚠️  CONSIDER - Marginal Setups ({len(by_tier[RecommendationTier.CONSIDER])} signals)[/bold yellow]")
+            console.print("[dim]Risky setups requiring extra research and caution[/dim]\n")
+            display_tier_table(by_tier[RecommendationTier.CONSIDER], show_details=False)
+        
+        if show_skip and by_tier[RecommendationTier.SKIP]:
+            console.print(f"\n[bold red]❌ SKIP - Don't Trade ({len(by_tier[RecommendationTier.SKIP])} signals)[/bold red]")
+            console.print("[dim]These signals don't meet quality standards[/dim]\n")
+            display_skip_table(by_tier[RecommendationTier.SKIP])
+        
+        # Final summary
+        console.print(f"\n[bold]📊 FINAL SUMMARY:[/bold]")
+        console.print(f"  • Total Signals Analyzed: {len(all_comparisons)}")
+        console.print(f"  • Worth Trading (STRONG BUY + BUY): {len(by_tier[RecommendationTier.STRONG_BUY]) + len(by_tier[RecommendationTier.BUY])}")
+        console.print(f"  • Marginal (CONSIDER): {len(by_tier[RecommendationTier.CONSIDER])}")
+        console.print(f"  • Skip: {len(by_tier[RecommendationTier.SKIP])}")
+        
+        trade_rate = (len(by_tier[RecommendationTier.STRONG_BUY]) + len(by_tier[RecommendationTier.BUY])) / len(all_comparisons) * 100
+        console.print(f"  • Quality Rate: {trade_rate:.1f}% worth trading\n")
+        
+    except Exception as e:
+        error_msg = Text()
+        error_msg.append("Error: ", style="bold red")
+        error_msg.append(str(e))
+        console.print(error_msg)
+        logger.exception("All signals analysis failed")
+        raise typer.Exit(1)
+
+
+def display_all_signals_summary(by_tier: dict, days: int):
+    """Display summary panel for all signals analysis."""
+    strong_buy_count = len(by_tier[RecommendationTier.STRONG_BUY])
+    buy_count = len(by_tier[RecommendationTier.BUY])
+    consider_count = len(by_tier[RecommendationTier.CONSIDER])
+    skip_count = len(by_tier[RecommendationTier.SKIP])
+    total = strong_buy_count + buy_count + consider_count + skip_count
+    
+    summary_lines = [
+        f"Analyzed {total} signals from last {days} days",
+        "",
+        f"🚀 {strong_buy_count} STRONG BUY | ✅ {buy_count} BUY | ⚠️  {consider_count} CONSIDER | ❌ {skip_count} SKIP"
+    ]
+    
+    panel = Panel(
+        "\n".join(summary_lines),
+        title="ALL SIGNALS ANALYSIS",
+        border_style="blue",
+        box=box.DOUBLE
+    )
+    console.print(panel)
+
+
+def display_tier_table(signals: list, show_details: bool = True):
+    """Display table for STRONG BUY, BUY, or CONSIDER tiers."""
+    table = Table(box=box.ROUNDED, width=140)
+    table.add_column("Ticker", style="cyan", width=6)
+    table.add_column("Gr", style="white", width=3)
+    table.add_column("Sc", style="green", width=3)
+    table.add_column("Strategy", style="white", width=16)
+    table.add_column("Cost", style="yellow", width=7)
+    table.add_column("P%", style="white", width=4)
+    table.add_column("R:R", style="white", width=5)
+    
+    if show_details:
+        table.add_column("Why Trade", style="dim", no_wrap=False)
+    
+    for comparison, signal, technical in signals:
+        # Get strategy details
+        if comparison.recommended_strategy == StrategyRecommendation.VERTICAL_SPREAD and comparison.spread:
+            strategy = comparison.spread.strategy_type.value
+            cost = f"${comparison.spread.cost_per_contract:.0f}" if comparison.spread.cost_per_contract else "N/A"
+            prob = f"{comparison.spread.probability_profit:.0f}%" if comparison.spread.probability_profit else "N/A"
+            rr = f"1:{comparison.spread.risk_reward_ratio:.1f}" if comparison.spread.risk_reward_ratio else "N/A"
+        elif comparison.recommended_strategy == StrategyRecommendation.NAKED_OPTION and comparison.naked:
+            strategy = comparison.naked.strategy_type.value
+            cost = f"${comparison.naked.cost_per_contract:.0f}" if comparison.naked.cost_per_contract else "N/A"
+            prob = f"{comparison.naked.probability_profit:.0f}%" if comparison.naked.probability_profit else "N/A"
+            rr = f"1:{comparison.naked.risk_reward_ratio:.1f}" if comparison.naked.risk_reward_ratio else "N/A"
+        else:
+            strategy = "N/A"
+            cost = "N/A"
+            prob = "N/A"
+            rr = "N/A"
+        
+        # Add row
+        row = [
+            signal.ticker,
+            signal.grade,
+            f"{comparison.composite_score:.0f}",
+            strategy,
+            cost,
+            prob,
+            rr
+        ]
+        
+        if show_details:
+            # Show full reason (will wrap in table)
+            row.append(comparison.recommendation_reason)
+        
+        table.add_row(*row)
+    
+    console.print(table)
+
+
+def display_skip_table(signals: list):
+    """Display table for SKIP tier with skip reasons."""
+    table = Table(box=box.ROUNDED)
+    table.add_column("Ticker", style="cyan", width=8)
+    table.add_column("Grade", style="white", width=6)
+    table.add_column("Score", style="red", width=6)
+    table.add_column("Skip Reasons", style="dim", width=60)
+    
+    for comparison, signal, technical in signals:
+        # Get skip reasons
+        if comparison.skip_reasons:
+            reasons = " | ".join(comparison.skip_reasons[:2])  # Show first 2 reasons
+            if len(comparison.skip_reasons) > 2:
+                reasons += f" (+{len(comparison.skip_reasons) - 2} more)"
+        else:
+            reasons = comparison.recommendation_reason
+        
+        table.add_row(
+            signal.ticker,
+            signal.grade,
+            f"{comparison.composite_score:.0f}",
+            reasons
+        )
+    
+    console.print(table)
+
+
+@app.command(name="ask")
+def ask_cmd(
+    question: str,
+    days: int = 7
+):
+    """
+    Ask questions about unusual options signals.
+    
+    Get intelligent answers about signals, risks, comparisons, and more.
+    
+    Examples:
+        analyze ask "Why should I trade AAPL?"
+        analyze ask "What are the risks for TSLA?"
+        analyze ask "Compare GOOGL vs MSFT"
+        analyze ask "What's the best signal?"
+    """
+    console.print(f"\n[bold blue]🤔 Signal Q&A[/bold blue]")
+    console.print(f"[dim]Question: {question}[/dim]\n")
+    
+    try:
+        # Load configuration
+        config = load_config()
+        
+        # Create fetcher
+        fetcher = SignalFetcher(config)
+        
+        # Fetch ALL signals for context
+        all_signals = fetcher.fetch_all_signals_for_analysis(lookback_days=days)
+        
+        if not all_signals:
+            console.print("[yellow]No signals found in database[/yellow]")
+            return
+        
+        console.print(f"[dim]Analyzing {len(all_signals)} signals...[/dim]\n")
+        
+        # Create strategy recommender
+        recommender = StrategyRecommender(
+            account_size=config.default_account_size,
+            risk_per_trade_pct=config.default_risk_pct,
+            risk_tolerance=config.risk_tolerance
+        )
+        
+        # Analyze each signal
+        signals_data = []
+        for signal, technical in all_signals:
+            comparison = recommender.recommend(signal, technical)
+            signals_data.append((comparison, signal, technical))
+        
+        # Create Q&A engine
+        qa_engine = SignalQAEngine(use_ai=False)  # Use template-based for now
+        
+        # Get answer
+        response = qa_engine.ask(question, signals_data)
+        
+        # Display answer
+        confidence_color = "green" if response.confidence >= 0.8 else "yellow" if response.confidence >= 0.6 else "red"
+        confidence_text = f"[{confidence_color}]Confidence: {response.confidence*100:.0f}%[/{confidence_color}]"
+        
+        panel = Panel(
+            response.answer,
+            title=f"💡 Answer {confidence_text}",
+            border_style="blue",
+            box=box.ROUNDED
+        )
+        console.print(panel)
+        
+        # Show relevant signals if any
+        if response.relevant_signals:
+            console.print(f"\n[dim]📎 Relevant signals: {len(response.relevant_signals)}[/dim]")
+        
+        console.print()
+        
+    except Exception as e:
+        error_msg = Text()
+        error_msg.append("Error: ", style="bold red")
+        error_msg.append(str(e))
+        console.print(error_msg)
+        logger.exception("Q&A failed")
         raise typer.Exit(1)
 
 
