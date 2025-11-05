@@ -32,11 +32,11 @@ async def store_signals(config: dict, signals: list, use_continuity: bool = True
             # Process signals with deduplication
             stats = await continuity_service.process_signals(signals)
             
-            # Mark stale signals as inactive
-            stale_count = await continuity_service.mark_stale_signals(hours_threshold=3)
+            # Mark expired signals as inactive
+            expired_count = await continuity_service.mark_expired_signals()
             
             if stats['failed_signals'] == 0:
-                console.print(f"[green]✓ Stored {stats['new_signals']} new, updated {stats['updated_signals']}, marked {stale_count} inactive[/green]")
+                console.print(f"[green]✓ Stored {stats['new_signals']} new, updated {stats['updated_signals']}, marked {expired_count} expired[/green]")
             else:
                 console.print(f"[yellow]⚠ Stored {stats['new_signals']} new, updated {stats['updated_signals']}, {stats['failed_signals']} failed[/yellow]")
         else:

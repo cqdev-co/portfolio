@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Line,
   XAxis,
@@ -65,6 +65,7 @@ export function PriceChart({
     x: number;
     y: number;
   } | null>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -173,6 +174,50 @@ export function PriceChart({
     () => getCurrentPrice(priceData),
     [priceData]
   );
+
+  // Calculate smart tooltip position that stays within chart bounds
+  const tooltipPosition = useMemo(() => {
+    if (!pinnedTooltip || !chartContainerRef.current) {
+      return { left: 0, top: 0, transform: '', arrowClass: 'bottom' as const };
+    }
+
+    const container = chartContainerRef.current.getBoundingClientRect();
+    const tooltipWidth = 200; // min-width from tooltip
+    const tooltipHeight = 250; // approximate max height
+    const arrowHeight = 12;
+    const padding = 16;
+
+    const { x, y } = pinnedTooltip;
+
+    // Calculate initial position (above the dot)
+    let left = x;
+    let top = y - arrowHeight;
+    let transform = 'translate(-50%, -100%)';
+    let arrowClass: 'top' | 'bottom' = 'bottom'; // arrow points down by default
+
+    // Check if tooltip goes off top - flip to bottom
+    if (top - tooltipHeight < padding) {
+      top = y + arrowHeight;
+      transform = 'translate(-50%, 0%)';
+      arrowClass = 'top'; // arrow points up
+    }
+
+    // Check horizontal bounds
+    const tooltipLeft = left - tooltipWidth / 2;
+    const tooltipRight = left + tooltipWidth / 2;
+
+    if (tooltipLeft < padding) {
+      // Too far left
+      left = tooltipWidth / 2 + padding;
+      transform = transform.replace('-50%', '0%');
+    } else if (tooltipRight > container.width - padding) {
+      // Too far right
+      left = container.width - tooltipWidth / 2 - padding;
+      transform = transform.replace('-50%', '-100%');
+    }
+
+    return { left, top, transform, arrowClass };
+  }, [pinnedTooltip]);
 
   const CustomTooltip = ({ 
     active, 
@@ -305,6 +350,10 @@ export function PriceChart({
     const baseSize = 4;
     const size = Math.min(baseSize + data.detections.length * 1, 8);
 
+    // Check if this dot is currently pinned
+    const isPinned = pinnedTooltip !== null && 
+                     pinnedTooltip.data.time === data.time;
+
     return (
       <g 
         style={{ cursor: 'pointer' }}
@@ -321,13 +370,43 @@ export function PriceChart({
           }
         }}
       >
+        {/* Pinned indicator - pulsing ring */}
+        {isPinned && (
+          <>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={size + 6}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth={2}
+              opacity={0.4}
+            >
+              <animate
+                attributeName="r"
+                from={size + 4}
+                to={size + 8}
+                dur="1.5s"
+                repeatCount="indefinite"
+              />
+              <animate
+                attributeName="opacity"
+                from={0.6}
+                to={0.1}
+                dur="1.5s"
+                repeatCount="indefinite"
+              />
+            </circle>
+          </>
+        )}
+        
         {/* Outer glow - more subtle */}
         <circle
           cx={cx}
           cy={cy}
           r={size + 2.5}
           fill={color}
-          fillOpacity={0.08}
+          fillOpacity={isPinned ? 0.15 : 0.08}
         />
         {/* Middle ring - subtle */}
         <circle
@@ -335,7 +414,7 @@ export function PriceChart({
           cy={cy}
           r={size + 0.8}
           fill={color}
-          fillOpacity={0.18}
+          fillOpacity={isPinned ? 0.3 : 0.18}
         />
         {/* Inner dot - solid */}
         <circle
@@ -343,8 +422,8 @@ export function PriceChart({
           cy={cy}
           r={size}
           fill={color}
-          stroke="hsl(var(--background))"
-          strokeWidth={1.5}
+          stroke={isPinned ? "hsl(var(--primary))" : "hsl(var(--background))"}
+          strokeWidth={isPinned ? 2 : 1.5}
         />
         {/* Badge for multiple detections - smaller */}
         {data.detections.length > 1 && (
@@ -450,13 +529,6 @@ export function PriceChart({
         style={{
           backgroundImage: `radial-gradient(circle, hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px)`,
           backgroundSize: '16px 16px'
-        }}
-        onClick={(e) => {
-          // Close pinned tooltip when clicking on chart background
-          const target = e.target as HTMLElement;
-          if (target.tagName === 'DIV' && pinnedTooltip) {
-            setPinnedTooltip(null);
-          }
         }}
       >
         <ResponsiveContainer width="100%" height={260}>
@@ -577,23 +649,48 @@ export function PriceChart({
           </div>
         )}
 
+        {/* Pinned Tooltip Overlay */}
+        {pinnedTooltip && (
+          <div 
+            className="absolute inset-0 bg-background/40 backdrop-blur-[1px] z-40 pointer-events-auto animate-in fade-in-0 duration-200"
+            onClick={() => setPinnedTooltip(null)}
+          />
+        )}
+
         {/* Pinned Tooltip */}
         {pinnedTooltip && (
           <div 
-            className="absolute pointer-events-auto z-50"
+            className="absolute pointer-events-auto z-50 animate-in fade-in-0 zoom-in-95 duration-200"
             style={{
-              left: `${pinnedTooltip.x}px`,
-              top: `${pinnedTooltip.y}px`,
-              transform: 'translate(-50%, -100%)',
-              marginTop: '-20px'
+              left: `${tooltipPosition.left}px`,
+              top: `${tooltipPosition.top}px`,
+              transform: tooltipPosition.transform
             }}
           >
             <div className="relative">
-              <div className="bg-background/95 backdrop-blur-lg border border-primary/50 rounded shadow-xl p-2 min-w-[150px]">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1">
-                      <div className="text-[8px] text-muted-foreground/50 font-medium">
+              {/* Arrow pointing to dot */}
+              {tooltipPosition.arrowClass === 'bottom' ? (
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-primary/50"
+                  style={{
+                    bottom: '-8px'
+                  }}
+                />
+              ) : (
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[8px] border-l-transparent border-r-transparent border-b-primary/50"
+                  style={{
+                    top: '-8px'
+                  }}
+                />
+              )}
+              
+              <div className="bg-background/98 backdrop-blur-lg border-2 border-primary/50 rounded-lg shadow-2xl p-3 min-w-[200px]">
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="text-[10px] text-muted-foreground/60 font-medium mb-0.5">
                         {new Date(pinnedTooltip.data.time).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -601,7 +698,7 @@ export function PriceChart({
                           minute: '2-digit'
                         })}
                       </div>
-                      <div className="text-xs font-bold">
+                      <div className="text-sm font-bold text-foreground">
                         {formatPrice(pinnedTooltip.data.price)}
                       </div>
                     </div>
@@ -610,32 +707,35 @@ export function PriceChart({
                         e.stopPropagation();
                         setPinnedTooltip(null);
                       }}
-                      className="text-muted-foreground/50 hover:text-foreground transition-colors"
+                      className="text-muted-foreground/50 hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted/20"
                       title="Close (ESC)"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
                   {pinnedTooltip.data.detections && pinnedTooltip.data.detections.length > 0 && (
                     <>
-                      <div className="pt-1 mt-1 border-t border-border/10">
-                        <div className="text-[8px] font-semibold mb-1 flex items-center gap-1 text-muted-foreground/50 uppercase tracking-wider">
-                          <Activity className="h-1.5 w-1.5" />
+                      <div className="border-t border-border/20 pt-2">
+                        <div className="text-[9px] font-semibold mb-2 flex items-center gap-1.5 text-muted-foreground/70 uppercase tracking-wide">
+                          <Activity className="h-2 w-2" />
                           <span>
-                            {pinnedTooltip.data.detections.length} Option{pinnedTooltip.data.detections.length > 1 ? 's' : ''}
+                            {pinnedTooltip.data.detections.length} Unusual Option{pinnedTooltip.data.detections.length > 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
+                        <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                           {pinnedTooltip.data.detections.map(({ signal }) => (
                             <button
                               key={signal.signal_id}
-                              onClick={() => onSignalClick?.(signal.signal_id)}
-                              className="w-full text-xs p-1 bg-muted/5 rounded hover:bg-muted/20 transition-colors cursor-pointer"
+                              onClick={() => {
+                                onSignalClick?.(signal.signal_id);
+                                setPinnedTooltip(null);
+                              }}
+                              className="w-full text-left p-2 bg-muted/10 hover:bg-muted/30 rounded-md transition-all cursor-pointer border border-transparent hover:border-primary/30"
                             >
-                              <div className="flex items-center justify-between mb-0.5">
+                              <div className="flex items-center justify-between mb-1">
                                 <span className={cn(
-                                  "text-[9px] font-semibold capitalize",
+                                  "text-[11px] font-bold capitalize",
                                   signal.option_type === 'call' 
                                     ? 'text-green-500' 
                                     : 'text-red-500'
@@ -643,13 +743,13 @@ export function PriceChart({
                                   ${signal.strike} {signal.option_type}
                                 </span>
                                 <Badge className={cn(
-                                  "text-[7px] px-1 py-0 h-3",
+                                  "text-[8px] px-1.5 py-0.5 h-4",
                                   getGradeColor(signal.grade)
                                 )}>
                                   {signal.grade}
                                 </Badge>
                               </div>
-                              <div className="text-[8px] font-semibold text-green-600">
+                              <div className="text-[9px] font-semibold text-green-600">
                                 {formatPremiumFlow(signal.premium_flow)}
                               </div>
                             </button>

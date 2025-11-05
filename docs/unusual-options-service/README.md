@@ -23,6 +23,8 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Price Chart Visualization](price-chart-visualization.md) - Interactive charts with option detection overlay
 - [Spread Detection](spread-detection.md) - Multi-leg strategy detection system
 - [Frontend Spread Updates](frontend-spread-detection-updates.md) - UI changes for spread visualization
+- [Spread Detection Results](spread-detection-results.md) - Analysis of recent scan data
+- [Spread Detection Quick Start](SPREAD_DETECTION_QUICKSTART.md) - 3-step guide to see spreads
 
 ### Technical Documentation
 - [Architecture](architecture.md) - System design and components
@@ -71,11 +73,25 @@ All documentation follows these principles:
 
 ## 🔄 Recent Updates
 
+**November 5, 2025**
+- **Continuity Tracking Fix**: Fixed signals being marked inactive after 3 hours
+  - Signals now only marked inactive when option contract actually expires
+  - Previously: Marked inactive if not detected in last 3 hours
+  - Now: Marked inactive only when `expiry < CURRENT_DATE`
+  - This prevents active signals from disappearing between scans
+  - Updated database function `mark_stale_signals_inactive()` and Python code
+
 **November 4, 2025**
 - **Price Chart Visualization**: Interactive stock price charts with option detection overlay
 - **Unified Timeline View**: Merged chart and signal details into single interactive tab
-- **Click-to-Pin Tooltips**: Click detection dots to pin tooltips for easy interaction
-- **Pinned Tooltip Management**: Close with X button, ESC key, or click outside
+- **Click-to-Pin Tooltips**: Click detection dots to pin tooltips in place for easy interaction
+- **Enhanced Pinned Tooltip UX**: 
+  - Polished design with arrow pointer to detection dot
+  - Pulsing ring animation on active detection
+  - Semi-transparent overlay for focus
+  - Smooth fade-in/zoom animations
+  - Close via X button, ESC key, or click outside
+  - Auto-closes when clicking signal to navigate
 - **Flat Signal Display**: Streamlined signal list with sticky date headers
 - **Multi-Signal Detection**: Smart handling of grouped options at same timestamp
 - **Click-to-Navigate**: Click tooltip signals to jump to detail view in table

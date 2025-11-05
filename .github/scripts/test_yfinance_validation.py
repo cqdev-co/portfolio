@@ -12,7 +12,7 @@ import logging
 
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
-from yfinance_validator import YFinanceValidator
+from yfinance_validator import YFinanceValidator  # pyright: ignore[reportMissingImports]
 
 # Setup logging
 logging.basicConfig(

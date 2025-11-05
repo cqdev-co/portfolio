@@ -67,7 +67,15 @@ export async function GET(request: NextRequest) {
 
     // Filter out null/invalid data points
     const validData = priceData.filter(
-      (point: any) => point.price > 0 && !isNaN(point.price)
+      (point: { 
+        price: number; 
+        time: string; 
+        open: number; 
+        high: number; 
+        low: number; 
+        close: number; 
+        volume: number 
+      }) => point.price > 0 && !isNaN(point.price)
     );
 
     return NextResponse.json({

@@ -307,19 +307,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to mark signals as inactive if not detected
+-- Function to mark signals as inactive if option has expired
 CREATE OR REPLACE FUNCTION mark_stale_signals_inactive(
-    p_hours_threshold INTEGER DEFAULT 3
+    p_hours_threshold INTEGER DEFAULT 3  -- Kept for backwards compatibility but unused
 ) RETURNS INTEGER AS $$
 DECLARE
     v_count INTEGER;
 BEGIN
+    -- Mark signals as inactive only when the option contract has expired
     UPDATE unusual_options_signals
     SET is_active = FALSE,
         updated_at = NOW()
     WHERE is_active = TRUE
-        AND last_detected_at < NOW() - (p_hours_threshold || ' hours')::INTERVAL
-        AND expiry >= CURRENT_DATE;  -- Don't mark expired options
+        AND expiry < CURRENT_DATE;  -- Option has expired
     
     GET DIAGNOSTICS v_count = ROW_COUNT;
     RETURN v_count;
@@ -411,13 +411,13 @@ ORDER BY table_name;
 -- 1. Call find_existing_signal() before inserting new signals
 -- 2. If signal exists, call update_signal_continuity()
 -- 3. If signal is new, insert with signal_group_id = signal_id
--- 4. After scan completes, call mark_stale_signals_inactive(3)
---    to mark signals not detected in last 3 hours as inactive
+-- 4. After scan completes, call mark_stale_signals_inactive()
+--    to mark signals with expired options as inactive
 -- 
 -- Signal lifecycle:
 -- - New signal: is_new_signal=true, detection_count=1, is_active=true
 -- - Continuing signal: is_new_signal=false, detection_count++, is_active=true
--- - Stale signal: is_active=false (not detected in last 3 hours)
+-- - Expired signal: is_active=false (option expiry date has passed)
 -- 
 -- Deduplication strategy:
 -- - Match on: ticker + option_symbol + strike + expiry + option_type
