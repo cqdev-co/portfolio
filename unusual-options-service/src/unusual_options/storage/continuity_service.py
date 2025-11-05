@@ -257,15 +257,15 @@ class SignalContinuityService:
         
         return stats
     
-    async def mark_stale_signals(
+    async def mark_expired_signals(
         self, 
         hours_threshold: int = 3
     ) -> int:
         """
-        Mark signals as inactive if not detected recently.
+        Mark signals as inactive if their option contracts have expired.
         
         Args:
-            hours_threshold: Hours since last detection
+            hours_threshold: Deprecated parameter kept for backwards compatibility
             
         Returns:
             Number of signals marked inactive
@@ -281,13 +281,13 @@ class SignalContinuityService:
             if count > 0:
                 logger.info(
                     f"Marked {count} signals as inactive "
-                    f"(not detected in {hours_threshold} hours)"
+                    f"(option contracts expired)"
                 )
             
             return count
             
         except Exception as e:
-            logger.error(f"Error marking stale signals: {e}")
+            logger.error(f"Error marking expired signals: {e}")
             return 0
     
     async def get_signal_history(

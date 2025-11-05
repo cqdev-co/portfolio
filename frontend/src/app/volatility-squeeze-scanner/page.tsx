@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import type { VolatilitySqueezeSignal, SignalFilters, SignalSortConfig } from "@/lib/types/signals";
-import { fetchVolatilitySignals, fetchLatestSignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
+import { fetchVolatilitySignals, fetchSignalStats, subscribeToSignalUpdates, type SignalStats } from "@/lib/api/volatility-signals";
 import { fetchPerformanceDashboard } from "@/lib/api/performance";
 import type { PerformanceDashboard } from "@/lib/types/performance";
 import Link from "next/link";

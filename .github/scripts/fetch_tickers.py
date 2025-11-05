@@ -38,6 +38,7 @@ from dotenv import load_dotenv
 # Import quality filtering utilities
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
 from utils.efficient_ticker_filter import EfficientTickerFilter, EfficientTickerMetrics
+from utils.yfinance_validator import YFinanceValidator, YFinanceValidation
 
 # Load environment variables
 load_dotenv()
@@ -61,7 +62,7 @@ class TickerFetcher:
     def __init__(self, dry_run: bool = False, verbose: bool = False, 
                  enable_quality_filter: bool = True, us_only: bool = True,
                  min_quality_score: float = 45.0, enable_cfd_filter: bool = True,
-                 max_tickers: int = 5000):
+                 max_tickers: int = 5000, enable_yfinance_validation: bool = True):
         self.dry_run = dry_run
         self.verbose = verbose
         self.enable_quality_filter = enable_quality_filter
@@ -69,11 +70,13 @@ class TickerFetcher:
         self.min_quality_score = min_quality_score
         self.enable_cfd_filter = enable_cfd_filter
         self.max_tickers = max_tickers
+        self.enable_yfinance_validation = enable_yfinance_validation
         
         self.setup_logging()
         self.setup_supabase()
         self.setup_api_keys()
         self.setup_quality_filter()
+        self.setup_yfinance_validator()
         
     def setup_logging(self):
         """Configure logging"""
@@ -128,6 +131,28 @@ class TickerFetcher:
         else:
             self.quality_filter = None
             self.logger.info("Quality filtering disabled")
+    
+    def setup_yfinance_validator(self):
+        """Setup YFinance data quality validator"""
+        if self.enable_yfinance_validation:
+            self.yfinance_validator = YFinanceValidator(
+                min_history_days=90,
+                min_volume=10_000,
+                min_price=0.50,
+                max_price=10_000,
+                min_data_completeness=0.85,
+                max_gap_ratio=0.10,
+                recency_days=5,
+                max_workers=3,  # Reduced to avoid rate limiting
+                request_delay=0.5  # 500ms delay between requests
+            )
+            self.logger.info(
+                "YFinance validation enabled with conservative rate limiting "
+                "(3 workers, 0.5s delay) to avoid API errors"
+            )
+        else:
+            self.yfinance_validator = None
+            self.logger.info("YFinance validation disabled")
     
     def fetch_alpha_vantage_tickers(self) -> List[TickerInfo]:
         """Fetch tickers from Alpha Vantage API"""
@@ -444,6 +469,86 @@ class TickerFetcher:
             self.logger.info("Falling back to unfiltered ticker list")
             return tickers
     
+    def apply_yfinance_validation(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+        """
+        Apply YFinance data quality validation.
+        
+        This is the final quality gate that ensures:
+        - Data is accessible on YFinance
+        - Historical data exists and is recent
+        - OHLC data is valid (no violations)
+        - Volume data is present
+        - No excessive data gaps
+        """
+        if not self.enable_yfinance_validation or not self.yfinance_validator:
+            self.logger.info("YFinance validation disabled, skipping")
+            return tickers
+        
+        self.logger.info(
+            f"Applying YFinance validation to {len(tickers)} tickers "
+            f"(this may take a few minutes...)"
+        )
+        
+        # Extract symbols for validation
+        symbols = [t.symbol for t in tickers]
+        
+        try:
+            # Validate all tickers in parallel
+            validation_results = self.yfinance_validator.validate_batch(
+                symbols,
+                period="6mo",
+                verbose=self.verbose
+            )
+            
+            # Filter to only valid tickers
+            validated_tickers = []
+            for ticker in tickers:
+                result = validation_results.get(ticker.symbol)
+                if result and result.is_valid:
+                    # Update ticker info with validation data
+                    if result.last_price:
+                        ticker.market_cap = ticker.market_cap or 0
+                    validated_tickers.append(ticker)
+                elif result and self.verbose:
+                    self.logger.debug(
+                        f"Rejected {ticker.symbol}: "
+                        f"{', '.join(result.validation_issues[:2])}"
+                    )
+            
+            # Generate summary
+            summary = self.yfinance_validator.get_validation_summary(
+                validation_results
+            )
+            
+            self.logger.info(
+                f"YFinance validation complete: {len(validated_tickers)} tickers passed "
+                f"({summary['pass_rate']*100:.1f}% pass rate)"
+            )
+            
+            if summary['top_rejection_reasons']:
+                self.logger.info("Top rejection reasons:")
+                for reason_info in summary['top_rejection_reasons'][:5]:
+                    self.logger.info(
+                        f"  - {reason_info['reason']}: "
+                        f"{reason_info['count']} tickers"
+                    )
+            
+            self.logger.info(
+                f"Validated data quality: "
+                f"avg_completeness={summary['avg_data_completeness']*100:.1f}%, "
+                f"avg_ohlc_quality={summary['avg_ohlc_quality']*100:.1f}%, "
+                f"avg_history={summary['avg_history_days']:.0f} days"
+            )
+            
+            return validated_tickers
+            
+        except Exception as e:
+            self.logger.error(f"Error during YFinance validation: {e}")
+            self.logger.warning(
+                "YFinance validation failed, proceeding with unvalidated tickers"
+            )
+            return tickers
+    
     def store_tickers(self, tickers: List[TickerInfo]) -> bool:
         """Store tickers in Supabase database"""
         if self.dry_run:
@@ -556,13 +661,20 @@ class TickerFetcher:
             self.logger.error("No tickers remaining after quality filtering")
             return False
         
+        # Apply YFinance validation (final quality gate)
+        validated_tickers = self.apply_yfinance_validation(filtered_tickers)
+        
+        if not validated_tickers:
+            self.logger.error("No tickers remaining after YFinance validation")
+            return False
+        
         # Final safety check - ensure we don't exceed max_tickers
-        if len(filtered_tickers) > self.max_tickers:
-            self.logger.info(f"Final limit: Reducing from {len(filtered_tickers)} to {self.max_tickers} tickers")
-            filtered_tickers = filtered_tickers[:self.max_tickers]
+        if len(validated_tickers) > self.max_tickers:
+            self.logger.info(f"Final limit: Reducing from {len(validated_tickers)} to {self.max_tickers} tickers")
+            validated_tickers = validated_tickers[:self.max_tickers]
         
         # Store in database
-        success = self.store_tickers(filtered_tickers)
+        success = self.store_tickers(validated_tickers)
         
         if success:
             self.logger.info("Ticker fetch process completed successfully")
@@ -613,6 +725,11 @@ def main():
         default=2500,
         help='Maximum number of tickers to store (default: 2500)'
     )
+    parser.add_argument(
+        '--disable-yfinance-validation',
+        action='store_true',
+        help='Disable YFinance data quality validation (not recommended)'
+    )
     
     args = parser.parse_args()
     
@@ -624,7 +741,8 @@ def main():
             us_only=not args.include_global,
             min_quality_score=args.min_quality_score,
             enable_cfd_filter=not args.disable_cfd_filter,
-            max_tickers=args.max_tickers
+            max_tickers=args.max_tickers,
+            enable_yfinance_validation=not args.disable_yfinance_validation
         )
         success = fetcher.run()
         sys.exit(0 if success else 1)
