@@ -45,6 +45,8 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Options Flow Patterns](options-flow-patterns.md) - Common patterns and their meanings
 - [Case Studies](case-studies.md) - Real-world examples and lessons learned
 - [Performance Metrics](performance-metrics.md) - Historical accuracy and statistics
+- [Signal Analysis - November 2025](signal-analysis-nov-2025.md) - Deep dive analysis of 1,025 signals with trading strategies
+- [Trading Strategy Framework](trading-strategy-framework.md) - Systematic approach to identify and execute best plays
 
 ## 🎯 Quick Links
 
@@ -52,9 +54,11 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **Day Traders**: See [Intraday Scanning](scanning-strategies.md#intraday-scanning)
 - **Swing Traders**: See [Multi-Day Signals](scanning-strategies.md#swing-trading)
 - **Options Sellers**: See [High IV Opportunities](signal-interpretation.md#selling-premium)
+- **Systematic Trading**: See [Trading Strategy Framework](trading-strategy-framework.md) - Complete playbook for signal execution
 
 ### For Automation
 - **GitHub Actions Workflow**: See [GitHub Actions Setup](github-actions-setup.md) - Complete automated scanning guide
+- **Fast Scanner Workflow**: Hard-coded ticker watchlist for focused scanning (see below)
 - **Signal Lifecycle**: See [Signal Lifecycle](github-actions-setup.md#signal-lifecycle) - How signals are tracked over time
 - **Deduplication**: See [How It Works](github-actions-setup.md#how-it-works) - Prevents duplicate signals
 - **Troubleshooting**: See [Troubleshooting](github-actions-setup.md#-troubleshooting) - Common issues and solutions
@@ -77,9 +81,75 @@ All documentation follows these principles:
 3. **Progressive Detail**: Start simple, offer deep dives for advanced users
 4. **Up-to-date**: Documentation updated with each feature release
 
+## ⚡ Fast Scanner Workflow
+
+The portfolio includes a **fast scanner workflow** (`.github/workflows/uos-fast.yml`) that scans a hard-coded watchlist of tickers. This is ideal for:
+- Focused scanning on your favorite tickers
+- Faster execution times
+- Lower API usage
+- Custom watchlist monitoring
+
+### Configured Tickers
+The workflow is pre-configured to scan these tickers:
+```
+AAPL, TSLA, NVDA, AMD, GOOGL, MSFT, META, AMZN, SPY, QQQ
+```
+
+### How to Customize
+1. Open `.github/workflows/uos-fast.yml`
+2. Find the `HARDCODED_TICKERS` variable (around line 75)
+3. Edit the comma-separated list of tickers
+4. Commit and push your changes
+
+### Schedule
+- Runs once per scheduled trigger (configure via cron expression)
+- Can also be triggered manually from GitHub Actions UI
+- Manual trigger supports custom ticker input to override hard-coded list
+
+### Usage
+**Scheduled Run**: Automatically scans hard-coded tickers at scheduled times
+
+**Manual Trigger**:
+- Go to GitHub Actions → "Unusual Options Fast Scanner (Watchlist)"
+- Click "Run workflow"
+- Optionally provide custom tickers to override the hard-coded list
+- Set minimum grade (default: B)
+
 ## 🔄 Recent Updates
 
+**November 6, 2025**
+- **Fast Scanner Workflow**: Added hard-coded ticker watchlist for focused scanning
+  - Pre-configured with 10 popular tickers (AAPL, TSLA, NVDA, etc.)
+  - Easy to customize by editing the workflow file
+  - Supports manual override with custom tickers
+  - Faster execution and lower API usage
+- **Trading Strategy Framework**: Complete systematic approach to signal execution
+  - 5-Filter System to reduce 1000+ signals to 10-20 best plays
+  - 10-point validation checklist for every trade
+  - Position sizing framework using adapted Kelly Criterion
+  - Multi-signal correlation strategies with scoring system
+  - 3-tier portfolio approach (60% core, 30% opportunistic, 10% spec)
+  - Weekly workflow and daily monitoring routines
+  - Advanced strategies: straddles, spreads, calendar spreads, sector baskets
+  - See [Trading Strategy Framework](trading-strategy-framework.md)
+- **Automated Analysis Script**: Python tool implementing 5-Filter System
+  - Located at `scripts/analyze_best_plays.py`
+  - Automatically filters, ranks, and categorizes signals
+  - Provides tier-based recommendations and sector analysis
+  - Command: `python analyze_best_plays.py signals.csv`
+- **Trading Cheatsheet**: One-page quick reference for active trading
+  - Print-friendly format with all essential rules
+  - Position sizing matrix, exit rules, commandments
+  - Pre-trade checklist and daily monitoring routine
+  - See [Trading Cheatsheet](trading-cheatsheet.md)
+
 **November 5, 2025**
+- **Signal Analysis Report**: Comprehensive analysis of 1,025 unusual options signals
+  - Analyzed Nov 3-5 data with $1.9B total premium flow
+  - Identified top plays: AAPL, TSM, AMD with specific strike/expiry recommendations
+  - Detailed trading strategies: momentum, high probability, volatility, swing trades
+  - Risk management guidelines and position sizing recommendations
+  - See [Signal Analysis - November 2025](signal-analysis-nov-2025.md)
 - **Row Level Security Fix**: Added RLS policies for frontend access
   - Frontend can now read signals from database
   - Issue: Tables had RLS enabled but no policies configured

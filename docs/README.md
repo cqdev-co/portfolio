@@ -19,6 +19,7 @@ smart money positioning.
   flow, and detection patterns
 - Interactive price charts with signal overlay
 - Automated hourly scanning with signal continuity
+- **Fast Scanner Workflow** - Hard-coded watchlist for focused scanning
 - Frontend dashboard with grouped ticker view
 - RLS (Row Level Security) policies for data protection
 
@@ -30,24 +31,32 @@ smart money positioning.
 - [Technical Implementation](unusual-options-service/technical-implementation.md)
 - [Troubleshooting RLS](unusual-options-service/troubleshooting-rls.md)
 
-#### [Analyze Options Service](analyze-options-service/) ✅ Phase 2+ Complete
-Enterprise-grade options analysis system with high-confidence trade filtering.
+#### [Analyze Options Service](analyze-options-service/) ✅ Strategic Enhancement Complete
+Complete end-to-end trading system with tactical analysis + strategic framework.
 
-**Status:** Phase 2+ Complete - Best-of-Best Command Added
+**Status:** Phase 4 Complete - Full Strategic Trading System
 
-**Key Features:**
-- 🏆 **`analyze best`** - Get only high-confidence opportunities (top 1-2% of signals)
-- 🎯 Automated vertical spread vs naked option comparison
-- 📊 Intelligent position sizing and risk management  
-- 🔍 Multi-layer quality filtering (technical + strategy + quality gates)
+**NEW Strategic Features (Nov 6, 2025):**
+- 📊 **5-Filter System** - Reduce 1000+ signals to 10-20 best (automated)
+- ✅ **10-Point Validation** - Pre-trade checklist catches issues before entry
+- ⏰ **Entry Timing Strategies** - 5 approaches (First Hour Fade, Confirmation, Scale-In, etc.)
+- 🎯 **Exit Strategy Manager** - Systematic profit-taking (50%/100%/trail)
+- 📈 **Portfolio Construction** - 3-tier system (60% core, 30% opportunistic, 10% spec)
+- 🔄 **Daily Monitoring** - Position health checks with actionable alerts
+- 🔗 **Correlation Analysis** - Find multi-signal opportunities with confidence scoring
+
+**Existing Features:**
+- 🏆 `analyze best` - High-confidence opportunities (top 1-2% of signals)
+- 🎯 Vertical spread vs naked option comparison
+- 📊 Position sizing and risk management  
 - 📈 Black-Scholes probability estimation
-- 💰 Account-based risk allocation (conservative/moderate/aggressive)
-- ⚡ Fast execution: 408 signals → 5 actionable trades in 2 minutes
+- ⚡ Fast execution: 1000 signals → 15 actionable plays
 
 **Quick Links:**
-- [Quick Start Guide](../analyze-options-service/QUICK_START.md) ⭐
-- [Command Guide](../analyze-options-service/COMMAND_GUIDE.md) - Which command when?
-- [Best Command Explained](../analyze-options-service/BEST_COMMAND.md) - High-confidence filtering
+- [Strategy Integration Guide](analyze-options-service/STRATEGY-INTEGRATION.md) ⭐ NEW
+- [Enhancements Summary](analyze-options-service/ENHANCEMENTS-SUMMARY.md) - What's new
+- [Quick Start Guide](../analyze-options-service/QUICK_START.md)
+- [Command Guide](../analyze-options-service/COMMAND_GUIDE.md)
 - [Architecture](analyze-options-service/architecture.md)
 - [Trade Strategies](analyze-options-service/trade-strategies.md)
 - [Phase 2 Complete](../analyze-options-service/PHASE_2_COMPLETE.md)

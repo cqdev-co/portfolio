@@ -895,6 +895,203 @@ def ask_cmd(
         raise typer.Exit(1)
 
 
+@app.command()
+def entry(
+    ticker: str,
+    show_alternatives: bool = False
+):
+    """
+    Get entry timing strategy recommendation for a signal.
+    
+    Analyzes signal characteristics and market conditions to recommend
+    optimal entry approach (First Hour Fade, Confirmation Entry, etc.)
+    
+    Example:
+        analyze entry --ticker AAPL
+        analyze entry --ticker AAPL --show-alternatives
+    """
+    console.print(f"\n[bold blue]⏰ Entry Timing Strategy for {ticker}[/bold blue]\n")
+    
+    try:
+        # Load configuration and fetch signal
+        config = load_config()
+        fetcher = SignalFetcher(config)
+        
+        # Fetch signals for this ticker
+        console.print(f"[dim]Fetching signals for {ticker}...[/dim]")
+        approved, _ = fetcher.fetch_filtered_signals(
+            min_grade="B",
+            lookback_days=7,
+            show_filtered=False
+        )
+        
+        # Find the signal for this ticker
+        ticker_signal = None
+        ticker_technical = None
+        for signal, technical, _ in approved:
+            if signal.ticker == ticker:
+                ticker_signal = signal
+                ticker_technical = technical
+                break
+        
+        if not ticker_signal:
+            console.print(f"[yellow]No active signals found for {ticker}[/yellow]")
+            console.print("[dim]Try: analyze scan --days 7 to see available tickers[/dim]")
+            return
+        
+        # Import here to avoid circular dependencies
+        from .analyzers.entry_timing import EntryStrategySelector
+        
+        # Get entry recommendation
+        selector = EntryStrategySelector()
+        recommendation = selector.recommend_entry_strategy(
+            ticker_signal,
+            market_data={'technical': ticker_technical} if ticker_technical else None
+        )
+        
+        # Display primary strategy
+        strategy = recommendation.primary_strategy
+        
+        console.print(Panel(
+            f"[bold]{strategy.name}[/bold]\n\n"
+            f"{strategy.description}\n\n"
+            f"[cyan]Timing:[/cyan] {strategy.timing}\n"
+            f"[cyan]Risk Level:[/cyan] {strategy.risk_level}\n"
+            f"[cyan]Best For:[/cyan] {strategy.best_for}",
+            title=f"🎯 Recommended Strategy",
+            border_style="green",
+            box=box.ROUNDED
+        ))
+        
+        # Execution steps
+        console.print("\n[bold]📋 Execution Steps:[/bold]")
+        for step in strategy.execution_steps:
+            console.print(f"  {step}")
+        
+        # Pros and Cons
+        console.print("\n[bold green]✅ Advantages:[/bold green]")
+        for pro in strategy.pros:
+            console.print(f"  • {pro}")
+        
+        console.print("\n[bold yellow]⚠️  Considerations:[/bold yellow]")
+        for con in strategy.cons:
+            console.print(f"  • {con}")
+        
+        # Recommendation reason
+        console.print(f"\n[bold]💡 Why This Strategy:[/bold]")
+        console.print(f"  {recommendation.recommendation_reason}")
+        
+        # Show alternatives if requested
+        if show_alternatives and recommendation.alternative_strategies:
+            console.print("\n[bold blue]🔄 Alternative Strategies:[/bold blue]")
+            for alt in recommendation.alternative_strategies:
+                console.print(f"\n  [cyan]• {alt.name}[/cyan]")
+                console.print(f"    {alt.description}")
+                console.print(f"    Best for: {alt.best_for}")
+        
+        console.print()
+        
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        logger.exception("Entry command failed")
+        raise typer.Exit(1)
+
+
+@app.command()
+def validate(
+    ticker: Optional[str] = None,
+    all: bool = False,
+    min_checks: int = 8
+):
+    """
+    Validate signal(s) using 10-point pre-trade checklist.
+    
+    Checks technical, signal quality, and macro conditions before trading.
+    
+    Examples:
+        analyze validate --ticker AAPL
+        analyze validate --all
+        analyze validate --ticker AAPL --min-checks 9
+    """
+    console.print(f"\n[bold blue]✅ Signal Validation (10-Point Checklist)[/bold blue]\n")
+    
+    try:
+        # Load configuration and fetch signals
+        config = load_config()
+        fetcher = SignalFetcher(config)
+        
+        console.print(f"[dim]Fetching and validating signals...[/dim]\n")
+        approved, _ = fetcher.fetch_filtered_signals(
+            min_grade="B",
+            lookback_days=7,
+            show_filtered=False
+        )
+        
+        if not approved:
+            console.print("[yellow]No signals found[/yellow]")
+            return
+        
+        # Filter by ticker if specified
+        if ticker and not all:
+            approved = [(s, t, f) for s, t, f in approved if s.ticker == ticker]
+            if not approved:
+                console.print(f"[yellow]No signals found for {ticker}[/yellow]")
+                return
+        
+        # Import validator
+        from .analyzers.validation_checklist import TradeValidator
+        
+        validator = TradeValidator()
+        
+        # Validate each signal
+        passed_count = 0
+        failed_count = 0
+        
+        for signal, technical, _ in approved:
+            market_data = {'technical': technical} if technical else None
+            result = validator.validate_trade(signal, market_data)
+            
+            # Status color
+            if result.passed:
+                status = f"[bold green]✅ PASS[/bold green]"
+                passed_count += 1
+            else:
+                status = f"[bold red]❌ FAIL[/bold red]"
+                failed_count += 1
+            
+            # Display result
+            console.print(Panel(
+                f"{status} | "
+                f"{result.checks_passed}/{result.checks_total} checks | "
+                f"Score: {result.score:.1%}\n\n"
+                f"{result.recommendation}\n\n"
+                f"[dim]{result.summary}[/dim]",
+                title=f"📊 {result.ticker} (Grade {signal.grade})",
+                border_style="green" if result.passed else "red",
+                box=box.ROUNDED
+            ))
+            
+            # Show failed checks if any
+            failed_checks = [c for c in result.checks if not c.passed]
+            if failed_checks:
+                console.print("[yellow]Failed Checks:[/yellow]")
+                for check in failed_checks:
+                    console.print(f"  ❌ {check.name}: {check.reason}")
+                console.print()
+        
+        # Summary
+        console.print(f"\n[bold]Summary:[/bold]")
+        console.print(f"  ✅ Passed: {passed_count}")
+        console.print(f"  ❌ Failed: {failed_count}")
+        console.print(f"  Total: {len(approved)}")
+        console.print()
+        
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        logger.exception("Validation command failed")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
 

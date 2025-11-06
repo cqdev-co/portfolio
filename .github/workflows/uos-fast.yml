@@ -1,0 +1,94 @@
+name: Unusual Options Fast Scanner (Watchlist)
+
+on:
+  schedule:
+    # Run during US market hours (9:30 AM - 4:00 PM ET)
+    # Scans hard-coded watchlist tickers (see HARDCODED_TICKERS below)
+    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
+  
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      tickers:
+        description: 'Specific tickers to scan (comma-separated, e.g. AAPL,TSLA,NVDA)'
+        required: false
+        type: string
+      min_grade:
+        description: 'Minimum signal grade'
+        required: false
+        default: 'B'
+        type: choice
+        options:
+          - S
+          - A
+          - B
+          - C
+          - D
+          - F
+      limit:
+        description: 'Max tickers to scan (optional, only for scan-all)'
+        required: false
+        type: number
+
+jobs:
+  scan-unusual-options:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: unusual-options-service/.venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+      
+      - name: Install dependencies
+        working-directory: unusual-options-service
+        run: |
+          poetry install --no-interaction
+      
+      - name: Run scanner with continuity tracking
+        working-directory: unusual-options-service
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Hard-coded tickers for fast scheduled scans
+          HARDCODED_TICKERS="PLTR,TSLA,NVDA,MSFT,META,AMZN,SPY,QQQ"
+          
+          # Set parameters
+          TICKERS="${{ github.event.inputs.tickers }}"
+          MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
+          LIMIT="${{ github.event.inputs.limit }}"
+          
+          # Build command - Use python -m for proper module imports
+          # Continuity tracking is enabled by default
+          if [ -n "$TICKERS" ]; then
+            # Manual trigger with specific tickers
+            poetry run python -m unusual_options.cli scan-tickers $TICKERS --min-grade $MIN_GRADE --store
+          elif [ -n "$LIMIT" ]; then
+            # Manual trigger: Scan all with limit
+            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
+          else
+            # Scheduled cron or manual trigger without params: use hard-coded tickers
+            poetry run python -m unusual_options.cli scan-tickers $HARDCODED_TICKERS --min-grade $MIN_GRADE --store
+          fi
+
