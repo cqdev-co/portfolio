@@ -92,14 +92,19 @@ The portfolio includes a **fast scanner workflow** (`.github/workflows/uos-fast.
 ### Configured Tickers
 The workflow is pre-configured to scan these tickers:
 ```
-AAPL, TSLA, NVDA, AMD, GOOGL, MSFT, META, AMZN, SPY, QQQ
+PLTR TSLA NVDA MSFT META AMZN SPY QQQ
 ```
 
 ### How to Customize
 1. Open `.github/workflows/uos-fast.yml`
-2. Find the `HARDCODED_TICKERS` variable (around line 75)
-3. Edit the comma-separated list of tickers
+2. Find the `HARDCODED_TICKERS` variable (around line 76)
+3. Edit the space-separated list of tickers (note: use spaces, not commas)
 4. Commit and push your changes
+
+**Example:**
+```bash
+HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
+```
 
 ### Schedule
 - Runs once per scheduled trigger (configure via cron expression)

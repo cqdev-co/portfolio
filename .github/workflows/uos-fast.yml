@@ -72,7 +72,8 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           # Hard-coded tickers for fast scheduled scans
-          HARDCODED_TICKERS="PLTR,TSLA,NVDA,MSFT,META,AMZN,SPY,QQQ"
+          # Edit this list to change which tickers are automatically scanned
+          HARDCODED_TICKERS="PLTR TSLA NVDA MSFT META AMZN SPY QQQ"
           
           # Set parameters
           TICKERS="${{ github.event.inputs.tickers }}"
@@ -82,13 +83,14 @@ jobs:
           # Build command - Use python -m for proper module imports
           # Continuity tracking is enabled by default
           if [ -n "$TICKERS" ]; then
-            # Manual trigger with specific tickers
-            poetry run python -m unusual_options.cli scan-tickers $TICKERS --min-grade $MIN_GRADE --store
+            # Manual trigger with specific tickers (convert comma-separated to space-separated)
+            TICKERS_SPACED=$(echo "$TICKERS" | tr ',' ' ')
+            poetry run python -m unusual_options.cli scan $TICKERS_SPACED --min-grade $MIN_GRADE --store
           elif [ -n "$LIMIT" ]; then
             # Manual trigger: Scan all with limit
             poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
           else
             # Scheduled cron or manual trigger without params: use hard-coded tickers
-            poetry run python -m unusual_options.cli scan-tickers $HARDCODED_TICKERS --min-grade $MIN_GRADE --store
+            poetry run python -m unusual_options.cli scan $HARDCODED_TICKERS --min-grade $MIN_GRADE --store
           fi
 
