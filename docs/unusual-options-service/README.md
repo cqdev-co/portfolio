@@ -124,10 +124,14 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 
 **November 6, 2025**
 - **Fast Scanner Workflow**: Added hard-coded ticker watchlist for focused scanning
-  - Pre-configured with 10 popular tickers (AAPL, TSLA, NVDA, etc.)
+  - Pre-configured with popular tickers (PLTR, TSLA, NVDA, MSFT, META, AMZN, SPY, QQQ)
   - Easy to customize by editing the workflow file
   - Supports manual override with custom tickers
   - Faster execution and lower API usage
+- **Ticker Validation Fix**: Improved validation to allow scanning any ticker
+  - Scanner now accepts tickers even if not in the database
+  - Useful for ETFs, newly listed stocks, and tickers pending database sync
+  - Reduced logging noise from database lookups
 - **Trading Strategy Framework**: Complete systematic approach to signal execution
   - 5-Filter System to reduce 1000+ signals to 10-20 best plays
   - 10-point validation checklist for every trade

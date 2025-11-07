@@ -142,6 +142,11 @@ def validate_ticker_symbols(symbols: List[str]) -> List[str]:
             ticker = get_ticker_by_symbol(symbol)
             if ticker:
                 valid_symbols.append(symbol.upper())
+            else:
+                # Ticker not in database, but still allow it 
+                # (yfinance can scan any ticker)
+                # This is useful for ETFs, newly listed stocks, etc.
+                valid_symbols.append(symbol.upper())
         except Exception:
             # If validation fails, assume it's valid (fallback)
             valid_symbols.append(symbol.upper())

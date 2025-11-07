@@ -168,7 +168,7 @@ def get_ticker_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
             logger.debug(f"Found ticker: {symbol}")
             return response.data[0]
         else:
-            logger.warning(f"Ticker not found: {symbol}")
+            logger.debug(f"Ticker not found in database: {symbol}")
             return None
             
     except Exception as e:
