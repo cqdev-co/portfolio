@@ -19,7 +19,7 @@ smart money positioning.
   flow, and detection patterns
 - Interactive price charts with signal overlay
 - Automated hourly scanning with signal continuity
-- **Fast Scanner Workflow** - Hard-coded watchlist for focused scanning
+- **Fast Scanner Workflow** - Every 5 minutes on your watchlist (78 scans/day)
 - Frontend dashboard with grouped ticker view
 - RLS (Row Level Security) policies for data protection
 
