@@ -45,8 +45,7 @@ def load_config() -> Dict[str, Any]:
         "MIN_MARKET_CAP": float(os.getenv("MIN_MARKET_CAP", "1000000000")),
         "MIN_AVG_VOLUME": int(os.getenv("MIN_AVG_VOLUME", "1000000")),
         "MIN_OPTION_VOLUME": int(os.getenv("MIN_OPTION_VOLUME", "100")),
-        "MIN_DTE_STANDARD": int(os.getenv("MIN_DTE_STANDARD", "3")),
-        "MIN_DTE_HIGH_0DTE_TICKERS": int(os.getenv("MIN_DTE_HIGH_0DTE_TICKERS", "5")),
+        "MIN_DTE_ALL_TICKERS": int(os.getenv("MIN_DTE_ALL_TICKERS", "2")),  # Universal 0DTE filter (filters 0DTE and 1DTE)
         "ENABLE_MEME_STOCK_FILTERING": os.getenv("ENABLE_MEME_STOCK_FILTERING", "true").lower() == "true",
         
         # Alerts

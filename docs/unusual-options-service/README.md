@@ -92,7 +92,7 @@ The portfolio includes a **fast scanner workflow** (`.github/workflows/uos-fast.
 ### Configured Tickers
 The workflow is pre-configured to scan these tickers:
 ```
-PLTR TSLA NVDA MSFT META AMZN SPY QQQ
+PLTR TSLA SPY QQQ HIMS
 ```
 
 ### How to Customize
@@ -127,12 +127,18 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 **November 6, 2025**
 - **Fast Scanner Workflow**: Added hard-coded ticker watchlist for focused scanning
   - **Runs every 5 minutes** during market hours (78 scans/day)
-  - Pre-configured with popular tickers (PLTR, TSLA, NVDA, MSFT, META, AMZN, SPY, QQQ)
+  - Pre-configured with popular tickers (PLTR, TSLA, SPY, QQQ, HIMS)
   - Easy to customize by editing the workflow file
   - Supports manual override with custom tickers
   - Faster execution and lower API usage than full market scan
-- **Ticker Validation Fix**: Improved validation to allow scanning any ticker
-  - Scanner now accepts tickers even if not in the database
+- **Universal 0DTE Filtering** - Smarter approach to reducing noise
+  - **No longer blocking popular tickers** like TSLA, NVDA, SPY, QQQ
+  - Instead: **Filter 0DTE and 1DTE contracts universally** across all tickers
+  - Catches legitimate unusual activity on popular stocks
+  - Eliminates day-trader noise without throwing away good signals
+  - Configurable via `MIN_DTE_ALL_TICKERS` (default: 2 days minimum)
+- **Ticker Validation Improvements**
+  - Scanner now accepts any ticker, even if not in database
   - Useful for ETFs, newly listed stocks, and tickers pending database sync
   - Reduced logging noise from database lookups
 - **Trading Strategy Framework**: Complete systematic approach to signal execution

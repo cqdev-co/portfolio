@@ -298,10 +298,12 @@ async def _run_scan(config: dict, tickers: list, min_grade: str, output: str, st
         task = progress.add_task(f"Scanning {len(tickers)} tickers...", total=None)
         
         try:
+            # When user explicitly requests specific tickers, bypass blocking filters
+            # (they know what they want to scan)
             if len(tickers) == 1:
-                signals = await orchestrator.scan_ticker(tickers[0])
+                signals = await orchestrator.scan_ticker(tickers[0], skip_blocking=True)
             else:
-                signals = await orchestrator.scan_multiple(tickers)
+                signals = await orchestrator.scan_multiple(tickers, skip_blocking=True)
             
             progress.update(task, completed=True)
             

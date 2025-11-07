@@ -160,7 +160,7 @@ jobs:
         run: |
           # Hard-coded tickers for fast scheduled scans
           # Edit this list to change which tickers are automatically scanned
-          HARDCODED_TICKERS="PLTR TSLA NVDA MSFT META AMZN SPY QQQ"
+          HARDCODED_TICKERS="PLTR TSLA SPY QQQ HIMS"
           
           # Set parameters
           TICKERS="${{ github.event.inputs.tickers }}"

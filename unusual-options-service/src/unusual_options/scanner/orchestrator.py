@@ -36,21 +36,24 @@ class ScanOrchestrator:
             self._provider = await get_provider_with_fallback(self.config)
         return self._provider
     
-    async def scan_ticker(self, ticker: str) -> List[UnusualOptionsSignal]:
+    async def scan_ticker(self, ticker: str, skip_blocking: bool = False) -> List[UnusualOptionsSignal]:
         """
         Scan a single ticker for unusual options activity.
         
         Args:
             ticker: Stock ticker symbol
+            skip_blocking: If True, bypass ticker blocking filters (useful for explicit watchlists)
             
         Returns:
             List of detected signals
         """
         logger.info(f"Scanning {ticker}")
         
-        # Early filter: Skip blocked tickers (meme stocks + high 0DTE activity) to avoid noise
-        if self.config.get("ENABLE_MEME_STOCK_FILTERING", True) and should_block_ticker(ticker):
-            logger.debug(f"Skipping blocked ticker {ticker} (meme stock or high 0DTE activity)")
+        # Early filter: Skip blocked tickers (meme stocks only)
+        # Note: Popular tickers like TSLA, NVDA, SPY, QQQ are NO LONGER blocked
+        # Instead, we filter 0DTE contracts universally (see _should_process_detections)
+        if not skip_blocking and self.config.get("ENABLE_MEME_STOCK_FILTERING", True) and should_block_ticker(ticker):
+            logger.debug(f"Skipping blocked ticker {ticker} (meme stock)")
             return []
         
         try:
@@ -123,7 +126,8 @@ class ScanOrchestrator:
     async def scan_multiple(
         self, 
         tickers: List[str],
-        max_concurrent: int = 5
+        max_concurrent: int = 5,
+        skip_blocking: bool = False
     ) -> List[UnusualOptionsSignal]:
         """
         Scan multiple tickers with concurrency control.
@@ -131,6 +135,7 @@ class ScanOrchestrator:
         Args:
             tickers: List of ticker symbols
             max_concurrent: Maximum concurrent scans
+            skip_blocking: If True, bypass ticker blocking filters (useful for explicit watchlists)
             
         Returns:
             Combined list of all signals
@@ -154,7 +159,7 @@ class ScanOrchestrator:
             nonlocal rate_limit_count
             async with semaphore:
                 try:
-                    return await self.scan_ticker(ticker)
+                    return await self.scan_ticker(ticker, skip_blocking=skip_blocking)
                 except Exception as e:
                     error_msg = str(e).lower()
                     if any(phrase in error_msg for phrase in [
@@ -262,20 +267,18 @@ class ScanOrchestrator:
         primary_detection = detections[0]
         contract = primary_detection.contract
         
-        # Enhanced DTE filtering based on ticker type
+        # Universal 0DTE filtering - applies to ALL tickers
+        # This filters out day-trader noise while preserving legitimate unusual activity
         days_to_expiry = (contract.expiry - contract.timestamp.date()).days
         
-        # Apply stricter filtering for high 0DTE activity tickers
-        if should_apply_strict_dte_filtering(ticker):
-            # Require minimum days for high 0DTE activity tickers (configurable)
-            min_dte = self.config.get("MIN_DTE_HIGH_0DTE_TICKERS", 5)
-            if days_to_expiry < min_dte:
-                return False
-        else:
-            # Standard filtering: minimum days for other tickers (configurable)
-            min_dte = self.config.get("MIN_DTE_STANDARD", 3)
-            if days_to_expiry < min_dte:
-                return False
+        # Filter 0DTE and 1DTE contracts (configurable, default: 2 days minimum)
+        # 0DTE = expires today (day traders)
+        # 1DTE = expires tomorrow (still mostly day trading)
+        # ≥2 DTE = legitimate directional plays worth flagging
+        min_dte = self.config.get("MIN_DTE_ALL_TICKERS", 2)
+        if days_to_expiry < min_dte:
+            logger.debug(f"Filtered {ticker} contract: {days_to_expiry} DTE < {min_dte} minimum (0DTE filter)")
+            return False
         
         # Filter out extremely OTM options (> 30% away from current price)
         price_diff_pct = abs(contract.strike - underlying_price) / underlying_price

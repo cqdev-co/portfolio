@@ -200,49 +200,44 @@ def is_meme_stock(ticker: str) -> bool:
 
 def get_high_0dte_activity_tickers() -> List[str]:
     """
-    Get list of tickers known for high 0DTE activity that should be filtered more aggressively.
-    These are typically large-cap stocks with daily options that attract day traders.
+    Get list of tickers known for high 0DTE activity.
+    
+    NOTE: As of Nov 2025, we no longer block these tickers entirely.
+    Instead, we filter 0DTE contracts universally across all tickers.
+    This list is kept for backwards compatibility and potential future use.
     
     Returns:
-        List of ticker symbols with high 0DTE activity
+        Empty list (deprecated functionality)
     """
-    return [
-        "TSLA", "NVDA", "AMZN", "GOOGL", "META", "MSFT", 
-        "SPY", "QQQ", "IWM", "NFLX", "CRM", "ADBE", "PYPL", "INTC", 
-        "BAC", "XLF", "GS", "MS", "C", "V", "MA"
-    ]
+    return []  # No longer blocking entire tickers - filter 0DTE contracts instead
 
 
 def should_apply_strict_dte_filtering(ticker: str) -> bool:
     """
-    Determine if a ticker should have stricter DTE filtering applied.
+    DEPRECATED: As of Nov 2025, we use universal 0DTE filtering instead.
     
     Args:
         ticker: Stock symbol to check
         
     Returns:
-        True if ticker should have stricter DTE filtering (min 5+ days instead of 3+)
+        False (deprecated - always use universal MIN_DTE_ALL_TICKERS config)
     """
-    ticker_upper = ticker.upper()
-    return (
-        is_meme_stock(ticker_upper) or 
-        ticker_upper in get_high_0dte_activity_tickers()
-    )
+    return False  # Deprecated: Use universal 0DTE filtering instead
 
 
 def should_block_ticker(ticker: str) -> bool:
     """
     Determine if a ticker should be completely blocked from scanning.
-    This includes both meme stocks and high 0DTE activity tickers.
+    
+    As of Nov 2025: Only blocks true meme stocks.
+    No longer blocks popular tickers like TSLA, NVDA, SPY, QQQ.
+    Instead, we filter 0DTE contracts universally across all tickers.
     
     Args:
         ticker: Stock symbol to check
         
     Returns:
-        True if ticker should be completely blocked from scanning
+        True if ticker should be completely blocked (meme stocks only)
     """
     ticker_upper = ticker.upper()
-    return (
-        is_meme_stock(ticker_upper) or 
-        ticker_upper in get_high_0dte_activity_tickers()
-    )
+    return is_meme_stock(ticker_upper)  # Only block meme stocks, not popular tickers
