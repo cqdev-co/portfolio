@@ -1,7 +1,7 @@
 """Database models for signals and performance tracking."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional, Dict
 from uuid import uuid4
 
@@ -36,7 +36,9 @@ class UnusualOptionsSignal:
     signal_id: str = field(default_factory=lambda: str(uuid4()))
     ticker: str = ""
     option_symbol: str = ""
-    detection_timestamp: datetime = field(default_factory=datetime.now)
+    detection_timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     
     # Option Details
     strike: float = 0.0
@@ -121,7 +123,9 @@ class SignalPerformance:
     ticker: str = ""
     
     # Entry
-    entry_timestamp: datetime = field(default_factory=datetime.now)
+    entry_timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     entry_price: float = 0.0
     option_symbol: str = ""
     signal_grade: str = ""
@@ -153,5 +157,7 @@ class SignalPerformance:
     exit_reason: str = ""
     
     # Metadata
-    last_updated: datetime = field(default_factory=datetime.now)
+    last_updated: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 

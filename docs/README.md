@@ -22,6 +22,7 @@ smart money positioning.
 - **Fast Scanner Workflow** - Every 5 minutes on your watchlist (78 scans/day)
 - Frontend dashboard with grouped ticker view
 - RLS (Row Level Security) policies for data protection
+- **Timezone Handling** - UTC storage, EST display for market alignment
 
 **Quick Links:**
 - [System Overview](unusual-options-service/system-overview.md)
@@ -29,6 +30,7 @@ smart money positioning.
 - [Filter System Guide](unusual-options-service/filter-system.md) ⭐ NEW
 - [Database Schema](unusual-options-service/database-schema.md)
 - [Technical Implementation](unusual-options-service/technical-implementation.md)
+- [Timezone Handling](timezone-handling.md) - UTC storage and EST display
 - [Troubleshooting RLS](unusual-options-service/troubleshooting-rls.md)
 
 #### [Analyze Options Service](analyze-options-service/) ✅ Strategic Enhancement Complete

@@ -5,7 +5,7 @@ import pandas as pd
 import asyncio
 import time
 from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from loguru import logger
 
 from .base import DataProvider, DataNotAvailableError, RateLimitError
@@ -189,7 +189,7 @@ class YFinanceProvider(DataProvider):
                 ticker=ticker,
                 underlying_price=float(current_price),
                 contracts=all_contracts,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
             
         except RateLimitError as e:
@@ -235,7 +235,7 @@ class YFinanceProvider(DataProvider):
                 volume=volume,
                 open_interest=open_interest,
                 implied_volatility=float(implied_vol) if implied_vol else None,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
             
         except Exception as e:

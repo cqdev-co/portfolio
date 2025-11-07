@@ -1,7 +1,7 @@
 """Data models for options chains and market data."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional, Dict
 
 
@@ -31,7 +31,9 @@ class OptionsContract:
     implied_volatility: Optional[float] = None
     
     # Metadata
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 @dataclass
@@ -41,7 +43,9 @@ class OptionsChain:
     ticker: str
     underlying_price: float
     contracts: List[OptionsContract]
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     
     def get_calls(self) -> List[OptionsContract]:
         """Get all call contracts."""

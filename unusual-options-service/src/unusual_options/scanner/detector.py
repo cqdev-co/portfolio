@@ -2,7 +2,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from loguru import logger
 
 from ..data.models import OptionsChain, OptionsContract, HistoricalData
@@ -138,18 +138,18 @@ class AnomalyDetector:
             if current_volume >= self.min_heuristic_volume:
                 # More conservative confidence calculation
                 confidence = min(current_volume / 10000, 0.8)  # Cap at 0.8 for heuristics
-                return Detection(
-                    detection_type='VOLUME_ANOMALY',
-                    contract=contract,
-                    metrics={
-                        'current_volume': current_volume,
-                        'average_volume': 0,  # Unknown
-                        'volume_ratio': float('inf'),
-                        'heuristic': True
-                    },
-                    confidence=confidence,
-                    timestamp=datetime.now()
-                )
+            return Detection(
+                detection_type='VOLUME_ANOMALY',
+                contract=contract,
+                metrics={
+                    'current_volume': current_volume,
+                    'average_volume': 0,  # Unknown
+                    'volume_ratio': float('inf'),
+                    'heuristic': True
+                },
+                confidence=confidence,
+                timestamp=datetime.now(timezone.utc)
+            )
             return None
         
         # Get average volume from historical data
@@ -174,7 +174,7 @@ class AnomalyDetector:
                     'heuristic': False
                 },
                 confidence=confidence,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
         
         return None
@@ -206,7 +206,7 @@ class AnomalyDetector:
                         'heuristic': True
                     },
                     confidence=confidence,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(timezone.utc)
                 )
             return None
         
@@ -232,7 +232,7 @@ class AnomalyDetector:
                     'heuristic': False
                 },
                 confidence=confidence,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
         
         return None
@@ -272,7 +272,7 @@ class AnomalyDetector:
                 'avg_price': contract.last_price
             },
             confidence=confidence,
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
     
     def _detect_unusual_spread(self, contract: OptionsContract) -> Optional[Detection]:
@@ -303,7 +303,7 @@ class AnomalyDetector:
                     'mid_price': mid_price
                 },
                 confidence=confidence,
-                timestamp=datetime.now()
+                timestamp=datetime.now(timezone.utc)
             )
         
         return None
@@ -349,5 +349,5 @@ class AnomalyDetector:
                 'total_volume': call_volume + put_volume
             },
             confidence=confidence,
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )

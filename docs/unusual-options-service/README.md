@@ -32,6 +32,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Database Schema](database-schema.md) - Supabase table structures and relationships
 - [API Integration](api-integration.md) - Data provider integration details
 - [Performance Tuning](performance-tuning.md) - Optimization and scaling
+- [Timezone Handling](../timezone-handling.md) - UTC storage and EST display strategy
 
 ### Advanced Topics
 - [Backtesting](backtesting.md) - Historical performance analysis

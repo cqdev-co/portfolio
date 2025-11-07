@@ -36,6 +36,12 @@ import { fetchUnusualOptionsSignals, subscribeToUnusualOptionsUpdates } from "@/
 import type { UnusualOptionsStats } from "@/lib/types/unusual-options";
 import { cn } from "@/lib/utils";
 import { 
+  formatDateEST, 
+  formatTimeEST, 
+  toLocaleStringEST,
+  formatDateWithWeekdayEST
+} from "@/lib/utils/timezone";
+import { 
   ArrowUpDown, 
   ArrowUp, 
   ArrowDown, 
@@ -904,7 +910,7 @@ export default function UnusualOptionsScanner() {
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-sm">
-                                {new Date(expiry.expiry).toLocaleDateString()}
+                                {formatDateEST(expiry.expiry)}
                               </span>
                               <span className="text-[10px] text-muted-foreground font-medium">
                                 {expiry.daysToExpiry}d
@@ -988,15 +994,15 @@ export default function UnusualOptionsScanner() {
                       <div className="text-[10px] text-muted-foreground space-y-1 bg-muted/20 p-2.5 rounded-lg border border-border/30">
                         <div className="flex items-center justify-between">
                           <span className="font-medium">First:</span>
-                          <span>{new Date(
+                          <span>{toLocaleStringEST(
                             summary.dateRange.earliest
-                          ).toLocaleString()}</span>
+                          )}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="font-medium">Latest:</span>
-                          <span>{new Date(
+                          <span>{toLocaleStringEST(
                             summary.dateRange.latest
-                          ).toLocaleString()}</span>
+                          )}</span>
                         </div>
                       </div>
                     </div>
@@ -1105,7 +1111,7 @@ export default function UnusualOptionsScanner() {
                         >
                           <div className="flex items-center gap-2.5">
                             <span className="font-semibold text-base">
-                              {new Date(expiry.expiry).toLocaleDateString()}
+                              {formatDateEST(expiry.expiry)}
                             </span>
                             <span className="text-xs text-muted-foreground font-medium">
                               {expiry.daysToExpiry}d
@@ -1219,11 +1225,7 @@ export default function UnusualOptionsScanner() {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-semibold text-foreground">
-                                    {new Date(dateGroup.date).toLocaleDateString('en-US', {
-                                      weekday: 'short',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
+                                    {formatDateWithWeekdayEST(dateGroup.date)}
                                   </span>
                                   <span className="text-[10px] text-muted-foreground/60">
                                     {dateGroup.callCount}C / {dateGroup.putCount}P
@@ -1274,13 +1276,10 @@ export default function UnusualOptionsScanner() {
                                   </div>
                                   
                                   <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
-                                    <div className="flex items-center gap-2">
-                                      <span>
-                                        {new Date(signal.detection_timestamp).toLocaleTimeString('en-US', {
-                                          hour: 'numeric',
-                                          minute: '2-digit'
-                                        })}
-                                      </span>
+                                  <div className="flex items-center gap-2">
+                                    <span>
+                                      {formatTimeEST(signal.detection_timestamp)}
+                                    </span>
                                       <span className="text-muted-foreground/40">•</span>
                                       <span>
                                         {signal.days_to_expiry}d to expiry
@@ -1459,9 +1458,7 @@ export default function UnusualOptionsScanner() {
 
                           {/* Detection Time */}
                           <div className="text-[10px] text-muted-foreground font-medium pt-0.5 border-t border-border/30">
-                            {new Date(
-                              signal.detection_timestamp
-                            ).toLocaleString()}
+                            {toLocaleStringEST(signal.detection_timestamp)} EST
                           </div>
                         </div>
                       ))}
