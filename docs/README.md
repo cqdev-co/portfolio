@@ -31,6 +31,7 @@ smart money positioning.
 - [Database Schema](unusual-options-service/database-schema.md)
 - [Technical Implementation](unusual-options-service/technical-implementation.md)
 - [Timezone Handling](timezone-handling.md) - UTC storage and EST display
+- [Date Filtering Fix](timezone-date-filtering-fix.md) - EST-based date filters
 - [Troubleshooting RLS](unusual-options-service/troubleshooting-rls.md)
 
 #### [Analyze Options Service](analyze-options-service/) ✅ Strategic Enhancement Complete

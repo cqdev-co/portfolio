@@ -90,8 +90,9 @@ export default function UnusualOptionsScanner() {
       setError(null);
       
       // Load signals with filters applied
+      // Use a very high limit to get all signals (pagination handles this)
       const signalsResponse = await fetchUnusualOptionsSignals({
-        limit: 5000, // High limit to capture all active signals
+        limit: 50000, // Effectively unlimited (pagination will fetch all)
         sortBy: 'premium_flow' as keyof UnusualOptionsSignal,
         sortOrder: 'desc',
         filters,
@@ -1276,10 +1277,10 @@ export default function UnusualOptionsScanner() {
                                   </div>
                                   
                                   <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
-                                  <div className="flex items-center gap-2">
-                                    <span>
+                                    <div className="flex items-center gap-2">
+                                      <span>
                                       {formatTimeEST(signal.detection_timestamp)}
-                                    </span>
+                                      </span>
                                       <span className="text-muted-foreground/40">•</span>
                                       <span>
                                         {signal.days_to_expiry}d to expiry

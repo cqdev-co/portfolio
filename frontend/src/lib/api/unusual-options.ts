@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { UnusualOptionsSignal, UnusualOptionsFilters, UnusualOptionsStats } from '@/lib/types/unusual-options';
+import { fromZonedTime } from 'date-fns-tz';
 
 export interface SignalQueryOptions {
   limit?: number;
@@ -113,15 +114,28 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
     }
 
     if (filters.detection_date) {
-      // Filter for signals detected on or after the specified date
-      const startOfDay = new Date(filters.detection_date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filters.detection_date);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Filter for signals detected on the specified date IN EST TIMEZONE
+      // This ensures "Today" means "Today in market time" (EST)
+      // regardless of user's local timezone
+      const US_EASTERN_TZ = 'America/New_York';
+      
+      // Parse the date string (e.g., "2025-11-07")
+      const dateStr = filters.detection_date;
+      
+      // Create start and end of day in EST timezone
+      // e.g., "2025-11-07" becomes:
+      //   Start: 2025-11-07 00:00:00 EST → 2025-11-07 05:00:00 UTC (during EST)
+      //   End:   2025-11-07 23:59:59 EST → 2025-11-08 04:59:59 UTC (during EST)
+      const startOfDayEST = new Date(`${dateStr}T00:00:00`);
+      const endOfDayEST = new Date(`${dateStr}T23:59:59`);
+      
+      // Convert EST date boundaries to UTC for database query
+      const startOfDayUTC = fromZonedTime(startOfDayEST, US_EASTERN_TZ);
+      const endOfDayUTC = fromZonedTime(endOfDayEST, US_EASTERN_TZ);
       
       query = query
-        .gte('detection_timestamp', startOfDay.toISOString())
-        .lte('detection_timestamp', endOfDay.toISOString());
+        .gte('detection_timestamp', startOfDayUTC.toISOString())
+        .lte('detection_timestamp', endOfDayUTC.toISOString());
     }
 
     // Continuity filters (NEW for cron job support)
@@ -140,22 +154,68 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
     // Apply sorting (prefer last_detected_at for active signals)
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching unusual options signals:', error);
-      return {
-        data: [],
-        count: 0,
-        error: error.message
-      };
+    // Fetch ALL results using pagination if limit exceeds Supabase's max (1000)
+    let allData: UnusualOptionsSignal[] = [];
+    let currentOffset = offset;
+    const pageSize = 1000; // Supabase max page size
+    
+    if (limit > pageSize) {
+      // Need to paginate
+      let hasMore = true;
+      let totalFetched = 0;
+      
+      while (hasMore && totalFetched < limit) {
+        const fetchLimit = Math.min(pageSize, limit - totalFetched);
+        const pageQuery = query.range(
+          currentOffset, 
+          currentOffset + fetchLimit - 1
+        );
+        
+        const { data: pageData, error: pageError } = await pageQuery;
+        
+        if (pageError) {
+          console.error('Error fetching page:', pageError);
+          break;
+        }
+        
+        if (!pageData || pageData.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        allData.push(...pageData);
+        totalFetched += pageData.length;
+        currentOffset += pageData.length;
+        
+        // If we got fewer results than requested, we've reached the end
+        if (pageData.length < fetchLimit) {
+          hasMore = false;
+        }
+      }
+    } else {
+      // Single page request
+      query = query.range(offset, offset + limit - 1);
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching unusual options signals:', error);
+        return {
+          data: [],
+          count: 0,
+          error: error.message
+        };
+      }
+      
+      allData = data || [];
     }
 
+    // Get total count (this is not affected by pagination)
+    const { count } = await supabase
+      .from('unusual_options_signals')
+      .select('*', { count: 'exact', head: true });
+
     // Transform data to add id field for frontend compatibility
-    const transformedData = (data || []).map(signal => ({
+    const transformedData = allData.map(signal => ({
       ...signal,
       id: signal.signal_id // Add id field mapping to signal_id
     }));

@@ -6,13 +6,8 @@
  * (US Eastern Time) since that's when US stock markets operate.
  */
 
-import { 
-  format, 
-  formatInTimeZone 
-} from 'date-fns-tz';
-import { 
-  parseISO 
-} from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { parseISO } from 'date-fns';
 
 /**
  * US Eastern Timezone (handles both EST and EDT automatically)
@@ -131,7 +126,7 @@ export function toLocaleDateStringEST(
  */
 export function toLocaleTimeStringEST(
   date: string | Date,
-  options?: Intl.DateTimeFormatOptions
+  _options?: Intl.DateTimeFormatOptions
 ): string {
   return formatTimeEST(date);
 }

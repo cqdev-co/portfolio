@@ -325,27 +325,21 @@ export function PriceChart({
       return null;
     }
 
-    const highestGrade = data.detections.reduce((best, curr) => {
-      const gradeOrder = { 
-        'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 
-      };
-      return gradeOrder[curr.signal.grade] > 
-        gradeOrder[best.signal.grade] 
-        ? curr 
-        : best;
-    }, data.detections[0]);
-
-    const isCall = highestGrade.signal.option_type === 'call';
-    const gradeColors: Record<string, string> = {
-      'S': isCall ? '#a855f7' : '#dc2626',
-      'A': isCall ? '#10b981' : '#ef4444',
-      'B': isCall ? '#3b82f6' : '#f97316',
-      'C': isCall ? '#eab308' : '#f59e0b',
-      'D': isCall ? '#f97316' : '#ea580c',
-      'F': '#6b7280',
-    };
-
-    const color = gradeColors[highestGrade.signal.grade] || '#6b7280';
+    // Determine if this point has calls, puts, or both
+    const hasCalls = data.detections.some(d => d.signal.option_type === 'call');
+    const hasPuts = data.detections.some(d => d.signal.option_type === 'put');
+    
+    let color: string;
+    if (hasCalls && hasPuts) {
+      // Mixed - both calls and puts at this time
+      color = '#a855f7'; // Purple for mixed
+    } else if (hasCalls) {
+      // Only calls
+      color = '#10b981'; // Green for calls
+    } else {
+      // Only puts
+      color = '#ef4444'; // Red for puts
+    }
     
     const baseSize = 4;
     const size = Math.min(baseSize + data.detections.length * 1, 8);
@@ -799,7 +793,7 @@ export function PriceChart({
         <span className="text-muted-foreground/20">•</span>
         <div className="flex items-center gap-1">
           <div className="h-0.5 w-0.5 rounded-full bg-purple-500/60" />
-          <span>S-Grade</span>
+          <span>Mixed</span>
         </div>
       </div>
     </div>
