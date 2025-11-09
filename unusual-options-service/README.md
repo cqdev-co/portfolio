@@ -199,11 +199,27 @@ poetry run python scripts/cron_scanner.py --scan-all --min-grade B
 **Key Features:**
 - ✅ Automatic deduplication (no duplicate signals)
 - ✅ Continuity tracking (NEW/CONTINUING badges)
-- ✅ Stale signal cleanup (marks inactive signals)
+- ✅ Smart signal lifecycle management (active until expiry)
 - ✅ GitHub Actions integration
 - ✅ Complete audit trail
 
-**See:** [Hourly Cron Setup Guide](../docs/unusual-options-service/hourly-cron-setup.md)
+**Signal Lifecycle:**
+- **ACTIVE**: Option contract hasn't expired yet (`expiry >= today`)
+- **INACTIVE**: Option contract has expired (`expiry < today`)
+- Signals stay active until expiration, regardless of detection frequency
+- Only active signals are shown on the frontend
+- Inactive signals remain in database for historical analysis
+
+**Automated Signal Expiration:**
+- ✅ Runs daily at 4:30 PM ET (30 min after market close)
+- ✅ Marks expired options as inactive automatically
+- ✅ Detailed statistics by expiry date, ticker, and grade
+- ✅ Manual trigger available via GitHub Actions
+- ✅ Dry-run mode for safe testing
+
+**See:** 
+- [Hourly Cron Setup Guide](../docs/unusual-options-service/hourly-cron-setup.md)
+- [Signal Expiration System](../docs/unusual-options-service/signal-expiration.md)
 
 ### Advanced Analysis
 

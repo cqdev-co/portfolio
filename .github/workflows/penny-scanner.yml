@@ -1,0 +1,103 @@
+name: Market Hours Penny Stock Scanner
+
+on:
+  schedule:
+    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
+    # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
+    # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
+    # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges
+    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
+    - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
+    - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
+    - cron: '0 15 * * 1-5'   # 11:00 AM EDT (15:00 UTC)
+    - cron: '30 15 * * 1-5'  # 11:30 AM EDT (15:30 UTC)
+    - cron: '0 16 * * 1-5'   # 12:00 PM EDT (16:00 UTC)
+    - cron: '30 16 * * 1-5'  # 12:30 PM EDT (16:30 UTC)
+    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (17:00 UTC)
+    - cron: '30 17 * * 1-5'  # 1:30 PM EDT (17:30 UTC)
+    - cron: '0 18 * * 1-5'   # 2:00 PM EDT (18:00 UTC)
+    - cron: '30 18 * * 1-5'  # 2:30 PM EDT (18:30 UTC)
+    - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
+    - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
+    - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      min_score:
+        description: 'Minimum signal score threshold'
+        required: false
+        default: '0.70'
+        type: string
+      max_symbols:
+        description: 'Maximum symbols to scan (leave empty for all)'
+        required: false
+        default: ''
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  scan-penny-stocks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25  # Full scan takes ~12 minutes, add buffer
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Cache Poetry dependencies
+      uses: actions/cache@v4
+      with:
+        path: penny-stock-scanner/.venv
+        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('penny-stock-scanner/poetry.lock') }}
+        restore-keys: |
+          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+          
+    - name: Install dependencies
+      working-directory: penny-stock-scanner
+      run: |
+        poetry install --only=main
+        
+    - name: Run Penny Stock Scanner
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+      working-directory: penny-stock-scanner
+      run: |
+        
+        # Build command with optional max_symbols
+        if [ -n "${{ github.event.inputs.max_symbols }}" ]; then
+          poetry run penny-scanner scan-all \
+            --min-score ${{ github.event.inputs.min_score || '0.70' }} \
+            --max-symbols ${{ github.event.inputs.max_symbols }}
+        else
+          poetry run penny-scanner scan-all \
+            --min-score ${{ github.event.inputs.min_score || '0.70' }}
+        fi
+        
+        echo "✅ Scan complete"
+        
+    - name: Upload scan logs (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: penny-scanner-logs-${{ github.run_number }}
+        path: penny-stock-scanner/logs/
+        retention-days: 7
+

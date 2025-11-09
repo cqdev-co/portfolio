@@ -1,335 +1,422 @@
-# GitHub Scripts
+# GitHub Actions Scripts
 
-Automation scripts for maintaining data quality and system health.
+This directory contains automation scripts used by GitHub Actions workflows.
 
-## 📋 Scripts Overview
+## Table of Contents
 
-### Ticker Fetching
+- [Ticker Fetchers](#ticker-fetchers)
+- [Utilities](#utilities)
+- [Requirements](#requirements)
+- [Environment Variables](#environment-variables)
+- [Testing](#testing)
 
-#### `fetch_tickers.py`
-**Main ticker fetching script with multi-layer quality validation.**
+## Ticker Fetchers
 
-Fetches tickers from multiple sources and validates data quality before storage.
+### fetch_tickers.py
 
-**Features:**
-- Multi-source fetching (Alpha Vantage, FMP, Yahoo Finance)
-- CFD (Contract for Difference) filtering
-- Heuristic quality scoring
-- **YFinance data validation** ⭐ NEW
-- Batch processing for efficiency
-- Comprehensive logging
+**Purpose**: Fetches high-quality US stock tickers for the main trading systems.
+
+**Target Criteria:**
+- US stocks from major exchanges (NASDAQ, NYSE, NYSEARCA, NYSEMKT)
+- Price: $0.50+ (excludes penny stocks)
+- Volume: 25,000+ shares/day
+- Market Cap: $25M+
+- Quality score: 45+
+- Max tickers: 2,500
 
 **Usage:**
 ```bash
-# Standard production run (recommended)
+# Production run
 python fetch_tickers.py
 
-# Dry run (test without storing)
-python fetch_tickers.py --dry-run --verbose
+# Dry run (no database writes)
+python fetch_tickers.py --dry-run
 
-# Custom configuration
-python fetch_tickers.py \
-  --max-tickers 3000 \
-  --min-quality-score 50.0 \
-  --verbose
+# Verbose output
+python fetch_tickers.py --verbose
+
+# Disable quality filter
+python fetch_tickers.py --disable-quality-filter
+
+# Include global markets (default: US-only)
+python fetch_tickers.py --include-global
+
+# Custom quality score threshold
+python fetch_tickers.py --min-quality-score 50.0
+
+# Custom ticker limit
+python fetch_tickers.py --max-tickers 3000
 
 # Disable YFinance validation (not recommended)
 python fetch_tickers.py --disable-yfinance-validation
 ```
 
-**CLI Options:**
-- `--dry-run` - Test without storing to database
-- `--verbose` - Enable detailed logging
-- `--disable-quality-filter` - Disable heuristic filtering
-- `--include-global` - Include non-US tickers
-- `--min-quality-score` - Minimum quality score (0-100, default: 45)
-- `--disable-cfd-filter` - Include CFD instruments
-- `--max-tickers` - Maximum tickers to store (default: 2500)
-- `--disable-yfinance-validation` - Skip YFinance validation
+**Workflow:** `.github/workflows/fetch-tickers.yml`  
+**Schedule:** Sundays at 6:00 AM UTC  
+**Database Table:** `tickers`
 
-#### `test_yfinance_validation.py`
-**Test script for YFinance data quality validator.**
+### fetch_penny_tickers.py
 
-Tests the validation system with known tickers.
+**Purpose**: Fetches penny stock tickers (stocks under $5) for 
+specialized trading strategies.
+
+**Target Criteria:**
+- Price: $0.10 - $5.00 (penny stock range)
+- Market Cap: $5M - $300M (micro to small cap)
+- Volume: 10,000+ shares/day
+- Includes OTC markets (OTCQX, OTCQB, PINK)
+- Max tickers: 2,000
 
 **Usage:**
 ```bash
+# Production run
+python fetch_penny_tickers.py
+
+# Dry run (no database writes)
+python fetch_penny_tickers.py --dry-run
+
+# Verbose output
+python fetch_penny_tickers.py --verbose
+
+# Custom ticker limit
+python fetch_penny_tickers.py --max-tickers 1500
+
+# Disable YFinance validation (not recommended)
+python fetch_penny_tickers.py --disable-yfinance-validation
+```
+
+**Workflow:** `.github/workflows/fetch-penny-tickers.yml`  
+**Schedule:** Mondays at 7:00 AM UTC  
+**Database Table:** `penny_tickers`
+
+**Documentation:** [Penny Tickers Guide](../../docs/db/penny-tickers.md)
+
+## Utilities
+
+### utils/efficient_ticker_filter.py
+
+**Purpose**: High-performance ticker filtering with batch processing.
+
+**Features:**
+- CFD (Contract for Difference) detection
+- S&P 500 symbol prioritization
+- Exchange filtering (US markets)
+- Heuristic-based quality scoring
+- Batch API calls to multiple data sources
+- Symbol validation patterns
+
+**Key Classes:**
+- `EfficientTickerFilter`: Main filtering logic
+- `EfficientTickerMetrics`: Lightweight ticker metrics
+
+### utils/yfinance_validator.py
+
+**Purpose**: Validates ticker data quality on Yahoo Finance.
+
+**Features:**
+- Historical data availability checks
+- OHLC (Open-High-Low-Close) validation
+- Volume data verification
+- Price range validation
+- Data completeness scoring
+- Gap detection
+- Parallel batch processing with rate limiting
+
+**Key Classes:**
+- `YFinanceValidator`: Main validation logic
+- `YFinanceValidation`: Validation result data class
+
+### test_yfinance_validation.py
+
+**Purpose**: Test suite for YFinance validator.
+
+**Usage:**
+```bash
+cd .github/scripts
 python test_yfinance_validation.py
 ```
 
-## 🔧 Utilities
+**Tests:**
+- Known valid tickers (AAPL, MSFT, GOOGL)
+- Known invalid tickers (fake symbols)
+- Batch validation performance
+- Rate limiting behavior
 
-### `utils/efficient_ticker_filter.py`
-Heuristic-based quality filtering using batch API calls.
+## Requirements
 
-**Features:**
-- S&P 500 priority processing
-- CFD detection
-- Market cap/volume/price scoring
-- Batch API optimization
+### Python Dependencies
 
-### `utils/yfinance_validator.py` ⭐ NEW
-YFinance data quality validation engine.
-
-**Validates:**
-- Data accessibility
-- Historical data completeness
-- OHLC integrity
-- Volume consistency
-- Price validity
-- Data recency
-
-**Example:**
-```python
-from utils.yfinance_validator import YFinanceValidator
-
-validator = YFinanceValidator(
-    min_history_days=90,
-    min_volume=10_000,
-    min_price=0.50
-)
-
-results = validator.validate_batch(symbols)
-summary = validator.get_validation_summary(results)
-```
-
-## 📊 Workflows Integration
-
-### `fetch-tickers.yml`
-GitHub Actions workflow for weekly ticker updates.
-
-**Schedule:** Sundays at 6 AM UTC
-
-**Workflow Steps:**
-1. Setup Python environment
-2. Install dependencies
-3. Test YFinance validator
-4. Run ticker fetch (dry-run or production)
-
-**Manual Trigger:**
-- Navigate to Actions → "Weekly Global Market Tickers Update"
-- Click "Run workflow"
-- Options:
-  - `dry_run`: Test without database writes
-  - `verbose`: Enable detailed logging
-
-## 🎯 Quality Pipeline
-
-The ticker fetching process uses a multi-layer quality pipeline:
+**File:** `requirements.txt`
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ 1. Fetch from Multiple Sources                     │
-│    - Alpha Vantage API                              │
-│    - Financial Modeling Prep API                    │
-│    - Yahoo Finance                                  │
-└─────────────────────────────────────────────────────┘
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│ 2. Deduplication                                    │
-│    - Remove duplicates                              │
-│    - Keep most complete information                 │
-└─────────────────────────────────────────────────────┘
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│ 3. CFD Filtering                                    │
-│    - Remove Contract for Difference instruments     │
-│    - Filter derivatives, synthetics                 │
-└─────────────────────────────────────────────────────┘
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│ 4. Quality Filtering (Heuristic)                    │
-│    - Symbol validation                              │
-│    - Exchange filtering (US-only)                   │
-│    - S&P 500 priority                              │
-│    - Quality scoring                                │
-└─────────────────────────────────────────────────────┘
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│ 5. YFinance Validation ⭐ NEW                       │
-│    - Test actual data accessibility                 │
-│    - Validate OHLC integrity                        │
-│    - Check volume consistency                       │
-│    - Verify data completeness                       │
-│    - Ensure data recency                            │
-└─────────────────────────────────────────────────────┘
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│ 6. Database Storage                                 │
-│    - Batch upsert to Supabase                       │
-│    - Only validated tickers stored                  │
-└─────────────────────────────────────────────────────┘
+python-dotenv==1.0.0
+requests==2.31.0
+supabase==2.0.3
+yfinance==0.2.32
+pandas==2.1.3
+numpy==1.26.2
 ```
 
-## 📈 Expected Results
+### Installation
 
-### Typical Pass Rates
-
-| Stage | Input | Output | Pass Rate |
-|-------|-------|--------|-----------|
-| Raw Fetch | - | 15,000+ | - |
-| Deduplication | 15,000+ | 12,000+ | ~80% |
-| CFD Filter | 12,000+ | 10,000+ | ~83% |
-| Quality Filter | 10,000+ | 2,500 | ~25% |
-| **YFinance Validation** | 2,500 | 1,800-2,200 | **70-88%** |
-
-### Quality Metrics
-
-After YFinance validation:
-- **Data Completeness**: 92-95%
-- **OHLC Quality**: 98-99%
-- **Average History**: 120-150 days
-- **Average Volume**: 250k-500k daily
-- **Price Range**: $2-$150 (typical)
-
-## 🔍 Monitoring
-
-### Log Files
-
-- **Location**: `ticker_fetch.log`
-- **Format**: Timestamped with level indicators
-- **Contents**: All validation details, errors, statistics
-
-### Validation Summary
-
-Look for this output in logs:
-
-```
-YFinance validation complete: 2,142 tickers passed (85.7% pass rate)
-
-Top rejection reasons:
-  - Insufficient history: 187 tickers
-  - Stale data: 95 tickers
-  - Insufficient volume: 76 tickers
-  - OHLC violations: 42 tickers
-  - Too many data gaps: 23 tickers
-
-Validated data quality:
-  avg_completeness=93.4%
-  avg_ohlc_quality=98.7%
-  avg_history=134 days
-```
-
-## 🛠️ Development
-
-### Requirements
-
-Install dependencies:
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Or with virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**Required packages:**
-- `requests>=2.31.0`
-- `supabase>=2.18.1`
-- `python-dotenv>=1.1.1`
-- `yfinance>=0.2.18`
-- `pandas>=2.0.0`
-- `numpy>=1.24.0`
+## Environment Variables
 
-### Environment Variables
+All scripts require these environment variables:
 
-Create `.env` file:
+### Required for Database Access
+
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_url
-NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_key
-ALPHA_VANTAGE_API_KEY=your_key  # Optional
-FMP_API_KEY=your_key            # Optional
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-### Testing Locally
+### Required for Data Sources
 
 ```bash
-# Test with dry-run
+# Alpha Vantage (US stock listings)
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+
+# Financial Modeling Prep (global markets, penny stocks)
+FMP_API_KEY=your_fmp_key
+```
+
+### Setting Up Environment
+
+#### Local Development
+
+Create `.env` file in project root:
+
+```bash
+cat > .env << EOF
+NEXT_PUBLIC_SUPABASE_URL=<your_supabase_url>
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
+ALPHA_VANTAGE_API_KEY=<your_alpha_vantage_key>
+FMP_API_KEY=<your_fmp_key>
+EOF
+```
+
+#### GitHub Actions
+
+1. Go to repository Settings → Secrets and variables → Actions
+2. Add repository secrets:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`
+   - `ALPHA_VANTAGE_API_KEY`
+   - `FMP_API_KEY`
+
+## Testing
+
+### Dry Run Mode
+
+Test scripts without writing to database:
+
+```bash
+# Regular tickers
 python fetch_tickers.py --dry-run --verbose
 
-# Test validator only
-python test_yfinance_validation.py
-
-# Full run with limited tickers
-python fetch_tickers.py --max-tickers 100 --verbose
+# Penny tickers
+python fetch_penny_tickers.py --dry-run --verbose
 ```
 
-## 📚 Documentation
+### Validation Testing
 
-- **[Ticker Fetch Improvements](../../docs/ticker-fetch-improvements.md)** - Full documentation
-- **[Quick Summary](../../docs/ticker-fetch-improvements-summary.md)** - TL;DR version
+Test YFinance validator:
 
-## 🚨 Troubleshooting
+```bash
+python test_yfinance_validation.py
+```
 
-### Low Pass Rate (<50%)
+### Manual Workflow Triggers
 
-**Causes:**
-- Market closed (weekend/holiday)
-- YFinance API issues
-- Too restrictive criteria
+Test workflows via GitHub UI:
+
+1. Go to Actions tab
+2. Select workflow:
+   - "Weekly Global Market Tickers Update" (regular tickers)
+   - "Weekly Penny Stock Tickers Update" (penny tickers)
+3. Click "Run workflow"
+4. Set parameters:
+   - `dry_run`: true (test without database writes)
+   - `verbose`: true (detailed logging)
+   - `max_tickers`: Custom limit (optional)
+
+### Expected Results
+
+#### fetch_tickers.py
+
+**Typical Output:**
+```
+Total Candidates: 10,000 - 15,000 tickers
+After Pre-Filtering: 5,000 - 8,000 tickers
+After Quality Filtering: 3,000 - 5,000 tickers
+After YFinance Validation: 2,000 - 2,500 tickers
+Pass Rate: 20% - 25%
+Execution Time: 15-25 minutes
+```
+
+#### fetch_penny_tickers.py
+
+**Typical Output:**
+```
+Total Candidates: 5,000 - 10,000 tickers
+After Deduplication: 4,000 - 8,000 tickers
+After YFinance Validation: 1,000 - 2,000 tickers
+Pass Rate: 20% - 40%
+Execution Time: 10-20 minutes
+```
+
+## Common Issues
+
+### API Rate Limiting
+
+**Symptoms:**
+- 401/429 HTTP errors
+- "Too many requests" messages
+- Incomplete results
 
 **Solutions:**
-1. Check if market is open
-2. Retry after a few hours
-3. Adjust validation thresholds
-4. Use `--disable-yfinance-validation` temporarily
+- Wait and retry (limits reset hourly/daily)
+- Reduce `max_tickers` parameter
+- Use `--verbose` to see detailed errors
+- Check API usage quotas
 
-### Validation Taking Too Long
+### YFinance Validation Failures
 
-**Causes:**
-- Too many tickers
-- Rate limiting
-- Network issues
-
-**Solutions:**
-1. Reduce `--max-tickers` limit
-2. Adjust `max_workers` in code (try 5 instead of 10)
-3. Run during off-peak hours
-
-### Database Connection Issues
-
-**Causes:**
-- Invalid credentials
-- Network connectivity
-- Supabase service issues
+**Symptoms:**
+- Very low pass rates (< 10%)
+- "No historical data" errors
+- Connection timeouts
 
 **Solutions:**
-1. Verify `.env` credentials
-2. Test connection manually
-3. Check Supabase status page
+- Check internet connectivity
+- Reduce batch size (built-in: 100 tickers/batch)
+- Increase timeout (workflow default: 30-45 minutes)
+- Disable validation if necessary (not recommended)
 
-## 🎯 Best Practices
+### Supabase Connection Issues
 
-1. **Weekly Updates**: Run on Sundays before market opens
-2. **Monitor Logs**: Review validation summary after each run
-3. **Quality First**: Keep validation enabled
-4. **Test Changes**: Use `--dry-run` before production
-5. **Adjust Gradually**: Make threshold changes incrementally
+**Symptoms:**
+- "Missing Supabase credentials" error
+- Database write failures
+- Timeout during inserts
 
-## 🔄 Maintenance
+**Solutions:**
+- Verify environment variables
+- Check Supabase project status
+- Verify service role key permissions
+- Check database row limits
 
-### Regular Tasks
+## Best Practices
 
-- **Weekly**: Run ticker fetch (automated)
-- **Monthly**: Review rejection reasons and adjust thresholds
-- **Quarterly**: Update S&P 500 list in efficient_ticker_filter.py
-- **As Needed**: Add new data sources
+1. **Always test with dry-run first**
+   ```bash
+   python fetch_tickers.py --dry-run --verbose
+   ```
 
-### Version Updates
+2. **Monitor workflow runs in GitHub Actions**
+   - Check logs for warnings
+   - Review automated issues
+   - Track success rates over time
 
-When updating dependencies:
-1. Test with `--dry-run` first
-2. Monitor pass rates
-3. Adjust validation criteria if needed
-4. Update documentation
+3. **Use appropriate ticker limits**
+   - Regular tickers: 2,000 - 3,000 recommended
+   - Penny tickers: 1,500 - 2,000 recommended
 
-## 📞 Support
+4. **Respect API rate limits**
+   - Don't run scripts too frequently
+   - Use built-in rate limiting
+   - Stagger different scripts (separate days)
+
+5. **Keep dependencies updated**
+   ```bash
+   pip list --outdated
+   pip install --upgrade <package>
+   ```
+
+## Monitoring
+
+### GitHub Actions
+
+- View workflow runs: `Actions` tab
+- Check logs: Click on workflow run → job → step
+- Download artifacts: Logs are saved for 30 days
+
+### Automated Issues
+
+Failed workflows create GitHub issues automatically:
+
+- Tagged with `automation`, `tickers`, `bug`
+- Include run details and error information
+- Should be reviewed and resolved promptly
+
+### Database Health
+
+Monitor ticker data quality:
+
+```sql
+-- Check last update times
+SELECT 
+  'tickers' as table_name,
+  COUNT(*) as ticker_count,
+  MAX(last_fetched) as last_update
+FROM tickers
+WHERE is_active = true
+UNION ALL
+SELECT 
+  'penny_tickers' as table_name,
+  COUNT(*) as ticker_count,
+  MAX(last_fetched) as last_update
+FROM penny_tickers
+WHERE is_active = true;
+
+-- Check data freshness
+SELECT 
+  symbol, 
+  name, 
+  last_fetched,
+  NOW() - last_fetched as age
+FROM tickers
+WHERE is_active = true
+AND last_fetched < NOW() - INTERVAL '7 days'
+ORDER BY last_fetched
+LIMIT 10;
+```
+
+## Contributing
+
+When modifying scripts:
+
+1. Test locally with `--dry-run`
+2. Update documentation
+3. Add tests for new features
+4. Update `requirements.txt` if adding dependencies
+5. Update workflow files if changing parameters
+
+## Support
 
 For issues or questions:
-1. Check logs in `ticker_fetch.log`
-2. Review documentation
-3. Test with `--dry-run --verbose`
-4. Check Supabase connection
 
----
+1. Check this README
+2. Review script logs (`--verbose` flag)
+3. Check GitHub Actions logs
+4. Review data source documentation:
+   - [FMP API Docs](https://site.financialmodelingprep.com/developer/docs)
+   - [Alpha Vantage Docs](https://www.alphavantage.co/documentation/)
+   - [YFinance Docs](https://github.com/ranaroussi/yfinance)
+   - [Supabase Docs](https://supabase.com/docs)
 
-**Last Updated:** November 2025
+## Related Documentation
 
-**Key Enhancement:** YFinance validation layer prevents 85% of downstream data quality issues in scanners.
-
+- [Database Documentation](../../docs/db/README.md)
+- [Penny Tickers Guide](../../docs/db/penny-tickers.md)
+- [GitHub Actions Workflows](../.github/workflows/)

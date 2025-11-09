@@ -249,6 +249,13 @@ class StrategyComparison:
     
     # Position sizing
     suggested_contracts: int = 0
+    
+    # ML Predictions (optional)
+    ml_win_probability: Optional[float] = None
+    ml_expected_return: Optional[float] = None
+    ml_expected_value: Optional[float] = None
+    ml_recommendation: Optional[str] = None
+    ml_reasoning: List[str] = field(default_factory=list)
     suggested_capital: float = 0.0
     risk_per_trade: float = 0.0  # Dollar amount at risk
     

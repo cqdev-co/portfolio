@@ -15,6 +15,8 @@ from ..models.strategy import (
 )
 from .spread_analyzer import VerticalSpreadAnalyzer
 from .naked_analyzer import NakedOptionAnalyzer
+from ..ml_client import MLPredictorClient
+from ..config import get_settings
 
 
 class StrategyRecommender:
@@ -42,6 +44,21 @@ class StrategyRecommender:
         # Initialize analyzers
         self.spread_analyzer = VerticalSpreadAnalyzer(account_size, risk_per_trade_pct)
         self.naked_analyzer = NakedOptionAnalyzer(account_size, risk_per_trade_pct)
+        
+        # Initialize ML client (optional)
+        settings = get_settings()
+        self.ml_client: Optional[MLPredictorClient] = None
+        if settings.ml_predictor_enabled:
+            try:
+                self.ml_client = MLPredictorClient(settings.ml_predictor_url)
+                if self.ml_client.is_available():
+                    logger.info("ML Predictor service connected")
+                else:
+                    logger.debug("ML Predictor service not available")
+                    self.ml_client = None
+            except Exception as e:
+                logger.debug(f"ML Predictor initialization failed: {e}")
+                self.ml_client = None
     
     def recommend(
         self,
@@ -74,11 +91,79 @@ class StrategyRecommender:
             naked=naked
         )
         
+        # Enhance with ML predictions if available
+        comparison = self._enhance_with_ml(comparison, signal, technical)
+        
         # Determine recommendation
         comparison = self._determine_recommendation(comparison, signal)
         
         # Calculate position sizing
         comparison = self._calculate_position_size(comparison)
+        
+        return comparison
+    
+    def _enhance_with_ml(
+        self,
+        comparison: StrategyComparison,
+        signal: EnrichedSignal,
+        technical: TechnicalIndicators
+    ) -> StrategyComparison:
+        """
+        Enhance strategy comparison with ML predictions.
+        
+        Args:
+            comparison: Strategy comparison
+            signal: Signal data
+            technical: Technical indicators
+            
+        Returns:
+            Enhanced comparison with ML insights
+        """
+        if self.ml_client is None:
+            return comparison
+        
+        try:
+            # Prepare signal data for ML prediction
+            signal_data = {
+                "ticker": signal.ticker,
+                "strike": signal.strike,
+                "expiry": signal.expiry,
+                "option_type": signal.option_type,
+                "days_to_expiry": signal.days_to_expiry,
+                "grade": signal.grade,
+                "overall_score": signal.overall_score,
+                "confidence": 0.8,  # Default confidence
+                "premium_flow": signal.premium_flow,
+                "volume_ratio": getattr(signal, "volume_ratio", None),
+                "current_volume": signal.current_volume,
+                "implied_volatility": signal.current_iv,
+                "moneyness": signal.moneyness,
+                "underlying_price": signal.current_price,
+                "sentiment": signal.sentiment.value,
+                "has_volume_anomaly": False,
+                "has_oi_spike": False,
+                "has_premium_flow": signal.premium_flow > 100000,
+            }
+            
+            # Get ML prediction
+            ml_prediction = self.ml_client.predict(**signal_data)
+            
+            if ml_prediction:
+                # Store ML prediction in comparison
+                comparison.ml_win_probability = ml_prediction.win_probability
+                comparison.ml_expected_return = ml_prediction.expected_return_pct
+                comparison.ml_expected_value = ml_prediction.expected_value
+                comparison.ml_recommendation = ml_prediction.recommendation
+                comparison.ml_reasoning = ml_prediction.reasoning
+                
+                logger.debug(
+                    f"ML enhanced {signal.ticker}: "
+                    f"Win Prob={ml_prediction.win_probability:.1%}, "
+                    f"EV={ml_prediction.expected_value:.1f}%"
+                )
+        
+        except Exception as e:
+            logger.debug(f"ML enhancement failed: {e}")
         
         return comparison
     

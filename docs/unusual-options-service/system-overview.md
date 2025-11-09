@@ -439,6 +439,79 @@ def calculate_risk_score(ticker, detections, market_data):
     }
 ```
 
+## 🔄 Signal Lifecycle
+
+### Signal States
+
+Signals in the system progress through the following lifecycle:
+
+#### 1. **NEW** → Initial Detection
+- Signal is detected for the first time
+- `is_new_signal = TRUE`
+- `is_active = TRUE`
+- `detection_count = 1`
+
+#### 2. **CONTINUING** → Re-detection
+- Same option contract detected in subsequent scans
+- `is_new_signal = FALSE`
+- `is_active = TRUE`
+- `detection_count` increments
+- `last_detected_at` updates
+
+#### 3. **INACTIVE** → Contract Expired
+- Option contract has passed expiration date
+- `is_active = FALSE`
+- `expiry < CURRENT_DATE`
+- Signal archived but not shown to frontend
+
+### What Does "Inactive" Mean?
+
+**A signal becomes inactive when the option contract expires**, 
+making it no longer tradeable. This is the ONLY condition that 
+marks a signal as inactive.
+
+**Key Points:**
+- ✅ Signals stay active until option expiration date
+- ✅ Not detecting a signal for hours/days does NOT make it inactive
+- ✅ Only frontend shows active signals (non-expired contracts)
+- ✅ Inactive signals remain in database for historical analysis
+
+**Example:**
+```
+Signal: AAPL 185C 2025-01-17
+Created: 2025-01-10 (is_active = TRUE)
+Re-detected: 2025-01-11, 2025-01-12, 2025-01-15 (still active)
+Last scan: 2025-01-16 (not detected, but still active)
+Expiration: 2025-01-17 → Signal marked INACTIVE
+```
+
+**Important History:**
+Prior to November 2025, there was a bug where signals were 
+incorrectly marked inactive after 3 hours without detection. 
+This was fixed - signals now ONLY go inactive on contract expiration.
+
+### Continuity Tracking
+
+The system automatically deduplicates signals across scans:
+
+```python
+# Continuity Matching Criteria
+def is_same_signal(signal_a, signal_b):
+    return (
+        signal_a.ticker == signal_b.ticker and
+        signal_a.option_symbol == signal_b.option_symbol and
+        signal_a.strike == signal_b.strike and
+        signal_a.expiry == signal_b.expiry and
+        signal_a.option_type == signal_b.option_type
+    )
+```
+
+**Benefits:**
+- No duplicate signals cluttering the database
+- Track how long unusual activity persists
+- Distinguish new opportunities from ongoing ones
+- Build complete signal history timeline
+
 ## 🔄 Data Flow
 
 ### Typical Scan Workflow
@@ -450,9 +523,10 @@ def calculate_risk_score(ticker, detections, market_data):
 5. **Scoring**: Calculate multi-factor score
 6. **Grading**: Assign letter grade (S/A/B/C/D/F)
 7. **Risk Assessment**: Evaluate risk factors
-8. **Storage**: Save signal to Supabase
-9. **Alert**: Send notification if grade meets threshold
-10. **Output**: Display results to user
+8. **Storage**: Save signal to Supabase with continuity check
+9. **Expiry Management**: Mark expired contracts as inactive
+10. **Alert**: Send notification if grade meets threshold
+11. **Output**: Display results to user
 
 ### Performance Tracking Workflow
 

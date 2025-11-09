@@ -1,0 +1,81 @@
+name: Expire Unusual Options Signals
+
+on:
+  schedule:
+    # Run daily at 4:30 PM ET (8:30 PM UTC / 20:30 UTC during EDT)
+    # This is 30 minutes after market close to ensure all data is captured
+    # During EST (winter), this will be 9:30 PM UTC
+    - cron: '30 20 * * 1-5'  # Mon-Fri at 8:30 PM UTC (4:30 PM EDT)
+  
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      dry_run:
+        description: 'Dry run mode (report only, no changes)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  expire-signals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: unusual-options-service/.venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+      
+      - name: Install dependencies
+        working-directory: unusual-options-service
+        run: |
+          poetry install --no-interaction
+      
+      - name: Expire signals
+        working-directory: unusual-options-service
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Check for dry run mode
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Running in DRY RUN mode..."
+            poetry run python scripts/expire_signals.py --dry-run
+          else
+            echo "Running expiration script..."
+            poetry run python scripts/expire_signals.py
+          fi
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Signal Expiration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Signals with expiry <= today were marked as inactive." >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for detailed statistics." >> $GITHUB_STEP_SUMMARY
+

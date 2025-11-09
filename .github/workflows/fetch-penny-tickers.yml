@@ -1,0 +1,103 @@
+name: Weekly Penny Stock Tickers Update
+
+on:
+  schedule:
+    # Run weekly on Mondays at 7 AM UTC (different from regular tickers)
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no database writes)'
+        required: false
+        default: false
+        type: boolean
+      verbose:
+        description: 'Enable verbose logging'
+        required: false
+        default: false
+        type: boolean
+      max_tickers:
+        description: 'Maximum number of penny tickers to fetch'
+        required: false
+        default: '2000'
+        type: string
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  fetch-penny-tickers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # Longer timeout due to validation
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('.github/scripts/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r .github/scripts/requirements.txt
+        
+    - name: Create .env file
+      run: |
+        echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" >> .env
+        echo "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+        echo "ALPHA_VANTAGE_API_KEY=${{ secrets.ALPHA_VANTAGE_API_KEY }}" >> .env
+        echo "FMP_API_KEY=${{ secrets.FMP_API_KEY }}" >> .env
+    
+    - name: Run penny ticker fetch (dry-run)
+      if: github.event.inputs.dry_run == 'true'
+      run: |
+        cd .github/scripts
+        python fetch_penny_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}
+        
+    - name: Run penny ticker fetch (production)
+      if: github.event.inputs.dry_run != 'true'
+      run: |
+        cd .github/scripts
+        python fetch_penny_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}
+    
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: penny-ticker-fetch-logs
+        path: .github/scripts/penny_ticker_fetch.log
+        retention-days: 30
+    
+    - name: Create issue on failure
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '❌ Penny Ticker Fetch Failed',
+            body: `The weekly penny ticker fetch job failed.
+            
+            **Run Details:**
+            - Workflow: ${{ github.workflow }}
+            - Run ID: ${{ github.run_id }}
+            - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            - Triggered by: ${{ github.event_name }}
+            
+            Please check the logs for details.`,
+            labels: ['automation', 'penny-tickers', 'bug']
+          })
+

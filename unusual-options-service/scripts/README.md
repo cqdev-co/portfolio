@@ -17,6 +17,62 @@ poetry run python scripts/signal_correlation.py --days 14
 
 ## 🛠️ Utility Scripts
 
+### **Signal Expiration Tool** (`expire_signals.py`)
+**Purpose**: Automatically mark options signals as inactive when they reach their expiration date
+
+**Quick Usage**:
+```bash
+# Mark expired signals as inactive
+python scripts/expire_signals.py
+
+# Dry run (report only, no changes)
+python scripts/expire_signals.py --dry-run
+```
+
+**What It Does**:
+- Finds all signals where `is_active = true` AND `expiry <= today`
+- Marks them as `is_active = false` in batches
+- Provides detailed statistics by expiry date, ticker, and grade
+- Runs automatically daily at 4:30 PM ET via GitHub Actions
+
+**Example Output**:
+```
+============================================================
+EXPIRATION SUMMARY
+============================================================
+
+By Expiry Date:
+  2025-11-07: 1,767 signals
+
+By Grade:
+  Grade S: 523 signals
+  Grade A: 402 signals
+  Grade B: 389 signals
+
+Top 10 Tickers:
+  TSLA: 187 signals
+  AAPL: 143 signals
+  SPY: 132 signals
+
+============================================================
+✓ Successfully expired 1,767 signals
+```
+
+**Automation**:
+- **GitHub Actions**: Runs daily at 4:30 PM ET (30 min after market close)
+- **Workflow**: `.github/workflows/uos-expire-signals.yml`
+- **Manual Trigger**: Available via GitHub Actions UI with dry-run option
+
+**Use Cases**:
+- Keep database signals accurate
+- Remove expired options from active queries
+- Historical performance analysis
+- Database maintenance
+
+**See**: [Signal Expiration Documentation](../../docs/unusual-options-service/signal-expiration.md) for detailed information
+
+---
+
 ### **Signal Reactivation Tool** (`reactivate_valid_signals.py`)
 **Purpose**: Identify and reactivate signals that were falsely marked inactive due to the 3-hour rule bug (before the expiry logic fix)
 

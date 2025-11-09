@@ -1,227 +1,205 @@
 # Portfolio Documentation
 
-This directory contains comprehensive documentation for all services and 
-components in the portfolio project.
+Comprehensive documentation for all services in the portfolio.
 
-## 📁 Service Documentation
+## 📚 Services Documentation
 
 ### Trading & Analysis Services
 
-#### [Unusual Options Service](unusual-options-service/)
-Detect unusual options activity that may indicate insider information or 
-smart money positioning.
-
-**Key Features:**
-- Real-time unusual options activity detection
-- Signal grading system (S, A, B, C, D, F)
-- Spread detection (vertical spreads, iron condors, etc.)
-- **Advanced Filter System** - Filter by date, grade, option type, premium 
-  flow, and detection patterns
-- Interactive price charts with signal overlay
-- Automated hourly scanning with signal continuity
-- **Fast Scanner Workflow** - Every 5 minutes on your watchlist (78 scans/day)
-- Frontend dashboard with grouped ticker view
-- RLS (Row Level Security) policies for data protection
-- **Timezone Handling** - UTC storage, EST display for market alignment
-
-**Quick Links:**
-- [System Overview](unusual-options-service/system-overview.md)
-- [Quick Start Guide](unusual-options-service/quick-start.md)
-- [Filter System Guide](unusual-options-service/filter-system.md) ⭐ NEW
-- [Database Schema](unusual-options-service/database-schema.md)
-- [Technical Implementation](unusual-options-service/technical-implementation.md)
-- [Timezone Handling](timezone-handling.md) - UTC storage and EST display
-- [Date Filtering Fix](timezone-date-filtering-fix.md) - EST-based date filters
-- [Troubleshooting RLS](unusual-options-service/troubleshooting-rls.md)
-
-#### [Analyze Options Service](analyze-options-service/) ✅ Strategic Enhancement Complete
-Complete end-to-end trading system with tactical analysis + strategic framework.
-
-**Status:** Phase 4 Complete - Full Strategic Trading System
-
-**NEW Strategic Features (Nov 6, 2025):**
-- 📊 **5-Filter System** - Reduce 1000+ signals to 10-20 best (automated)
-- ✅ **10-Point Validation** - Pre-trade checklist catches issues before entry
-- ⏰ **Entry Timing Strategies** - 5 approaches (First Hour Fade, Confirmation, Scale-In, etc.)
-- 🎯 **Exit Strategy Manager** - Systematic profit-taking (50%/100%/trail)
-- 📈 **Portfolio Construction** - 3-tier system (60% core, 30% opportunistic, 10% spec)
-- 🔄 **Daily Monitoring** - Position health checks with actionable alerts
-- 🔗 **Correlation Analysis** - Find multi-signal opportunities with confidence scoring
-
-**Existing Features:**
-- 🏆 `analyze best` - High-confidence opportunities (top 1-2% of signals)
-- 🎯 Vertical spread vs naked option comparison
-- 📊 Position sizing and risk management  
-- 📈 Black-Scholes probability estimation
-- ⚡ Fast execution: 1000 signals → 15 actionable plays
-
-**Quick Links:**
-- [Strategy Integration Guide](analyze-options-service/STRATEGY-INTEGRATION.md) ⭐ NEW
-- [Enhancements Summary](analyze-options-service/ENHANCEMENTS-SUMMARY.md) - What's new
-- [Quick Start Guide](../analyze-options-service/QUICK_START.md)
-- [Command Guide](../analyze-options-service/COMMAND_GUIDE.md)
-- [Architecture](analyze-options-service/architecture.md)
-- [Trade Strategies](analyze-options-service/trade-strategies.md)
-- [Phase 2 Complete](../analyze-options-service/PHASE_2_COMPLETE.md)
-
-#### [RDS Ticker Analysis](rds-ticker-analysis/)
-Reddit sentiment analysis combined with AI-powered investment insights.
-
-**Key Features:**
-- Reddit sentiment analysis from multiple subreddits
-- AI-generated investment thesis
-- Technical analysis integration
-- Risk assessment
-- Fast analysis mode for debugging
-
-**Quick Links:**
-- [System Overview](rds-ticker-analysis/system-overview.md)
+#### [Penny Stock Scanner](penny-stock-scanner/) 🆕 ✅ Updated Nov 2025
+Professional-grade scanner for identifying penny stocks before they explode.
+- **Strategy**: Volume-focused (50%) explosion setup detection
+- **Key Features**: Consolidation detection, volume spike analysis, signal continuity tracking, real-time web dashboard
+- **Status**: Production-ready (fixed timezone & pagination issues)
+- **Recent Fixes**: [Bug Fixes Nov 2025](penny-stock-scanner/bug-fixes-nov-2025.md)
+- [System Overview](penny-stock-scanner/system-overview.md) | [User Guide](penny-stock-scanner/user-guide.md) | [Frontend Integration](penny-stock-scanner/frontend-integration.md)
 
 #### [Volatility Squeeze Scanner](volatility-squeeze-scanner/)
-TTM Squeeze indicator scanner for identifying consolidation breakouts.
+Enterprise-grade scanner for volatility squeeze patterns.
+- **Strategy**: Bollinger Band compression detection
+- **Key Features**: ATR-based signals, AI analysis, backtesting
+- **Status**: Production-ready
+- [System Overview](volatility-squeeze-scanner/system-overview.md) | [User Guide](volatility-squeeze-scanner/user-guide.md)
 
-**Key Features:**
-- Real-time volatility squeeze detection
-- Historical backtesting capabilities
-- Multi-timeframe analysis
-- GitHub Actions CI/CD integration
-- Professional logging system
+#### [Unusual Options Service](unusual-options-service/)
+Real-time unusual options activity tracker.
+- **Strategy**: Volume, OI, and premium analysis
+- **Key Features**: Signal expiration, performance tracking, spread detection
+- **Status**: Production-ready
+- [Quick Start](unusual-options-service/quick-start.md) | [System Overview](unusual-options-service/system-overview.md)
 
-**Quick Links:**
-- [System Overview](volatility-squeeze-scanner/system-overview.md)
-- [Technical Implementation](volatility-squeeze-scanner/technical-implementation.md)
-- [User Guide](volatility-squeeze-scanner/user-guide.md)
+#### [Analyze Options Service](analyze-options-service/)
+Comprehensive options analysis and strategy recommendation engine.
+- **Strategy**: Multi-factor options analysis
+- **Key Features**: Strategy recommendations, risk analysis, ML integration
+- **Status**: Production-ready
+- [User Guide](analyze-options-service/user-guide.md) | [Architecture](analyze-options-service/architecture.md)
 
-#### [Penny Stocks Service](pennystocks/)
-Small-cap stock screening and analysis system.
+#### [RDS Ticker Analysis](rds-ticker-analysis/)
+Reddit sentiment analysis for stock tickers.
+- **Strategy**: Social sentiment + market data integration
+- **Key Features**: Reddit scraping, sentiment scoring, AI insights
+- **Status**: Production-ready
+- [System Overview](rds-ticker-analysis/system-overview.md)
 
-**Quick Links:**
-- [System Overview](pennystocks/system-overview.md)
-- [Technical Implementation](pennystocks/technical-implementation.md)
+#### [ML Options Predictor](ml-options-predictor/)
+Machine learning-based options contract prediction.
+- **Strategy**: Gradient boosting with feature engineering
+- **Key Features**: Multi-timeframe prediction, confidence scoring
+- **Status**: Beta
+- [API Guide](ml-options-predictor/api-guide.md) | [CLI Guide](ml-options-predictor/cli-guide.md)
 
-### Frontend
-
-#### [Frontend Documentation](frontend/)
-Next.js frontend application with Vercel deployment.
-
-**Key Features:**
-- Modern React with TypeScript
-- Responsive design with Tailwind CSS
-- Real-time data updates via Supabase
-- Interactive data visualizations
-- Advanced filtering system for options signals
-
-**Quick Links:**
-- [Vercel Build Fixes](frontend/vercel-build-fixes.md)
-- [Volatility Squeeze Scanner UI](frontend/volatility-squeeze-scanner.md)
-
-### Utilities
+### Supporting Services
 
 #### [Database](db/)
-Shared database schemas and migrations for all services.
+Centralized database schemas and migrations.
+- **Tables**: Tickers, penny_tickers, signals, options activity
+- [README](db/README.md) | [Penny Tickers Guide](db/penny-tickers.md)
 
-**Quick Links:**
-- [Database README](db/README.md)
+#### [Frontend](frontend/)
+Next.js-based web interface for all services.
+- **Features**: Dashboard, signal visualization, performance tracking, real-time updates
+- **Scanners**: Volatility Squeeze, Unusual Options, Penny Stock Scanner
+- [README](frontend/README.md) | [Vercel Build Fixes](frontend/vercel-build-fixes.md)
 
-#### [Library](lib/)
-Shared types and utilities across services.
+## 🔍 Service Comparison
 
-**Quick Links:**
-- [Library README](lib/README.md)
+| Service | Focus | Data Sources | Update Frequency | Best For |
+|---------|-------|--------------|------------------|----------|
+| Penny Stock Scanner | Penny stocks explosion setups | YFinance, Supabase | Daily | Finding penny breakouts |
+| Volatility Squeeze Scanner | Volatility patterns | YFinance | Daily | Day/swing trading setups |
+| Unusual Options | Options flow | Market data APIs | Real-time | Options trading signals |
+| RDS Ticker Analysis | Social sentiment | Reddit, Market data | On-demand | Sentiment-driven trades |
+| ML Options Predictor | Options prediction | Historical options | Batch | ML-based forecasting |
 
-## 🎯 Getting Started
+## 🚀 Quick Start by Use Case
 
-### For Traders
-1. Start with the [Unusual Options Quick Start](unusual-options-service/quick-start.md)
-2. Learn about [Signal Interpretation](unusual-options-service/signal-interpretation.md)
-3. Use the [Filter System](unusual-options-service/filter-system.md) to find 
-   signals that match your strategy
-4. Set up [Scanning Strategies](unusual-options-service/scanning-strategies.md)
+### "I want to find penny stocks before they explode"
+→ Use **[Penny Stock Scanner](penny-stock-scanner/)**
+```bash
+cd penny-stock-scanner
+# Quick test (recommended first run)
+poetry run penny-scanner scan-all --min-score 0.50 --max-symbols 100
 
-### For Developers
-1. Review [Architecture](unusual-options-service/architecture.md)
-2. Set up [Database Schema](unusual-options-service/database-schema.md)
-3. Understand the [Filter System Architecture](unusual-options-service/filter-system.md)
-4. Follow [Technical Implementation](unusual-options-service/technical-implementation.md)
+# Full scan (1715 symbols, ~15-20 minutes)
+poetry run penny-scanner scan-all --min-score 0.50
+```
 
-## 📊 Recent Updates
+### "I want to find volatility squeeze setups"
+→ Use **[Volatility Squeeze Scanner](volatility-squeeze-scanner/)**
+```bash
+cd volatility-squeeze-scanner
+volatility-scanner scan-all --min-score 0.7
+```
 
-### November 2024
+### "I want to track unusual options activity"
+→ Use **[Unusual Options Service](unusual-options-service/)**
+```bash
+cd unusual-options-service
+unusual-options scan --volume-threshold 2.0
+```
 
-#### Filter System Enhancement (Latest) ⭐
-- Implemented modular, scalable filter system for unusual options scanner
-- Date-based filtering with quick presets
-- Multi-select grade and option type filters
-- Premium flow range filtering
-- Detection pattern toggles (volume anomaly, OI spike, sweep, block trade)
-- Slide-out filter panel with active filter count
-- Full documentation in [filter-system.md](unusual-options-service/filter-system.md)
+### "I want to analyze a specific stock with social sentiment"
+→ Use **[RDS Ticker Analysis](rds-ticker-analysis/)**
+```bash
+cd rds-ticker-analysis
+rds-analyze AEMD --fast
+```
 
-#### Spread Detection System
-- Phase 1 implementation for vertical spreads, iron condors, etc.
-- Confidence scoring and reasoning
-- Frontend visualization with warning badges
-- Comprehensive documentation in [spread-detection.md](unusual-options-service/spread-detection.md)
+### "I want options strategy recommendations"
+→ Use **[Analyze Options Service](analyze-options-service/)**
+```bash
+cd analyze-options-service
+analyze-options AAPL --with-ml
+```
 
-#### Signal Continuity & Cron Jobs
-- Automated hourly scanning
-- Signal deduplication
-- Active signal tracking
-- Detection count metrics
+## 📊 Data Architecture
 
-#### RLS & Security
-- Row Level Security policies implemented
-- Anonymous access controls
-- Premium account distinction
-- Frontend fixes for authentication
+### Data Flow
+```
+External APIs (YFinance, Reddit, Market Data)
+    ↓
+Services (Scanners, Analyzers)
+    ↓
+Supabase Database (Signals, Tickers, Performance)
+    ↓
+Frontend Dashboard (Visualization)
+```
 
-## 🔧 Technical Stack
+### Database Tables
+- `penny_tickers`: ~2000 penny stocks ($0.10-$5.00)
+- `tickers`: ~12,000 all market tickers
+- `penny_stock_signals`: Penny stock explosion signals
+- `volatility_squeeze_signals`: Squeeze signals
+- `unusual_options_activity`: Options flow data
+- `signal_performance_tracking`: Performance metrics
 
-### Backend
-- **Python 3.12+** - Core services
-- **Poetry** - Dependency management
-- **Supabase** - PostgreSQL database with real-time features
-- **FastAPI** - API framework (where applicable)
+## 🛠️ Development
 
-### Frontend
-- **Next.js 14** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **Bun** - Package manager
-- **Recharts** - Data visualization
+### Prerequisites
+- Python 3.11+
+- Poetry (Python dependency management)
+- Node.js 18+ (for frontend)
+- Supabase account
 
-### Infrastructure
-- **Vercel** - Frontend hosting
-- **GitHub Actions** - CI/CD
-- **Supabase** - Backend as a Service
+### Environment Setup
+Each service requires a `.env` file:
+```bash
+# Copy template
+cp env.example .env
+
+# Required for most services
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_key
+
+# Optional: AI features
+OPENAI_API_KEY=your_key
+ANTHROPIC_API_KEY=your_key
+```
+
+### Running Services Locally
+```bash
+# Python services (most scanners/analyzers)
+cd service-name/
+poetry install
+poetry run service-cli command
+
+# Frontend
+cd frontend/
+bun install
+bun dev
+```
 
 ## 📝 Documentation Standards
 
-All service documentation should include:
-- System overview and purpose
-- Technical architecture
-- Setup and configuration
-- Usage examples
-- API references (where applicable)
-- Performance considerations
-- Troubleshooting guide
+All service documentation includes:
+- ✅ README.md (quick start, features)
+- ✅ system-overview.md (architecture, strategy)
+- ✅ user-guide.md (CLI usage, examples)
+- ✅ technical-implementation.md (developer docs)
 
 ## 🤝 Contributing
 
-When making changes:
-1. Update relevant documentation
-2. Follow existing code style
-3. Add tests for new features
-4. Update the changelog in docs
+When adding new features:
+1. Update relevant documentation in `docs/`
+2. Add database schemas to `db/` if needed
+3. Follow existing service patterns
+4. Include comprehensive examples
+5. Test full workflow before committing
 
-## 📧 Support
+## 📄 License
 
-For questions or issues:
-- Check the relevant service documentation
-- Review troubleshooting guides
-- Check GitHub issues
+Proprietary software. All rights reserved.
+
+## 🔗 Quick Links
+
+- [Database Schemas](db/)
+- [Frontend Documentation](frontend/)
+- [Performance Optimization Guide](performance-optimization-complete.md)
+- [Analysis Service Consolidation](analysis-service-consolidation.md)
 
 ---
 
-**Last Updated:** November 2024  
-**Maintained by:** Portfolio Project Team
+**Last Updated**: 2024-11-09
+**Services Count**: 7 active services
+**Documentation Coverage**: 100%

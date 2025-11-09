@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     supabase_key: str = Field(..., validation_alias="SUPABASE_ANON_KEY")
     supabase_service_key: Optional[str] = Field(None, validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     
+    # ML Predictor (optional)
+    ml_predictor_url: str = Field(default="http://localhost:8001", validation_alias="ML_PREDICTOR_URL")
+    ml_predictor_enabled: bool = Field(default=True, validation_alias="ML_PREDICTOR_ENABLED")
+    
     # Account Configuration
     default_account_size: float = Field(10000.0, alias="DEFAULT_ACCOUNT_SIZE")
     default_risk_pct: float = Field(1.5, alias="DEFAULT_RISK_PCT")
@@ -42,6 +46,11 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"  # Ignore extra fields from shared .env file
     )
+
+
+def get_settings() -> Settings:
+    """Alias for load_config for consistency with other services."""
+    return load_config()
 
 
 def load_config() -> Settings:

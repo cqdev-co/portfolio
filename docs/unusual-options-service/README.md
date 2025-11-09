@@ -8,6 +8,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [System Overview](system-overview.md) - High-level architecture and concepts
 - [Installation Guide](installation-guide.md) - Setup and configuration
 - [Quick Start Tutorial](quick-start.md) - First scans and basic usage
+- [FAQ](faq.md) - Frequently asked questions and troubleshooting
 
 ### Core Concepts
 - [Understanding Unusual Activity](understanding-unusual-activity.md) - What makes options activity unusual
@@ -30,6 +31,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 ### Technical Documentation
 - [Architecture](architecture.md) - System design and components
 - [Database Schema](database-schema.md) - Supabase table structures and relationships
+- [Signal Expiration](signal-expiration.md) - Automated daily expiration system
 - [API Integration](api-integration.md) - Data provider integration details
 - [Performance Tuning](performance-tuning.md) - Optimization and scaling
 - [Timezone Handling](../timezone-handling.md) - UTC storage and EST display strategy
@@ -61,12 +63,14 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **GitHub Actions Workflow**: See [GitHub Actions Setup](github-actions-setup.md) - Complete automated scanning guide
 - **Fast Scanner Workflow**: Hard-coded ticker watchlist for focused scanning (see below)
 - **Signal Lifecycle**: See [Signal Lifecycle](github-actions-setup.md#signal-lifecycle) - How signals are tracked over time
+- **Signal Expiration**: See [Signal Expiration](signal-expiration.md) - Automatic daily expiration of options signals
 - **Deduplication**: See [How It Works](github-actions-setup.md#how-it-works) - Prevents duplicate signals
 - **Troubleshooting**: See [Troubleshooting](github-actions-setup.md#-troubleshooting) - Common issues and solutions
 
 ### Troubleshooting
+- **Common Questions**: See [FAQ](faq.md) - Frequently asked questions and solutions
 - **Frontend Not Showing Signals**: See [RLS Troubleshooting](troubleshooting-rls.md) - Fix Row Level Security issues
-- **Signals Disappearing**: Check continuity tracking and expiry logic
+- **Signal Lifecycle Questions**: See [FAQ - Signal Lifecycle](faq.md#signal-lifecycle)
 - **Database Connection Issues**: Verify Supabase credentials
 
 ### For Developers

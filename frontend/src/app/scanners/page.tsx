@@ -18,6 +18,10 @@ const scanners: Scanner[] = [
     name: "Unusual Options Scanner", 
     path: "/unusual-options-scanner",
   },
+  {
+    name: "Penny Stock Scanner",
+    path: "/penny-stock-scanner",
+  },
 ];
 
 export default function ScannersPage() {
