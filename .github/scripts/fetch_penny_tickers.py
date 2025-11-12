@@ -29,11 +29,10 @@ Usage:
 
 import os
 import sys
-import json
 import time
 import logging
 import argparse
-from typing import List, Dict, Optional, Set
+from typing import List, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import requests
@@ -41,8 +40,22 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Import quality filtering utilities
-sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
 from utils.yfinance_validator import YFinanceValidator, YFinanceValidation
+from utils.common_filters import is_cfd_ticker
+from utils.db_utils import store_tickers as store_tickers_util
+from utils.constants import (
+    TABLE_PENNY_TICKERS,
+    DEFAULT_BATCH_SIZE,
+    RATE_LIMIT_DELAY_SECONDS,
+    PENNY_MIN_PRICE,
+    PENNY_MAX_PRICE,
+    PENNY_MIN_MARKET_CAP,
+    PENNY_MAX_MARKET_CAP,
+    PENNY_MIN_VOLUME,
+    FMP_MAX_CANDIDATES,
+    DEFAULT_MAX_PENNY_TICKERS
+)
 
 # Load environment variables
 load_dotenv()
@@ -63,13 +76,13 @@ class PennyTickerInfo:
 class PennyTickerFilter:
     """Penny stock specific filtering logic"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         # Penny stock specific thresholds
-        self.min_price = 0.10  # $0.10 minimum
-        self.max_price = 5.00  # $5.00 maximum (penny stock definition)
-        self.min_market_cap = 5_000_000  # $5M minimum
-        self.max_market_cap = 300_000_000  # $300M maximum (small cap)
-        self.min_volume = 10_000  # Lower volume threshold for penny stocks
+        self.min_price = PENNY_MIN_PRICE
+        self.max_price = PENNY_MAX_PRICE
+        self.min_market_cap = PENNY_MIN_MARKET_CAP
+        self.max_market_cap = PENNY_MAX_MARKET_CAP
+        self.min_volume = PENNY_MIN_VOLUME
         
         # US exchanges
         self.us_exchanges = {
@@ -77,25 +90,6 @@ class PennyTickerFilter:
             'OTC', 'OTCQX', 'OTCQB', 'PINK'  # Include OTC markets
         }
         
-    def is_cfd_ticker(self, symbol: str, name: str, exchange: str = '') -> bool:
-        """Detect if a ticker is a CFD (Contract for Difference)"""
-        symbol_lower = symbol.lower()
-        name_lower = name.lower() if name else ''
-        exchange_lower = exchange.lower() if exchange else ''
-        
-        # CFD patterns
-        cfd_patterns = [
-            'cfd', 'contract for difference', 'derivative',
-            'synthetic', 'swap', 'future', 'forward'
-        ]
-        
-        return any(
-            pattern in symbol_lower or 
-            pattern in name_lower or 
-            pattern in exchange_lower
-            for pattern in cfd_patterns
-        )
-    
     def calculate_penny_quality_score(
         self, 
         price: float, 
@@ -147,8 +141,8 @@ class PennyTickerFetcher:
         dry_run: bool = False, 
         verbose: bool = False,
         enable_yfinance_validation: bool = True,
-        max_tickers: int = 2000
-    ):
+        max_tickers: int = DEFAULT_MAX_PENNY_TICKERS
+    ) -> None:
         self.dry_run = dry_run
         self.verbose = verbose
         self.enable_yfinance_validation = enable_yfinance_validation
@@ -173,7 +167,7 @@ class PennyTickerFetcher:
         )
         self.logger = logging.getLogger(__name__)
         
-    def setup_supabase(self):
+    def setup_supabase(self) -> None:
         """Initialize Supabase client"""
         url = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
         key = os.getenv('NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY')
@@ -188,7 +182,7 @@ class PennyTickerFetcher:
         self.supabase: Client = create_client(url, key)
         self.logger.info("Supabase client initialized")
         
-    def setup_api_keys(self):
+    def setup_api_keys(self) -> None:
         """Setup API keys for data sources"""
         self.alpha_vantage_key = os.getenv('ALPHA_VANTAGE_API_KEY')
         self.fmp_key = os.getenv('FMP_API_KEY')
@@ -198,14 +192,14 @@ class PennyTickerFetcher:
                 "No API keys found. Will use free data sources only."
             )
     
-    def setup_yfinance_validator(self):
+    def setup_yfinance_validator(self) -> None:
         """Setup YFinance data quality validator with penny stock settings"""
         if self.enable_yfinance_validation:
             self.yfinance_validator = YFinanceValidator(
                 min_history_days=60,  # Reduced for penny stocks
-                min_volume=10_000,  # Lower volume threshold
-                min_price=0.10,  # Penny stock min
-                max_price=5.00,  # Penny stock max
+                min_volume=PENNY_MIN_VOLUME,
+                min_price=PENNY_MIN_PRICE,
+                max_price=PENNY_MAX_PRICE,
                 min_data_completeness=0.75,  # More lenient
                 max_gap_ratio=0.15,  # Allow more gaps
                 recency_days=7,  # Extended recency window
@@ -232,12 +226,12 @@ class PennyTickerFetcher:
             url = f"https://financialmodelingprep.com/api/v3/stock-screener"
             params = {
                 'apikey': self.fmp_key,
-                'priceMoreThan': 0.10,
-                'priceLowerThan': 5.00,
-                'marketCapMoreThan': 5000000,
-                'marketCapLowerThan': 300000000,
-                'volumeMoreThan': 10000,
-                'limit': 5000  # Get more candidates for filtering
+                'priceMoreThan': PENNY_MIN_PRICE,
+                'priceLowerThan': PENNY_MAX_PRICE,
+                'marketCapMoreThan': PENNY_MIN_MARKET_CAP,
+                'marketCapLowerThan': PENNY_MAX_MARKET_CAP,
+                'volumeMoreThan': PENNY_MIN_VOLUME,
+                'limit': FMP_MAX_CANDIDATES
             }
             
             self.logger.info(
@@ -263,7 +257,7 @@ class PennyTickerFetcher:
                     continue
                 
                 # Skip CFDs
-                if self.penny_filter.is_cfd_ticker(
+                if is_cfd_ticker(
                     symbol, name, item.get('exchange', '')
                 ):
                     continue
@@ -285,8 +279,12 @@ class PennyTickerFetcher:
                 f"Fetched {len(tickers)} penny tickers from FMP"
             )
             
+        except requests.RequestException as e:
+            self.logger.error(f"Network error fetching from FMP: {e}")
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data parsing error from FMP: {e}")
         except Exception as e:
-            self.logger.error(f"Error fetching from FMP: {e}")
+            self.logger.error(f"Unexpected error fetching from FMP: {e}", exc_info=True)
             
         return tickers
     
@@ -350,7 +348,7 @@ class PennyTickerFetcher:
                     
                     # Skip CFDs
                     exchange = values[2].strip() if len(values) > 2 else None
-                    if self.penny_filter.is_cfd_ticker(
+                    if is_cfd_ticker(
                         symbol, name, exchange or ''
                     ):
                         continue
@@ -370,8 +368,12 @@ class PennyTickerFetcher:
                 f"(will validate for penny stock criteria)"
             )
             
+        except requests.RequestException as e:
+            self.logger.error(f"Network error fetching from Alpha Vantage: {e}")
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data parsing error from Alpha Vantage: {e}")
         except Exception as e:
-            self.logger.error(f"Error fetching from Alpha Vantage: {e}")
+            self.logger.error(f"Unexpected error fetching from Alpha Vantage: {e}", exc_info=True)
             
         return tickers
     
@@ -468,8 +470,14 @@ class PennyTickerFetcher:
             
             return validated_tickers
             
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data error during YFinance validation: {e}")
+            self.logger.warning(
+                "YFinance validation failed, proceeding with unvalidated tickers"
+            )
+            return tickers
         except Exception as e:
-            self.logger.error(f"Error during YFinance validation: {e}")
+            self.logger.error(f"Unexpected error during YFinance validation: {e}", exc_info=True)
             self.logger.warning(
                 "YFinance validation failed, proceeding with unvalidated tickers"
             )
@@ -477,106 +485,14 @@ class PennyTickerFetcher:
     
     def store_tickers(self, tickers: List[PennyTickerInfo]) -> bool:
         """Store penny tickers in Supabase database"""
-        if self.dry_run:
-            self.logger.info(
-                f"DRY RUN: Would store {len(tickers)} penny tickers"
-            )
-            return True
-            
-        try:
-            # Prepare data for batch insert
-            ticker_data = []
-            skipped_count = 0
-            
-            for ticker in tickers:
-                # Skip tickers with missing required fields
-                if not ticker.name or ticker.name.strip() == '':
-                    self.logger.warning(
-                        f"Skipping ticker {ticker.symbol}: missing or empty name"
-                    )
-                    skipped_count += 1
-                    continue
-                
-                if not ticker.symbol or ticker.symbol.strip() == '':
-                    self.logger.warning(
-                        f"Skipping ticker with empty symbol: name={ticker.name}"
-                    )
-                    skipped_count += 1
-                    continue
-                
-                data = {
-                    'symbol': ticker.symbol.strip(),
-                    'name': ticker.name.strip(),
-                    'exchange': (
-                        ticker.exchange.strip() 
-                        if ticker.exchange else None
-                    ),
-                    'country': (
-                        ticker.country.strip() 
-                        if ticker.country else None
-                    ),
-                    'currency': (
-                        ticker.currency.strip() 
-                        if ticker.currency else None
-                    ),
-                    'sector': (
-                        ticker.sector.strip() 
-                        if ticker.sector else None
-                    ),
-                    'industry': (
-                        ticker.industry.strip() 
-                        if ticker.industry else None
-                    ),
-                    'market_cap': ticker.market_cap,
-                    'ticker_type': ticker.ticker_type or 'stock',
-                    'is_active': True,
-                    'last_fetched': datetime.now(timezone.utc).isoformat()
-                }
-                ticker_data.append(data)
-            
-            if skipped_count > 0:
-                self.logger.info(
-                    f"Skipped {skipped_count} tickers due to missing "
-                    f"required fields"
-                )
-            
-            # Insert in batches to avoid timeouts
-            batch_size = 1000
-            total_inserted = 0
-            
-            for i in range(0, len(ticker_data), batch_size):
-                batch = ticker_data[i:i + batch_size]
-                
-                try:
-                    result = self.supabase.table('penny_tickers').upsert(
-                        batch,
-                        on_conflict='symbol'
-                    ).execute()
-                    
-                    total_inserted += len(batch)
-                    self.logger.info(
-                        f"Inserted batch {i//batch_size + 1}: "
-                        f"{len(batch)} penny tickers "
-                        f"({total_inserted}/{len(ticker_data)} total)"
-                    )
-                    
-                    # Rate limiting
-                    time.sleep(0.1)
-                    
-                except Exception as e:
-                    self.logger.error(
-                        f"Error inserting batch {i//batch_size + 1}: {e}"
-                    )
-                    continue
-            
-            self.logger.info(
-                f"Successfully stored {total_inserted} penny tickers"
-            )
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error storing penny tickers: {e}")
-            return False
+        return store_tickers_util(
+            self.supabase,
+            tickers,
+            TABLE_PENNY_TICKERS,
+            dry_run=self.dry_run,
+            batch_size=DEFAULT_BATCH_SIZE,
+            rate_limit_delay=RATE_LIMIT_DELAY_SECONDS
+        )
     
     def run(self) -> bool:
         """Main execution method"""
@@ -650,8 +566,8 @@ def main():
     parser.add_argument(
         '--max-tickers',
         type=int,
-        default=2000,
-        help='Maximum number of penny tickers to store (default: 2000)'
+        default=DEFAULT_MAX_PENNY_TICKERS,
+        help=f'Maximum number of penny tickers to store (default: {DEFAULT_MAX_PENNY_TICKERS})'
     )
     
     args = parser.parse_args()
@@ -666,8 +582,11 @@ def main():
         success = fetcher.run()
         sys.exit(0 if success else 1)
         
+    except (ValueError, KeyError) as e:
+        logging.error(f"Configuration error: {e}")
+        sys.exit(1)
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logging.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == '__main__':

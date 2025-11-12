@@ -24,11 +24,10 @@ Usage:
 
 import os
 import sys
-import json
 import time
 import logging
 import argparse
-from typing import List, Dict, Optional, Set
+from typing import List, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import requests
@@ -36,9 +35,19 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Import quality filtering utilities
-sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
 from utils.efficient_ticker_filter import EfficientTickerFilter, EfficientTickerMetrics
 from utils.yfinance_validator import YFinanceValidator, YFinanceValidation
+from utils.common_filters import is_cfd_ticker
+from utils.db_utils import store_tickers as store_tickers_util
+from utils.constants import (
+    TABLE_TICKERS,
+    DEFAULT_BATCH_SIZE,
+    RATE_LIMIT_DELAY_SECONDS,
+    TICKER_MIN_PRICE,
+    TICKER_MAX_PRICE,
+    DEFAULT_MAX_TICKERS
+)
 
 # Load environment variables
 load_dotenv()
@@ -78,7 +87,7 @@ class TickerFetcher:
         self.setup_quality_filter()
         self.setup_yfinance_validator()
         
-    def setup_logging(self):
+    def setup_logging(self) -> None:
         """Configure logging"""
         level = logging.DEBUG if self.verbose else logging.INFO
         logging.basicConfig(
@@ -91,7 +100,7 @@ class TickerFetcher:
         )
         self.logger = logging.getLogger(__name__)
         
-    def setup_supabase(self):
+    def setup_supabase(self) -> None:
         """Initialize Supabase client"""
         url = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
         key = os.getenv('NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY')
@@ -105,7 +114,7 @@ class TickerFetcher:
         self.supabase: Client = create_client(url, key)
         self.logger.info("Supabase client initialized")
         
-    def setup_api_keys(self):
+    def setup_api_keys(self) -> None:
         """Setup API keys for data sources"""
         self.alpha_vantage_key = os.getenv('ALPHA_VANTAGE_API_KEY')
         self.fmp_key = os.getenv('FMP_API_KEY')
@@ -115,7 +124,7 @@ class TickerFetcher:
                 "No API keys found. Will use free data sources only."
             )
     
-    def setup_quality_filter(self):
+    def setup_quality_filter(self) -> None:
         """Setup quality filtering components"""
         if self.enable_quality_filter:
             self.quality_filter = EfficientTickerFilter(
@@ -132,14 +141,14 @@ class TickerFetcher:
             self.quality_filter = None
             self.logger.info("Quality filtering disabled")
     
-    def setup_yfinance_validator(self):
+    def setup_yfinance_validator(self) -> None:
         """Setup YFinance data quality validator"""
         if self.enable_yfinance_validation:
             self.yfinance_validator = YFinanceValidator(
                 min_history_days=90,
                 min_volume=10_000,
-                min_price=0.50,
-                max_price=10_000,
+                min_price=TICKER_MIN_PRICE,
+                max_price=TICKER_MAX_PRICE,
                 min_data_completeness=0.85,
                 max_gap_ratio=0.10,
                 recency_days=5,
@@ -217,8 +226,12 @@ class TickerFetcher:
                     
             self.logger.info(f"Fetched {len(tickers)} tickers from Alpha Vantage")
             
+        except requests.RequestException as e:
+            self.logger.error(f"Network error fetching from Alpha Vantage: {e}")
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data parsing error from Alpha Vantage: {e}")
         except Exception as e:
-            self.logger.error(f"Error fetching from Alpha Vantage: {e}")
+            self.logger.error(f"Unexpected error fetching from Alpha Vantage: {e}", exc_info=True)
             
         return tickers
     
@@ -259,54 +272,12 @@ class TickerFetcher:
                 
             self.logger.info(f"Fetched {len(tickers)} tickers from FMP")
             
+        except requests.RequestException as e:
+            self.logger.error(f"Network error fetching from FMP: {e}")
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data parsing error from FMP: {e}")
         except Exception as e:
-            self.logger.error(f"Error fetching from FMP: {e}")
-            
-        return tickers
-    
-    def fetch_yahoo_finance_tickers(self) -> List[TickerInfo]:
-        """Fetch additional tickers from Yahoo Finance screener"""
-        tickers = []
-        try:
-            # Major exchanges and their common tickers
-            exchanges = {
-                'NASDAQ': 'https://api.nasdaq.com/api/screener/stocks',
-                'NYSE': 'https://api.nasdaq.com/api/screener/stocks'
-            }
-            
-            self.logger.info("Fetching tickers from Yahoo Finance sources...")
-            
-            # This is a simplified approach - in practice, you might want
-            # to use yfinance library or other methods
-            # For now, we'll add some major known tickers
-            major_tickers = [
-                ('AAPL', 'Apple Inc.', 'NASDAQ', 'US', 'USD'),
-                ('GOOGL', 'Alphabet Inc.', 'NASDAQ', 'US', 'USD'),
-                ('MSFT', 'Microsoft Corporation', 'NASDAQ', 'US', 'USD'),
-                ('TSLA', 'Tesla, Inc.', 'NASDAQ', 'US', 'USD'),
-                ('AMZN', 'Amazon.com, Inc.', 'NASDAQ', 'US', 'USD'),
-                ('META', 'Meta Platforms, Inc.', 'NASDAQ', 'US', 'USD'),
-                ('NVDA', 'NVIDIA Corporation', 'NASDAQ', 'US', 'USD'),
-                ('BRK.A', 'Berkshire Hathaway Inc.', 'NYSE', 'US', 'USD'),
-                ('JPM', 'JPMorgan Chase & Co.', 'NYSE', 'US', 'USD'),
-                ('JNJ', 'Johnson & Johnson', 'NYSE', 'US', 'USD'),
-            ]
-            
-            for symbol, name, exchange, country, currency in major_tickers:
-                ticker = TickerInfo(
-                    symbol=symbol,
-                    name=name,
-                    exchange=exchange,
-                    country=country,
-                    currency=currency,
-                    ticker_type='stock'
-                )
-                tickers.append(ticker)
-                
-            self.logger.info(f"Added {len(tickers)} major tickers")
-            
-        except Exception as e:
-            self.logger.error(f"Error fetching Yahoo Finance tickers: {e}")
+            self.logger.error(f"Unexpected error fetching from FMP: {e}", exc_info=True)
             
         return tickers
     
@@ -354,16 +325,12 @@ class TickerFetcher:
         cfd_count = 0
         
         for ticker in tickers:
-            # Use the efficient filter's CFD detection if available
-            if self.quality_filter:
-                is_cfd = self.quality_filter._is_cfd_ticker(
-                    ticker.symbol, 
-                    ticker.name or '', 
-                    ticker.exchange or ''
-                )
-            else:
-                # Fallback CFD detection logic
-                is_cfd = self._basic_cfd_detection(ticker)
+            # Use shared CFD detection function
+            is_cfd = is_cfd_ticker(
+                ticker.symbol, 
+                ticker.name or '', 
+                ticker.exchange or ''
+            )
             
             if is_cfd:
                 cfd_count += 1
@@ -377,17 +344,6 @@ class TickerFetcher:
         )
         
         return filtered_tickers
-    
-    def _basic_cfd_detection(self, ticker: TickerInfo) -> bool:
-        """Basic CFD detection fallback when quality filter is disabled"""
-        symbol_lower = ticker.symbol.lower()
-        name_lower = (ticker.name or '').lower()
-        
-        # Basic CFD patterns
-        cfd_patterns = ['cfd', 'contract for difference', 'derivative', 'synthetic']
-        
-        return any(pattern in symbol_lower or pattern in name_lower 
-                  for pattern in cfd_patterns)
     
     def apply_quality_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
         """Apply efficient quality filters to ticker list"""
@@ -464,8 +420,12 @@ class TickerFetcher:
             
             return filtered_tickers
             
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data error during efficient quality filtering: {e}")
+            self.logger.info("Falling back to unfiltered ticker list")
+            return tickers
         except Exception as e:
-            self.logger.error(f"Error during efficient quality filtering: {e}")
+            self.logger.error(f"Unexpected error during efficient quality filtering: {e}", exc_info=True)
             self.logger.info("Falling back to unfiltered ticker list")
             return tickers
     
@@ -542,8 +502,14 @@ class TickerFetcher:
             
             return validated_tickers
             
+        except (ValueError, KeyError) as e:
+            self.logger.error(f"Data error during YFinance validation: {e}")
+            self.logger.warning(
+                "YFinance validation failed, proceeding with unvalidated tickers"
+            )
+            return tickers
         except Exception as e:
-            self.logger.error(f"Error during YFinance validation: {e}")
+            self.logger.error(f"Unexpected error during YFinance validation: {e}", exc_info=True)
             self.logger.warning(
                 "YFinance validation failed, proceeding with unvalidated tickers"
             )
@@ -551,79 +517,14 @@ class TickerFetcher:
     
     def store_tickers(self, tickers: List[TickerInfo]) -> bool:
         """Store tickers in Supabase database"""
-        if self.dry_run:
-            self.logger.info(f"DRY RUN: Would store {len(tickers)} tickers")
-            return True
-            
-        try:
-            # Prepare data for batch insert
-            ticker_data = []
-            skipped_count = 0
-            
-            for ticker in tickers:
-                # Skip tickers with null or empty names (required field)
-                if not ticker.name or ticker.name.strip() == '':
-                    self.logger.warning(f"Skipping ticker {ticker.symbol}: missing or empty name")
-                    skipped_count += 1
-                    continue
-                
-                # Skip tickers with null or empty symbols (required field)
-                if not ticker.symbol or ticker.symbol.strip() == '':
-                    self.logger.warning(f"Skipping ticker with empty symbol: name={ticker.name}")
-                    skipped_count += 1
-                    continue
-                
-                data = {
-                    'symbol': ticker.symbol.strip(),
-                    'name': ticker.name.strip(),
-                    'exchange': ticker.exchange.strip() if ticker.exchange else None,
-                    'country': ticker.country.strip() if ticker.country else None,
-                    'currency': ticker.currency.strip() if ticker.currency else None,
-                    'sector': ticker.sector.strip() if ticker.sector else None,
-                    'industry': ticker.industry.strip() if ticker.industry else None,
-                    'market_cap': ticker.market_cap,
-                    'ticker_type': ticker.ticker_type or 'stock',
-                    'is_active': True,
-                    'last_fetched': datetime.now(timezone.utc).isoformat()
-                }
-                ticker_data.append(data)
-            
-            if skipped_count > 0:
-                self.logger.info(f"Skipped {skipped_count} tickers due to missing required fields")
-            
-            # Insert in batches to avoid timeouts
-            batch_size = 1000
-            total_inserted = 0
-            
-            for i in range(0, len(ticker_data), batch_size):
-                batch = ticker_data[i:i + batch_size]
-                
-                try:
-                    result = self.supabase.table('tickers').upsert(
-                        batch,
-                        on_conflict='symbol'
-                    ).execute()
-                    
-                    total_inserted += len(batch)
-                    self.logger.info(
-                        f"Inserted batch {i//batch_size + 1}: "
-                        f"{len(batch)} tickers "
-                        f"({total_inserted}/{len(ticker_data)} total)"
-                    )
-                    
-                    # Rate limiting
-                    time.sleep(0.1)
-                    
-                except Exception as e:
-                    self.logger.error(f"Error inserting batch {i//batch_size + 1}: {e}")
-                    continue
-            
-            self.logger.info(f"Successfully stored {total_inserted} tickers")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error storing tickers: {e}")
-            return False
+        return store_tickers_util(
+            self.supabase,
+            tickers,
+            TABLE_TICKERS,
+            dry_run=self.dry_run,
+            batch_size=DEFAULT_BATCH_SIZE,
+            rate_limit_delay=RATE_LIMIT_DELAY_SECONDS
+        )
     
     def run(self) -> bool:
         """Main execution method"""
@@ -640,10 +541,6 @@ class TickerFetcher:
         fmp_tickers = self.fetch_fmp_tickers()
         all_tickers.extend(fmp_tickers)
         
-        # Yahoo Finance / Additional sources
-        yf_tickers = self.fetch_yahoo_finance_tickers()
-        all_tickers.extend(yf_tickers)
-        
         if not all_tickers:
             self.logger.error("No tickers fetched from any source")
             return False
@@ -651,22 +548,34 @@ class TickerFetcher:
         # Deduplicate
         unique_tickers = self.deduplicate_tickers(all_tickers)
         
-        # Apply CFD filters (before quality filters to reduce processing)
+        # Apply CFD filters (before other filters to reduce processing)
         cfd_filtered_tickers = self.apply_cfd_filters(unique_tickers)
         
-        # Apply quality filters
-        filtered_tickers = self.apply_quality_filters(cfd_filtered_tickers)
+        # Choose validation strategy: YFinance validation OR quality filtering
+        # YFinance validation already checks price, volume, and data quality,
+        # so quality filtering is redundant when YFinance validation is enabled
+        if self.enable_yfinance_validation:
+            # Skip quality filtering - YFinance validation will handle everything
+            self.logger.info(
+                "YFinance validation enabled - skipping quality filtering "
+                "(YFinance validates price, volume, and data quality)"
+            )
+            filtered_tickers = cfd_filtered_tickers
+        else:
+            # Apply quality filters only if YFinance validation is disabled
+            filtered_tickers = self.apply_quality_filters(cfd_filtered_tickers)
+            if not filtered_tickers:
+                self.logger.error("No tickers remaining after quality filtering")
+                return False
         
-        if not filtered_tickers:
-            self.logger.error("No tickers remaining after quality filtering")
-            return False
-        
-        # Apply YFinance validation (final quality gate)
-        validated_tickers = self.apply_yfinance_validation(filtered_tickers)
-        
-        if not validated_tickers:
-            self.logger.error("No tickers remaining after YFinance validation")
-            return False
+        # Apply YFinance validation if enabled
+        if self.enable_yfinance_validation:
+            validated_tickers = self.apply_yfinance_validation(filtered_tickers)
+            if not validated_tickers:
+                self.logger.error("No tickers remaining after YFinance validation")
+                return False
+        else:
+            validated_tickers = filtered_tickers
         
         # Final safety check - ensure we don't exceed max_tickers
         if len(validated_tickers) > self.max_tickers:
@@ -722,8 +631,8 @@ def main():
     parser.add_argument(
         '--max-tickers',
         type=int,
-        default=2500,
-        help='Maximum number of tickers to store (default: 2500)'
+        default=DEFAULT_MAX_TICKERS,
+        help=f'Maximum number of tickers to store (default: {DEFAULT_MAX_TICKERS})'
     )
     parser.add_argument(
         '--disable-yfinance-validation',
@@ -747,8 +656,11 @@ def main():
         success = fetcher.run()
         sys.exit(0 if success else 1)
         
+    except (ValueError, KeyError) as e:
+        logging.error(f"Configuration error: {e}")
+        sys.exit(1)
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logging.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == '__main__':

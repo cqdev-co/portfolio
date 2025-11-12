@@ -2,10 +2,7 @@ name: Market Hours Penny Stock Scanner
 
 on:
   schedule:
-    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
-    # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
-    # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
-    # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges
+    # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
     - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
     - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
     - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
@@ -20,7 +17,7 @@ on:
     - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
     - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
     - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
     inputs:
       min_score:
         description: 'Minimum signal score threshold'
@@ -39,7 +36,7 @@ env:
 jobs:
   scan-penny-stocks:
     runs-on: ubuntu-latest
-    timeout-minutes: 25  # Full scan takes ~12 minutes, add buffer
+    timeout-minutes: 25
     
     steps:
     - name: Checkout code
@@ -67,10 +64,10 @@ jobs:
           
     - name: Install dependencies
       working-directory: penny-stock-scanner
-      run: |
-        poetry install --only=main
+      run: poetry install --only=main
         
     - name: Run Penny Stock Scanner
+      working-directory: penny-stock-scanner
       env:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -78,26 +75,4 @@ jobs:
         SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-      working-directory: penny-stock-scanner
-      run: |
-        
-        # Build command with optional max_symbols
-        if [ -n "${{ github.event.inputs.max_symbols }}" ]; then
-          poetry run penny-scanner scan-all \
-            --min-score ${{ github.event.inputs.min_score || '0.70' }} \
-            --max-symbols ${{ github.event.inputs.max_symbols }}
-        else
-          poetry run penny-scanner scan-all \
-            --min-score ${{ github.event.inputs.min_score || '0.70' }}
-        fi
-        
-        echo "✅ Scan complete"
-        
-    - name: Upload scan logs (on failure)
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: penny-scanner-logs-${{ github.run_number }}
-        path: penny-stock-scanner/logs/
-        retention-days: 7
-
+      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }} --max-symbols ${{ github.event.inputs.max_symbols }}

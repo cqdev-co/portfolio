@@ -2,7 +2,7 @@ name: Market Hours Volatility Squeeze Scanner
 
 on:
   schedule:
-    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
+    # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
     # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
     # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
     # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges

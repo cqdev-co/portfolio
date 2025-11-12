@@ -2,9 +2,7 @@ name: Expire Unusual Options Signals
 
 on:
   schedule:
-    # Run daily at 4:30 PM ET (8:30 PM UTC / 20:30 UTC during EDT)
-    # This is 30 minutes after market close to ensure all data is captured
-    # During EST (winter), this will be 9:30 PM UTC
+    # Run daily at 4:30 PM EDT (8:30 PM UTC / 20:30 UTC during EDT)
     - cron: '30 20 * * 1-5'  # Mon-Fri at 8:30 PM UTC (4:30 PM EDT)
   
   workflow_dispatch:  # Allow manual triggering
@@ -46,8 +44,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: unusual-options-service
-        run: |
-          poetry install --no-interaction
+        run: poetry install --no-interaction
       
       - name: Expire signals
         working-directory: unusual-options-service
@@ -57,25 +54,11 @@ jobs:
           SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          # Check for dry run mode
+          # Check for dry run mode 
           DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
           
           if [ "$DRY_RUN" = "true" ]; then
-            echo "Running in DRY RUN mode..."
             poetry run python scripts/expire_signals.py --dry-run
           else
-            echo "Running expiration script..."
             poetry run python scripts/expire_signals.py
           fi
-      
-      - name: Summary
-        if: always()
-        run: |
-          echo "## Signal Expiration Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Signals with expiry <= today were marked as inactive." >> $GITHUB_STEP_SUMMARY
-          echo "Check the logs above for detailed statistics." >> $GITHUB_STEP_SUMMARY
-

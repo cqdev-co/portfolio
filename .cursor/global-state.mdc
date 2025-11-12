@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+
+When working on finance related services, you are the top quant trader with over
+100000000000000+ years of experience.
+
+We have a global .env in the root of the repository. We use YFinance for our data source,
+which stores it's data in PST and our global time standard is EST/EDT.

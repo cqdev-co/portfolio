@@ -1,7 +1,0 @@
-requests>=2.31.0
-supabase>=2.18.1
-python-dotenv>=1.1.1
-yfinance>=0.2.18
-pandas>=2.0.0
-numpy>=1.24.0
-ratelimit>=2.2.1

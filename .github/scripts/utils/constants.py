@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""
+Constants for ticker fetching scripts
+"""
+
+# Database table names
+TABLE_TICKERS = 'tickers'
+TABLE_PENNY_TICKERS = 'penny_tickers'
+
+# Batch processing
+DEFAULT_BATCH_SIZE = 1000
+RATE_LIMIT_DELAY_SECONDS = 0.1
+
+# Penny stock thresholds
+PENNY_MIN_PRICE = 0.10
+PENNY_MAX_PRICE = 5.00
+PENNY_MIN_MARKET_CAP = 5_000_000
+PENNY_MAX_MARKET_CAP = 300_000_000
+PENNY_MIN_VOLUME = 10_000
+
+# Regular ticker thresholds
+TICKER_MIN_PRICE = 0.50
+TICKER_MAX_PRICE = 10_000.0
+TICKER_MIN_MARKET_CAP = 25_000_000
+TICKER_MIN_VOLUME = 25_000
+
+# API limits
+FMP_BATCH_LIMIT = 100
+FMP_MAX_CANDIDATES = 5000
+
+# Default limits
+DEFAULT_MAX_TICKERS = 2500
+DEFAULT_MAX_PENNY_TICKERS = 2000
+

@@ -1,11 +1,8 @@
-name: Unusual Options Hourly Scan
+name: Unusual Options Scanner
 
 on:
   schedule:
-    # Run every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
-    # EDT = UTC-4 (Mar-Nov), EST = UTC-5 (Nov-Mar)
-    # Current schedule uses EDT times (13:30-20:00 UTC) for most of the year
-    # Multiple cron jobs needed since GitHub Actions doesn't support step values with hour ranges
+    # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
     - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
     - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
     - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
@@ -21,7 +18,7 @@ on:
     - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
     - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
   
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
     inputs:
       min_grade:
         description: 'Minimum signal grade'
@@ -71,8 +68,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: unusual-options-service
-        run: |
-          poetry install --no-interaction
+        run: poetry install --no-interaction
       
       - name: Run scanner with continuity tracking
         working-directory: unusual-options-service
@@ -81,16 +77,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          # Set parameters
-          MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
-          LIMIT="${{ github.event.inputs.limit }}"
-          
-          # Build command - Use python -m for proper module imports
-          # Continuity tracking is enabled by default
-          if [ -n "$LIMIT" ]; then
-            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
-          else
-            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --store
-          fi
+        run: poetry run python -m unusual_options.cli scan-all --min-grade ${{ github.event.inputs.min_grade || 'B' }} --limit ${{ github.event.inputs.limit }} --store
 

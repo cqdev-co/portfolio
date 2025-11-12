@@ -1,18 +1,14 @@
-name: Unusual Options Fast Scanner (Watchlist)
+name: (Fast) Unusual Options Scanner
 
 on:
   schedule:
-    # Run every 5 minutes during US market hours (9:30 AM - 4:00 PM ET)
-    # EDT = UTC-4 (Mar-Nov), so 13:30-20:00 UTC
-    # Scans hard-coded watchlist tickers (see HARDCODED_TICKERS below)
-    # 9:30 AM EDT - 9:55 AM EDT
+    # Run every 5 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
     - cron: '30 13 * * 1-5'
     - cron: '35 13 * * 1-5'
     - cron: '40 13 * * 1-5'
     - cron: '45 13 * * 1-5'
     - cron: '50 13 * * 1-5'
     - cron: '55 13 * * 1-5'
-    # 10:00 AM EDT - 10:55 AM EDT
     - cron: '0 14 * * 1-5'
     - cron: '5 14 * * 1-5'
     - cron: '10 14 * * 1-5'
@@ -25,7 +21,6 @@ on:
     - cron: '45 14 * * 1-5'
     - cron: '50 14 * * 1-5'
     - cron: '55 14 * * 1-5'
-    # 11:00 AM EDT - 11:55 AM EDT
     - cron: '0 15 * * 1-5'
     - cron: '5 15 * * 1-5'
     - cron: '10 15 * * 1-5'
@@ -38,7 +33,6 @@ on:
     - cron: '45 15 * * 1-5'
     - cron: '50 15 * * 1-5'
     - cron: '55 15 * * 1-5'
-    # 12:00 PM EDT - 12:55 PM EDT
     - cron: '0 16 * * 1-5'
     - cron: '5 16 * * 1-5'
     - cron: '10 16 * * 1-5'
@@ -51,7 +45,6 @@ on:
     - cron: '45 16 * * 1-5'
     - cron: '50 16 * * 1-5'
     - cron: '55 16 * * 1-5'
-    # 1:00 PM EDT - 1:55 PM EDT
     - cron: '0 17 * * 1-5'
     - cron: '5 17 * * 1-5'
     - cron: '10 17 * * 1-5'
@@ -64,7 +57,6 @@ on:
     - cron: '45 17 * * 1-5'
     - cron: '50 17 * * 1-5'
     - cron: '55 17 * * 1-5'
-    # 2:00 PM EDT - 2:55 PM EDT
     - cron: '0 18 * * 1-5'
     - cron: '5 18 * * 1-5'
     - cron: '10 18 * * 1-5'
@@ -77,7 +69,6 @@ on:
     - cron: '45 18 * * 1-5'
     - cron: '50 18 * * 1-5'
     - cron: '55 18 * * 1-5'
-    # 3:00 PM EDT - 3:55 PM EDT
     - cron: '0 19 * * 1-5'
     - cron: '5 19 * * 1-5'
     - cron: '10 19 * * 1-5'
@@ -90,10 +81,9 @@ on:
     - cron: '45 19 * * 1-5'
     - cron: '50 19 * * 1-5'
     - cron: '55 19 * * 1-5'
-    # 4:00 PM EDT - Market close
     - cron: '0 20 * * 1-5'
   
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
     inputs:
       tickers:
         description: 'Specific tickers to scan (comma-separated, e.g. AAPL,TSLA,NVDA)'
@@ -111,10 +101,6 @@ on:
           - C
           - D
           - F
-      limit:
-        description: 'Max tickers to scan (optional, only for scan-all)'
-        required: false
-        type: number
 
 jobs:
   scan-unusual-options:
@@ -147,8 +133,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: unusual-options-service
-        run: |
-          poetry install --no-interaction
+        run: poetry install --no-interaction
       
       - name: Run scanner with continuity tracking
         working-directory: unusual-options-service
@@ -158,24 +143,16 @@ jobs:
           SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          # Hard-coded tickers for fast scheduled scans
-          # Edit this list to change which tickers are automatically scanned
-          HARDCODED_TICKERS="PLTR TSLA SPY QQQ HIMS HOOD"
+          HARDCODED_TICKERS="PLTR TSLA SPY QQQ HIMS HOOD SOFI RKLB"
           
           # Set parameters
           TICKERS="${{ github.event.inputs.tickers }}"
           MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
-          LIMIT="${{ github.event.inputs.limit }}"
           
-          # Build command - Use python -m for proper module imports
-          # Continuity tracking is enabled by default
           if [ -n "$TICKERS" ]; then
             # Manual trigger with specific tickers (convert comma-separated to space-separated)
             TICKERS_SPACED=$(echo "$TICKERS" | tr ',' ' ')
             poetry run python -m unusual_options.cli scan $TICKERS_SPACED --min-grade $MIN_GRADE --store
-          elif [ -n "$LIMIT" ]; then
-            # Manual trigger: Scan all with limit
-            poetry run python -m unusual_options.cli scan-all --min-grade $MIN_GRADE --limit $LIMIT --store
           else
             # Scheduled cron or manual trigger without params: use hard-coded tickers
             poetry run python -m unusual_options.cli scan $HARDCODED_TICKERS --min-grade $MIN_GRADE --store
