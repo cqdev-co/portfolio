@@ -24,11 +24,6 @@ on:
         required: false
         default: '0.70'
         type: string
-      max_symbols:
-        description: 'Maximum symbols to scan (leave empty for all)'
-        required: false
-        default: ''
-        type: string
 
 env:
   PYTHON_VERSION: '3.11'
@@ -75,4 +70,4 @@ jobs:
         SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }} --max-symbols ${{ github.event.inputs.max_symbols }}
+      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }}
