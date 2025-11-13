@@ -77,5 +77,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        run: poetry run python -m unusual_options.cli scan-all --min-grade ${{ github.event.inputs.min_grade || 'B' }} --limit ${{ github.event.inputs.limit }} --store
+        run: |
+          LIMIT_FLAG=""
+          if [ -n "${{ github.event.inputs.limit }}" ]; then
+            LIMIT_FLAG="--limit ${{ github.event.inputs.limit }}"
+          fi
+          poetry run python -m unusual_options.cli scan-all \
+            --min-grade ${{ github.event.inputs.min_grade || 'B' }} \
+            $LIMIT_FLAG \
+            --store
 
