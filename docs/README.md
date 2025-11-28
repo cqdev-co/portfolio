@@ -49,6 +49,13 @@ Machine learning-based options contract prediction.
 - **Status**: Beta
 - [API Guide](ml-options-predictor/api-guide.md) | [CLI Guide](ml-options-predictor/cli-guide.md)
 
+#### [Odyssey](odyssey/) 🆕 ✅ New Nov 2025
+Modern trading dashboard for market overview and opportunity detection.
+- **Strategy**: Modular, extensible opportunity detection (Options, Technicals, Fundamentals)
+- **Key Features**: Credit spread detection, market overview, sector analysis, configurable strategies
+- **Status**: Production-ready
+- [README](odyssey/README.md) | [Strategy Guide](odyssey/strategy-guide.md) | [User Guide](odyssey/user-guide.md)
+
 ### Supporting Services
 
 #### [Database](db/)
@@ -71,6 +78,7 @@ Next.js-based web interface for all services.
 | Unusual Options | Options flow | Market data APIs | Real-time | Options trading signals |
 | RDS Ticker Analysis | Social sentiment | Reddit, Market data | On-demand | Sentiment-driven trades |
 | ML Options Predictor | Options prediction | Historical options | Batch | ML-based forecasting |
+| Odyssey | Opportunity detection | YFinance | Real-time | Multi-strategy opportunity scanning |
 
 ## 🚀 Quick Start by Use Case
 
@@ -111,6 +119,14 @@ rds-analyze AEMD --fast
 ```bash
 cd analyze-options-service
 analyze-options AAPL --with-ml
+```
+
+### "I want a dashboard to monitor market conditions and opportunities"
+→ Use **[Odyssey](odyssey/)**
+```
+Navigate to /odyssey in the frontend
+Configure watchlist and strategy parameters
+View real-time market overview and detected opportunities
 ```
 
 ## 📊 Data Architecture
@@ -200,6 +216,6 @@ Proprietary software. All rights reserved.
 
 ---
 
-**Last Updated**: 2024-11-09
-**Services Count**: 7 active services
+**Last Updated**: 2025-11-21
+**Services Count**: 8 active services
 **Documentation Coverage**: 100%
