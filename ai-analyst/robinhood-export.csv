@@ -1,0 +1,39 @@
+"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"
+"12/5/2025","12/5/2025","12/8/2025","HOOD","Robinhood Markets
+CUSIP: 770700102","Sell","3","$131.40","$394.20"
+"12/4/2025","12/4/2025","12/5/2025","HIMS","Hims & Hers Health
+CUSIP: 433000106","Sell","3.158511","$40.04","$126.47"
+"12/4/2025","12/4/2025","12/4/2025","PSTV","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","SCWO","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","RR","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","IXHL","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","NVS","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","MFC","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","FEMY","Stock Lending","SLIP","","","$0.09"
+"12/4/2025","12/4/2025","12/4/2025","PFFA","Stock Lending","SLIP","","","$0.01"
+"12/4/2025","12/4/2025","12/4/2025","DFLI","Stock Lending","SLIP","","","$0.01"
+"12/3/2025","12/3/2025","12/4/2025","IXHL","Incannex Healthcare Inc
+CUSIP: 45333F109","Sell","40","$0.44","$17.71"
+"12/3/2025","12/3/2025","12/4/2025","CHYM","Chime Financial
+CUSIP: 16935C109","Sell","1","$22.24","$22.24"
+"12/3/2025","12/3/2025","12/4/2025","HIMS","Hims & Hers Health
+CUSIP: 433000106","Buy","1.158511","$36.68","($42.50)"
+"12/3/2025","12/3/2025","12/4/2025","NVDA","NVIDIA
+CUSIP: 67066G104","Buy","1","$180.71","($180.71)"
+"12/3/2025","12/3/2025","12/4/2025","IXHL","Incannex Healthcare Inc
+CUSIP: 45333F109","Buy","40","$0.42","($16.74)"
+"12/3/2025","12/3/2025","12/4/2025","CHYM","CHYM 12/19/2025 Call $17.50","BTC","1","$4.61","($461.02)"
+"12/3/2025","12/3/2025","12/4/2025","CHYM","CHYM 12/19/2025 Call $15.00","STC","1","$7.01","$700.97"
+"12/2/2025","12/2/2025","12/3/2025","NVDA","NVIDIA
+CUSIP: 67066G104","Buy","0.497276","$180.84","($89.93)"
+"12/2/2025","12/2/2025","12/3/2025","HOOD","Robinhood Markets
+CUSIP: 770700102","Sell","0.641661","$127.74","$81.97"
+"12/2/2025","12/2/2025","12/3/2025","NVDA","NVDA 1/16/2026 Call $170.00","STO","1","$17.40","$1,739.97"
+"12/2/2025","12/2/2025","12/3/2025","NVDA","NVDA 1/16/2026 Call $165.00","BTO","1","$21.03","($2,103.02)"
+"12/1/2025","12/1/2025","12/2/2025","HOOD","HOOD 1/9/2026 Call $112.00","STO","1","$14.86","$1,485.97"
+"12/1/2025","12/1/2025","12/2/2025","HOOD","HOOD 1/9/2026 Call $111.00","BTO","1","$15.54","($1,554.02)"
+"12/1/2025","12/1/2025","12/2/2025","HOOD","HOOD 1/9/2026 Call $111.00","BTO","1","$15.54","($1,554.02)"
+"12/1/2025","12/1/2025","12/2/2025","HOOD","HOOD 1/9/2026 Call $112.00","STO","1","$14.86","$1,485.97"
+"12/1/2025","12/1/2025","12/1/2025","","Gold Deposit Boost Payment","GDBP","","","$0.91"
+""
+"","","","","","","","","","The data provided is for informational purposes only. Please consult a professional tax service or personal tax advisor if you need instructions on how to calculate cost basis or questions regarding your specific tax situation. Reminder: This data does not include Robinhood Crypto or Robinhood Spending activity."

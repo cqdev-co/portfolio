@@ -49,7 +49,7 @@ def load_config() -> Dict[str, Any]:
         "ENABLE_MEME_STOCK_FILTERING": os.getenv("ENABLE_MEME_STOCK_FILTERING", "true").lower() == "true",
         
         # Alerts
-        "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_WEBHOOK_URL", ""),
+        "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_UOS_WEBHOOK_URL", os.getenv("DISCORD_WEBHOOK_URL", "")),
         "ALERT_ENABLED": os.getenv("ALERT_ENABLED", "false").lower() == "true",
         "ALERT_MIN_GRADE": os.getenv("ALERT_MIN_GRADE", "B"),
         

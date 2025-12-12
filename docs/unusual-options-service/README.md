@@ -129,6 +129,32 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 
 ## 🔄 Recent Updates
 
+**December 2025**
+- **Signal Quality Improvements**: Major scoring and filtering overhaul
+  - Fixed grade inflation (51% S-grade → ~5% target)
+  - Added DTE filtering (removes 0-7 day noise)
+  - Implemented ticker caps (max 5 signals per ticker)
+  - Higher premium thresholds for TSLA/NVDA/SPY ($3M vs $500K)
+  - See [Signal Quality Improvements](signal-quality-improvements.md)
+- **Discord Alerts Integration**: Real-time notifications for high-conviction plays
+  - Automated alerts sent via Discord webhooks
+  - Weekly performance reports every Sunday at 6 PM ET
+  - Configurable minimum score threshold
+  - Rich embeds with signal details, grade, and metrics
+  - See [Discord Alerts Setup](#discord-alerts-setup) below
+- **Hedge Detection System**: Filter out hedge fund portfolio hedging activity
+  - Identify Index/Sector ETF puts, mega-cap protective puts, LEAPS hedges
+  - `--exclude-hedges` flag for `insider_plays.py`
+  - New `hedge_analyzer.py` script for hedge vs directional breakdown
+- **Performance Tracker**: Measure actual signal performance
+  - 1-day and 5-day forward return calculations
+  - Win rate tracking by grade and option type
+  - `performance_tracker.py` script for historical analysis
+- **Stricter Insider Play Filters**: Reduced false positives
+  - Default strict mode: $2M+ premium, 7-45 DTE, >65% aggressive orders
+  - ETF filtering for hedge activity
+  - `--relaxed` flag to restore previous behavior
+
 **November 6, 2025**
 - **Fast Scanner Workflow**: Added hard-coded ticker watchlist for focused scanning
   - **Runs every 5 minutes** during market hours (78 scans/day)
@@ -225,6 +251,57 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 - Initial documentation structure created
 - System overview and architecture documented
 - CLI reference completed
+
+## 🔔 Discord Alerts Setup
+
+### Prerequisites
+1. A Discord server where you have permission to create webhooks
+2. A channel dedicated to options alerts (recommended)
+
+### Setup Steps
+
+**1. Create Discord Webhook**
+```
+Server Settings → Integrations → Webhooks → New Webhook
+```
+- Name it "Options Alerts" or similar
+- Select the target channel
+- Copy the webhook URL
+
+**2. Configure Local Environment**
+```bash
+# Add to unusual-options-service/.env or root .env
+DISCORD_UOS_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+**3. Configure GitHub Actions (for automated alerts)**
+```
+Repository Settings → Secrets → Actions → New repository secret
+```
+- Name: `DISCORD_UOS_WEBHOOK_URL`
+- Value: Your webhook URL
+
+### Alert Types
+
+**Real-time Insider Play Alerts**
+- Triggered after each scan (every 5 mins during market hours)
+- Shows high-conviction plays with score ≥70
+- Includes ticker, strike, expiry, premium, grade, and action recommendation
+
+**Weekly Performance Report**
+- Sent every Sunday at 6 PM ET
+- Summary of signal performance over the past week
+- Win rates by grade and option type
+- Hedge vs directional breakdown
+
+### Manual Testing
+```bash
+# Test alerts with signals from last day
+poetry run python scripts/discord_alerts.py --insider-plays --days 1 --min-score 60
+
+# Test performance report
+poetry run python scripts/discord_alerts.py --performance-report --days 7
+```
 
 ## 🤝 Contributing to Docs
 

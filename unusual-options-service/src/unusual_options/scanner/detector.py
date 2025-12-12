@@ -28,18 +28,39 @@ class Detection:
 class AnomalyDetector:
     """Detects unusual options activity across multiple dimensions."""
     
+    # High-volume tickers that generate excessive noise - need higher thresholds
+    HIGH_VOLUME_TICKERS = {
+        'TSLA', 'NVDA', 'META', 'SPY', 'QQQ', 'AMD', 'AAPL', 'AMZN', 
+        'GOOGL', 'MSFT', 'PLTR', 'AVGO', 'IWM', 'XLF', 'GLD', 'SLV',
+        'COIN', 'MSTR', 'HOOD', 'SOFI', 'NIO', 'BABA', 'INTC', 'MU'
+    }
+    
+    # Premium thresholds by ticker type (raised based on data analysis)
+    # Correct signals avg $23M (calls), $7.7M (puts) - wrong avg $3M
+    PREMIUM_THRESHOLD_HIGH_VOL = 5_000_000   # $5M for high-volume tickers
+    PREMIUM_THRESHOLD_NORMAL = 1_000_000     # $1M for normal tickers
+    
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.volume_threshold = config.get('VOLUME_MULTIPLIER_THRESHOLD', 5.0)  # Increased from 3.0
-        self.oi_change_threshold = config.get('OI_CHANGE_THRESHOLD', 0.30)  # Increased from 0.20
-        self.min_premium_flow = config.get('MIN_PREMIUM_FLOW', 500000)  # Increased from 100k
-        self.min_option_volume = config.get('MIN_OPTION_VOLUME', 200)  # Increased from 100
-        self.min_heuristic_volume = config.get('MIN_HEURISTIC_VOLUME', 2000)  # New threshold
-        self.min_heuristic_oi = config.get('MIN_HEURISTIC_OI', 10000)  # New threshold
+        self.volume_threshold = config.get('VOLUME_MULTIPLIER_THRESHOLD', 5.0)
+        self.oi_change_threshold = config.get('OI_CHANGE_THRESHOLD', 0.30)
+        self.min_premium_flow = config.get('MIN_PREMIUM_FLOW', 500000)
+        self.min_option_volume = config.get('MIN_OPTION_VOLUME', 200)
+        self.min_heuristic_volume = config.get('MIN_HEURISTIC_VOLUME', 2000)
+        self.min_heuristic_oi = config.get('MIN_HEURISTIC_OI', 10000)
+        
+        # Minimum DTE to filter out day-trader noise
+        self.min_dte = config.get('MIN_DTE_FILTER', 7)  # Default: filter 0-7 DTE
         
         # Spread detection (Phase 1: Conservative)
         self.enable_spread_detection = config.get('ENABLE_SPREAD_DETECTION', True)
         self.spread_detector = SpreadDetector(config) if self.enable_spread_detection else None
+    
+    def _get_premium_threshold(self, ticker: str) -> float:
+        """Get minimum premium threshold based on ticker volume."""
+        if ticker.upper() in self.HIGH_VOLUME_TICKERS:
+            return self.PREMIUM_THRESHOLD_HIGH_VOL
+        return self.PREMIUM_THRESHOLD_NORMAL
     
     def detect_anomalies(
         self,
@@ -57,10 +78,16 @@ class AnomalyDetector:
             List of detected anomalies
         """
         detections = []
+        ticker = options_chain.ticker
         
         for contract in options_chain.contracts:
             # Skip contracts with very low volume
             if contract.volume < self.min_option_volume:
+                continue
+            
+            # FILTER: Skip short-dated contracts (day trader noise)
+            days_to_expiry = (contract.expiry - contract.timestamp.date()).days
+            if days_to_expiry < self.min_dte:
                 continue
             
             # 1. Check volume anomalies
@@ -73,8 +100,8 @@ class AnomalyDetector:
             if oi_detection:
                 detections.append(oi_detection)
             
-            # 3. Check premium flow
-            premium_detection = self._detect_premium_flow(contract)
+            # 3. Check premium flow (with ticker-specific threshold)
+            premium_detection = self._detect_premium_flow(contract, ticker)
             if premium_detection:
                 detections.append(premium_detection)
             
@@ -237,13 +264,24 @@ class AnomalyDetector:
         
         return None
     
-    def _detect_premium_flow(self, contract: OptionsContract) -> Optional[Detection]:
-        """Detect large premium expenditures."""
+    def _detect_premium_flow(
+        self, 
+        contract: OptionsContract,
+        ticker: str = ""
+    ) -> Optional[Detection]:
+        """
+        Detect large premium expenditures.
         
+        Uses ticker-specific thresholds - high-volume tickers like TSLA/NVDA
+        require higher premium to qualify as unusual.
+        """
         # Calculate total premium flow (simplified)
         premium = contract.last_price * contract.volume * 100  # Convert to dollars
         
-        if premium < self.min_premium_flow:
+        # Get ticker-specific threshold
+        min_threshold = self._get_premium_threshold(ticker)
+        
+        if premium < min_threshold:
             return None
         
         # Simple aggressiveness check based on bid-ask spread
@@ -256,11 +294,23 @@ class AnomalyDetector:
         else:
             aggressiveness = 0.5
         
-        # More conservative confidence calculation for premium flow
-        # Require higher premium for higher confidence
-        base_confidence = min(premium / 2_000_000, 0.8)  # Doubled threshold, capped at 0.8
-        aggressiveness_bonus = aggressiveness * 0.2  # Reduced bonus
-        confidence = min(base_confidence + aggressiveness_bonus, 0.9)
+        # Scale confidence by premium size relative to threshold
+        # Higher premium = higher confidence, but capped
+        premium_ratio = premium / min_threshold  # How many multiples of threshold
+        
+        # Base confidence: scale from 0.3 to 0.7 based on premium size
+        # - 1x threshold = 0.3 confidence
+        # - 5x threshold = 0.7 confidence (max base)
+        base_confidence = min(0.3 + (premium_ratio - 1) * 0.1, 0.7)
+        
+        # Aggressiveness bonus (max 0.2)
+        aggressiveness_bonus = aggressiveness * 0.2
+        
+        # High-volume tickers get a penalty (harder to stand out)
+        ticker_penalty = 0.1 if ticker.upper() in self.HIGH_VOLUME_TICKERS else 0.0
+        
+        confidence = min(base_confidence + aggressiveness_bonus - ticker_penalty, 0.9)
+        confidence = max(confidence, 0.1)  # Floor at 0.1
         
         return Detection(
             detection_type='PREMIUM_FLOW',
@@ -269,7 +319,9 @@ class AnomalyDetector:
                 'total_premium': premium,
                 'aggressive_pct': aggressiveness,
                 'volume': contract.volume,
-                'avg_price': contract.last_price
+                'avg_price': contract.last_price,
+                'premium_threshold': min_threshold,
+                'is_high_volume_ticker': ticker.upper() in self.HIGH_VOLUME_TICKERS
             },
             confidence=confidence,
             timestamp=datetime.now(timezone.utc)

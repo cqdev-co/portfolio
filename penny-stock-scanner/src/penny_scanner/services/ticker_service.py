@@ -75,8 +75,15 @@ class TickerService:
                     
                     offset += page_size
             
-            logger.info(f"Retrieved {len(all_symbols)} penny ticker symbols")
-            return all_symbols
+            
+            # Filter out non-US symbols (Canadian, etc.)
+            filtered_symbols = [
+                s for s in all_symbols 
+                if not any(s.endswith(suffix) for suffix in ['.TO', '.V', '.CN', '.NE'])
+            ]
+            
+            logger.info(f"Retrieved {len(filtered_symbols)} penny ticker symbols (filtered {len(all_symbols) - len(filtered_symbols)} non-US)")
+            return filtered_symbols
             
         except Exception as e:
             logger.error(f"Error fetching symbols: {e}")

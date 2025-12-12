@@ -17,11 +17,21 @@ on:
     - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
     - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
     - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
+    # Weekly performance report (Sundays at 6 PM ET)
+    - cron: '0 23 * * 0'     # Sunday 6 PM EDT (23:00 UTC)
   
   workflow_dispatch:
     inputs:
+      job_type:
+        description: 'Job to run'
+        required: false
+        default: 'scan'
+        type: choice
+        options:
+          - scan
+          - performance_report
       min_grade:
-        description: 'Minimum signal grade'
+        description: 'Minimum signal grade (for scan)'
         required: false
         default: 'B'
         type: choice
@@ -71,6 +81,7 @@ jobs:
         run: poetry install --no-interaction
       
       - name: Run scanner with continuity tracking
+        if: github.event.inputs.job_type != 'performance_report' && github.event.schedule != '0 23 * * 0'
         working-directory: unusual-options-service
         env:
           PYTHONUNBUFFERED: 1
@@ -86,4 +97,54 @@ jobs:
             --min-grade ${{ github.event.inputs.min_grade || 'B' }} \
             $LIMIT_FLAG \
             --store
-
+      
+      - name: Send Discord alerts for high-conviction plays
+        if: github.event.inputs.job_type != 'performance_report' && github.event.schedule != '0 23 * * 0'
+        working-directory: unusual-options-service
+        continue-on-error: true
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          DISCORD_UOS_WEBHOOK_URL: ${{ secrets.DISCORD_UOS_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_UOS_WEBHOOK_URL" ]; then
+            poetry run python scripts/discord_alerts.py --insider-plays --days 1 --min-score 70
+          else
+            echo "Discord webhook not configured, skipping alerts"
+          fi
+      
+      - name: Run weekly performance report
+        if: github.event.inputs.job_type == 'performance_report' || github.event.schedule == '0 23 * * 0'
+        working-directory: unusual-options-service
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "=== Weekly Performance Report ==="
+          echo ""
+          poetry run python scripts/performance_tracker.py --days 7 --min-grade A --report
+          echo ""
+          echo "=== Hedge vs Directional Breakdown ==="
+          echo ""
+          poetry run python scripts/hedge_analyzer.py --days 7 --min-grade A
+      
+      - name: Send Discord weekly performance report
+        if: github.event.inputs.job_type == 'performance_report' || github.event.schedule == '0 23 * * 0'
+        working-directory: unusual-options-service
+        continue-on-error: true
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          DISCORD_UOS_WEBHOOK_URL: ${{ secrets.DISCORD_UOS_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_UOS_WEBHOOK_URL" ]; then
+            poetry run python scripts/discord_alerts.py --performance-report
+          else
+            echo "Discord webhook not configured, skipping notification"
+          fi

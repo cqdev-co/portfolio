@@ -108,9 +108,24 @@ class UnusualOptionsSignal:
     spread_detection_reason: Optional[str] = None
     spread_net_premium: Optional[float] = None
     
+    # Hedge Detection (Phase 2)
+    likely_hedge: bool = False
+    hedge_confidence: float = 0.0
+    hedge_type: Optional[str] = None  # PROTECTIVE_PUT, COLLAR, 
+                                      # COVERED_CALL, INDEX_HEDGE, etc.
+    hedge_indicators: List[str] = field(default_factory=list)
+    
+    # Cross-Signal Correlation
+    correlated_signal_ids: List[str] = field(default_factory=list)
+    time_window_group_id: Optional[str] = None
+    
+    # Order Side Inference
+    inferred_side: Optional[str] = None  # BUY, SELL, MIXED
+    side_confidence: float = 0.0
+    
     # Metadata
     data_provider: str = ""
-    detection_version: str = "0.1.0"
+    detection_version: str = "0.2.0"
     raw_detection_data: Dict = field(default_factory=dict)
 
 

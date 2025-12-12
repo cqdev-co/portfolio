@@ -96,18 +96,44 @@ The service includes a comprehensive suite of analysis tools designed for quants
    - Mega-cap filter (excludes normal flow in TSLA, AAPL, etc.)
    - Surprise factor ranking (relative to ticker's normal volume)
    - Composite scoring: suspicion × surprise factor
+   - **NEW**: `--exclude-hedges` flag to filter out hedge fund hedging
    - See [Insider Plays Improvements](../docs/unusual-options-service/insider-plays-improvements.md)
 
-2. **Signal Analysis** (`scripts/analyze_results.py`) - Statistical overview with AI insights
-3. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation  
-4. **Correlation Analysis** (`scripts/signal_correlation.py`) - Cross-ticker correlations and market regime detection
-5. **Flow Divergence** (`scripts/flow_divergence.py`) - Identify unusual patterns in positioning
-6. **Momentum Tracker** (`scripts/momentum_tracker.py`) - Track acceleration, exhaustion, and reversals
+2. **Hedge Analyzer** (`scripts/hedge_analyzer.py`) 🛡️ - Separate hedging from directional bets
+   - Detects protective puts, index hedges, sector hedges, collars
+   - Shows hedge vs directional premium flow breakdown
+   - Identifies paired call/put activity
+   - See [Hedge Detection Analysis](../docs/unusual-options-service/hedge-detection-analysis.md)
+
+3. **Performance Tracker** (`scripts/performance_tracker.py`) 📈 **[NEW]** - Measure actual results
+   - Tracks forward returns (1d, 5d) on all signals
+   - Calculates win rates by grade, option type, ticker
+   - Shows top/worst performing signals
+   - Creates feedback loop for filter tuning
+
+4. **Signal Analysis** (`scripts/analyze_results.py`) - Statistical overview with AI insights
+5. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation  
+6. **Correlation Analysis** (`scripts/signal_correlation.py`) - Cross-ticker correlations and market regime detection
+7. **Flow Divergence** (`scripts/flow_divergence.py`) - Identify unusual patterns in positioning
+8. **Momentum Tracker** (`scripts/momentum_tracker.py`) - Track acceleration, exhaustion, and reversals
 
 ### Quick Analysis
 ```bash
-# PRIMARY: Find suspicious insider-type plays (with earnings + 0DTE filter)
+# PRIMARY: Find suspicious insider-type plays with STRICT filters
+# (Requires: $2M+ premium, 7-45 DTE, >65% aggressive, excludes ETFs)
 poetry run python scripts/insider_plays.py --days 3 --min-grade A
+
+# Use --relaxed to see more signals (less filtering)
+poetry run python scripts/insider_plays.py --days 3 --min-grade A --relaxed
+
+# Exclude likely hedge fund hedging activity from results
+poetry run python scripts/insider_plays.py --days 3 --min-grade A --exclude-hedges
+
+# Analyze hedge vs directional activity breakdown
+poetry run python scripts/hedge_analyzer.py --days 7 --min-grade A
+
+# Track actual performance of signals (win rates, returns)
+poetry run python scripts/performance_tracker.py --days 30 --report
 
 # Statistical overview of signals
 poetry run python scripts/analyze_results.py --days 7 --min-grade A
@@ -157,9 +183,15 @@ TRADIER_API_KEY=your_tradier_api_key
 # Option 3: CBOE DataShop
 CBOE_API_KEY=your_cboe_api_key
 
-# Optional: Alert Configuration
-DISCORD_WEBHOOK_URL=your_discord_webhook
-ALERT_MIN_GRADE=B
+# Optional: Discord Alerts (for high-conviction play notifications)
+DISCORD_UOS_WEBHOOK_URL=your_discord_webhook_url
+# Get webhook: Discord Server Settings → Integrations → Webhooks → New Webhook
+
+# Signal Quality Tuning (optional - defaults shown)
+MIN_DTE_FILTER=7              # Minimum days to expiry (filters day-trader noise)
+MAX_SIGNALS_PER_TICKER=5      # Cap signals per ticker per scan
+MIN_PREMIUM_FLOW=500000       # Minimum premium for normal tickers ($500K)
+# Note: High-volume tickers (TSLA, NVDA, SPY, etc.) require $3M+ premium
 ```
 
 ## 🚀 Quick Start
@@ -533,7 +565,11 @@ unusual-options watchlist list
 - Cannot detect off-exchange or dark pool activity
 - Data may be delayed (depends on provider)
 - False positives possible (retail herding, hedging activity)
+  - **Mitigation**: Use `--exclude-hedges` flag or `hedge_analyzer.py`
+  - See [Hedge Detection Analysis](../docs/unusual-options-service/hedge-detection-analysis.md)
 - Does not account for broader market context
+- Cannot determine order side (buy vs. sell) - impacts hedge detection accuracy
+- No Greeks/delta tracking - cannot calculate net directional exposure
 
 ### Risk Management
 

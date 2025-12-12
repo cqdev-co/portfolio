@@ -14,9 +14,14 @@ class SignalContinuityService:
     Determines if signals are NEW, CONTINUING, or ENDED.
     """
     
-    def __init__(self, database_service: DatabaseService):
+    def __init__(
+        self, 
+        database_service: DatabaseService,
+        performance_service: Optional['PerformanceTrackingService'] = None
+    ):
         """Initialize signal continuity service."""
         self.database_service = database_service
+        self.performance_service = performance_service
     
     async def process_signals_with_continuity(
         self,
@@ -62,6 +67,7 @@ class SignalContinuityService:
             
             # Update each signal's continuity status
             updated_signals = []
+            new_signals = []
             new_count = 0
             continuing_count = 0
             
@@ -87,6 +93,7 @@ class SignalContinuityService:
                     result.explosion_signal.days_active = 1
                     
                     new_count += 1
+                    new_signals.append(result)
                     
                     logger.debug(f"{symbol}: NEW signal")
                 
@@ -96,6 +103,10 @@ class SignalContinuityService:
                 f"Continuity tracking complete: {new_count} NEW, "
                 f"{continuing_count} CONTINUING"
             )
+            
+            # Track performance for new signals
+            if self.performance_service and new_signals:
+                await self.performance_service.track_new_signals(new_signals, scan_date)
             
             # Track ended signals (present yesterday but not today)
             await self._track_ended_signals(
@@ -120,10 +131,6 @@ class SignalContinuityService:
         """
         Track signals that have ended (present yesterday but not today).
         
-        Note: For penny stocks, we don't store ENDED signals as separate records.
-        The absence of a signal on a given date indicates it has ended.
-        This is tracked implicitly through the database.
-        
         Args:
             current_signals: Today's signals
             yesterday_signals: Yesterday's signals
@@ -132,7 +139,7 @@ class SignalContinuityService:
         current_symbols = {signal.symbol for signal in current_signals}
         yesterday_symbols = {signal['symbol'] for signal in yesterday_signals}
         
-        ended_symbols = yesterday_symbols - current_symbols
+        ended_symbols = list(yesterday_symbols - current_symbols)
         
         if ended_symbols:
             logger.info(
@@ -140,6 +147,10 @@ class SignalContinuityService:
                 f"meeting criteria"
             )
             logger.debug(f"Ended signals: {', '.join(sorted(ended_symbols)[:10])}")
+            
+            # Close performance tracking for ended signals
+            if self.performance_service:
+                await self.performance_service.close_ended_signals(ended_symbols, scan_date)
     
     async def get_signal_history(
         self,

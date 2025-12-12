@@ -19,6 +19,7 @@ from penny_scanner.services.analysis_service import AnalysisService
 from penny_scanner.services.ticker_service import TickerService
 from penny_scanner.services.database_service import DatabaseService
 from penny_scanner.services.signal_continuity_service import SignalContinuityService
+from penny_scanner.services.performance_tracking_service import PerformanceTrackingService
 
 # Initialize console
 console = Console()
@@ -39,10 +40,18 @@ def get_services():
         ticker_service = TickerService(settings)
         database_service = DatabaseService(settings)
         
+        # Performance tracking service (requires database)
+        performance_service = None
+        if database_service.is_available():
+            performance_service = PerformanceTrackingService(database_service, data_service)
+        
         # Signal continuity service (requires database)
         continuity_service = None
         if database_service.is_available():
-            continuity_service = SignalContinuityService(database_service)
+            continuity_service = SignalContinuityService(
+                database_service,
+                performance_service
+            )
         
         # Show service status
         if ticker_service.is_available():
@@ -71,7 +80,7 @@ def get_services():
             )
         
         return (data_service, analysis_service, ticker_service, 
-                database_service, continuity_service)
+                database_service, continuity_service, performance_service)
         
     except Exception as e:
         console.print(f"[red]❌ Failed to initialize services: {e}[/red]")
@@ -88,7 +97,7 @@ def analyze(
     """Analyze a single penny stock for explosion setup signals."""
     
     async def _analyze():
-        data_service, analysis_service, _, _, _ = get_services()
+        data_service, analysis_service, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -150,7 +159,7 @@ def batch(
     
     async def _batch_analyze():
         (data_service, analysis_service, 
-         _, database_service, continuity_service) = get_services()
+         _, database_service, continuity_service, _) = get_services()
         
         # Parse symbols
         symbol_list = [s.strip().upper() for s in symbols.split(',')]
@@ -273,7 +282,7 @@ def scan_all(
     
     async def _scan_all():
         (data_service, analysis_service,
-         ticker_service, database_service, continuity_service) = get_services()
+         ticker_service, database_service, continuity_service, _) = get_services()
         
         try:
             # Get all penny stock symbols
@@ -472,7 +481,7 @@ def query(
     """Query stored penny stock signals from database."""
     
     async def _query():
-        _, _, _, database_service, _ = get_services()
+        _, _, _, database_service, _, _ = get_services()
         
         if not database_service.is_available():
             console.print("[red]❌ Database service not available[/red]")
@@ -510,6 +519,168 @@ def query(
             console.print(f"[red]❌ Error querying signals: {e}[/red]")
     
     asyncio.run(_query())
+
+
+@app.command()
+def performance() -> None:
+    """View performance metrics (win rate, returns)."""
+    
+    async def _performance():
+        _, _, _, _, _, performance_service = get_services()
+        
+        if not performance_service:
+            console.print("[red]❌ Performance service not available[/red]")
+            return
+            
+        try:
+            summary = await performance_service.get_performance_summary()
+            
+            if not summary:
+                console.print("[yellow]No performance data available yet[/yellow]")
+                return
+            
+            # Display performance dashboard
+            console.print("\n[bold blue]📈 Performance Dashboard[/bold blue]")
+            
+            # Key Metrics
+            grid = Table.grid(expand=True)
+            grid.add_column()
+            grid.add_column()
+            grid.add_column()
+            
+            win_rate = summary.get('win_rate_all', 0)
+            win_rate_color = "green" if win_rate >= 50 else "red"
+            
+            avg_return = summary.get('avg_return_all', 0)
+            return_color = "green" if avg_return > 0 else "red"
+            
+            grid.add_row(
+                Panel(
+                    f"[{win_rate_color}]{win_rate}%[/{win_rate_color}]",
+                    title="Win Rate",
+                    border_style=win_rate_color
+                ),
+                Panel(
+                    f"[{return_color}]{avg_return}%[/{return_color}]",
+                    title="Avg Return",
+                    border_style=return_color
+                ),
+                Panel(
+                    f"{summary.get('avg_days_held', 0)} days",
+                    title="Avg Hold Time",
+                    border_style="blue"
+                )
+            )
+            
+            console.print(grid)
+            
+            # Signal Counts
+            console.print("\n[bold]Signal Counts:[/bold]")
+            console.print(f"  Total Signals: {summary.get('total_signals', 0)}")
+            console.print(f"  Active: {summary.get('active_signals', 0)}")
+            console.print(f"  Closed: {summary.get('closed_signals', 0)}")
+            
+            # Rank Breakdown
+            by_rank = await performance_service.get_performance_by_rank()
+            if by_rank:
+                console.print("\n[bold]Performance by Rank:[/bold]")
+                rank_table = Table(show_header=True, header_style="bold magenta")
+                rank_table.add_column("Rank")
+                rank_table.add_column("Count", justify="right")
+                rank_table.add_column("Win Rate", justify="right")
+                rank_table.add_column("Avg Return", justify="right")
+                
+                for rank in ['S', 'A', 'B', 'C', 'D']:
+                    if rank in by_rank:
+                        data = by_rank[rank]
+                        wr_color = "green" if data['win_rate'] >= 50 else "red"
+                        ret_color = "green" if data['avg_return'] > 0 else "red"
+                        
+                        rank_table.add_row(
+                            rank,
+                            str(data['count']),
+                            f"[{wr_color}]{data['win_rate']}%[/{wr_color}]",
+                            f"[{ret_color}]{data['avg_return']}%[/{ret_color}]"
+                        )
+                console.print(rank_table)
+            
+            # Top Trades
+            top_trades = await performance_service.get_top_trades()
+            if top_trades['winners']:
+                console.print("\n[bold green]🏆 Top Winners:[/bold green]")
+                win_table = Table(show_header=True)
+                win_table.add_column("Symbol", style="cyan")
+                win_table.add_column("Return", style="green", justify="right")
+                win_table.add_column("Days", justify="right")
+                win_table.add_column("Entry Date")
+                
+                for trade in top_trades['winners']:
+                    win_table.add_row(
+                        trade['symbol'],
+                        f"+{trade['return_pct']:.1f}%",
+                        str(trade['days_held']),
+                        trade['entry_date']
+                    )
+                console.print(win_table)
+                
+            if top_trades['losers']:
+                console.print("\n[bold red]📉 Top Losers:[/bold red]")
+                loss_table = Table(show_header=True)
+                loss_table.add_column("Symbol", style="cyan")
+                loss_table.add_column("Return", style="red", justify="right")
+                loss_table.add_column("Days", justify="right")
+                loss_table.add_column("Entry Date")
+                
+                for trade in top_trades['losers']:
+                    loss_table.add_row(
+                        trade['symbol'],
+                        f"{trade['return_pct']:.1f}%",
+                        str(trade['days_held']),
+                        trade['entry_date']
+                    )
+                console.print(loss_table)
+            
+        except Exception as e:
+            console.print(f"[red]❌ Error fetching performance stats: {e}[/red]")
+    
+    asyncio.run(_performance())
+
+
+@app.command()
+def backfill() -> None:
+    """Backfill performance history from existing signals."""
+    
+    async def _backfill():
+        data_service, _, _, _, _, performance_service = get_services()
+        
+        if not performance_service:
+            console.print("[red]❌ Performance service not available[/red]")
+            return
+            
+        try:
+            console.print("[bold blue]🔄 Backfilling performance history...[/bold blue]")
+            console.print("[dim]This may take a while depending on the number of signals[/dim]")
+            
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("Backfilling...", total=None)
+                
+                count = await performance_service.backfill_history(data_service)
+                
+                progress.update(task, description="Complete!")
+            
+            if count > 0:
+                console.print(f"[green]✅ Successfully backfilled {count} performance records[/green]")
+            else:
+                console.print("[yellow]⚠️  No records backfilled (maybe already up to date)[/yellow]")
+                
+        except Exception as e:
+            console.print(f"[red]❌ Error backfilling history: {e}[/red]")
+    
+    asyncio.run(_backfill())
 
 
 @app.command()

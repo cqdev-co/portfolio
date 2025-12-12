@@ -195,8 +195,15 @@ class ScanOrchestrator:
         # Sort all signals by score
         all_signals.sort(key=lambda s: s.overall_score, reverse=True)
         
-        logger.info(f"Batch scan complete. Found {len(all_signals)} total signals")
-        return all_signals
+        # Apply ticker cap to prevent any single ticker from dominating
+        max_per_ticker = self.config.get("MAX_SIGNALS_PER_TICKER", 5)
+        capped_signals = self._apply_ticker_cap(all_signals, max_per_ticker)
+        
+        logger.info(
+            f"Batch scan complete. Found {len(all_signals)} total signals, "
+            f"{len(capped_signals)} after ticker cap ({max_per_ticker}/ticker)"
+        )
+        return capped_signals
     
     async def scan_all_tickers(
         self,
@@ -248,6 +255,41 @@ class ScanOrchestrator:
             groups[contract_symbol].append(detection)
         
         return groups
+    
+    def _apply_ticker_cap(
+        self, 
+        signals: List[UnusualOptionsSignal], 
+        max_per_ticker: int
+    ) -> List[UnusualOptionsSignal]:
+        """
+        Cap signals per ticker to prevent any single ticker from dominating.
+        
+        Keeps the highest-scoring signals for each ticker.
+        
+        Args:
+            signals: List of signals (should be sorted by score descending)
+            max_per_ticker: Maximum signals to keep per ticker
+            
+        Returns:
+            Filtered list with ticker caps applied
+        """
+        ticker_counts: Dict[str, int] = {}
+        capped_signals = []
+        
+        for signal in signals:
+            ticker = signal.ticker
+            current_count = ticker_counts.get(ticker, 0)
+            
+            if current_count < max_per_ticker:
+                capped_signals.append(signal)
+                ticker_counts[ticker] = current_count + 1
+            else:
+                logger.debug(
+                    f"Ticker cap reached for {ticker}, "
+                    f"skipping signal with score {signal.overall_score:.3f}"
+                )
+        
+        return capped_signals
     
     def _should_process_detections(self, detections: List, underlying_price: float, ticker: str) -> bool:
         """
@@ -313,12 +355,12 @@ class ScanOrchestrator:
             # Apply stricter filtering for high 0DTE activity tickers
             if should_apply_strict_dte_filtering(signal.ticker):
                 # Require minimum days for high 0DTE activity tickers (configurable)
-                min_dte = self.config.get("MIN_DTE_HIGH_0DTE_TICKERS", 5)
+                min_dte = self.config.get("MIN_DTE_HIGH_0DTE_TICKERS", 7)
                 if signal.days_to_expiry < min_dte:
                     return False
             else:
                 # Standard filtering: minimum days for other tickers (configurable)
-                min_dte = self.config.get("MIN_DTE_STANDARD", 3)
+                min_dte = self.config.get("MIN_DTE_STANDARD", 5)
                 if signal.days_to_expiry < min_dte:
                     return False
         
@@ -326,12 +368,13 @@ class ScanOrchestrator:
         if signal.grade in ['D', 'F']:
             return False
         
-        # Filter out signals with very low scores
-        if signal.overall_score < 0.40:
+        # Filter out signals with very low scores (adjusted for new scoring)
+        # New scoring: single premium-only detection ~0.15-0.25
+        if signal.overall_score < 0.15:
             return False
         
         # Filter out high-risk signals with low scores
-        if signal.risk_level == "HIGH" and signal.overall_score < 0.60:
+        if signal.risk_level == "HIGH" and signal.overall_score < 0.30:
             return False
         
         # Filter out signals with too many risk factors

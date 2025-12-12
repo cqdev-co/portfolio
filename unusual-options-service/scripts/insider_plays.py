@@ -83,6 +83,36 @@ MEGA_CAPS = {
     'AMD', 'NFLX', 'ADBE', 'CRM', 'TMO', 'DIS', 'ABT', 'NKE', 'INTC'
 }
 
+# Index ETFs (common hedge targets)
+INDEX_ETFS = {'SPY', 'QQQ', 'IWM', 'DIA', 'VXX', 'UVXY', 'SQQQ', 'TQQQ'}
+
+# Sector ETFs (common hedge targets)
+SECTOR_ETFS = {
+    'XLF', 'XLE', 'XLK', 'XLV', 'XLI', 'XLP', 'XLU', 'XLY', 'XLB', 
+    'XLRE', 'XLC', 'GDX', 'XBI', 'SMH', 'XOP', 'KRE', 'XHB'
+}
+
+# =============================================================================
+# QUALITY FILTERS - Tuned for finding insider-type plays
+# =============================================================================
+
+# Premium thresholds (higher = more institutional, less noise)
+MIN_PREMIUM_DEFAULT = 2_000_000      # $2M for non-mega-caps
+MIN_PREMIUM_MEGA_CAP = 10_000_000    # $10M for mega-caps (they have huge flow)
+
+# DTE sweet spot for informed trading (not too short, not too long)
+MIN_DTE_INSIDER = 7    # Insiders need time for catalyst
+MAX_DTE_INSIDER = 45   # But not too far out (theta + uncertainty)
+
+# Aggressive order % - confirms BUYING not SELLING
+MIN_AGGRESSIVE_PCT = 0.65  # 65%+ = likely buying activity
+
+# Moneyness - insiders use ATM/slight OTM, not lottery tickets
+MAX_OTM_PCT = 0.15  # Max 15% OTM (lottery tickets filtered)
+
+# Quality score minimum
+MIN_QUALITY_SCORE = 0.70
+
 @dataclass
 class InsiderPlay:
     """Represents a potential insider-type play with all matched patterns"""
@@ -107,10 +137,60 @@ class InsiderPlayDetector:
         self.storage = get_storage(self.config)
         self.signals: List[UnusualOptionsSignal] = []
         self.plays_by_signal_id: Dict[str, InsiderPlay] = {}  # Deduplicated plays
+        self.exclude_hedges: bool = False
     
-    async def fetch_signals(self, days: int = 3, min_grade: str = 'A') -> None:
-        """Fetch recent high-quality signals"""
-        console.print(f"[blue]Scanning for insider-type plays (last {days} days, grade {min_grade}+)...[/blue]")
+    def _is_likely_hedge(self, signal: UnusualOptionsSignal) -> bool:
+        """
+        Check if signal is likely hedging activity.
+        
+        Hedge patterns:
+        - Index/Sector ETF puts with far DTE
+        - Mega-cap OTM puts with 30+ DTE
+        - Far-dated (90+ DTE) puts on any ticker
+        """
+        # Index ETF puts = likely portfolio hedge
+        if signal.ticker in INDEX_ETFS and signal.option_type == 'put':
+            if signal.days_to_expiry and signal.days_to_expiry >= 30:
+                return True
+        
+        # Sector ETF puts = likely sector hedge
+        if signal.ticker in SECTOR_ETFS and signal.option_type == 'put':
+            if signal.days_to_expiry and signal.days_to_expiry >= 30:
+                return True
+        
+        # Mega-cap OTM puts with medium+ DTE = protective put
+        if signal.ticker in MEGA_CAPS and signal.option_type == 'put':
+            if signal.moneyness == 'OTM':
+                if signal.days_to_expiry and signal.days_to_expiry >= 45:
+                    return True
+        
+        # Very far-dated puts (90+ DTE) on any ticker
+        if signal.option_type == 'put':
+            if signal.days_to_expiry and signal.days_to_expiry >= 90:
+                if signal.moneyness in ['OTM', 'ATM']:
+                    return True
+        
+        return False
+    
+    async def fetch_signals(
+        self, 
+        days: int = 3, 
+        min_grade: str = 'A',
+        strict_mode: bool = True
+    ) -> None:
+        """
+        Fetch recent high-quality signals with quality filtering.
+        
+        Args:
+            days: Number of days to look back
+            min_grade: Minimum signal grade (S/A/B/C/D/F)
+            strict_mode: Apply strict insider-play filters
+        """
+        mode_str = "[STRICT MODE]" if strict_mode else "[RELAXED MODE]"
+        console.print(
+            f"[blue]Scanning for insider-type plays {mode_str} "
+            f"(last {days} days, grade {min_grade}+)...[/blue]"
+        )
         
         end_date = datetime.now().date() + timedelta(days=1)
         start_date = end_date - timedelta(days=days + 1)
@@ -122,20 +202,139 @@ class InsiderPlayDetector:
             limit=10000
         )
         
-        console.print(f"[green]✓ Analyzing {len(self.signals)} signals[/green]")
+        console.print(f"[green]✓ Loaded {len(self.signals)} raw signals[/green]")
         
-        # Filter out 0-2 DTE options (0DTE gambling noise)
-        original_count = len(self.signals)
-        self.signals = [
-            s for s in self.signals 
-            if s.days_to_expiry and s.days_to_expiry >= 3
-        ]
-        filtered_count = original_count - len(self.signals)
-        if filtered_count > 0:
-            console.print(f"[dim]Filtered out {filtered_count} 0-2 DTE signals (0DTE gambling noise)[/dim]")
+        if strict_mode:
+            self._apply_quality_filters()
+        else:
+            # Just filter 0-2 DTE
+            original_count = len(self.signals)
+            self.signals = [
+                s for s in self.signals 
+                if s.days_to_expiry and s.days_to_expiry >= 3
+            ]
+            filtered = original_count - len(self.signals)
+            if filtered > 0:
+                console.print(
+                    f"[dim]Filtered {filtered} 0-2 DTE signals[/dim]"
+                )
         
         # Calculate surprise factor for each signal
         self._calculate_surprise_factors()
+    
+    def _apply_quality_filters(self) -> None:
+        """
+        Apply strict quality filters tuned for insider-type plays.
+        
+        Filters:
+        1. DTE 7-45 days (insider sweet spot)
+        2. Premium $2M+ (non-mega-cap) or $10M+ (mega-cap)
+        3. Aggressive order % > 65% (confirmed buying)
+        4. Max 15% OTM (no lottery tickets)
+        5. Exclude index/sector ETFs (mostly hedging)
+        """
+        original_count = len(self.signals)
+        filter_stats = {
+            'dte_filtered': 0,
+            'premium_filtered': 0,
+            'aggressive_filtered': 0,
+            'otm_filtered': 0,
+            'etf_filtered': 0,
+            'mega_cap_filtered': 0
+        }
+        
+        filtered_signals = []
+        
+        for signal in self.signals:
+            # Skip index/sector ETFs (mostly hedging)
+            if signal.ticker in INDEX_ETFS or signal.ticker in SECTOR_ETFS:
+                filter_stats['etf_filtered'] += 1
+                continue
+            
+            # DTE filter: 7-45 days (insider sweet spot)
+            if not signal.days_to_expiry:
+                filter_stats['dte_filtered'] += 1
+                continue
+            if signal.days_to_expiry < MIN_DTE_INSIDER:
+                filter_stats['dte_filtered'] += 1
+                continue
+            if signal.days_to_expiry > MAX_DTE_INSIDER:
+                filter_stats['dte_filtered'] += 1
+                continue
+            
+            # Premium filter: tiered by market cap
+            min_premium = (
+                MIN_PREMIUM_MEGA_CAP if signal.ticker in MEGA_CAPS 
+                else MIN_PREMIUM_DEFAULT
+            )
+            if not signal.premium_flow or signal.premium_flow < min_premium:
+                if signal.ticker in MEGA_CAPS:
+                    filter_stats['mega_cap_filtered'] += 1
+                else:
+                    filter_stats['premium_filtered'] += 1
+                continue
+            
+            # Aggressive order % filter (confirm buying)
+            if signal.aggressive_order_pct is not None:
+                if signal.aggressive_order_pct < MIN_AGGRESSIVE_PCT:
+                    filter_stats['aggressive_filtered'] += 1
+                    continue
+            
+            # OTM filter: max 15% OTM (no lottery tickets)
+            if signal.moneyness == 'OTM' and signal.underlying_price > 0:
+                if signal.option_type == 'call':
+                    otm_pct = (
+                        (signal.strike - signal.underlying_price) / 
+                        signal.underlying_price
+                    )
+                else:  # put
+                    otm_pct = (
+                        (signal.underlying_price - signal.strike) / 
+                        signal.underlying_price
+                    )
+                
+                if otm_pct > MAX_OTM_PCT:
+                    filter_stats['otm_filtered'] += 1
+                    continue
+            
+            # Passed all filters
+            filtered_signals.append(signal)
+        
+        self.signals = filtered_signals
+        
+        # Report filtering stats
+        total_filtered = original_count - len(self.signals)
+        console.print(
+            f"[yellow]Quality Filters Applied:[/yellow] "
+            f"{total_filtered} signals filtered "
+            f"({len(self.signals)} remaining)"
+        )
+        
+        if total_filtered > 0:
+            console.print(
+                f"[dim]  • ETFs (hedge targets): "
+                f"{filter_stats['etf_filtered']}[/dim]"
+            )
+            console.print(
+                f"[dim]  • DTE outside 7-45d: "
+                f"{filter_stats['dte_filtered']}[/dim]"
+            )
+            console.print(
+                f"[dim]  • Premium < $2M: "
+                f"{filter_stats['premium_filtered']}[/dim]"
+            )
+            console.print(
+                f"[dim]  • Mega-cap < $10M: "
+                f"{filter_stats['mega_cap_filtered']}[/dim]"
+            )
+            console.print(
+                f"[dim]  • Low aggressive % (likely selling): "
+                f"{filter_stats['aggressive_filtered']}[/dim]"
+            )
+            console.print(
+                f"[dim]  • Far OTM (>15%, lottery): "
+                f"{filter_stats['otm_filtered']}[/dim]"
+            )
     
     def _calculate_surprise_factors(self):
         """Calculate how surprising each signal is relative to ticker's normal volume"""
@@ -481,14 +680,31 @@ class InsiderPlayDetector:
         """Get all plays, filtered and sorted by suspicion + surprise factor"""
         plays = list(self.plays_by_signal_id.values())
         
+        # Filter out likely hedges if requested
+        if self.exclude_hedges:
+            original_count = len(plays)
+            plays = [
+                p for p in plays 
+                if not self._is_likely_hedge(p.signal)
+            ]
+            filtered_count = original_count - len(plays)
+            if filtered_count > 0:
+                console.print(
+                    f"[dim]Filtered out {filtered_count} likely "
+                    f"hedge positions[/dim]"
+                )
+        
         # Generate recommendations
         for play in plays:
             play.action_recommendation = self._generate_recommendation(play)
         
         # Sort by composite score: suspicion * (1 + surprise_factor/10)
-        # This gives a small boost to surprising plays without overwhelming the suspicion score
+        # This gives a small boost to surprising plays without overwhelming 
+        # the suspicion score
         for play in plays:
-            play.composite_score = play.suspicion_score * (1 + play.surprise_factor / 10)
+            play.composite_score = (
+                play.suspicion_score * (1 + play.surprise_factor / 10)
+            )
         
         return sorted(plays, key=lambda x: x.composite_score, reverse=True)
     
@@ -573,18 +789,51 @@ class InsiderPlayDetector:
         
         console.print(table)
     
-    async def run_analysis(self, days: int = 3, min_grade: str = 'A'):
+    async def run_analysis(
+        self, 
+        days: int = 3, 
+        min_grade: str = 'A',
+        exclude_hedges: bool = False,
+        strict_mode: bool = True
+    ):
         """Run the complete insider play detection"""
+        
+        notes = []
+        if exclude_hedges:
+            notes.append("excluding hedges")
+        if strict_mode:
+            notes.append("STRICT filters")
+        else:
+            notes.append("relaxed filters")
+        notes_str = f" ({', '.join(notes)})" if notes else ""
         
         console.print(Panel.fit(
             "[bold red]🕵️ Insider-Type Play Detector[/bold red]\n"
-            f"Scanning for suspicious unusual options activity\n"
+            f"Scanning for suspicious unusual options activity{notes_str}\n"
             f"Goal: Find plays BEFORE the news drops",
             border_style="red"
         ))
         
-        # Fetch signals
-        await self.fetch_signals(days, min_grade)
+        if strict_mode:
+            console.print(Panel(
+                "[bold cyan]Strict Mode Filters:[/bold cyan]\n"
+                f"• Premium: ≥${MIN_PREMIUM_DEFAULT/1_000_000:.0f}M "
+                f"(≥${MIN_PREMIUM_MEGA_CAP/1_000_000:.0f}M mega-caps)\n"
+                f"• DTE: {MIN_DTE_INSIDER}-{MAX_DTE_INSIDER} days "
+                f"(insider sweet spot)\n"
+                f"• Aggressive: ≥{MIN_AGGRESSIVE_PCT*100:.0f}% "
+                f"(confirmed buying)\n"
+                f"• OTM: ≤{MAX_OTM_PCT*100:.0f}% "
+                f"(no lottery tickets)\n"
+                f"• Excludes: Index/Sector ETFs",
+                border_style="cyan"
+            ))
+        
+        self.exclude_hedges = exclude_hedges
+        self.strict_mode = strict_mode
+        
+        # Fetch signals with quality filters
+        await self.fetch_signals(days, min_grade, strict_mode=strict_mode)
         
         if len(self.signals) < 5:
             console.print("[yellow]Not enough high-quality signals for analysis.[/yellow]")
@@ -713,15 +962,35 @@ async def main():
     
     parser = argparse.ArgumentParser(
         description="Detect insider-type unusual options plays",
-        epilog="Example: Someone buys $6.5M in ORCL calls 4 days before OpenAI partnership news"
+        epilog="Example: Someone buys $6.5M in ORCL calls 4 days "
+               "before OpenAI partnership news"
     )
-    parser.add_argument("--days", type=int, default=3, help="Number of days to scan (default: 3)")
-    parser.add_argument("--min-grade", type=str, default="A", help="Minimum signal grade (default: A)")
+    parser.add_argument(
+        "--days", type=int, default=3, 
+        help="Number of days to scan (default: 3)"
+    )
+    parser.add_argument(
+        "--min-grade", type=str, default="A", 
+        help="Minimum signal grade (default: A)"
+    )
+    parser.add_argument(
+        "--exclude-hedges", action="store_true",
+        help="Filter out likely hedging activity"
+    )
+    parser.add_argument(
+        "--relaxed", action="store_true",
+        help="Disable strict quality filters (show more signals)"
+    )
     
     args = parser.parse_args()
     
     detector = InsiderPlayDetector()
-    await detector.run_analysis(days=args.days, min_grade=args.min_grade)
+    await detector.run_analysis(
+        days=args.days, 
+        min_grade=args.min_grade,
+        exclude_hedges=args.exclude_hedges,
+        strict_mode=not args.relaxed
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())

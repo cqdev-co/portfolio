@@ -49,6 +49,28 @@ Machine learning-based options contract prediction.
 - **Status**: Beta
 - [API Guide](ml-options-predictor/api-guide.md) | [CLI Guide](ml-options-predictor/cli-guide.md)
 
+#### [Stock Opportunity Scanner](stock-scanner/) 🆕 ✅ Updated Dec 2025
+CLI tool for identifying high-conviction stock buy opportunities.
+- **Strategy**: Technical + Fundamental + Analyst confluence scoring
+- **Key Features**: Narrative analysis, ASCII charts, AI-first architecture (v2.0.0), position management
+- **New (v2.0.0)**: AI-first architecture, cloud mode default, simplified CLI
+- **Status**: Production-ready (v2.0.0)
+- [README](stock-scanner/README.md) | [Roadmap](stock-scanner/roadmap.md)
+
+#### [AI Analyst "Victor Chen"](ai-analyst/) 🆕 ✅ Updated Dec 2025
+AI "Employee" - a 67-year-old veteran Wall Street analyst with 45 years experience.
+- **Strategy**: Deep ITM Call Debit Spreads with strict entry criteria
+- **Personality**: Direct, decisive, protective of capital. Strong opinions backed by data.
+- **Key Features**: 
+  - **Thinking Mode**: See Victor's reasoning before his answer
+  - **Agent Loop**: Victor can research proactively using tools
+  - **Tool Calling**: web_search (Ollama API), get_ticker_data, scan_for_opportunities
+  - **Fair Value**: "What is NVDA worth?" - P/E-based valuation analysis
+  - Trade Grading (A/B/C/F), Risk Scoring (1-10), Scenario Analysis
+- **Data Source**: Yahoo Finance + Ollama Web Search API
+- **Status**: Production-ready (v1.7.0 - Thinking Mode)
+- [README](ai-analyst/README.md)
+
 #### [Odyssey](odyssey/) 🆕 ✅ New Nov 2025
 Modern trading dashboard for market overview and opportunity detection.
 - **Strategy**: Modular, extensible opportunity detection (Options, Technicals, Fundamentals)
@@ -79,6 +101,8 @@ Next.js-based web interface for all services.
 | RDS Ticker Analysis | Social sentiment | Reddit, Market data | On-demand | Sentiment-driven trades |
 | ML Options Predictor | Options prediction | Historical options | Batch | ML-based forecasting |
 | Odyssey | Opportunity detection | YFinance | Real-time | Multi-strategy opportunity scanning |
+| Stock Scanner | Buy opportunity scoring | YFinance | Daily | High-conviction long entries |
+| AI Analyst | Entry decisions with history | YFinance, Supabase | On-demand | Ticker analysis + strategy |
 
 ## 🚀 Quick Start by Use Case
 
@@ -129,6 +153,32 @@ Configure watchlist and strategy parameters
 View real-time market overview and detected opportunities
 ```
 
+### "I want to find high-conviction buy opportunities across S&P 500"
+→ Use **[Stock Opportunity Scanner](stock-scanner/)**
+```bash
+cd screen-ticker
+bun run scan:sp500
+# Or specific tickers
+bun run scan --tickers NVDA,AAPL,GOOGL --min-score 70
+# AI-powered analysis (v2.0.0 - AI is now default)
+bun run analyze NVDA
+# Position management
+bun run analyze NVDA --position "165/170 Call Debit Spread"
+```
+
+### "I want AI-powered analysis with my trade history"
+→ Use **[AI Analyst](ai-analyst/)**
+```bash
+cd ai-analyst
+bun install
+# Analyze a ticker with AI
+bun run analyze NVDA
+# Import Robinhood export
+bun run import ~/Downloads/robinhood-export.csv
+# View trade history
+bun run journal --stats
+```
+
 ## 📊 Data Architecture
 
 ### Data Flow
@@ -149,6 +199,10 @@ Frontend Dashboard (Visualization)
 - `volatility_squeeze_signals`: Squeeze signals
 - `unusual_options_activity`: Options flow data
 - `signal_performance_tracking`: Performance metrics
+- `stock_opportunities`: Daily buy opportunity scores
+- `analyst_trades`: AI Analyst trade journal (from Robinhood CSV)
+- `analyst_observations`: Trading patterns and rules learned over time
+- `analyst_performance`: Weekly/monthly performance snapshots
 
 ## 🛠️ Development
 
@@ -171,6 +225,7 @@ NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_key
 # Optional: AI features
 OPENAI_API_KEY=your_key
 ANTHROPIC_API_KEY=your_key
+OLLAMA_API_KEY=your_key  # For Stock Scanner AI (cloud mode)
 ```
 
 ### Running Services Locally
@@ -216,6 +271,6 @@ Proprietary software. All rights reserved.
 
 ---
 
-**Last Updated**: 2025-11-21
-**Services Count**: 8 active services
+**Last Updated**: 2025-12-07
+**Services Count**: 10 active services
 **Documentation Coverage**: 100%

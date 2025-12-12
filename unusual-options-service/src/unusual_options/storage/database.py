@@ -216,7 +216,7 @@ class SupabaseStorage:
                         grade=row['grade'],
                         confidence=row['confidence'],
                         risk_level=row['risk_level'] or 'LOW',
-                        risk_factors=json.loads(row['risk_factors']) if row['risk_factors'] else [],
+                        risk_factors=row['risk_factors'] if isinstance(row['risk_factors'], list) else (json.loads(row['risk_factors']) if row['risk_factors'] else []),
                         has_volume_anomaly=row['has_volume_anomaly'] or False,
                         has_oi_spike=row['has_oi_spike'] or False,
                         has_premium_flow=row['has_premium_flow'] or False,

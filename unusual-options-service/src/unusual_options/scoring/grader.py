@@ -19,6 +19,19 @@ class SignalGrader:
         'ratio': 0.10        # Put/call ratio extremes
     }
     
+    # High-volume tickers requiring higher premium thresholds
+    HIGH_VOLUME_TICKERS = {
+        'TSLA', 'NVDA', 'META', 'SPY', 'QQQ', 'AMD', 'AAPL', 'AMZN', 
+        'GOOGL', 'MSFT', 'PLTR', 'AVGO', 'IWM', 'XLF', 'GLD', 'SLV',
+        'COIN', 'MSTR', 'HOOD', 'SOFI', 'NIO', 'BABA', 'INTC', 'MU'
+    }
+    
+    # Premium thresholds for "high conviction" (based on data analysis)
+    # Correct signals avg $23M (calls), $7.7M (puts)
+    # Wrong signals avg $3.3M (calls), $2.6M (puts)
+    HIGH_CONVICTION_PREMIUM = 10_000_000  # $10M = high conviction
+    MEDIUM_CONVICTION_PREMIUM = 5_000_000  # $5M = medium conviction
+    
     def __init__(self, config: Dict[str, Any]):
         self.config = config
     
@@ -112,11 +125,108 @@ class SignalGrader:
         signal.risk_level, signal.risk_factors = self._assess_basic_risk(signal)
         
         # Apply risk-based score adjustment
-        signal.overall_score = self._apply_risk_adjustment(signal.overall_score, signal.risk_level, signal.risk_factors)
+        signal.overall_score = self._apply_risk_adjustment(
+            signal.overall_score, signal.risk_level, signal.risk_factors
+        )
         
-        logger.info(f"Created signal: {ticker} {contract.symbol} Grade: {signal.grade} Score: {signal.overall_score:.3f}")
+        # Apply conviction-based adjustments (based on data analysis)
+        conviction_adjustment = self._calculate_conviction_adjustment(signal)
+        signal.overall_score = max(
+            min(signal.overall_score + conviction_adjustment, 0.95), 0.0
+        )
+        
+        # Re-assign grade after conviction adjustment
+        signal.grade = self._assign_grade(signal.overall_score)
+        
+        # Set sentiment based on option type and moneyness
+        signal.sentiment = self._calculate_sentiment(signal)
+        
+        logger.info(
+            f"Created signal: {ticker} {contract.symbol} "
+            f"Grade: {signal.grade} Score: {signal.overall_score:.3f} "
+            f"Conviction: {conviction_adjustment:+.3f}"
+        )
         
         return signal
+    
+    def _calculate_conviction_adjustment(self, signal: UnusualOptionsSignal) -> float:
+        """
+        Calculate conviction-based score adjustment.
+        
+        Based on data analysis findings:
+        - Higher premium = more likely correct (7x difference!)
+        - Shorter DTE = more conviction
+        - OTM calls often speculative (lottery tickets)
+        
+        Returns:
+            Score adjustment (positive = more conviction, negative = less)
+        """
+        adjustment = 0.0
+        
+        # 1. Premium-based conviction (BIGGEST predictor)
+        # Correct CALL signals avg $23.3M, wrong avg $3.3M
+        # Correct PUT signals avg $7.7M, wrong avg $2.6M
+        premium = signal.premium_flow or 0
+        
+        if premium >= self.HIGH_CONVICTION_PREMIUM:
+            adjustment += 0.15  # High conviction bonus
+        elif premium >= self.MEDIUM_CONVICTION_PREMIUM:
+            adjustment += 0.08  # Medium conviction bonus
+        elif premium < 2_000_000:
+            adjustment -= 0.05  # Low premium penalty
+        
+        # 2. DTE-based conviction
+        # Correct signals: 14-21 DTE avg
+        # Wrong signals: 26-34 DTE avg
+        dte = signal.days_to_expiry or 30
+        
+        if dte <= 14:
+            adjustment += 0.10  # Short-term = high conviction
+        elif dte <= 21:
+            adjustment += 0.05  # Medium-term = moderate conviction
+        elif dte >= 35:
+            adjustment -= 0.08  # Long-dated = lower conviction (more hedge-like)
+        
+        # 3. OTM CALL penalty (speculative lottery tickets)
+        # Wrong calls have 34% OTM vs 8% for correct
+        if signal.option_type == 'call' and signal.moneyness == 'OTM':
+            price_diff_pct = abs(signal.strike - signal.underlying_price) / signal.underlying_price
+            if price_diff_pct > 0.10:  # >10% OTM
+                adjustment -= 0.12  # Significant penalty for far OTM calls
+            else:
+                adjustment -= 0.05  # Mild penalty for near OTM calls
+        
+        # 4. High-volume ticker adjustment
+        # These tickers have more noise, need higher bar
+        if signal.ticker in self.HIGH_VOLUME_TICKERS:
+            if premium < self.HIGH_CONVICTION_PREMIUM:
+                adjustment -= 0.05  # Extra penalty for low premium on noisy tickers
+        
+        logger.debug(
+            f"Conviction adjustment for {signal.ticker}: {adjustment:+.3f} "
+            f"(premium=${premium/1e6:.1f}M, DTE={dte}, "
+            f"moneyness={signal.moneyness})"
+        )
+        
+        return adjustment
+    
+    def _calculate_sentiment(self, signal: UnusualOptionsSignal) -> str:
+        """
+        Calculate sentiment based on option type and moneyness.
+        
+        ITM options are often used for hedging, so they're more neutral.
+        ATM/OTM options suggest directional conviction.
+        """
+        if signal.option_type == 'call':
+            if signal.moneyness in ['ATM', 'OTM']:
+                return 'BULLISH'
+            else:  # ITM calls
+                return 'NEUTRAL'  # Could be covered call selling
+        else:  # PUT
+            if signal.moneyness in ['ATM', 'OTM']:
+                return 'BEARISH'
+            else:  # ITM puts
+                return 'NEUTRAL'  # Could be protective put
     
     def _calculate_overall_score(self, detection_metrics: Dict[str, float]) -> float:
         """
@@ -136,45 +246,65 @@ class SignalGrader:
                 total_score += detection_metrics[factor] * weight
                 total_weight += weight
         
-        # Normalize by actual weights used
-        if total_weight > 0:
-            normalized_score = total_score / total_weight
-        else:
-            normalized_score = 0.0
+        # CRITICAL FIX: Normalize by TOTAL weights, not just weights used
+        # This penalizes signals that only trigger one detection type
+        normalized_score = total_score  # Use raw weighted sum (max ~0.35 for single type)
         
-        # Reduced bonus for multiple detection types
-        detection_count = len(detection_metrics)
+        # Bonus for multiple detection types (signals with multiple
+        # confirmations are more reliable)
+        detection_count = len([k for k in detection_metrics.keys() 
+                              if k != 'heuristic_only'])
         if detection_count >= 4:
-            bonus = 0.08  # Reduced from 0.15
+            bonus = 0.25  # Multiple confirmations = high conviction
         elif detection_count >= 3:
-            bonus = 0.05  # Reduced from 0.15
+            bonus = 0.15
         elif detection_count >= 2:
-            bonus = 0.03  # Reduced from 0.10
+            bonus = 0.08
         else:
-            bonus = 0.0
+            bonus = 0.0  # Single detection type gets no bonus
+        
+        # PENALTY for single detection type (most are just premium flow)
+        single_type_penalty = 0.0
+        if detection_count == 1:
+            single_type_penalty = 0.10  # Penalize single-factor signals
         
         # Apply penalty for heuristic-only detections
         heuristic_penalty = 0.0
         if 'heuristic_only' in detection_metrics:
             heuristic_penalty = 0.15
         
-        final_score = max(min(normalized_score + bonus - heuristic_penalty, 0.95), 0.0)  # Cap at 0.95
+        final_score = normalized_score + bonus - single_type_penalty - heuristic_penalty
+        final_score = max(min(final_score, 0.95), 0.0)  # Cap at 0.95
         
-        logger.debug(f"Score calculation: base={normalized_score:.3f}, bonus={bonus:.3f}, penalty={heuristic_penalty:.3f}, final={final_score:.3f}")
+        logger.debug(
+            f"Score calculation: base={normalized_score:.3f}, "
+            f"bonus={bonus:.3f}, single_penalty={single_type_penalty:.3f}, "
+            f"heuristic_penalty={heuristic_penalty:.3f}, final={final_score:.3f}"
+        )
         
         return final_score
     
     def _assign_grade(self, score: float) -> str:
-        """Convert numerical score to letter grade with stricter thresholds."""
-        if score >= 0.85:  # Increased from 0.90
+        """
+        Convert numerical score to letter grade.
+        
+        Target distribution (approximate):
+        - S: < 5% of signals (exceptional multi-factor confluence)
+        - A: ~10% of signals (strong signals)
+        - B: ~25% of signals (good signals)
+        - C: ~30% of signals (average signals)
+        - D: ~20% of signals (weak signals)
+        - F: ~10% of signals (noise/low quality)
+        """
+        if score >= 0.55:  # Very strict - requires multiple detection types
             return 'S'
-        elif score >= 0.75:  # Increased from 0.80
+        elif score >= 0.45:
             return 'A'
-        elif score >= 0.65:  # Increased from 0.70
+        elif score >= 0.35:
             return 'B'
-        elif score >= 0.55:  # Increased from 0.60
+        elif score >= 0.25:
             return 'C'
-        elif score >= 0.45:  # Increased from 0.50
+        elif score >= 0.15:
             return 'D'
         else:
             return 'F'
