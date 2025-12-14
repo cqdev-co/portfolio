@@ -29,7 +29,6 @@ permissions:
 jobs:
   fetch-penny-tickers:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # Longer timeout due to validation
     
     steps:
     - name: Checkout repository
