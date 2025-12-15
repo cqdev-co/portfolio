@@ -20,6 +20,8 @@ from penny_scanner.services.ticker_service import TickerService
 from penny_scanner.services.database_service import DatabaseService
 from penny_scanner.services.signal_continuity_service import SignalContinuityService
 from penny_scanner.services.performance_tracking_service import PerformanceTrackingService
+from penny_scanner.services.discord_service import PennyDiscordNotifier
+from penny_scanner.models.analysis import OpportunityRank
 
 # Initialize console
 console = Console()
@@ -53,6 +55,11 @@ def get_services():
                 performance_service
             )
         
+        # Discord notifier
+        discord_notifier = None
+        if settings.is_discord_enabled():
+            discord_notifier = PennyDiscordNotifier(settings.discord_webhook_url)
+        
         # Show service status
         if ticker_service.is_available():
             console.print(
@@ -79,8 +86,19 @@ def get_services():
                 "signals won't be stored[/yellow]"
             )
         
+        if discord_notifier and discord_notifier.is_configured:
+            console.print(
+                f"[green]✅ Discord alerts enabled "
+                f"(min rank: {settings.discord_min_rank})[/green]"
+            )
+        else:
+            console.print(
+                "[dim]ℹ️  Discord alerts not configured[/dim]"
+            )
+        
         return (data_service, analysis_service, ticker_service, 
-                database_service, continuity_service, performance_service)
+                database_service, continuity_service, performance_service,
+                discord_notifier)
         
     except Exception as e:
         console.print(f"[red]❌ Failed to initialize services: {e}[/red]")
@@ -97,7 +115,7 @@ def analyze(
     """Analyze a single penny stock for explosion setup signals."""
     
     async def _analyze():
-        data_service, analysis_service, _, _, _, _ = get_services()
+        data_service, analysis_service, _, _, _, _, _ = get_services()
         
         with Progress(
             SpinnerColumn(),
@@ -158,8 +176,8 @@ def batch(
     """Analyze multiple penny stocks in batch."""
     
     async def _batch_analyze():
-        (data_service, analysis_service, 
-         _, database_service, continuity_service, _) = get_services()
+        (data_service, analysis_service,
+         _, database_service, continuity_service, _, _) = get_services()
         
         # Parse symbols
         symbol_list = [s.strip().upper() for s in symbols.split(',')]
@@ -276,13 +294,17 @@ def scan_all(
     ),
     store: bool = typer.Option(
         True, "--store/--no-store", help="Store results in database"
+    ),
+    alert: bool = typer.Option(
+        True, "--alert/--no-alert", help="Send Discord alerts for high-quality signals"
     )
 ) -> None:
     """Scan all available penny stocks for explosion setups."""
     
     async def _scan_all():
         (data_service, analysis_service,
-         ticker_service, database_service, continuity_service, _) = get_services()
+         ticker_service, database_service, continuity_service, _,
+         discord_notifier) = get_services()
         
         try:
             # Get all penny stock symbols
@@ -401,6 +423,47 @@ def scan_all(
                         f"[yellow]⚠️  Failed to store signals: {e}[/yellow]"
                     )
             
+            # Send Discord alerts for high-quality signals
+            if signals and alert and discord_notifier and discord_notifier.is_configured:
+                try:
+                    settings = get_settings()
+                    min_rank_str = settings.discord_min_rank
+                    
+                    # Map rank string to OpportunityRank
+                    rank_map = {
+                        'S': OpportunityRank.S_TIER,
+                        'A': OpportunityRank.A_TIER,
+                        'B': OpportunityRank.B_TIER,
+                        'C': OpportunityRank.C_TIER,
+                        'D': OpportunityRank.D_TIER,
+                    }
+                    min_rank = rank_map.get(min_rank_str, OpportunityRank.A_TIER)
+                    
+                    # Filter to NEW signals only (don't spam continuing signals)
+                    new_high_quality = [
+                        s for s in signals 
+                        if s.explosion_signal.signal_status.value == 'NEW'
+                    ]
+                    
+                    if new_high_quality:
+                        console.print(
+                            f"[bold blue]📢 Sending Discord alerts...[/bold blue]"
+                        )
+                        alert_count = await discord_notifier.send_batch_alerts(
+                            new_high_quality,
+                            min_rank=min_rank
+                        )
+                        if alert_count > 0:
+                            console.print(
+                                f"[green]📢 Sent {alert_count} Discord alerts[/green]"
+                            )
+                except Exception as e:
+                    console.print(
+                        f"[yellow]⚠️  Discord alerts failed: {e}[/yellow]"
+                    )
+                finally:
+                    await discord_notifier.close()
+            
             # Display results
             if signals:
                 signals.sort(key=lambda x: x.overall_score, reverse=True)
@@ -481,7 +544,7 @@ def query(
     """Query stored penny stock signals from database."""
     
     async def _query():
-        _, _, _, database_service, _, _ = get_services()
+        _, _, _, database_service, _, _, _ = get_services()
         
         if not database_service.is_available():
             console.print("[red]❌ Database service not available[/red]")
@@ -526,7 +589,7 @@ def performance() -> None:
     """View performance metrics (win rate, returns)."""
     
     async def _performance():
-        _, _, _, _, _, performance_service = get_services()
+        _, _, _, _, _, performance_service, _ = get_services()
         
         if not performance_service:
             console.print("[red]❌ Performance service not available[/red]")
@@ -651,7 +714,7 @@ def backfill() -> None:
     """Backfill performance history from existing signals."""
     
     async def _backfill():
-        data_service, _, _, _, _, performance_service = get_services()
+        data_service, _, _, _, _, performance_service, _ = get_services()
         
         if not performance_service:
             console.print("[red]❌ Performance service not available[/red]")

@@ -22,6 +22,10 @@ from penny_scanner.utils.technical_indicators import (
 from penny_scanner.utils.helpers import safe_divide, normalize_score, clamp
 from penny_scanner.core.exceptions import AnalysisError
 from penny_scanner.config.settings import Settings
+from penny_scanner.services.market_comparison_service import (
+    get_market_comparison_service,
+    MarketComparisonService
+)
 
 
 class AnalysisService:
@@ -35,6 +39,7 @@ class AnalysisService:
         """Initialize analysis service."""
         self.settings = settings
         self.indicator_calculator = TechnicalIndicatorCalculator(settings)
+        self.market_comparison = get_market_comparison_service(settings)
     
     async def analyze_symbol(
         self,
@@ -313,12 +318,31 @@ class AnalysisService:
             )
         )
         
-        # Breakout detection
-        is_breakout = (
-            is_consolidating and
-            latest_ohlcv.close > market_data.ohlcv_data[-2].close and
-            latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 1.5
-        )
+        # Breakout detection - IMPROVED
+        # Previous logic was too strict (required consolidation + up day + volume)
+        # Only 5.2% of signals were marked as breakouts
+        # New logic: Multiple ways to qualify as a breakout
+        
+        prev_close = market_data.ohlcv_data[-2].close if len(market_data.ohlcv_data) > 1 else latest_ohlcv.close
+        price_up_today = latest_ohlcv.close > prev_close
+        volume_surge = latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 2.0  # 2x volume
+        strong_volume_surge = latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 3.0  # 3x volume
+        
+        # Calculate price move percentage
+        price_move_pct = ((latest_ohlcv.close - prev_close) / prev_close * 100) if prev_close > 0 else 0
+        significant_move = price_move_pct >= 5.0  # 5%+ move
+        
+        # Multiple breakout scenarios:
+        # 1. Classic: Consolidation + price up + volume surge
+        classic_breakout = is_consolidating and price_up_today and volume_surge
+        
+        # 2. Volume explosion: 3x+ volume with price up (even without consolidation)
+        volume_explosion_breakout = strong_volume_surge and price_up_today
+        
+        # 3. Significant move: 5%+ price move with 2x+ volume
+        momentum_breakout = significant_move and volume_surge
+        
+        is_breakout = classic_breakout or volume_explosion_breakout or momentum_breakout
         
         # Price changes
         prices = [d.close for d in market_data.ohlcv_data]
@@ -400,12 +424,19 @@ class AnalysisService:
         # Breaking resistance (near 52w high)
         breaking_resistance = dist_from_52w_high > -10  # Within 10% of high
         
-        # TODO: Market and sector outperformance would require SPY/sector data
-        # For now, use None and calculate when available
+        # Calculate market outperformance using SPY comparison
+        # This is now properly implemented via MarketComparisonService
+        rs_metrics = self.market_comparison.calculate_relative_strength(market_data)
+        
+        # Use 20-day outperformance as the primary metric
+        market_outperformance = rs_metrics.get('market_outperformance_20d')
+        
+        # Sector outperformance still not implemented - would need sector ETF data
+        sector_outperformance = None
         
         return {
-            'market_outperformance': None,
-            'sector_outperformance': None,
+            'market_outperformance': market_outperformance,
+            'sector_outperformance': sector_outperformance,
             'dist_from_52w_low': dist_from_52w_low,
             'dist_from_52w_high': dist_from_52w_high,
             'breaking_resistance': breaking_resistance
@@ -575,18 +606,41 @@ class AnalysisService:
         - Market outperformance: 8%
         - Sector leadership: 4%
         - 52-week position: 3%
+        
+        NOTE: Market/sector comparison not yet implemented.
+        Previous approach gave 50% partial credit which inflated scores.
+        Now using 0 until properly implemented to avoid false confidence.
         """
         score = 0.0
         
-        # Market outperformance (8%) - TODO when SPY data available
-        # For now, use partial credit
-        score += 0.5 * self.settings.weight_market_outperformance
+        # Market outperformance (8%) - NOT IMPLEMENTED
+        # Previously gave 50% partial credit which inflated scores
+        # Set to 0 until SPY comparison is implemented
+        market_outperf = metrics.get('market_outperformance')
+        if market_outperf is not None:
+            # When implemented, score based on actual outperformance
+            if market_outperf > 10:
+                score += 1.0 * self.settings.weight_market_outperformance
+            elif market_outperf > 5:
+                score += 0.7 * self.settings.weight_market_outperformance
+            elif market_outperf > 0:
+                score += 0.5 * self.settings.weight_market_outperformance
+            # else: underperforming, no credit
+        # else: no credit until implemented
         
-        # Sector leadership (4%) - TODO when sector data available
-        # For now, use partial credit
-        score += 0.5 * self.settings.weight_sector_leadership
+        # Sector leadership (4%) - NOT IMPLEMENTED
+        # Set to 0 until sector comparison is implemented
+        sector_outperf = metrics.get('sector_outperformance')
+        if sector_outperf is not None:
+            if sector_outperf > 10:
+                score += 1.0 * self.settings.weight_sector_leadership
+            elif sector_outperf > 5:
+                score += 0.7 * self.settings.weight_sector_leadership
+            elif sector_outperf > 0:
+                score += 0.5 * self.settings.weight_sector_leadership
+        # else: no credit until implemented
         
-        # 52-week position (3%)
+        # 52-week position (3%) - This IS implemented
         dist_from_low = metrics['dist_from_52w_low']
         if dist_from_low > 100:  # 2x from lows
             pos_score = 1.0
@@ -608,14 +662,27 @@ class AnalysisService:
         - Bid-ask spread: 2%
         - Float analysis: 2%
         - Price stability: 1%
+        
+        NOTE: Bid-ask spread not available from yfinance.
+        Previous approach gave 50% partial credit which inflated scores.
         """
         score = 0.0
         
-        # Bid-ask spread (2%) - TODO when spread data available
-        # For now, use partial credit
-        score += 0.5 * self.settings.weight_bid_ask_spread
+        # Bid-ask spread (2%) - NOT AVAILABLE from yfinance
+        # Previously gave 50% partial credit - now set to 0
+        spread_pct = metrics.get('spread_pct')
+        if spread_pct is not None:
+            # When available, score based on actual spread
+            if spread_pct < 1.0:
+                score += 1.0 * self.settings.weight_bid_ask_spread
+            elif spread_pct < 2.0:
+                score += 0.8 * self.settings.weight_bid_ask_spread
+            elif spread_pct < 5.0:
+                score += 0.5 * self.settings.weight_bid_ask_spread
+            # else: wide spread, no credit
+        # else: no credit until we have spread data
         
-        # Float analysis (2%)
+        # Float analysis (2%) - This IS available
         float_score = 0.8 if metrics['is_low_float'] else 0.5
         score += float_score * self.settings.weight_float_analysis
         
@@ -665,26 +732,67 @@ class AnalysisService:
         signal: ExplosionSignal,
         score: float
     ) -> str:
-        """Generate trading recommendation."""
-        if score >= 0.85 and signal.is_breakout:
+        """
+        Generate trading recommendation based on score and signal characteristics.
+        
+        Previous logic had thresholds too close together - all 248 signals
+        were "BUY" with no discrimination. Now using more nuanced criteria.
+        
+        STRONG_BUY: High score + breakout + volume explosion
+        BUY: Good score with strong setup characteristics
+        WATCH: Decent score but missing key characteristics
+        HOLD: Below threshold or high risk
+        """
+        # Check for concerning risk factors
+        high_risk = signal.pump_dump_risk in (RiskLevel.HIGH, RiskLevel.EXTREME)
+        
+        # Strong buy requires multiple confirmations
+        if (score >= 0.75 and 
+            signal.is_breakout and 
+            signal.volume_spike_factor >= 3.0 and
+            not high_risk):
             return "STRONG_BUY"
-        elif score >= 0.70:
+        
+        # Buy requires good score and at least one strong signal
+        elif (score >= 0.68 and 
+              (signal.is_breakout or 
+               signal.volume_spike_factor >= 2.5 or 
+               signal.higher_lows_detected) and
+              not high_risk):
             return "BUY"
-        elif score >= 0.60:
+        
+        # Watch: decent score but not all criteria met
+        elif score >= 0.60 and not high_risk:
             return "WATCH"
+        
+        # Hold: below threshold or risky
         else:
             return "HOLD"
     
     def _calculate_stop_loss(self, signal: ExplosionSignal) -> float:
-        """Calculate recommended stop loss level."""
-        # Use ATR-based stop loss
-        atr_multiplier = 2.0
-        stop_distance = signal.atr_20 * atr_multiplier
-        stop_loss = signal.close_price - stop_distance
+        """
+        Calculate recommended stop loss level.
         
-        # Ensure stop loss is reasonable (max 15% down)
-        max_stop = signal.close_price * 0.85
-        return max(stop_loss, max_stop)
+        Penny stocks are highly volatile - the previous 15% max stop was too tight
+        and resulted in 60% of trades hitting stop loss. Now using:
+        - ATR-based calculation with 2.5x multiplier (up from 2.0x)
+        - Minimum stop at 10% below entry (always have some protection)
+        - Maximum stop at 25% below entry (allow room for volatility)
+        """
+        # ATR-based stop loss with wider multiplier for penny volatility
+        atr_multiplier = 2.5
+        stop_distance = signal.atr_20 * atr_multiplier
+        atr_stop = signal.close_price - stop_distance
+        
+        # Define boundaries
+        min_stop_price = signal.close_price * 0.90  # 10% max loss minimum
+        max_stop_price = signal.close_price * 0.75  # 25% max loss maximum
+        
+        # Clamp the ATR-based stop within reasonable bounds
+        # Stop should be between 75% and 90% of entry price
+        stop_loss = max(max_stop_price, min(atr_stop, min_stop_price))
+        
+        return stop_loss
     
     def _calculate_position_size(self, score: float) -> float:
         """Calculate recommended position size (% of capital)."""

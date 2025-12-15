@@ -19,6 +19,7 @@ import {
   type RelativeStrengthResult 
 } from "../utils/relative-strength.ts";
 import { analyzeQuarterlyPerformance } from "../utils/quarterly-earnings.ts";
+import { calculateSectorStrength, type SectorStrengthResult } from "../utils/sector-strength.ts";
 
 /**
  * Options chain data
@@ -47,6 +48,7 @@ export interface OptionsData {
 
 /**
  * Extended analysis result with historical data
+ * v1.7.0: Added sector strength
  */
 export interface AnalysisResult {
   score: StockScore;
@@ -60,6 +62,8 @@ export interface AnalysisResult {
   };
   options?: OptionsData | null;
   quarterlyPerformance?: QuarterlyPerformance | null;
+  /** v1.7.0: Sector relative strength */
+  sectorStrength?: SectorStrengthResult | null;
 }
 
 /**
@@ -138,6 +142,7 @@ export async function scanTicker(
 
 /**
  * Analyze a single ticker with full data including historical
+ * v1.7.0: Added sector strength calculation
  */
 export async function analyzeTicker(
   symbol: string
@@ -170,13 +175,17 @@ export async function analyzeTicker(
     // Analyze quarterly performance (v1.4.0)
     const quarterlyPerformance = analyzeQuarterlyPerformance(summary);
 
+    // v1.7.0: Calculate sector relative strength
+    const sectorStrength = await calculateSectorStrength(summary.assetProfile?.sector);
+
     return { 
       score, 
       historical, 
       summary, 
       relativeStrength, 
       options,
-      quarterlyPerformance 
+      quarterlyPerformance,
+      sectorStrength,
     };
   } catch (error) {
     logger.error(`Failed to analyze ${symbol}: ${error}`);

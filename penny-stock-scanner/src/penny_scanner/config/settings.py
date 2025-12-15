@@ -67,6 +67,21 @@ class Settings(BaseSettings):
         description="Anthropic API key for AI analysis"
     )
     
+    # Discord Alerts
+    discord_webhook_url: str = Field(
+        default="",
+        alias="DISCORD_PENNY_WEBHOOK_URL",
+        description="Discord webhook URL for penny stock alerts"
+    )
+    discord_alerts_enabled: bool = Field(
+        default=True,
+        description="Enable Discord alerts for high-quality signals"
+    )
+    discord_min_rank: str = Field(
+        default="A",
+        description="Minimum rank to trigger Discord alert (S, A, B, C, D)"
+    )
+    
     # Data & Caching
     yfinance_cache_ttl: int = Field(
         default=3600,
@@ -114,28 +129,33 @@ class Settings(BaseSettings):
     )
     
     # Score Thresholds
+    # NOTE: Thresholds adjusted after removing inflated partial credits
+    # from unimplemented features (market/sector comparison, bid-ask spread)
+    # This removes ~6% of artificial score inflation
     min_score_threshold: float = Field(
-        default=0.60,
-        description="Minimum overall score for signals"
+        default=0.55,
+        description="Minimum overall score for signals (lowered from 0.60)"
     )
     s_tier_threshold: float = Field(
-        default=0.90,
-        description="S-Tier ranking threshold"
+        default=0.82,
+        description="S-Tier ranking threshold (exceptional setups)"
     )
     a_tier_threshold: float = Field(
-        default=0.80,
-        description="A-Tier ranking threshold"
+        default=0.72,
+        description="A-Tier ranking threshold (excellent setups)"
     )
     b_tier_threshold: float = Field(
-        default=0.70,
-        description="B-Tier ranking threshold"
+        default=0.62,
+        description="B-Tier ranking threshold (solid setups)"
     )
     c_tier_threshold: float = Field(
-        default=0.60,
-        description="C-Tier ranking threshold"
+        default=0.55,
+        description="C-Tier ranking threshold (watch list)"
     )
     
     # Consolidation Detection
+    # NOTE: Penny stocks are more volatile than large caps
+    # Previous 15% range was too tight - only 6.5% of signals showed consolidation
     consolidation_days_min: int = Field(
         default=5,
         description="Minimum days for consolidation"
@@ -145,8 +165,8 @@ class Settings(BaseSettings):
         description="Maximum days for consolidation check"
     )
     consolidation_range_pct: float = Field(
-        default=15.0,
-        description="Max price range % for consolidation"
+        default=20.0,
+        description="Max price range % for consolidation (20% for penny stock volatility)"
     )
     
     # Scoring Weights - UPDATED TO MATCH STRATEGY
@@ -292,6 +312,10 @@ class Settings(BaseSettings):
             self.supabase_url and 
             self.supabase_service_role_key
         )
+    
+    def is_discord_enabled(self) -> bool:
+        """Check if Discord alerts are configured and enabled."""
+        return bool(self.discord_webhook_url and self.discord_alerts_enabled)
 
 
 # Global settings instance

@@ -90,6 +90,7 @@ The ideal penny stock signal we're looking for:
 - **API Examples**: See user guide for programmatic usage
 - **Backtesting**: Coming soon - validate strategy performance
 - **AI Integration**: Optional AI analysis for signal classification
+- **[Performance Improvements (Dec 2025)](performance-improvements-dec-2025.md)**: Analysis of real performance data and fixes
 
 ## ⚠️ Risk Disclaimer
 

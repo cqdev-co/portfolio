@@ -313,6 +313,24 @@ export class YahooProvider {
         shortPercentOfFloat: summary.defaultKeyStatistics.shortPercentOfFloat 
           ? { raw: summary.defaultKeyStatistics.shortPercentOfFloat } 
           : undefined,
+        sharesShort: summary.defaultKeyStatistics.sharesShort 
+          ? { raw: summary.defaultKeyStatistics.sharesShort } 
+          : undefined,
+        shortRatio: summary.defaultKeyStatistics.shortRatio 
+          ? { raw: summary.defaultKeyStatistics.shortRatio } 
+          : undefined,
+        beta: summary.defaultKeyStatistics.beta 
+          ? { raw: summary.defaultKeyStatistics.beta } 
+          : undefined,
+        fiftyTwoWeekChange: summary.defaultKeyStatistics["52WeekChange"] 
+          ? { raw: summary.defaultKeyStatistics["52WeekChange"] } 
+          : undefined,
+        floatShares: summary.defaultKeyStatistics.floatShares 
+          ? { raw: summary.defaultKeyStatistics.floatShares } 
+          : undefined,
+        sharesOutstanding: summary.defaultKeyStatistics.sharesOutstanding 
+          ? { raw: summary.defaultKeyStatistics.sharesOutstanding } 
+          : undefined,
       } : undefined,
       financialData: summary.financialData ? {
         freeCashflow: summary.financialData.freeCashflow 
@@ -346,6 +364,22 @@ export class YahooProvider {
           ? { raw: summary.financialData.returnOnEquity } 
           : undefined,
         financialCurrency: summary.financialData.financialCurrency,
+        // v1.7.0: Balance sheet health metrics
+        debtToEquity: summary.financialData.debtToEquity 
+          ? { raw: summary.financialData.debtToEquity } 
+          : undefined,
+        currentRatio: summary.financialData.currentRatio 
+          ? { raw: summary.financialData.currentRatio } 
+          : undefined,
+        quickRatio: summary.financialData.quickRatio 
+          ? { raw: summary.financialData.quickRatio } 
+          : undefined,
+        totalCash: summary.financialData.totalCash 
+          ? { raw: summary.financialData.totalCash } 
+          : undefined,
+        totalDebt: summary.financialData.totalDebt 
+          ? { raw: summary.financialData.totalDebt } 
+          : undefined,
       } : undefined,
       earningsTrend: summary.earningsTrend ? {
         trend: summary.earningsTrend.trend?.map((t: {
@@ -426,6 +460,8 @@ export class YahooProvider {
       assetProfile: summary.assetProfile ? {
         sector: summary.assetProfile.sector,
         industry: summary.assetProfile.industry,
+        country: summary.assetProfile.country,
+        website: summary.assetProfile.website,
       } : undefined,
       majorHoldersBreakdown: summary.majorHoldersBreakdown ? {
         insidersPercentHeld: summary.majorHoldersBreakdown.insidersPercentHeld,

@@ -1,4 +1,4 @@
-import { RSI, SMA, MACD, OBV } from "technicalindicators";
+import { RSI, SMA, MACD, OBV, ADX, BollingerBands } from "technicalindicators";
 import type { Signal, HistoricalData, QuoteData } from "../types/index.ts";
 import { defaultThresholds, defaultWeights } from "../config/thresholds.ts";
 import { isNearSupport } from "../utils/support-resistance.ts";
@@ -433,7 +433,139 @@ function check52WeekPosition(
 }
 
 /**
+ * v1.7.0: Check ADX (Average Directional Index) for trend strength
+ * ADX > 25 indicates a strong trend
+ * ADX < 20 indicates a weak/ranging market
+ */
+function checkADX(historical: HistoricalData[]): Signal | null {
+  if (historical.length < 20) return null;
+
+  const highs = historical.map(d => d.high);
+  const lows = historical.map(d => d.low);
+  const closes = historical.map(d => d.close);
+
+  try {
+    const adxResult = ADX.calculate({
+      high: highs,
+      low: lows,
+      close: closes,
+      period: 14,
+    });
+
+    if (adxResult.length === 0) return null;
+
+    const currentADX = adxResult[adxResult.length - 1]?.adx;
+    if (currentADX === undefined) return null;
+
+    // Strong trend (ADX > 30)
+    if (currentADX > 30) {
+      return {
+        name: "Strong Trend",
+        category: "technical",
+        points: 5,
+        description: `ADX ${currentADX.toFixed(0)} — strong trend in place`,
+        value: currentADX,
+      };
+    }
+
+    // Moderate trend (ADX 25-30)
+    if (currentADX > 25) {
+      return {
+        name: "Trending",
+        category: "technical",
+        points: 3,
+        description: `ADX ${currentADX.toFixed(0)} — trend developing`,
+        value: currentADX,
+      };
+    }
+
+    // Weak trend (ADX < 20) - potential breakout setup
+    if (currentADX < 20) {
+      return {
+        name: "Consolidating",
+        category: "technical",
+        points: 2,
+        description: `ADX ${currentADX.toFixed(0)} — ranging, watch for breakout`,
+        value: currentADX,
+      };
+    }
+  } catch {
+    // ADX calculation failed, return null
+  }
+
+  return null;
+}
+
+/**
+ * v1.7.0: Check Bollinger Band position for mean reversion
+ * Price near lower band = potential bounce
+ * Price near upper band = extended, potential pullback
+ */
+function checkBollingerBands(
+  closes: number[],
+  currentPrice: number
+): Signal | null {
+  if (closes.length < 25) return null;
+
+  try {
+    const bbResult = BollingerBands.calculate({
+      values: closes,
+      period: 20,
+      stdDev: 2,
+    });
+
+    if (bbResult.length === 0) return null;
+
+    const current = bbResult[bbResult.length - 1];
+    if (!current || !current.upper || !current.lower || !current.middle) {
+      return null;
+    }
+
+    const bandWidth = current.upper - current.lower;
+    if (bandWidth === 0) return null;
+
+    // Calculate %B (position within bands)
+    // %B = (Price - Lower) / (Upper - Lower)
+    // 0 = at lower band, 1 = at upper band, 0.5 = at middle
+    const percentB = (currentPrice - current.lower) / bandWidth;
+
+    // Near lower band (%B < 0.15) - potential bounce
+    if (percentB < 0.15) {
+      return {
+        name: "Near Lower Bollinger",
+        category: "technical",
+        points: 5,
+        description: `Price near lower band — oversold bounce potential`,
+        value: percentB,
+      };
+    }
+
+    // At lower half but not extreme (0.15-0.35) - favorable entry
+    if (percentB < 0.35) {
+      return {
+        name: "Lower Bollinger Zone",
+        category: "technical",
+        points: 3,
+        description: `Price in lower band zone — favorable entry area`,
+        value: percentB,
+      };
+    }
+
+    // At middle band - neutral, no signal
+    // Don't award points for being in the middle
+
+    // Near upper band (%B > 0.85) - extended, note as warning
+    // (This is informational, not a buy signal)
+  } catch {
+    // Bollinger calculation failed, return null
+  }
+
+  return null;
+}
+
+/**
  * Calculate all technical signals for a stock
+ * v1.7.0: Added ADX trend strength and Bollinger Band signals
  */
 export function calculateTechnicalSignals(
   quote: QuoteData,
@@ -511,6 +643,20 @@ export function calculateTechnicalSignals(
   if (weekPositionSignal) {
     signals.push(weekPositionSignal);
     score += weekPositionSignal.points;
+  }
+
+  // v1.7.0: ADX Trend Strength
+  const adxSignal = checkADX(historical);
+  if (adxSignal) {
+    signals.push(adxSignal);
+    score += adxSignal.points;
+  }
+
+  // v1.7.0: Bollinger Bands position
+  const bbSignal = checkBollingerBands(closes, currentPrice ?? 0);
+  if (bbSignal) {
+    signals.push(bbSignal);
+    score += bbSignal.points;
   }
 
   // Cap at 50 points

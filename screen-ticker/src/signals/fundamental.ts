@@ -327,6 +327,160 @@ function checkROE(summary: QuoteSummary): Signal | null {
 }
 
 /**
+ * v1.7.0: Check Short Interest (squeeze potential or risk)
+ * High short interest can be bullish (squeeze) or bearish (smart money betting against)
+ */
+function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; warning: Signal | null } {
+  const shortPct = summary.defaultKeyStatistics?.shortPercentOfFloat?.raw;
+  const shortRatio = summary.defaultKeyStatistics?.shortRatio?.raw; // days to cover
+  
+  if (!shortPct) return { signal: null, warning: null };
+  
+  // Convert to percentage if needed (Yahoo returns as decimal)
+  const shortPercent = shortPct > 1 ? shortPct : shortPct * 100;
+  
+  // High short interest (>15%) with high days to cover = squeeze potential
+  if (shortPercent > 15 && shortRatio && shortRatio > 5) {
+    return {
+      signal: {
+        name: "Short Squeeze Potential",
+        category: "fundamental",
+        points: 5,
+        description: `${shortPercent.toFixed(1)}% short, ${shortRatio.toFixed(1)} days to cover`,
+        value: shortPercent,
+      },
+      warning: {
+        name: "High Short Interest",
+        category: "fundamental",
+        points: 0,
+        description: `⚠️ ${shortPercent.toFixed(1)}% of float short — high squeeze potential but also risk`,
+        value: shortPercent,
+      },
+    };
+  }
+  
+  // Moderate short interest (10-15%) - note but not actionable
+  if (shortPercent > 10) {
+    return {
+      signal: null,
+      warning: {
+        name: "Elevated Short Interest",
+        category: "fundamental",
+        points: 0,
+        description: `${shortPercent.toFixed(1)}% of float short — bears positioning`,
+        value: shortPercent,
+      },
+    };
+  }
+  
+  // Low short interest (<5%) is a positive signal (minimal bearish bets)
+  if (shortPercent < 5) {
+    return {
+      signal: {
+        name: "Low Short Interest",
+        category: "fundamental",
+        points: 2,
+        description: `Only ${shortPercent.toFixed(1)}% short — limited bearish sentiment`,
+        value: shortPercent,
+      },
+      warning: null,
+    };
+  }
+  
+  return { signal: null, warning: null };
+}
+
+/**
+ * v1.7.0: Check Balance Sheet Health (debt metrics)
+ * 
+ * Note: Yahoo Finance returns debtToEquity as a percentage (e.g., 41.0 = 0.41 ratio)
+ * We normalize by dividing by 100 if the value is > 10 (assuming percentage format)
+ */
+function checkBalanceSheetHealth(summary: QuoteSummary): { signal: Signal | null; warning: Signal | null } {
+  let debtToEquity = summary.financialData?.debtToEquity?.raw;
+  const currentRatio = summary.financialData?.currentRatio?.raw;
+  const quickRatio = summary.financialData?.quickRatio?.raw;
+  const totalCash = summary.financialData?.totalCash?.raw;
+  const totalDebt = summary.financialData?.totalDebt?.raw;
+  
+  // Normalize D/E: Yahoo often returns as percentage (41.0 = 41%)
+  // If > 10, assume it's a percentage and convert to ratio
+  if (debtToEquity !== undefined && debtToEquity > 10) {
+    debtToEquity = debtToEquity / 100;
+  }
+  
+  let signal: Signal | null = null;
+  let warning: Signal | null = null;
+  
+  // First check for net cash position - this overrides debt concerns
+  const hasNetCash = totalCash && totalDebt && totalCash > totalDebt;
+  
+  if (hasNetCash) {
+    const netCash = totalCash - totalDebt;
+    const netCashStr = netCash >= 1e9 
+      ? `$${(netCash / 1e9).toFixed(1)}B` 
+      : `$${(netCash / 1e6).toFixed(0)}M`;
+    signal = {
+      name: "Net Cash Position",
+      category: "fundamental",
+      points: 5,
+      description: `${netCashStr} net cash — no debt pressure`,
+      value: netCash,
+    };
+    // Don't add debt warning if company has net cash
+    return { signal, warning: null };
+  }
+  
+  // Check for fortress balance sheet (low debt, high liquidity)
+  if (debtToEquity !== undefined && debtToEquity < 0.3 && currentRatio && currentRatio > 2) {
+    signal = {
+      name: "Fortress Balance Sheet",
+      category: "fundamental",
+      points: 5,
+      description: `D/E ${debtToEquity.toFixed(2)}, Current Ratio ${currentRatio.toFixed(1)} — very strong`,
+      value: debtToEquity,
+    };
+  } else if (debtToEquity !== undefined && debtToEquity < 0.5) {
+    signal = {
+      name: "Low Debt",
+      category: "fundamental",
+      points: 3,
+      description: `Debt/Equity ${debtToEquity.toFixed(2)} — conservative leverage`,
+      value: debtToEquity,
+    };
+  } else if (debtToEquity !== undefined && debtToEquity < 1.0 && currentRatio && currentRatio > 1.5) {
+    signal = {
+      name: "Healthy Balance Sheet",
+      category: "fundamental",
+      points: 2,
+      description: `D/E ${debtToEquity.toFixed(2)}, Current ${currentRatio.toFixed(1)}`,
+      value: debtToEquity,
+    };
+  }
+  
+  // Check for warning signs (only if no net cash position)
+  if (debtToEquity !== undefined && debtToEquity > 2.0) {
+    warning = {
+      name: "High Debt Load",
+      category: "fundamental",
+      points: 0,
+      description: `⚠️ Debt/Equity ${debtToEquity.toFixed(2)} — elevated leverage risk`,
+      value: debtToEquity,
+    };
+  } else if (currentRatio !== undefined && currentRatio < 1.0) {
+    warning = {
+      name: "Liquidity Concern",
+      category: "fundamental",
+      points: 0,
+      description: `⚠️ Current Ratio ${currentRatio.toFixed(2)} — may struggle to cover short-term obligations`,
+      value: currentRatio,
+    };
+  }
+  
+  return { signal, warning };
+}
+
+/**
  * Check for fundamental warnings (negative signals that don't subtract points)
  * v1.3.0: Added warnings for unprofitable companies and missing data
  */
@@ -412,12 +566,14 @@ function assessDataQuality(summary: QuoteSummary): "good" | "partial" | "poor" {
 /**
  * Calculate all fundamental signals for a stock
  * v1.3.0: Added warnings for unprofitable/speculative stocks
+ * v1.7.0: Added short interest and balance sheet health signals
  */
 export function calculateFundamentalSignals(
   summary: QuoteSummary,
   marketCap?: number
 ): FundamentalResult {
   const signals: Signal[] = [];
+  const warnings: Signal[] = [];
   let score = 0;
 
   // Value signals
@@ -477,6 +633,26 @@ export function calculateFundamentalSignals(
     score += roeSignal.points;
   }
 
+  // v1.7.0: Short interest signals
+  const shortResult = checkShortInterest(summary);
+  if (shortResult.signal) {
+    signals.push(shortResult.signal);
+    score += shortResult.signal.points;
+  }
+  if (shortResult.warning) {
+    warnings.push(shortResult.warning);
+  }
+
+  // v1.7.0: Balance sheet health signals
+  const balanceSheetResult = checkBalanceSheetHealth(summary);
+  if (balanceSheetResult.signal) {
+    signals.push(balanceSheetResult.signal);
+    score += balanceSheetResult.signal.points;
+  }
+  if (balanceSheetResult.warning) {
+    warnings.push(balanceSheetResult.warning);
+  }
+
   // Sector comparison
   const sector = summary.assetProfile?.sector;
   const pe = summary.summaryDetail?.trailingPE?.raw;
@@ -485,7 +661,8 @@ export function calculateFundamentalSignals(
   const sectorComparison = compareToBenchmark(sector, pe, peg, evEbitda);
 
   // v1.3.0: Check for warnings and data quality
-  const warnings = checkFundamentalWarnings(summary);
+  const fundamentalWarnings = checkFundamentalWarnings(summary);
+  warnings.push(...fundamentalWarnings);
   const dataQuality = assessDataQuality(summary);
 
   // Cap at 30 points

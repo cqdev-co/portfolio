@@ -33,12 +33,27 @@ export const WeekContext = z.object({
   marketCap: z.number().optional(),
   nextEarningsDate: z.date().optional(),
   sector: z.string().optional(),
+  industry: z.string().optional(),
   // Valuation metrics for sector comparison (v1.1.1)
   trailingPE: z.number().optional(),
   forwardPE: z.number().optional(),
   pegRatio: z.number().optional(),
   evEbitda: z.number().optional(),
   analystTarget: z.number().optional(),
+  // v1.7.0: Additional risk/context metrics
+  beta: z.number().optional(),
+  shortPercentOfFloat: z.number().optional(),
+  sharesShort: z.number().optional(),
+  shortRatio: z.number().optional(),  // days to cover
+  // Balance sheet health
+  debtToEquity: z.number().optional(),
+  currentRatio: z.number().optional(),
+  quickRatio: z.number().optional(),
+  totalCash: z.number().optional(),
+  totalDebt: z.number().optional(),
+  // Volatility context
+  atr14: z.number().optional(),  // 14-day ATR
+  atrPercent: z.number().optional(),  // ATR as % of price
 });
 export type WeekContext = z.infer<typeof WeekContext>;
 
@@ -175,8 +190,12 @@ export interface QuoteSummary {
     enterpriseToEbitda?: { raw?: number };
     pegRatio?: { raw?: number };
     shortPercentOfFloat?: { raw?: number };
+    sharesShort?: { raw?: number };
+    shortRatio?: { raw?: number };  // days to cover
     beta?: { raw?: number };
     fiftyTwoWeekChange?: { raw?: number };
+    floatShares?: { raw?: number };
+    sharesOutstanding?: { raw?: number };
   };
   financialData?: {
     freeCashflow?: { raw?: number };
@@ -192,6 +211,12 @@ export interface QuoteSummary {
     operatingMargins?: { raw?: number };
     returnOnEquity?: { raw?: number };
     financialCurrency?: string;
+    // v1.7.0: Balance sheet health metrics
+    debtToEquity?: { raw?: number };
+    currentRatio?: { raw?: number };
+    quickRatio?: { raw?: number };
+    totalCash?: { raw?: number };
+    totalDebt?: { raw?: number };
   };
   earningsTrend?: {
     trend?: Array<{
@@ -242,6 +267,8 @@ export interface QuoteSummary {
   assetProfile?: {
     sector?: string;
     industry?: string;
+    country?: string;
+    website?: string;
   };
   majorHoldersBreakdown?: {
     insidersPercentHeld?: number;

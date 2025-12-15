@@ -188,6 +188,10 @@ bun run src/index.ts trends [options]
 | Volume Surge | 10 | Volume > 1.5x 10-day avg |
 | OBV Uptrend | 5 | On-Balance Volume rising |
 | MACD Bullish | 5 | MACD crossed above signal |
+| **ADX Strong Trend** | **5** | **ADX > 30 (v1.7.0)** |
+| **ADX Trending** | **3** | **ADX 25-30 (v1.7.0)** |
+| **Near Lower Bollinger** | **5** | **Price at lower band (v1.7.0)** |
+| **Lower Bollinger Zone** | **3** | **Price in lower band area (v1.7.0)** |
 
 ### Fundamental Signals (Max 30 pts)
 
@@ -200,6 +204,11 @@ bun run src/index.ts trends [options]
 | Strong Earnings | 5 | Earnings growth > 15% |
 | Revenue Growing | 3 | Revenue growth > 10% |
 | Deep Value | 5 | Price/Book < 1.0 |
+| **Fortress Balance Sheet** | **5** | **D/E < 0.3, Current Ratio > 2 (v1.7.0)** |
+| **Low Debt** | **3** | **Debt/Equity < 0.5 (v1.7.0)** |
+| **Net Cash Position** | **5** | **Cash > Debt (v1.7.0)** |
+| **Low Short Interest** | **2** | **< 5% short float (v1.7.0)** |
+| **Short Squeeze Potential** | **5** | **> 15% short + high days to cover (v1.7.0)** |
 
 ### Analyst Signals (Max 20 pts)
 
@@ -210,6 +219,14 @@ bun run src/index.ts trends [options]
 | Positive Revisions | 5 | Positive EPS growth estimates |
 | Strong Buy Consensus | 5 | Buy ratings > 3x Sell ratings |
 | High Coverage | 2 | 20+ analysts covering |
+
+### Fundamental Warnings (v1.7.0)
+
+| Warning | Condition |
+|---------|-----------|
+| High Short Interest | > 10% short float |
+| High Debt Load | Debt/Equity > 2.0 |
+| Liquidity Concern | Current Ratio < 1.0 |
 
 ## Entry Decision Engine (v1.5.0)
 
@@ -443,11 +460,31 @@ export async function GET() {
 }
 ```
 
-## Current Version: v2.0.0
+## Current Version: v2.0.0 (with v1.7.0 data enhancements)
 
 See [roadmap.md](./roadmap.md) for full version history.
 
 ### Recent Features
+
+**v1.7.0 — Enhanced Data Analysis** ✅
+- **New Technical Indicators**: ADX trend strength, Bollinger Bands position
+- **Short Interest Analysis**: Squeeze potential detection, warnings for elevated shorts
+- **Balance Sheet Health**: Fortress balance sheet, net cash position, debt warnings
+- **Sector Relative Strength**: Compare sector ETFs vs SPY, money flow detection
+- **ATR Volatility**: Average True Range for position sizing and stops
+- **Beta Context**: Stock volatility vs market for risk assessment
+- **Enhanced AI Context**: Short interest, balance sheet, and sector data for AI analysis
+
+```bash
+# New signals now included in analysis
+bun run analyze NVDA
+
+# New data shown in:
+# - VOLATILITY CONTEXT: Beta, ATR
+# - SHORT INTEREST: % of float, days to cover, squeeze risk
+# - BALANCE SHEET: D/E, current ratio, net cash
+# - SECTOR: Relative strength vs SPY, money flow
+```
 
 **v2.0.0 — AI-First Architecture** ✅
 - **AI is now the core of the analyze command** — no more `--ai` flag needed

@@ -35,6 +35,42 @@ function classifyStock(summary: QuoteSummary): StockStyle {
 }
 
 /**
+ * Calculate ATR (Average True Range) for volatility context
+ * Used for position sizing and stop loss calculation
+ */
+function calculateATR(historical: HistoricalData[], period: number = 14): { atr: number; atrPercent: number } | null {
+  if (historical.length < period + 1) return null;
+  
+  const trValues: number[] = [];
+  
+  // Calculate True Range for each day
+  for (let i = 1; i < historical.length; i++) {
+    const current = historical[i];
+    const previous = historical[i - 1];
+    if (!current || !previous) continue;
+    
+    const highLow = current.high - current.low;
+    const highClose = Math.abs(current.high - previous.close);
+    const lowClose = Math.abs(current.low - previous.close);
+    
+    const trueRange = Math.max(highLow, highClose, lowClose);
+    trValues.push(trueRange);
+  }
+  
+  if (trValues.length < period) return null;
+  
+  // Calculate ATR (simple moving average of TR)
+  const recentTR = trValues.slice(-period);
+  const atr = recentTR.reduce((a, b) => a + b, 0) / period;
+  
+  // Calculate ATR as percentage of current price
+  const currentPrice = historical[historical.length - 1]?.close ?? 0;
+  const atrPercent = currentPrice > 0 ? (atr / currentPrice) * 100 : 0;
+  
+  return { atr, atrPercent };
+}
+
+/**
  * Calculate 52-week context from quote and historical data
  */
 function calculate52WeekContext(
@@ -90,9 +126,12 @@ function calculate52WeekContext(
     }
   }
 
-  // Sector
+  // Sector and Industry
   if (summary.assetProfile?.sector) {
     context.sector = summary.assetProfile.sector;
+  }
+  if (summary.assetProfile?.industry) {
+    context.industry = summary.assetProfile.industry;
   }
 
   // Valuation metrics for sector comparison (v1.1.1)
@@ -111,6 +150,51 @@ function calculate52WeekContext(
   // Analyst target for R/R fallback
   if (summary.financialData?.targetMeanPrice?.raw) {
     context.analystTarget = summary.financialData.targetMeanPrice.raw;
+  }
+
+  // v1.7.0: Beta (volatility vs market)
+  if (summary.defaultKeyStatistics?.beta?.raw) {
+    context.beta = summary.defaultKeyStatistics.beta.raw;
+  }
+
+  // v1.7.0: Short Interest data
+  if (summary.defaultKeyStatistics?.shortPercentOfFloat?.raw) {
+    context.shortPercentOfFloat = summary.defaultKeyStatistics.shortPercentOfFloat.raw;
+  }
+  if (summary.defaultKeyStatistics?.sharesShort?.raw) {
+    context.sharesShort = summary.defaultKeyStatistics.sharesShort.raw;
+  }
+  if (summary.defaultKeyStatistics?.shortRatio?.raw) {
+    context.shortRatio = summary.defaultKeyStatistics.shortRatio.raw;
+  }
+
+  // v1.7.0: Balance sheet health metrics
+  // Note: Yahoo returns D/E as percentage (41.0 = 41%), normalize to ratio
+  if (summary.financialData?.debtToEquity?.raw) {
+    let debtToEquity = summary.financialData.debtToEquity.raw;
+    if (debtToEquity > 10) {
+      debtToEquity = debtToEquity / 100;  // Convert percentage to ratio
+    }
+    context.debtToEquity = debtToEquity;
+  }
+  if (summary.financialData?.currentRatio?.raw) {
+    context.currentRatio = summary.financialData.currentRatio.raw;
+  }
+  if (summary.financialData?.quickRatio?.raw) {
+    context.quickRatio = summary.financialData.quickRatio.raw;
+  }
+  if (summary.financialData?.totalCash?.raw) {
+    context.totalCash = summary.financialData.totalCash.raw;
+  }
+  if (summary.financialData?.totalDebt?.raw) {
+    context.totalDebt = summary.financialData.totalDebt.raw;
+  }
+
+  // v1.7.0: ATR for volatility context
+  const atrResult = calculateATR(historical);
+  if (atrResult) {
+    context.atr14 = atrResult.atr;
+    context.atrPercent = atrResult.atrPercent;
   }
 
   return context;

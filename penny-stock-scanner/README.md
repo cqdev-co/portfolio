@@ -2,15 +2,32 @@
 
 Professional-grade penny stock scanner for identifying explosive breakout opportunities under $5.
 
-## ⚠️ Recent Updates (November 2025)
+## ⚠️ Recent Updates
+
+### December 2025 - Performance Improvements
+
+**Major fixes based on real performance data (248 signals, 65 closed trades):**
+- ✅ **Stop loss widened**: 15% → 25% max (60% were hitting stops)
+- ✅ **Breakout detection improved**: Multiple scenarios now qualify (was only 5.2%)
+- ✅ **Score inflation fixed**: Removed partial credit for unimplemented features
+- ✅ **Tier thresholds adjusted**: Better signal discrimination
+- ✅ **Weekend/holiday bug fixed**: Signal continuity now works across weekends
+- ✅ **Recommendation logic improved**: No longer all "BUY"
+
+**New Features:**
+- 🔔 **Discord Alerts**: Automatic notifications for S/A-Tier signals
+- 📊 **SPY Comparison**: Market outperformance now actually calculated
+- 🎯 **Profit Target Tracking**: Track 10%, 20%, 30% targets with dynamic levels
+
+**See**: [`../docs/penny-stock-scanner/performance-improvements-dec-2025.md`](../docs/penny-stock-scanner/performance-improvements-dec-2025.md) for full details.
+
+### November 2025 - Initial Fixes
 
 **Fixed Critical Issues:**
 - ✅ Timezone-aware datetime handling (no more crash errors)
 - ✅ Supabase pagination (now fetches all 1715 symbols)
 - ✅ Signal continuity tracking integrated
 - ✅ Improved filtering recommendations for better signal detection
-
-**See**: [`../docs/penny-stock-scanner/bug-fixes-nov-2025.md`](../docs/penny-stock-scanner/bug-fixes-nov-2025.md) for full details.
 
 ## 🚀 Features
 
@@ -213,7 +230,12 @@ PENNY_MIN_VOLUME=200000          # Daily volume minimum
 PENNY_MIN_DOLLAR_VOLUME=100000   # Dollar volume minimum
 
 # Score thresholds
-MIN_SCORE_THRESHOLD=0.60         # Default minimum score
+MIN_SCORE_THRESHOLD=0.55         # Default minimum score
+
+# Discord Alerts (optional)
+DISCORD_PENNY_WEBHOOK_URL=your_webhook_url  # Webhook for penny stock alerts
+# discord_alerts_enabled defaults to true
+# discord_min_rank defaults to "A" (S, A, B, C, D)
 ```
 
 ### Adjusting Filters

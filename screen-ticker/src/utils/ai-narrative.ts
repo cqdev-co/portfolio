@@ -63,15 +63,55 @@ export interface VolatilityContext {
   historicalVolatility?: number;
   /** IV/HV ratio */
   ivHvRatio?: number;
+  /** v1.7.0: Beta (stock volatility vs market) */
+  beta?: number;
+  /** v1.7.0: ATR (average true range) */
+  atr14?: number;
+  /** v1.7.0: ATR as percentage of price */
+  atrPercent?: number;
 }
 
 export interface SectorContext {
   /** Sector name */
   sector: string;
+  /** Industry within sector */
+  industry?: string;
   /** Sector performance vs SPY (20d) */
   sectorVsSpy20d?: number;
   /** Is money flowing into or out of sector */
   sectorFlow?: "inflow" | "outflow" | "neutral";
+  /** Sector rating */
+  sectorRating?: "leading" | "inline" | "lagging" | "underperforming";
+  /** Sector ETF used for comparison */
+  sectorETF?: string;
+}
+
+/** v1.7.0: Short Interest Context */
+export interface ShortInterestContext {
+  /** Short percent of float */
+  shortPercentOfFloat?: number;
+  /** Days to cover (short ratio) */
+  daysToCover?: number;
+  /** Squeeze potential level */
+  squeezeRisk?: "high" | "moderate" | "low";
+}
+
+/** v1.7.0: Balance Sheet Context */
+export interface BalanceSheetContext {
+  /** Debt to equity ratio */
+  debtToEquity?: number;
+  /** Current ratio */
+  currentRatio?: number;
+  /** Quick ratio */
+  quickRatio?: number;
+  /** Total cash */
+  totalCash?: number;
+  /** Total debt */
+  totalDebt?: number;
+  /** Net cash position (positive = more cash than debt) */
+  netCash?: number;
+  /** Balance sheet health rating */
+  healthRating?: "fortress" | "healthy" | "moderate" | "leveraged" | "distressed";
 }
 
 export interface AIStockContext {
@@ -114,6 +154,10 @@ export interface AIStockContext {
   volatility?: VolatilityContext;
   /** Sector rotation context */
   sectorContext?: SectorContext;
+  /** v1.7.0: Short interest context */
+  shortInterest?: ShortInterestContext;
+  /** v1.7.0: Balance sheet health */
+  balanceSheet?: BalanceSheetContext;
 }
 
 export interface AIStoryResult {
@@ -632,6 +676,19 @@ function buildContextString(ctx: AIStockContext): string {
     const v = ctx.volatility;
     parts.push("");
     parts.push("=== VOLATILITY CONTEXT ===");
+    if (v.beta !== undefined) {
+      const betaDesc = v.beta > 1.5 ? "HIGH volatility vs market" :
+                       v.beta > 1.1 ? "Above average volatility" :
+                       v.beta > 0.9 ? "Market-like volatility" :
+                       v.beta > 0.5 ? "Below average volatility" : "LOW volatility (defensive)";
+      parts.push(`Beta: ${v.beta.toFixed(2)} (${betaDesc})`);
+    }
+    if (v.atr14 !== undefined && v.atrPercent !== undefined) {
+      const atrDesc = v.atrPercent > 5 ? "HIGH daily swings" :
+                      v.atrPercent > 3 ? "Moderate volatility" :
+                      v.atrPercent > 1.5 ? "Normal volatility" : "Low volatility";
+      parts.push(`ATR(14): $${v.atr14.toFixed(2)} (${v.atrPercent.toFixed(1)}% daily range — ${atrDesc})`);
+    }
     if (v.ivRank !== undefined) {
       parts.push(`IV Rank: ${v.ivRank}% (${v.ivRank < 30 ? "LOW" : v.ivRank < 70 ? "MODERATE" : "HIGH"})`);
     }
@@ -651,13 +708,67 @@ function buildContextString(ctx: AIStockContext): string {
     parts.push("");
     parts.push("=== SECTOR CONTEXT ===");
     parts.push(`Sector: ${s.sector}`);
+    if (s.industry) {
+      parts.push(`Industry: ${s.industry}`);
+    }
+    if (s.sectorETF) {
+      parts.push(`Sector ETF: ${s.sectorETF}`);
+    }
     if (s.sectorVsSpy20d !== undefined) {
       const flow = s.sectorVsSpy20d > 2 ? "outperforming" : 
                    s.sectorVsSpy20d < -2 ? "underperforming" : "inline with";
       parts.push(`20-day vs SPY: ${s.sectorVsSpy20d > 0 ? "+" : ""}${s.sectorVsSpy20d.toFixed(1)}% (${flow} market)`);
     }
+    if (s.sectorRating) {
+      parts.push(`Sector Rating: ${s.sectorRating.toUpperCase()}`);
+    }
     if (s.sectorFlow) {
       parts.push(`Money Flow: ${s.sectorFlow.toUpperCase()}`);
+    }
+  }
+
+  // v1.7.0: Short Interest context
+  if (ctx.shortInterest) {
+    const si = ctx.shortInterest;
+    parts.push("");
+    parts.push("=== SHORT INTEREST ===");
+    if (si.shortPercentOfFloat !== undefined) {
+      const shortPct = si.shortPercentOfFloat > 1 ? si.shortPercentOfFloat : si.shortPercentOfFloat * 100;
+      parts.push(`Short % of Float: ${shortPct.toFixed(1)}%`);
+    }
+    if (si.daysToCover !== undefined) {
+      parts.push(`Days to Cover: ${si.daysToCover.toFixed(1)}`);
+    }
+    if (si.squeezeRisk) {
+      parts.push(`Squeeze Risk: ${si.squeezeRisk.toUpperCase()}`);
+      if (si.squeezeRisk === "high") {
+        parts.push(`⚠️ High short interest — potential squeeze but also risk`);
+      }
+    }
+  }
+
+  // v1.7.0: Balance Sheet context
+  if (ctx.balanceSheet) {
+    const bs = ctx.balanceSheet;
+    parts.push("");
+    parts.push("=== BALANCE SHEET HEALTH ===");
+    if (bs.healthRating) {
+      parts.push(`Health Rating: ${bs.healthRating.toUpperCase()}`);
+    }
+    if (bs.debtToEquity !== undefined) {
+      parts.push(`Debt/Equity: ${bs.debtToEquity.toFixed(2)}`);
+    }
+    if (bs.currentRatio !== undefined) {
+      parts.push(`Current Ratio: ${bs.currentRatio.toFixed(2)}`);
+    }
+    if (bs.netCash !== undefined) {
+      const netCashStr = Math.abs(bs.netCash) >= 1e9 
+        ? `$${(bs.netCash / 1e9).toFixed(1)}B`
+        : `$${(bs.netCash / 1e6).toFixed(0)}M`;
+      parts.push(`Net Cash: ${netCashStr} ${bs.netCash > 0 ? "(cash rich)" : "(net debt)"}`);
+    }
+    if (bs.healthRating === "distressed" || bs.healthRating === "leveraged") {
+      parts.push(`⚠️ Elevated debt — monitor for refinancing risk`);
     }
   }
 
@@ -909,6 +1020,7 @@ export async function generateFullAIAnalysis(
 
 /**
  * Create AIStockContext from analysis data
+ * v1.7.0: Added shortInterest and balanceSheet parameters
  */
 export function createAIContext(
   score: StockScore,
@@ -939,7 +1051,9 @@ export function createAIContext(
   position?: PositionContext,
   catalysts?: CatalystContext,
   volatility?: VolatilityContext,
-  sectorContext?: SectorContext
+  sectorContext?: SectorContext,
+  shortInterest?: ShortInterestContext,
+  balanceSheet?: BalanceSheetContext
 ): AIStockContext {
   return {
     ticker: score.ticker,
@@ -957,6 +1071,8 @@ export function createAIContext(
     catalysts,
     volatility,
     sectorContext,
+    shortInterest,
+    balanceSheet,
   };
 }
 

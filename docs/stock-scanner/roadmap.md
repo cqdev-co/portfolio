@@ -1,12 +1,72 @@
 # Stock Scanner Roadmap
 
-## Current Version: v1.5.1 ✅
+## Current Version: v1.7.0 ✅
 
-Production-ready CLI tool with Decision Engine, smart analysis, options features, and quarterly earnings tracking.
+Production-ready CLI tool with Decision Engine, smart analysis, options features, quarterly earnings tracking, and enhanced data analysis.
 
 ---
 
-### v1.5.1 Features (Current) — Scan with Decisions ✅
+### v1.7.0 Features (Current) — Enhanced Data Analysis ✅
+
+**Major data enhancements for better stock analysis and risk assessment.**
+
+**New Technical Indicators:**
+- ✅ **ADX (Average Directional Index)** - Trend strength measurement
+  - ADX > 30: Strong trend in place (+5 pts)
+  - ADX 25-30: Trend developing (+3 pts)
+  - ADX < 20: Consolidating, watch for breakout (+2 pts)
+- ✅ **Bollinger Bands Position** - Mean reversion detection
+  - Near lower band: Oversold bounce potential (+5 pts)
+  - Lower band zone: Favorable entry area (+3 pts)
+- ✅ **ATR (Average True Range)** - Volatility measurement for position sizing
+  - Used for stop loss calculation
+  - Shows daily volatility as % of price
+
+**New Fundamental Signals:**
+- ✅ **Short Interest Analysis**
+  - Short squeeze potential (>15% short + high days to cover)
+  - Low short interest signal (<5% = limited bearish sentiment)
+  - Elevated short interest warnings (10-15%)
+- ✅ **Balance Sheet Health**
+  - Fortress balance sheet (low D/E, high current ratio)
+  - Net cash position detection
+  - High debt load warnings
+  - Liquidity concern warnings (current ratio < 1)
+- ✅ **Beta/Volatility Context**
+  - Stock volatility vs market
+  - Used for position sizing recommendations
+
+**New Sector Analysis:**
+- ✅ **Sector Relative Strength** - Compare sector ETF vs SPY
+  - Leading/inline/lagging/underperforming rating
+  - Money flow direction (inflow/outflow/neutral)
+  - Sector ETF mapping (XLK, XLF, XLV, etc.)
+
+**Enhanced AI Context:**
+- ✅ **Short Interest Context** - Squeeze risk assessment for AI
+- ✅ **Balance Sheet Context** - Debt health for AI analysis
+- ✅ **Volatility Context** - Beta and ATR included
+- ✅ **Sector Context** - Sector strength and rotation data
+
+**Technical Improvements:**
+- ✅ Added BollingerBands and ADX from technicalindicators library
+- ✅ ATR calculation for volatility measurement
+- ✅ Sector ETF data fetching for rotation analysis
+- ✅ Balance sheet metrics from Yahoo Finance financialData module
+
+**Files Added/Modified:**
+- `src/utils/sector-strength.ts` - NEW: Sector relative strength utility
+- `src/signals/technical.ts` - Added ADX, Bollinger Bands
+- `src/signals/fundamental.ts` - Added short interest, balance sheet signals
+- `src/engine/scorer.ts` - Added ATR, beta, debt context calculation
+- `src/engine/screener.ts` - Added sector strength to analysis
+- `src/utils/ai-narrative.ts` - Enhanced context interfaces
+- `src/types/index.ts` - Extended WeekContext and QuoteSummary
+- `src/providers/yahoo.ts` - Map additional Yahoo Finance fields
+
+---
+
+### v1.5.1 Features — Scan with Decisions ✅
 
 **Scan Command Improvements:**
 - ✅ **Decision Column** - Every scan result shows ENTER/WAIT/PASS status

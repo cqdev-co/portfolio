@@ -70,4 +70,6 @@ jobs:
         SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.70' }}
+        # Discord alerts for S/A-Tier signals
+        DISCORD_PENNY_WEBHOOK_URL: ${{ secrets.DISCORD_PENNY_WEBHOOK_URL }}
+      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.60' }}
