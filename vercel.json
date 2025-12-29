@@ -1,5 +1,5 @@
 {
   "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "frontend/.next",
-  "installCommand": "cd frontend && bun install"
+  "installCommand": "bun install"
 }

@@ -1,0 +1,17 @@
+{
+  "name": "portfolio-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "lib/ai-agent"
+  ],
+  "scripts": {
+    "dev": "cd frontend && bun run dev",
+    "build": "cd frontend && bun run build",
+    "start": "cd frontend && bun run start"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
+
