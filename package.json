@@ -10,6 +10,9 @@
     "build": "cd frontend && bun run build",
     "start": "cd frontend && bun run start"
   },
+  "dependencies": {
+    "next": "16.1.0"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   }
