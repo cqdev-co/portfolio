@@ -33,15 +33,11 @@ const AI_CHAT_WHITELIST: string[] = [
 
 /**
  * Check if a user is authorized to use the AI chat
- * Uses cookies from the request to verify Supabase session
+ * Uses HTTP-only cookies to verify Supabase session server-side
  */
 async function isUserAuthorized(): Promise<{ authorized: boolean; email?: string; error?: string }> {
   try {
     const cookieStore = await cookies();
-    
-    // Debug: log available cookies
-    const allCookies = cookieStore.getAll();
-    console.log("[Chat Auth] Available cookies:", allCookies.map(c => c.name));
     
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,60 +48,24 @@ async function isUserAuthorized(): Promise<{ authorized: boolean; email?: string
             return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
-            // In Route Handlers, we need to use the response to set cookies
-            // but for auth check we only need to read
+            // Route handlers can set cookies during token refresh
             try {
               cookiesToSet.forEach(({ name, value, options }) => {
                 cookieStore.set(name, value, options);
               });
             } catch {
-              // Silently fail - can't set cookies in some contexts
+              // Read-only context - token refresh will happen on next request
             }
           },
         },
       }
     );
 
-    // First try getUser (validates with Supabase server)
+    // Validate session with Supabase server
     const { data: { user }, error } = await supabase.auth.getUser();
     
-    console.log("[Chat Auth] getUser result:", { 
-      hasUser: !!user, 
-      email: user?.email,
-      error: error?.message 
-    });
-    
     if (error || !user) {
-      // Try getSession as fallback (uses cached session)
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("[Chat Auth] getSession fallback:", { 
-        hasSession: !!session,
-        email: session?.user?.email 
-      });
-      
-      if (!session?.user) {
-        return { authorized: false, error: "Not authenticated. Please sign in to use the AI chat." };
-      }
-      
-      // Use session user
-      const email = session.user.email?.toLowerCase();
-      if (!email) {
-        return { authorized: false, error: "No email associated with your account." };
-      }
-      
-      const isWhitelisted = AI_CHAT_WHITELIST.some(
-        (whitelistedEmail) => whitelistedEmail.toLowerCase() === email
-      );
-      
-      if (!isWhitelisted) {
-        return { 
-          authorized: false, 
-          email,
-          error: "Your account is not authorized to use the AI chat. Contact the administrator for access." 
-        };
-      }
-      
-      return { authorized: true, email };
+      return { authorized: false, error: "Not authenticated. Please sign in to use the AI chat." };
     }
 
     const email = user.email?.toLowerCase();
@@ -113,7 +73,7 @@ async function isUserAuthorized(): Promise<{ authorized: boolean; email?: string
       return { authorized: false, error: "No email associated with your account." };
     }
 
-    // Check if email is in whitelist
+    // Check whitelist
     const isWhitelisted = AI_CHAT_WHITELIST.some(
       (whitelistedEmail) => whitelistedEmail.toLowerCase() === email
     );
@@ -128,7 +88,7 @@ async function isUserAuthorized(): Promise<{ authorized: boolean; email?: string
 
     return { authorized: true, email };
   } catch (err) {
-    console.error("[Chat Auth] Error checking authorization:", err);
+    console.error("[Chat Auth] Error:", err);
     return { authorized: false, error: "Authentication error. Please try again." };
   }
 }

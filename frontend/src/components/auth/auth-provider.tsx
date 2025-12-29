@@ -65,39 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Clear the session and remove all auth tokens
-      const { error } = await supabase.auth.signOut({
-        scope: 'local'
-      })
-      
+      const { error } = await supabase.auth.signOut()
       if (error) throw error
-      
-      // Force clear the user state immediately
       setUser(null)
-      
-      // Clear any local storage items related to auth
-      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        try {
-          // Get all localStorage keys and remove any auth-related ones
-          const keys = Object.keys(localStorage)
-          keys.forEach(key => {
-            if (key.includes('supabase') || 
-                key.includes('auth') || 
-                key.includes('sb-') ||
-                key.startsWith('supabase.') ||
-                key.includes('session') ||
-                key.includes('token')) {
-              localStorage.removeItem(key)
-            }
-          })
-        } catch (error) {
-          console.error('Error during localStorage cleanup:', error)
-        }
-      }
-      
     } catch (error) {
       console.error('Error signing out:', error)
-      // Even if there's an error, force clear the user state
       setUser(null)
     }
   }
