@@ -7,8 +7,10 @@
   "private": true,
   "scripts": {
     "analyst": "bun run src/index.ts",
+    "debug": "bun run src/index.ts debug",
     "chat": "bun run src/index.ts chat",
     "analyze": "bun run src/index.ts analyze",
+    "short-term": "bun run src/index.ts short-term",
     "import": "bun run src/index.ts import",
     "journal": "bun run src/index.ts journal",
     "log": "bun run src/index.ts log",
@@ -20,7 +22,9 @@
     "briefing": "bun run src/index.ts briefing",
     "alerts": "bun run src/index.ts alerts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "eval": "bun test eval/",
+    "eval:verbose": "bun test eval/ --verbose"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -30,6 +34,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
+    "@toon-format/toon": "^2.1.0",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.2",
@@ -41,4 +46,3 @@
     "zod": "^4.1.13"
   }
 }
-

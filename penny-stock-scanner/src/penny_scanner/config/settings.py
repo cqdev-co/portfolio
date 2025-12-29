@@ -206,18 +206,45 @@ class Settings(BaseSettings):
         description="Weight for MA position (3% of total)"
     )
     
-    # Relative Strength: 15%
+    # Relative Strength: 20% (INCREASED - strongest predictor per data)
+    # Data shows: Outperforming SPY = 63.6% WR, +4.56% vs Underperforming = 36% WR, -2.73%
     weight_market_outperformance: float = Field(
-        default=0.08,
-        description="Weight for market outperformance (8% of total)"
+        default=0.15,
+        description="Weight for market outperformance (15% of total) - INCREASED from 8%"
     )
     weight_sector_leadership: float = Field(
-        default=0.04,
-        description="Weight for sector leadership (4% of total)"
+        default=0.02,
+        description="Weight for sector leadership (2% of total) - reduced"
     )
     weight_52w_position: float = Field(
         default=0.03,
         description="Weight for 52-week position (3% of total)"
+    )
+    
+    # High-Risk Countries (0% WR to 18% WR in data)
+    # These countries showed significantly worse performance
+    high_risk_countries: list = Field(
+        default=["Israel", "Malaysia", "Greece", "Australia", "Cayman Islands", "British Virgin Islands"],
+        description="Countries with historically poor performance - demote signals from these"
+    )
+    moderate_risk_countries: list = Field(
+        default=["China", "Hong Kong"],
+        description="Countries with moderate risk - flag but don't filter"
+    )
+    
+    # Volume Ceiling (Anti-Pump-and-Dump)
+    # Data shows: 10x+ volume = 34% WR, -3.16% vs 2-5x = 50% WR, +1.9%
+    volume_ceiling: float = Field(
+        default=10.0,
+        description="Volume above this is penalized (likely pump-and-dump)"
+    )
+    volume_sweet_spot_min: float = Field(
+        default=2.0,
+        description="Minimum volume for optimal zone"
+    )
+    volume_sweet_spot_max: float = Field(
+        default=5.0,
+        description="Maximum volume for optimal zone"
     )
     
     # Risk & Liquidity: 5%

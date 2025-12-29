@@ -2,6 +2,31 @@
 
 ## Recent Updates
 
+### Chat Component Fix (December 2025)
+Fixed runtime TypeErrors in the chat components related to the `@ai-sdk/react` 
+v3+ API changes and Ollama provider incompatibility with AI SDK 6.x.
+
+**Issues Fixed:**
+1. `useChat` hook API changes - no longer manages input state internally
+2. `ollama-ai-provider` v1.2.0 uses v1 spec, but AI SDK 6.x requires v2
+
+**Changes Made:**
+- **chat-panel.tsx**:
+  - Added local `useState` for input management
+  - Changed from `handleSubmit()` to `sendMessage({ role, parts })` API
+  - Replaced `append` with `sendMessage` for suggestion clicks
+- **chat-input.tsx**:
+  - Made `input` prop optional with default value (`input = ""`)
+- **api/chat/route.ts**:
+  - Replaced `ollama-ai-provider` with direct Ollama API calls
+  - Implemented custom stream transformer for AI SDK compatibility
+  - More reliable and avoids version spec incompatibilities
+
+**Files:** 
+- `src/components/chat/chat-input.tsx`
+- `src/components/chat/chat-panel.tsx`
+- `src/app/api/chat/route.ts`
+
 ### Signal Aggregation & Smart Summary View (November 2025)
 Completely redesigned the Unusual Options Scanner sidebar to solve the "75 signals problem" by implementing intelligent signal aggregation with a modern, polished UI:
 

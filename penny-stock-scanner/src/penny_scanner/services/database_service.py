@@ -317,6 +317,11 @@ class DatabaseService:
             'atr_20': signal.atr_20,
             'pump_dump_risk': signal.pump_dump_risk.value,
             
+            # Country risk (added Dec 2024)
+            'country': signal.country,
+            'is_high_risk_country': signal.is_high_risk_country,
+            'pump_dump_warning': signal.pump_dump_warning,
+            
             # Trend
             'trend_direction': signal.trend_direction.value,
             

@@ -3,9 +3,10 @@
 import uuid
 import asyncio
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict
 from loguru import logger
 import numpy as np
+import yfinance as yf
 
 from penny_scanner.models.market_data import MarketData
 from penny_scanner.models.analysis import (
@@ -28,6 +29,10 @@ from penny_scanner.services.market_comparison_service import (
 )
 
 
+# Country info cache to avoid repeated API calls
+_country_cache: Dict[str, Optional[str]] = {}
+
+
 class AnalysisService:
     """
     Service for analyzing penny stocks and detecting explosion setups.
@@ -40,6 +45,47 @@ class AnalysisService:
         self.settings = settings
         self.indicator_calculator = TechnicalIndicatorCalculator(settings)
         self.market_comparison = get_market_comparison_service(settings)
+    
+    def _get_country(self, symbol: str) -> Optional[str]:
+        """
+        Get country of origin for a stock symbol.
+        Uses cache to avoid repeated yfinance API calls.
+        """
+        global _country_cache
+        
+        if symbol in _country_cache:
+            return _country_cache[symbol]
+        
+        try:
+            info = yf.Ticker(symbol).info
+            country = info.get('country')
+            _country_cache[symbol] = country
+            return country
+        except Exception as e:
+            logger.debug(f"Could not fetch country for {symbol}: {e}")
+            _country_cache[symbol] = None
+            return None
+    
+    def _check_pump_dump_warning(
+        self,
+        signal: ExplosionSignal,
+        score: float,
+        country: Optional[str]
+    ) -> bool:
+        """
+        Check if signal shows pump-and-dump warning signs.
+        
+        Triggers on:
+        - Extreme volume (10x+) AND
+        - High score (0.75+) AND
+        - (High-risk country OR price < $0.50)
+        """
+        extreme_volume = signal.volume_spike_factor >= self.settings.volume_ceiling
+        high_score = score >= 0.75
+        low_price = signal.close_price < 0.50
+        high_risk_country = country in self.settings.high_risk_countries if country else False
+        
+        return extreme_volume and high_score and (high_risk_country or low_price)
     
     async def analyze_symbol(
         self,
@@ -110,8 +156,34 @@ class AnalysisService:
             if overall_score < self.settings.min_score_threshold:
                 return None
             
+            # Get country info for risk assessment
+            country = self._get_country(market_data.symbol)
+            is_high_risk = country in self.settings.high_risk_countries if country else False
+            is_moderate_risk = country in self.settings.moderate_risk_countries if country else False
+            
+            # Update explosion signal with country info
+            explosion_signal.country = country
+            explosion_signal.is_high_risk_country = is_high_risk
+            
+            # Check for pump-and-dump warning
+            explosion_signal.pump_dump_warning = self._check_pump_dump_warning(
+                explosion_signal, overall_score, country
+            )
+            
             # Calculate opportunity rank
             opportunity_rank = self._calculate_opportunity_rank(overall_score)
+            
+            # RANK ADJUSTMENTS based on data insights
+            # 1. Demote rank for high-risk countries (0-18% WR)
+            if is_high_risk and opportunity_rank != OpportunityRank.D_TIER:
+                logger.debug(f"{market_data.symbol}: Demoting from {opportunity_rank.value} due to high-risk country ({country})")
+                opportunity_rank = self._demote_rank(opportunity_rank)
+            
+            # 2. Require breakout for B/C tier (non-breakout = 20.4% WR)
+            if (not explosion_signal.is_breakout and 
+                opportunity_rank in (OpportunityRank.B_TIER, OpportunityRank.C_TIER)):
+                logger.debug(f"{market_data.symbol}: Demoting from {opportunity_rank.value} - no breakout detected")
+                opportunity_rank = self._demote_rank(opportunity_rank)
             
             # Generate recommendation
             recommendation = self._generate_recommendation(
@@ -249,6 +321,11 @@ class AnalysisService:
             daily_volatility=risk_metrics['volatility'],
             atr_20=latest_indicators.atr_20 or 0,
             pump_dump_risk=risk_metrics['pump_risk'],
+            
+            # Country risk (will be populated in analyze_symbol)
+            country=None,
+            is_high_risk_country=False,
+            pump_dump_warning=False,
             
             # Trend
             trend_direction=trend,
@@ -513,19 +590,27 @@ class AnalysisService:
         - Volume acceleration: 15%
         - Volume consistency: 10%
         - Liquidity depth: 5%
+        
+        UPDATED Dec 2024: Added volume ceiling to penalize extreme spikes.
+        Data shows 10x+ volume = 34% WR, -3.16% vs 2-5x = 50% WR, +1.9%
         """
         score = 0.0
         
-        # Volume surge (20%)
+        # Volume surge (20%) - with ceiling for pump-and-dump protection
         volume_ratio = metrics['volume_ratio']
-        if volume_ratio >= 5.0:
+        
+        # Sweet spot is 2-5x volume (best performance)
+        if volume_ratio >= self.settings.volume_ceiling:
+            # 10x+ volume is a WARNING sign - likely pump-and-dump
+            surge_score = 0.50  # Penalize extreme volume
+        elif volume_ratio >= self.settings.volume_sweet_spot_max:
+            # 5-10x: Good but slightly concerning
+            surge_score = 0.80
+        elif volume_ratio >= self.settings.volume_sweet_spot_min:
+            # 2-5x: OPTIMAL zone
             surge_score = 1.0
-        elif volume_ratio >= 3.0:
-            surge_score = 0.85
-        elif volume_ratio >= 2.0:
-            surge_score = 0.65
         elif volume_ratio >= 1.5:
-            surge_score = 0.40
+            surge_score = 0.50
         else:
             surge_score = normalize_score(volume_ratio, 1.0, 1.5)
         score += surge_score * self.settings.weight_volume_surge
@@ -727,6 +812,17 @@ class AnalysisService:
         else:
             return OpportunityRank.D_TIER
     
+    def _demote_rank(self, rank: OpportunityRank) -> OpportunityRank:
+        """Demote a rank by one tier."""
+        demotion_map = {
+            OpportunityRank.S_TIER: OpportunityRank.A_TIER,
+            OpportunityRank.A_TIER: OpportunityRank.B_TIER,
+            OpportunityRank.B_TIER: OpportunityRank.C_TIER,
+            OpportunityRank.C_TIER: OpportunityRank.D_TIER,
+            OpportunityRank.D_TIER: OpportunityRank.D_TIER,
+        }
+        return demotion_map.get(rank, rank)
+    
     def _generate_recommendation(
         self,
         signal: ExplosionSignal,
@@ -735,37 +831,61 @@ class AnalysisService:
         """
         Generate trading recommendation based on score and signal characteristics.
         
-        Previous logic had thresholds too close together - all 248 signals
-        were "BUY" with no discrimination. Now using more nuanced criteria.
+        UPDATED Dec 2024: Fixed BUY criteria - was 25.5% WR vs STRONG_BUY 61.5%
+        Data shows: BUY was too loose, HOLD actually performed better!
         
-        STRONG_BUY: High score + breakout + volume explosion
-        BUY: Good score with strong setup characteristics
-        WATCH: Decent score but missing key characteristics
-        HOLD: Below threshold or high risk
+        New criteria requires:
+        - Market outperformance (63.6% WR when outperforming SPY)
+        - Breakout confirmation (48.7% WR vs 20.4% without)
+        - Volume in sweet spot (2-5x optimal, 10x+ penalized)
+        
+        STRONG_BUY: High score + breakout + outperforming + good volume
+        BUY: Good score + breakout + outperforming
+        WATCH: Breakout OR outperforming (one of the key signals)
+        HOLD: Neither breakout nor outperforming
         """
         # Check for concerning risk factors
         high_risk = signal.pump_dump_risk in (RiskLevel.HIGH, RiskLevel.EXTREME)
+        extreme_volume = signal.volume_spike_factor >= self.settings.volume_ceiling
         
-        # Strong buy requires multiple confirmations
-        if (score >= 0.75 and 
+        # Check if outperforming market (strongest predictor!)
+        outperforming_market = (
+            signal.market_outperformance is not None and 
+            signal.market_outperformance > 0
+        )
+        
+        # Check volume is in sweet spot (not extreme pump)
+        volume_in_sweet_spot = (
+            self.settings.volume_sweet_spot_min <= 
+            signal.volume_spike_factor <= 
+            self.settings.volume_sweet_spot_max
+        )
+        
+        # Strong buy requires ALL key confirmations
+        if (score >= 0.80 and 
             signal.is_breakout and 
+            outperforming_market and
             signal.volume_spike_factor >= 3.0 and
+            not extreme_volume and
             not high_risk):
             return "STRONG_BUY"
         
-        # Buy requires good score and at least one strong signal
-        elif (score >= 0.68 and 
-              (signal.is_breakout or 
-               signal.volume_spike_factor >= 2.5 or 
-               signal.higher_lows_detected) and
+        # Buy requires breakout + outperforming (the two best predictors)
+        elif (score >= 0.72 and 
+              signal.is_breakout and 
+              outperforming_market and
+              signal.volume_spike_factor >= 2.0 and
+              not extreme_volume and
               not high_risk):
             return "BUY"
         
-        # Watch: decent score but not all criteria met
-        elif score >= 0.60 and not high_risk:
+        # Watch: Has at least one strong predictor
+        elif (score >= 0.62 and 
+              (signal.is_breakout or outperforming_market) and
+              not high_risk):
             return "WATCH"
         
-        # Hold: below threshold or risky
+        # Hold: Missing key predictors or high risk
         else:
             return "HOLD"
     

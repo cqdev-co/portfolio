@@ -21,12 +21,6 @@ import {
   type LogTradeOptions 
 } from "./commands/journal.ts";
 import { startChat, type ChatOptions } from "./commands/chat.ts";
-import { 
-  listPositions, 
-  addNewPosition, 
-  closePosition,
-  type AddPositionOptions 
-} from "./commands/position.ts";
 import {
   listWatchlist,
   addToWatch,
@@ -54,6 +48,11 @@ import {
   alertsSummary,
   type ListAlertsOptions,
 } from "./commands/alerts.ts";
+import {
+  shortTermCommand,
+  type ShortTermOptions,
+} from "./commands/short-term.ts";
+import { debugCommand, type DebugOptions } from "./commands/debug.ts";
 import { testDiscordWebhook } from "./services/discord.ts";
 import type { OllamaMode } from "./services/ollama.ts";
 import type { AlertType } from "./services/supabase.ts";
@@ -128,6 +127,42 @@ program
     };
 
     await analyzeCommand(ticker, options);
+  });
+
+// ============================================================================
+// DEBUG COMMAND
+// ============================================================================
+
+program
+  .command("debug <ticker>")
+  .description("Show ALL raw context that would be sent to AI (no AI call)")
+  .option(
+    "-a, --account <size>",
+    "Account size in dollars",
+    "1500"
+  )
+  .option(
+    "-c, --compact",
+    "Compact output (hide full PFV magnetic levels)",
+    false
+  )
+  .option(
+    "-l, --log",
+    "Save full output to a log file in logs/",
+    false
+  )
+  .action(async (ticker: string, opts: {
+    account: string;
+    compact: boolean;
+    log: boolean;
+  }) => {
+    const options: DebugOptions = {
+      accountSize: parseInt(opts.account, 10) || 1500,
+      compact: opts.compact,
+      log: opts.log,
+    };
+
+    await debugCommand(ticker, options);
   });
 
 // ============================================================================
@@ -248,59 +283,6 @@ program
     };
 
     await startChat(options);
-  });
-
-// ============================================================================
-// POSITION COMMANDS
-// ============================================================================
-
-program
-  .command("positions")
-  .alias("pos")
-  .description("View open positions")
-  .option("-a, --analyze", "Include Victor's analysis with live market data")
-  .option("--ai-mode <mode>", "AI mode: local or cloud", "cloud")
-  .action(async (opts: { analyze?: boolean; aiMode?: string }) => {
-    await listPositions({
-      analyze: opts.analyze,
-      aiMode: opts.aiMode as OllamaMode,
-    });
-  });
-
-program
-  .command("position-add <ticker> <long> <short> <expiration> <cost>")
-  .description("Add an open position (e.g., position-add NVDA 165 170 'Jan 17' 3.80)")
-  .option("-q, --quantity <qty>", "Number of contracts", "1")
-  .option("-u, --underlying <price>", "Underlying price at entry")
-  .option("-n, --notes <text>", "Notes about the position")
-  .action(async (
-    ticker: string,
-    long: string,
-    short: string,
-    expiration: string,
-    cost: string,
-    opts: { quantity: string; underlying?: string; notes?: string }
-  ) => {
-    const options: AddPositionOptions = {
-      ticker,
-      longStrike: parseFloat(long),
-      shortStrike: parseFloat(short),
-      expiration,
-      cost: parseFloat(cost),
-      quantity: parseInt(opts.quantity, 10) || 1,
-      underlying: opts.underlying ? parseFloat(opts.underlying) : undefined,
-      notes: opts.notes,
-    };
-
-    await addNewPosition(options);
-  });
-
-program
-  .command("position-close <ticker>")
-  .description("Close/remove a position")
-  .option("-r, --reason <text>", "Reason for closing")
-  .action(async (ticker: string, opts: { reason?: string }) => {
-    await closePosition(ticker, opts.reason);
   });
 
 // ============================================================================
@@ -554,19 +536,70 @@ alertsCommand
   });
 
 // ============================================================================
+// SHORT-TERM COMMAND
+// ============================================================================
+
+program
+  .command("short-term")
+  .description("Scan SPY/QQQ for 1-3 day swing trade entries")
+  .alias("st")
+  .option(
+    "--ai-mode <mode>",
+    "Ollama mode: local or cloud",
+    "cloud"
+  )
+  .option(
+    "--ai-model <model>",
+    "Override default AI model"
+  )
+  .option(
+    "-a, --account <size>",
+    "Account size in dollars",
+    "1500"
+  )
+  .option(
+    "-v, --verbose",
+    "Show detailed analysis",
+    false
+  )
+  .action(async (opts: {
+    aiMode: string;
+    aiModel?: string;
+    account: string;
+    verbose: boolean;
+  }) => {
+    // Validate AI mode
+    if (!["local", "cloud"].includes(opts.aiMode)) {
+      console.log(chalk.red(`  Invalid --ai-mode: ${opts.aiMode}`));
+      console.log(chalk.gray("  Valid options: local, cloud"));
+      process.exit(1);
+    }
+
+    const options: ShortTermOptions = {
+      aiMode: opts.aiMode as OllamaMode,
+      aiModel: opts.aiModel,
+      accountSize: parseInt(opts.account, 10) || 1500,
+      verbose: opts.verbose,
+    };
+
+    await shortTermCommand(options);
+  });
+
+// ============================================================================
 // HELP EXAMPLES
 // ============================================================================
 
 program.on("--help", () => {
   console.log();
   console.log("Examples:");
+  console.log("  $ bun run debug NVDA               # Show ALL raw context (no AI call)");
+  console.log("  $ bun run debug NVDA --compact     # Shorter output, hide PFV details");
+  console.log();
   console.log("  $ bun run chat                     # Talk to your AI Analyst");
   console.log("  $ bun run chat --account 3000      # With custom account size");
   console.log();
-  console.log("  $ bun run positions                # View open positions");
-  console.log("  $ bun run positions --analyze      # With Victor's analysis");
-  console.log("  $ bun run position-add NVDA 165 170 'Jan 17' 3.80");
-  console.log("  $ bun run position-close NVDA --reason 'Hit target'");
+  console.log("  $ bun run short-term               # Scan SPY/QQQ for swing trades");
+  console.log("  $ bun run short-term --account 500 # With custom account size");
   console.log();
   console.log("  $ bun run watch list               # View watchlist");
   console.log("  $ bun run watch add NVDA AAPL      # Add tickers to watchlist");

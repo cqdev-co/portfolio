@@ -176,6 +176,130 @@ Full scan of 1,605 symbols with updated algorithm:
 - **Breakout detection fixed**: Majority of signals show 🚀 breakout indicator
 - **Volume signals working**: Most S/A-Tier have 5.0x+ volume spikes
 
+---
+
+## 📊 Week 1 Performance Review (Dec 14-19, 2025)
+
+### Results vs Targets
+
+| Metric | Before (Nov) | Week 1 (Dec) | Target | Status |
+|--------|--------------|--------------|--------|--------|
+| Win Rate | 20% | **41.3%** | 40%+ | ✅ Met! |
+| Avg Return | -8.28% | **-1.31%** | +5% | 🔄 Improved |
+| Stop Loss Hits | 60% | **15.5%** | <30% | ✅ Met! |
+| Breakout Detection | 5.2% | **37.8%** | 20%+ | ✅ Met! |
+
+### Deep Analysis Findings
+
+**By Volume Ratio:**
+| Volume | Win Rate | Avg Return | Analysis |
+|--------|----------|------------|----------|
+| 1-2x | 33.3% | -3.58% | Too low |
+| **2-5x** | **50%+** | **+1.9%** | ✅ SWEET SPOT |
+| 5-10x | 50.0% | -0.59% | Okay |
+| **10x+** | **34.1%** | **-3.16%** | 🚨 PUMP & DUMP |
+
+**By Pattern:**
+| Pattern | Win Rate | Avg Return |
+|---------|----------|------------|
+| **Breakout Only** | **48.7%** | **+1.23%** |
+| Neither | 20.4% | -6.97% |
+
+**By Country:**
+| Country | Win Rate | Avg Return |
+|---------|----------|------------|
+| United States | 45.2% | -0.34% |
+| China/HK | 47.1% | -3.24% |
+| **Israel** | **0%** | -2.81% |
+| **Malaysia** | **18.2%** | -4.54% |
+| **Greece** | **12.5%** | -1.91% |
+
+**By Recommendation (ISSUE FOUND!):**
+| Recommendation | Win Rate | Avg Return |
+|----------------|----------|------------|
+| **STRONG_BUY** | **61.5%** | **+4.15%** |
+| **BUY** | **25.5%** | **-5.93%** 🚨 |
+| WATCH | 41.0% | +2.14% |
+| HOLD | 50.4% | +0.35% |
+
+**Market Outperformance (STRONGEST SIGNAL!):**
+| Condition | Win Rate | Avg Return |
+|-----------|----------|------------|
+| **Outperforming SPY** | **63.6%** | **+4.56%** |
+| Underperforming | 36.0% | -2.73% |
+
+---
+
+## 🔧 Week 1 Improvements Implemented (Dec 19, 2025)
+
+### 1. Country Risk Filter 🌍
+**Problem**: Stocks from certain countries showed 0-18% win rates.
+
+**Fix**: 
+- Added country detection via yfinance
+- High-risk countries demote signal by 1 tier
+- Countries flagged: Israel, Malaysia, Greece, Australia, Cayman Islands, British Virgin Islands
+- Moderate risk (flagged): China, Hong Kong
+
+```python
+if is_high_risk_country:
+    opportunity_rank = demote_rank(opportunity_rank)
+```
+
+### 2. Volume Ceiling (Anti-Pump-and-Dump) 📉
+**Problem**: 10x+ volume showed 34% WR, -3.16% returns (likely pump-and-dumps).
+
+**Fix**:
+- Volume sweet spot: 2-5x (full credit)
+- 5-10x: Slight penalty (80% credit)
+- **10x+: Major penalty (50% credit)**
+
+```python
+if volume_ratio >= 10.0:
+    surge_score = 0.50  # Penalize extreme volume
+elif 2.0 <= volume_ratio <= 5.0:
+    surge_score = 1.0   # Optimal zone
+```
+
+### 3. Fixed BUY Recommendation 🛠️
+**Problem**: BUY had 25.5% WR vs STRONG_BUY 61.5% - criteria too loose.
+
+**Fix**: Now requires BOTH:
+- Breakout confirmation (48.7% WR vs 20.4%)
+- Market outperformance (63.6% WR vs 36%)
+
+| Rec | New Criteria |
+|-----|--------------|
+| STRONG_BUY | Score ≥0.80 + breakout + outperforming + 3x volume |
+| BUY | Score ≥0.72 + breakout + outperforming + 2x volume |
+| WATCH | Breakout OR outperforming |
+| HOLD | Neither or high risk |
+
+### 4. Increased Market Outperformance Weight 📈
+**Problem**: Only 8% weight despite being strongest predictor (63.6% vs 36% WR).
+
+**Fix**: Increased from 8% to **15%** of total score.
+
+### 5. Breakout Required for B/C Tier 🚀
+**Problem**: Non-breakout signals had 20.4% WR, -6.97% returns.
+
+**Fix**: B/C tier signals without breakout are demoted to next tier.
+
+```python
+if not is_breakout and rank in (B_TIER, C_TIER):
+    rank = demote_rank(rank)
+```
+
+### 6. Pump-and-Dump Warning Flag ⚠️
+**Problem**: Extreme volume + high score + risky characteristics = P&D trap.
+
+**Fix**: Added `pump_dump_warning` flag when:
+- Volume ≥ 10x AND
+- Score ≥ 0.75 AND
+- (High-risk country OR price < $0.50)
+
+---
+
 ## 📅 Future Improvements
 
 1. **Backtest improvements** - Validate changes on historical data
@@ -183,18 +307,29 @@ Full scan of 1,605 symbols with updated algorithm:
 
 ## 📝 Files Modified/Added
 
-**Modified:**
+**Modified (Dec 14):**
 - `src/penny_scanner/services/analysis_service.py` - Stop loss, breakout, scoring fixes, SPY integration
 - `src/penny_scanner/services/signal_continuity_service.py` - Weekend/holiday bug fix
 - `src/penny_scanner/config/settings.py` - Threshold adjustments, Discord config
 - `src/penny_scanner/cli.py` - Discord alert integration
+
+**Modified (Dec 19 - Week 1 Improvements):**
+- `src/penny_scanner/services/analysis_service.py` - Country detection, volume ceiling, BUY fix, breakout requirements
+- `src/penny_scanner/config/settings.py` - Market outperformance weight (8%→15%), high-risk countries, volume ceiling
+- `src/penny_scanner/models/analysis.py` - Added country, is_high_risk_country, pump_dump_warning fields
+- `src/penny_scanner/services/database_service.py` - Store new country/warning fields
+- `frontend/src/lib/types/penny-stock.ts` - Added new TypeScript types
+- `frontend/src/app/penny-stock-scanner/page.tsx` - Display warnings in table and sidebar
+- `db/penny_stock_signals.sql` - Added country, is_high_risk_country, pump_dump_warning columns
 
 **Added:**
 - `src/penny_scanner/services/discord_service.py` - Discord notification service
 - `src/penny_scanner/services/market_comparison_service.py` - SPY comparison service
 - `src/penny_scanner/services/profit_target_checker.py` - Profit target tracking
 - `db/penny_signal_performance.sql` - Performance tracking schema
-- `scripts/analyze_performance.py` - New analysis script
+- `scripts/analyze_performance.py` - Performance analysis script
+- `scripts/deep_analysis.py` - Deep dive analysis by factor
+- `scripts/price_analysis.py` - Price range analysis
 
 ## ⚠️ Breaking Changes
 

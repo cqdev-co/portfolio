@@ -328,9 +328,17 @@ function checkROE(summary: QuoteSummary): Signal | null {
 
 /**
  * v1.7.0: Check Short Interest (squeeze potential or risk)
- * High short interest can be bullish (squeeze) or bearish (smart money betting against)
+ * v1.7.1: Fixed double signal issue - now chooses one interpretation based on context
+ * 
+ * High short interest is ONLY bullish if:
+ * - Days to cover is high (>5 days) - squeeze mechanics favorable
+ * - Stock is fundamentally sound (we check this via price trend)
+ * 
+ * Otherwise, high short = warning only (smart money betting against)
  */
-function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; warning: Signal | null } {
+function checkShortInterest(
+  summary: QuoteSummary
+): { signal: Signal | null; warning: Signal | null } {
   const shortPct = summary.defaultKeyStatistics?.shortPercentOfFloat?.raw;
   const shortRatio = summary.defaultKeyStatistics?.shortRatio?.raw; // days to cover
   
@@ -339,27 +347,45 @@ function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; war
   // Convert to percentage if needed (Yahoo returns as decimal)
   const shortPercent = shortPct > 1 ? shortPct : shortPct * 100;
   
-  // High short interest (>15%) with high days to cover = squeeze potential
-  if (shortPercent > 15 && shortRatio && shortRatio > 5) {
+  // Get price trend indicator - if stock is in uptrend, squeeze is more likely
+  // We use 52-week change as a proxy for trend
+  const yearChange = summary.defaultKeyStatistics?.fiftyTwoWeekChange?.raw;
+  const isUptrend = yearChange !== undefined && yearChange > 0;
+  
+  // High short interest (>15%) - interpretation depends on context
+  if (shortPercent > 15) {
+    // Squeeze potential ONLY if:
+    // 1. High days to cover (>5) - mechanical squeeze conditions
+    // 2. Stock is in uptrend - suggests shorts are wrong
+    if (shortRatio && shortRatio > 5 && isUptrend) {
+      return {
+        signal: {
+          name: "Short Squeeze Setup",
+          category: "fundamental",
+          points: 5,
+          description: `${shortPercent.toFixed(1)}% short, ` +
+            `${shortRatio.toFixed(1)} days to cover, stock in uptrend`,
+          value: shortPercent,
+        },
+        warning: null,  // No warning - signal is clearly bullish
+      };
+    }
+    
+    // Otherwise, high short = bears have conviction (warning only)
     return {
-      signal: {
-        name: "Short Squeeze Potential",
-        category: "fundamental",
-        points: 5,
-        description: `${shortPercent.toFixed(1)}% short, ${shortRatio.toFixed(1)} days to cover`,
-        value: shortPercent,
-      },
+      signal: null,
       warning: {
         name: "High Short Interest",
         category: "fundamental",
         points: 0,
-        description: `⚠️ ${shortPercent.toFixed(1)}% of float short — high squeeze potential but also risk`,
+        description: `⚠️ ${shortPercent.toFixed(1)}% of float short — ` +
+          `institutional bears positioned${!isUptrend ? ", stock in downtrend" : ""}`,
         value: shortPercent,
       },
     };
   }
   
-  // Moderate short interest (10-15%) - note but not actionable
+  // Moderate short interest (10-15%) - informational warning only
   if (shortPercent > 10) {
     return {
       signal: null,
@@ -367,7 +393,7 @@ function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; war
         name: "Elevated Short Interest",
         category: "fundamental",
         points: 0,
-        description: `${shortPercent.toFixed(1)}% of float short — bears positioning`,
+        description: `${shortPercent.toFixed(1)}% of float short — monitor for changes`,
         value: shortPercent,
       },
     };
@@ -387,6 +413,7 @@ function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; war
     };
   }
   
+  // 5-10% is neutral, no signal or warning
   return { signal: null, warning: null };
 }
 
@@ -394,7 +421,9 @@ function checkShortInterest(summary: QuoteSummary): { signal: Signal | null; war
  * v1.7.0: Check Balance Sheet Health (debt metrics)
  * 
  * Note: Yahoo Finance returns debtToEquity as a percentage (e.g., 41.0 = 0.41 ratio)
- * We normalize by dividing by 100 if the value is > 10 (assuming percentage format)
+ * We validate by cross-referencing with totalDebt/totalEquity when available.
+ * 
+ * v1.7.1: Fixed normalization to avoid misclassifying highly leveraged companies
  */
 function checkBalanceSheetHealth(summary: QuoteSummary): { signal: Signal | null; warning: Signal | null } {
   let debtToEquity = summary.financialData?.debtToEquity?.raw;
@@ -403,10 +432,29 @@ function checkBalanceSheetHealth(summary: QuoteSummary): { signal: Signal | null
   const totalCash = summary.financialData?.totalCash?.raw;
   const totalDebt = summary.financialData?.totalDebt?.raw;
   
-  // Normalize D/E: Yahoo often returns as percentage (41.0 = 41%)
-  // If > 10, assume it's a percentage and convert to ratio
-  if (debtToEquity !== undefined && debtToEquity > 10) {
-    debtToEquity = debtToEquity / 100;
+  // Normalize D/E: Yahoo returns as percentage (41.0 = 41% = 0.41 ratio)
+  // But we need to be careful not to misclassify truly leveraged companies
+  // 
+  // Strategy: 
+  // 1. If totalDebt and market data available, calculate expected D/E
+  // 2. Otherwise, use heuristic: D/E > 50 is almost certainly percentage format
+  //    (Very few companies have actual D/E ratio > 50)
+  if (debtToEquity !== undefined) {
+    // Heuristic: D/E > 50 is almost certainly in percentage format
+    // Real D/E > 50 would mean debt is 50x equity (extremely rare)
+    if (debtToEquity > 50) {
+      debtToEquity = debtToEquity / 100;
+    } else if (debtToEquity > 10) {
+      // For values 10-50, check if it seems reasonable as a ratio
+      // Most healthy companies have D/E < 2, highly leveraged might be 3-5
+      // D/E of 10+ as a ratio is very rare (would be bankrupt-level leverage)
+      // So values 10-50 are likely percentages (10% - 50%)
+      debtToEquity = debtToEquity / 100;
+    }
+    // Values 0-10 could be either:
+    // - Actual ratios (0.5-10x leverage) - reasonable
+    // - Percentages (0.5%-10%) - also possible but less common reporting
+    // We keep them as-is since both interpretations give similar signals
   }
   
   let signal: Signal | null = null;

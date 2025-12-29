@@ -6,27 +6,22 @@
 import chalk from "chalk";
 import {
   getWatchlist,
-  getPositions,
   getConfig,
   createAlert,
   logScan,
   checkAlertCooldown,
   updateAlertCooldown,
   type WatchlistItem,
-  type Position,
   type AlertType,
 } from "../services/supabase.ts";
 import { scanForOpportunities, type ScanResult } from "../services/scanner.ts";
-import { 
+import {
   sendDiscordAlert, 
   sendEntrySignal, 
-  sendPositionRisk,
   isDiscordConfigured,
 } from "../services/discord.ts";
 import {
   evaluateEntrySignal,
-  evaluatePositionRisk,
-  buildPositionRiskAlert,
   shouldSendAlert,
   type AlertDecision,
   type MarketContext,
@@ -244,10 +239,9 @@ async function runScan(config: AgentConfig): Promise<void> {
   const startTime = Date.now();
 
   try {
-    // Get watchlist, positions, and market regime in parallel
-    const [watchlist, positions, regime] = await Promise.all([
+    // Get watchlist and market regime in parallel
+    const [watchlist, regime] = await Promise.all([
       getWatchlist(),
-      getPositions(),
       getMarketRegime(),
     ]);
 
@@ -265,7 +259,7 @@ async function runScan(config: AgentConfig): Promise<void> {
     };
 
     // Scan watchlist tickers
-    const tickers = watchlist.map(w => w.ticker);
+    const tickers = watchlist.map((w: WatchlistItem) => w.ticker);
     const results = await scanForOpportunities(tickers, {
       minGrade: "C",
       maxRisk: 10,
@@ -277,13 +271,13 @@ async function runScan(config: AgentConfig): Promise<void> {
     const debugRejections: { ticker: string; reason: string; grade: string; adjustments?: string[] }[] = [];
     
     for (const result of results) {
-      const watchlistItem = watchlist.find(w => w.ticker === result.ticker);
+      const watchlistItem = watchlist.find((w: WatchlistItem) => w.ticker === result.ticker);
       if (!watchlistItem) continue;
 
       // Check entry signal with market context
       const decision = evaluateEntrySignal(result, watchlistItem, marketContext);
       if (decision.trigger) {
-        const sent = await processAlert(decision, config, positions);
+        const sent = await processAlert(decision, config);
         if (sent) alertsTriggered++;
       } else if (config.debug) {
         // Log rejection reason in debug mode
@@ -294,18 +288,6 @@ async function runScan(config: AgentConfig): Promise<void> {
           grade: result.grade.grade,
           adjustments,
         });
-      }
-    }
-
-    // Check position risks
-    for (const position of positions) {
-      const result = results.find(r => r.ticker === position.ticker);
-      const riskCheck = evaluatePositionRisk(position, result?.price);
-      
-      if (riskCheck.needsAlert) {
-        const decision = buildPositionRiskAlert(riskCheck);
-        const sent = await processAlert(decision, config, positions);
-        if (sent) alertsTriggered++;
       }
     }
 
@@ -377,8 +359,7 @@ async function runScan(config: AgentConfig): Promise<void> {
  */
 async function processAlert(
   decision: AlertDecision,
-  config: AgentConfig,
-  positions: Position[]
+  config: AgentConfig
 ): Promise<boolean> {
   const ticker = decision.data.ticker as string;
 
@@ -398,7 +379,7 @@ async function processAlert(
       const review = await reviewAlert(
         decision.data as unknown as ScanResult,
         decision.alertType,
-        { regime, positions, recentAlerts: [] },
+        { regime, recentAlerts: [] },
         { aiMode: config.aiMode, aiModel: config.aiModel }
       );
 
@@ -465,19 +446,6 @@ async function processAlert(
         spread: data.spread,
         aiCommentary: aiReasoning,
         conviction: aiConviction,
-      });
-    } else if (decision.alertType === "POSITION_RISK") {
-      const data = decision.data as {
-        ticker: string;
-        risks: { message: string }[];
-      };
-
-      await sendPositionRisk({
-        ticker: data.ticker,
-        reason: decision.reason,
-        details: data.risks.map(r => r.message).join("; "),
-        action: "Review position and consider exit",
-        priority: decision.priority,
       });
     }
   }

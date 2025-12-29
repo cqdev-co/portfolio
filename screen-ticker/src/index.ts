@@ -292,18 +292,24 @@ function getQuickDecision(score: StockScore): QuickDecisionResult {
     issues.push("Below MA200");
   }
 
-  // Check 2: RSI not overbought (look for RSI signal)
+  // Check 2: RSI not overbought (use numeric value, not string matching)
   const rsiSignal = score.signals.find(s => 
     s.name.toLowerCase().includes("rsi")
   );
-  if (rsiSignal) {
-    const rsiDesc = rsiSignal.description.toLowerCase();
-    if (rsiDesc.includes("oversold") || rsiDesc.includes("neutral")) {
+  if (rsiSignal && typeof rsiSignal.value === "number") {
+    const rsiValue = rsiSignal.value;
+    if (rsiValue < 70) {
       checks.rsiOK = true;
-    } else if (rsiDesc.includes("overbought")) {
+    } else {
+      issues.push(`RSI overbought (${rsiValue.toFixed(0)})`);
+    }
+  } else if (rsiSignal) {
+    // Fallback to string matching if no numeric value
+    const rsiDesc = rsiSignal.description.toLowerCase();
+    if (rsiDesc.includes("overbought")) {
       issues.push("RSI overbought");
     } else {
-      checks.rsiOK = true; // Assume OK if not explicitly overbought
+      checks.rsiOK = true;
     }
   } else {
     checks.rsiOK = true; // No RSI signal = assume OK

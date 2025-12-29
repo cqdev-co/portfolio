@@ -153,6 +153,7 @@ function checkRecentUpgrades(
 
 /**
  * Check recommendation trend (buy/sell ratio)
+ * v1.7.1: Relaxed thresholds to catch more valid consensus signals
  */
 function checkRecommendationTrend(summary: QuoteSummary): Signal | null {
   const trends = summary.recommendationTrend?.trend;
@@ -174,15 +175,40 @@ function checkRecommendationTrend(summary: QuoteSummary): Signal | null {
 
   const bullish = strongBuy + buy;
   const bearish = sell + strongSell;
+  const bullishRatio = bullish / totalAnalysts;
 
-  // Strong buy consensus
-  if (bullish > bearish * 3 && bullish >= 5) {
+  // Strong buy consensus (relaxed: 70%+ bullish with at least 3 analysts)
+  // Old: bullish > bearish * 3 AND bullish >= 5 (too strict)
+  // New: 70%+ bullish AND at least 3 bullish ratings
+  if (bullishRatio >= 0.70 && bullish >= 3) {
     return {
       name: "Strong Buy Consensus",
       category: "analyst",
-      points: 5, // Bonus signal
-      description: `${bullish} Buy vs ${bearish} Sell ratings`,
-      value: bullish / totalAnalysts,
+      points: 5,
+      description: `${bullish} Buy vs ${bearish} Sell (${(bullishRatio * 100).toFixed(0)}% bullish)`,
+      value: bullishRatio,
+    };
+  }
+
+  // Moderate buy consensus (60%+ bullish with at least 4 analysts)
+  if (bullishRatio >= 0.60 && bullish >= 4) {
+    return {
+      name: "Buy Consensus",
+      category: "analyst",
+      points: 3,
+      description: `${bullish} Buy vs ${bearish} Sell (${(bullishRatio * 100).toFixed(0)}% bullish)`,
+      value: bullishRatio,
+    };
+  }
+
+  // Mixed but leaning bullish (more buys than sells with decent coverage)
+  if (bullish > bearish && totalAnalysts >= 5 && bullishRatio >= 0.45) {
+    return {
+      name: "Leaning Bullish",
+      category: "analyst",
+      points: 2,
+      description: `${bullish} Buy vs ${bearish} Sell, ${hold} Hold`,
+      value: bullishRatio,
     };
   }
 

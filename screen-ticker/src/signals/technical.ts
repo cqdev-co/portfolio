@@ -564,15 +564,79 @@ function checkBollingerBands(
 }
 
 /**
+ * Signal group caps to prevent excessive scoring from related signals
+ * v1.7.1: Added to prevent MA-related signal stacking
+ */
+const SIGNAL_GROUP_CAPS: Record<string, { keywords: string[]; maxPoints: number }> = {
+  movingAverage: {
+    keywords: ["ma", "golden", "sma", "moving average"],
+    maxPoints: 15,  // Cap MA-related signals at 15 points
+  },
+  momentum: {
+    keywords: ["rsi", "macd", "obv"],
+    maxPoints: 12,  // Cap momentum indicators at 12 points
+  },
+  pricePosition: {
+    keywords: ["52-week", "support", "bollinger"],
+    maxPoints: 12,  // Cap price position signals at 12 points
+  },
+};
+
+/**
+ * Apply signal group caps to prevent related signals from stacking excessively
+ */
+function applySignalGroupCaps(signals: Signal[]): number {
+  let totalScore = 0;
+  const groupScores: Record<string, number> = {};
+
+  // Initialize group scores
+  for (const group of Object.keys(SIGNAL_GROUP_CAPS)) {
+    groupScores[group] = 0;
+  }
+
+  for (const signal of signals) {
+    const signalNameLower = signal.name.toLowerCase();
+    let assignedToGroup = false;
+
+    // Check which group this signal belongs to
+    for (const [groupName, config] of Object.entries(SIGNAL_GROUP_CAPS)) {
+      const belongsToGroup = config.keywords.some(
+        kw => signalNameLower.includes(kw)
+      );
+
+      if (belongsToGroup) {
+        // Add points up to the group cap
+        const currentGroupScore = groupScores[groupName] ?? 0;
+        const pointsToAdd = Math.min(
+          signal.points,
+          config.maxPoints - currentGroupScore
+        );
+        groupScores[groupName] = currentGroupScore + pointsToAdd;
+        totalScore += pointsToAdd;
+        assignedToGroup = true;
+        break;
+      }
+    }
+
+    // If signal doesn't belong to any capped group, add full points
+    if (!assignedToGroup) {
+      totalScore += signal.points;
+    }
+  }
+
+  return totalScore;
+}
+
+/**
  * Calculate all technical signals for a stock
  * v1.7.0: Added ADX trend strength and Bollinger Band signals
+ * v1.7.1: Added signal group caps to prevent stacking
  */
 export function calculateTechnicalSignals(
   quote: QuoteData,
   historical: HistoricalData[]
 ): TechnicalResult {
   const signals: Signal[] = [];
-  let score = 0;
 
   if (historical.length < 20) {
     return { score: 0, signals: [] };
@@ -586,82 +650,74 @@ export function calculateTechnicalSignals(
   const rsiSignal = checkRSI(closes);
   if (rsiSignal) {
     signals.push(rsiSignal);
-    score += rsiSignal.points;
   }
 
   // Golden Cross
   const goldenCrossSignal = checkGoldenCross(closes);
   if (goldenCrossSignal) {
     signals.push(goldenCrossSignal);
-    score += goldenCrossSignal.points;
   }
 
   // MA Position (graduated based on how many MAs price is above)
   const maPositionSignals = checkMAPosition(currentPrice ?? 0, closes);
   for (const signal of maPositionSignals) {
     signals.push(signal);
-    score += signal.points;
   }
 
   // MA Proximity (near key MA levels)
   const maProximitySignal = checkMAProximity(currentPrice ?? 0, closes);
   if (maProximitySignal) {
     signals.push(maProximitySignal);
-    score += maProximitySignal.points;
   }
 
   // Volume Surge
   const volumeSignal = checkVolumeSurge(volumes, quote);
   if (volumeSignal) {
     signals.push(volumeSignal);
-    score += volumeSignal.points;
   }
 
   // Near Support
   const supportSignal = checkNearSupport(currentPrice ?? 0, historical);
   if (supportSignal) {
     signals.push(supportSignal);
-    score += supportSignal.points;
   }
 
   // OBV Trend
   const obvSignal = checkOBVTrend(closes, volumes);
   if (obvSignal) {
     signals.push(obvSignal);
-    score += obvSignal.points;
   }
 
   // MACD
   const macdSignal = checkMACD(closes);
   if (macdSignal) {
     signals.push(macdSignal);
-    score += macdSignal.points;
   }
 
   // 52-Week Position
   const weekPositionSignal = check52WeekPosition(currentPrice ?? 0, historical);
   if (weekPositionSignal) {
     signals.push(weekPositionSignal);
-    score += weekPositionSignal.points;
   }
 
   // v1.7.0: ADX Trend Strength
   const adxSignal = checkADX(historical);
   if (adxSignal) {
     signals.push(adxSignal);
-    score += adxSignal.points;
   }
 
   // v1.7.0: Bollinger Bands position
   const bbSignal = checkBollingerBands(closes, currentPrice ?? 0);
   if (bbSignal) {
     signals.push(bbSignal);
-    score += bbSignal.points;
   }
 
-  // Cap at 50 points
+  // v1.7.1: Apply signal group caps to prevent stacking
+  const cappedScore = applySignalGroupCaps(signals);
+
+  // Cap at 50 points total
   return { 
-    score: Math.min(score, 50), 
+    score: Math.min(cappedScore, 50), 
     signals 
   };
 }

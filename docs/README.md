@@ -55,7 +55,7 @@ CLI tool for identifying high-conviction stock buy opportunities.
 - **Key Features**: Narrative analysis, ASCII charts, AI-first architecture (v2.0.0), position management
 - **New (v2.0.0)**: AI-first architecture, cloud mode default, simplified CLI
 - **Status**: Production-ready (v2.0.0)
-- [README](stock-scanner/README.md) | [Roadmap](stock-scanner/roadmap.md)
+- [README](stock-scanner/README.md) | [Roadmap](stock-scanner/roadmap.md) | [Scan Analysis](screen-ticker/scan-command-analysis.md)
 
 #### [AI Analyst "Victor Chen"](ai-analyst/) 🆕 ✅ Updated Dec 2025
 AI "Employee" - a 67-year-old veteran Wall Street analyst with 45 years experience.
@@ -77,6 +77,14 @@ Modern trading dashboard for market overview and opportunity detection.
 - **Key Features**: Credit spread detection, market overview, sector analysis, configurable strategies
 - **Status**: Production-ready
 - [README](odyssey/README.md) | [Strategy Guide](odyssey/strategy-guide.md) | [User Guide](odyssey/user-guide.md)
+
+### Shared Libraries
+
+#### [AI Agent Shared Library](ai-agent/) 🆕 ✅ New Dec 2025
+Shared AI agent logic for CLI (ai-analyst) and Frontend chat.
+- **Components**: Victor persona prompts, tool definitions, question classification
+- **Benefits**: Single source of truth, CLI testing → Frontend deployment
+- [Integration Plan](ai-agent/INTEGRATION_PLAN.md) | [Library Guide](ai-agent/SHARED_LIBRARY.md)
 
 ### Supporting Services
 
@@ -271,6 +279,6 @@ Proprietary software. All rights reserved.
 
 ---
 
-**Last Updated**: 2025-12-07
-**Services Count**: 10 active services
+**Last Updated**: 2025-12-27
+**Services Count**: 10 active services + 1 shared library
 **Documentation Coverage**: 100%

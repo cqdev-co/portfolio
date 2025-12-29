@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS penny_stock_signals (
     atr_20 DECIMAL(10,4),
     pump_dump_risk VARCHAR(10),
     
+    -- Country risk (added Dec 2024)
+    country VARCHAR(50),
+    is_high_risk_country BOOLEAN DEFAULT FALSE,
+    pump_dump_warning BOOLEAN DEFAULT FALSE,
+    
     -- Trend context
     trend_direction VARCHAR(10),
     

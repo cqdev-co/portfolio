@@ -10,7 +10,7 @@
  */
 
 import type { ScanResult } from "../services/scanner.ts";
-import type { WatchlistItem, Position, AlertType, AlertPriority } from "../services/supabase.ts";
+import type { WatchlistItem, AlertType, AlertPriority } from "../services/supabase.ts";
 
 // ============================================================================
 // TYPES

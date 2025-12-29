@@ -62,3 +62,9 @@ wp-service/src/**/__pycache__/
 volatility-squeeze-scanner/exports/
 volatility-squeeze-scanner/__pycache__/
 volatility-squeeze-scanner/src/**/__pycache__/
+
+# ai-analyst debug logs
+ai-analyst/logs/
+
+# lib/ai-agent generated files
+lib/ai-agent/bun.lock

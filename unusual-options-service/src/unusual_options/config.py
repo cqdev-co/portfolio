@@ -45,8 +45,22 @@ def load_config() -> Dict[str, Any]:
         "MIN_MARKET_CAP": float(os.getenv("MIN_MARKET_CAP", "1000000000")),
         "MIN_AVG_VOLUME": int(os.getenv("MIN_AVG_VOLUME", "1000000")),
         "MIN_OPTION_VOLUME": int(os.getenv("MIN_OPTION_VOLUME", "100")),
-        "MIN_DTE_ALL_TICKERS": int(os.getenv("MIN_DTE_ALL_TICKERS", "2")),  # Universal 0DTE filter (filters 0DTE and 1DTE)
         "ENABLE_MEME_STOCK_FILTERING": os.getenv("ENABLE_MEME_STOCK_FILTERING", "true").lower() == "true",
+        
+        # DTE Filtering (based on performance analysis)
+        # Analysis showed: Short DTE (≤10d) = 27% win rate, Mid DTE (11-21d) = 60% win rate
+        "MIN_DTE_ALL_TICKERS": int(os.getenv("MIN_DTE_ALL_TICKERS", "10")),  # Minimum DTE for all tickers
+        "MIN_DTE_HIGH_0DTE_TICKERS": int(os.getenv("MIN_DTE_HIGH_0DTE_TICKERS", "14")),  # Stricter for TSLA, SPY, etc.
+        "MIN_DTE_STANDARD": int(os.getenv("MIN_DTE_STANDARD", "10")),  # Standard DTE filter
+        
+        # Hedge Detection (smarter than blanket PUT exclusion)
+        # Note: Don't exclude all PUTs - in bearish weeks they could be the edge
+        # Instead, flag likely hedges based on patterns
+        "EXCLUDE_PUT_SIGNALS": os.getenv("EXCLUDE_PUT_SIGNALS", "false").lower() == "true",
+        "FLAG_LIKELY_HEDGES": os.getenv("FLAG_LIKELY_HEDGES", "true").lower() == "true",
+        
+        # Ticker Caps (prevent single ticker from dominating)
+        "MAX_SIGNALS_PER_TICKER": int(os.getenv("MAX_SIGNALS_PER_TICKER", "3")),  # Reduced from 5
         
         # Alerts
         "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_UOS_WEBHOOK_URL", os.getenv("DISCORD_WEBHOOK_URL", "")),

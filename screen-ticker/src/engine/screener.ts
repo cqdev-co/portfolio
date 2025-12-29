@@ -196,42 +196,62 @@ export async function analyzeTicker(
 /**
  * Scan multiple tickers with progress logging
  * v1.4.1: Reduced verbosity for skipped tickers
+ * v1.7.1: Batch concurrent scanning for 3-5x performance improvement
  */
 export async function scanTickers(
   tickers: string[],
-  options: { verbose?: boolean } = {}
+  options: { verbose?: boolean; batchSize?: number } = {}
 ): Promise<StockScore[]> {
   const results: StockScore[] = [];
   const total = tickers.length;
   let skipped = 0;
+  let processed = 0;
 
-  logger.info(`Scanning ${total} tickers...`);
+  // Batch size: balance between speed and rate limiting
+  // 5 concurrent requests is safe for Yahoo Finance
+  const BATCH_SIZE = options.batchSize ?? 5;
 
-  for (let i = 0; i < tickers.length; i++) {
-    const ticker = tickers[i];
-    if (!ticker) continue;
+  logger.info(`Scanning ${total} tickers (batch size: ${BATCH_SIZE})...`);
 
-    if (options.verbose) {
-      logger.debug(`[${i + 1}/${total}] Scanning ${ticker}...`);
-    } else if (i % 100 === 0 && i > 0) {
-      // Progress update every 100 tickers
-      logger.info(`Progress: ${i}/${total} tickers scanned...`);
+  // Process tickers in batches for concurrent execution
+  for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+    const batch = tickers.slice(i, i + BATCH_SIZE).filter(Boolean);
+    
+    // Process batch concurrently
+    const batchResults = await Promise.all(
+      batch.map(async (ticker) => {
+        if (options.verbose) {
+          logger.debug(`Scanning ${ticker}...`);
+        }
+        return {
+          ticker,
+          score: await scanTicker(ticker, { verbose: options.verbose }),
+        };
+      })
+    );
+
+    // Collect results
+    for (const { ticker, score } of batchResults) {
+      processed++;
+      if (score) {
+        results.push(score);
+
+        // Log high-scoring stocks immediately
+        if (score.totalScore >= 70) {
+          logger.ticker(
+            ticker,
+            score.totalScore,
+            score.signals.slice(0, 3).map((s) => s.name)
+          );
+        }
+      } else {
+        skipped++;
+      }
     }
 
-    const score = await scanTicker(ticker, { verbose: options.verbose });
-    if (score) {
-      results.push(score);
-
-      // Log high-scoring stocks immediately
-      if (score.totalScore >= 70) {
-        logger.ticker(
-          ticker,
-          score.totalScore,
-          score.signals.slice(0, 3).map((s) => s.name)
-        );
-      }
-    } else {
-      skipped++;
+    // Progress update every 50 tickers (or after each batch in verbose)
+    if (!options.verbose && processed % 50 < BATCH_SIZE && processed > 0) {
+      logger.info(`Progress: ${processed}/${total} tickers scanned...`);
     }
   }
 

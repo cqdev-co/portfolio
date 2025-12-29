@@ -2,24 +2,55 @@
 
 ## Overview
 
-Based on analysis of 20,391 signals over 30 days, several signal quality issues were identified and fixed.
+Based on analysis of signals over multiple weeks, several improvements were made.
 
-### Latest Update: Conviction-Based Scoring (Dec 12)
+### Latest Update: Performance-Based Filtering (Dec 20)
 
-Analysis of correct vs wrong signals revealed key predictors:
+After one week of collecting signals with the new algorithm, we analyzed actual 
+performance and made further refinements.
+
+#### Performance Analysis Results
+
+| Segment | Win Rate | Avg Return | Action |
+|---------|----------|------------|--------|
+| **Mid DTE CALLS (11-21d)** | **60.0%** | +0.83% | ✅ EDGE - Focus here |
+| Short DTE CALLS (≤10d) | 27.3% | -0.43% | ❌ NOISE - Filtered |
+| All PUT signals | 16.7% | +1.23%* | ❌ HEDGING - Excluded |
+
+*PUTs showed inverse returns: stock went UP when PUTs were detected (hedging)
+
+#### Key Findings
+
+1. **PUT signals are 73% hedging activity** - Excluded by default
+2. **Short DTE (≤10d) = noise** - Filtered out (27% win rate)
+3. **Mid DTE (11-21d) = edge** - 60% win rate, focus here
+4. **TSLA dominated but underperformed** - Capped to 3 signals
+
+#### New Filter Settings
+
+```python
+MIN_DTE_ALL_TICKERS = 10        # Filter all < 10 DTE
+MIN_DTE_HIGH_0DTE_TICKERS = 14  # Filter TSLA/SPY < 14 DTE
+EXCLUDE_PUT_SIGNALS = False     # Keep PUTs - they may be edge in bearish weeks
+FLAG_LIKELY_HEDGES = True       # Flag hedges instead of excluding
+MAX_SIGNALS_PER_TICKER = 3      # Prevent single ticker domination
+```
+
+**Note**: We don't exclude PUTs by default. Market conditions vary - in bearish 
+weeks, PUT signals could be the edge. Use `hedge_analyzer.py` to filter hedges 
+when analyzing, and track CALL vs PUT performance separately over time.
+
+---
+
+### Previous Updates
+
+#### Conviction-Based Scoring (Dec 12)
 
 | Metric | Correct Signals | Wrong Signals | Insight |
 |--------|-----------------|---------------|---------|
 | **CALL Avg Premium** | $23.3M | $3.3M | **7x higher!** |
 | **PUT Avg Premium** | $7.7M | $2.6M | 3x higher |
 | **CALL Avg DTE** | 14 days | 26 days | Shorter = more conviction |
-| **PUT Avg DTE** | 21 days | 34 days | Shorter = more conviction |
-
-New scoring adjustments implemented:
-- **Premium conviction bonus**: +15% for >$10M, +8% for >$5M
-- **DTE conviction bonus**: +10% for ≤14 days, +5% for ≤21 days
-- **OTM CALL penalty**: -12% for far OTM calls (speculative lottery tickets)
-- **Long-dated penalty**: -8% for DTE ≥35 days (more hedge-like)
 
 ---
 
@@ -28,7 +59,7 @@ New scoring adjustments implemented:
 | Grade Inflation | 51% were S-grade | Stricter scoring thresholds |
 | Short-DTE Noise | 35% were 0-7 DTE | Filter short-dated contracts |
 | Ticker Domination | TSLA alone = 11% of signals | Cap signals per ticker |
-| High-Volume Noise | TSLA/NVDA/SPY generate constant signals | Higher premium thresholds |
+| PUT Hedging | 73% of PUTs are hedges | Exclude PUT signals |
 
 ## Changes Made
 
@@ -127,35 +158,52 @@ ticker_penalty = 0.1 if ticker in HIGH_VOLUME_TICKERS else 0.0
 New/updated config options in `.env`:
 
 ```bash
-# Minimum DTE to filter (default: 7)
-MIN_DTE_FILTER=7
+# DTE Filtering (based on performance analysis)
+# Short DTE (≤10d) = 27% win rate, Mid DTE (11-21d) = 60% win rate
+MIN_DTE_ALL_TICKERS=10           # Minimum DTE for all tickers (default: 10)
+MIN_DTE_HIGH_0DTE_TICKERS=14     # Stricter for TSLA, SPY, etc. (default: 14)
+MIN_DTE_STANDARD=10              # Standard DTE filter (default: 10)
 
-# Minimum DTE for high 0DTE activity tickers (default: 7)
-MIN_DTE_HIGH_0DTE_TICKERS=7
+# Hedge Detection
+# Note: Don't exclude all PUTs - in bearish weeks they could be the edge
+EXCLUDE_PUT_SIGNALS=false        # Keep both CALLS and PUTS (default: false)
+FLAG_LIKELY_HEDGES=true          # Flag hedges for filtering during analysis
 
-# Minimum DTE for standard tickers (default: 5)
-MIN_DTE_STANDARD=5
+# Ticker Caps
+MAX_SIGNALS_PER_TICKER=3         # Max signals per ticker (default: 3)
 
-# Maximum signals per ticker in batch scans (default: 5)
-MAX_SIGNALS_PER_TICKER=5
-
-# Minimum premium for normal tickers (default: 500000)
-MIN_PREMIUM_FLOW=500000
+# Premium Thresholds
+MIN_PREMIUM_FLOW=500000          # Minimum premium (default: $500K)
 ```
 
 ## Expected Impact
 
-### Before (20,391 signals over 30 days):
-- 51% S-grade (no discrimination)
-- 35% 0-7 DTE (noise)
-- TSLA = 11% of all signals
-- 55% premium < $1M
+### Before (Week 1 - Original Algorithm):
+- 51% S-grade (grade inflation)
+- 33% 1-Day Win Rate (below coin flip)
+- 73% of signals were hedging activity
+- PUT signals acted as inverse indicators
 
-### After (expected):
-- ~5% S-grade (truly exceptional)
-- 0% 0-7 DTE (filtered)
-- Max 5 signals per ticker per scan
-- Higher premium bar for high-volume tickers
+### After (Week 2 - Performance-Based Filters):
+- Both CALLS and PUTS captured (market conditions vary)
+- Mid DTE (11-21d) focus = better signal quality
+- Max 3 signals per ticker
+- Hedge detection flags likely hedges for filtering
+- Track CALL vs PUT performance separately over time
+
+### Test Results (Dec 20):
+
+```
+Total signals found: 6 (down from hundreds)
+
+Grade Distribution:
+  S: 0 (0.0%)
+  A: 1 (16.7%)
+  B: 3 (50.0%)
+  C: 2 (33.3%)
+
+All CALLS, all 13-27 DTE (sweet spot)
+```
 
 ## Validation
 

@@ -22,7 +22,7 @@
       "@screen-ticker/*": ["../screen-ticker/src/*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../lib/**/*.ts"],
   "exclude": ["node_modules"]
 }
 

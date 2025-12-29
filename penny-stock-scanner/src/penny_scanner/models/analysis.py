@@ -143,6 +143,20 @@ class ExplosionSignal(BaseModel):
         description="Pump-and-dump risk level"
     )
     
+    # Country risk (added Dec 2024)
+    country: Optional[str] = Field(
+        None, description="Company country of origin"
+    )
+    is_high_risk_country: bool = Field(
+        default=False, description="Company from high-risk country (Israel, Malaysia, etc.)"
+    )
+    
+    # Pump-and-dump warning (added Dec 2024)
+    # Triggered by: extreme volume (10x+) + high score + (high-risk country OR sub-$0.50)
+    pump_dump_warning: bool = Field(
+        default=False, description="Warning flag for potential pump-and-dump"
+    )
+    
     # Trend context
     trend_direction: TrendDirection = Field(
         description="Current trend direction"

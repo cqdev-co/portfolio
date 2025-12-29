@@ -25,7 +25,7 @@ import {
   type StreamingAgentChunk,
   type StreamingAgentResult,
 } from "../services/ollama.ts";
-import { getAllTrades, getTradesByTicker, getPerformanceSummary, getPositions, getPositionsByTicker, isConfigured } from "../services/supabase.ts";
+import { getAllTrades, getTradesByTicker, getPerformanceSummary, isConfigured } from "../services/supabase.ts";
 import { 
   buildTickerHistory, 
   detectPatterns, 
@@ -69,11 +69,14 @@ import {
   type WebSearchResponse,
 } from "../services/web-search.ts";
 import { 
-  checkDataStaleness, 
   getMarketStatus,
   findSpreadWithAlternatives,
+  analyzePosition,
+  formatPositionAnalysisForAI,
   type DataQuality,
   type SpreadAlternatives,
+  type SpreadSelectionContext,
+  type PositionAnalysis,
 } from "../services/yahoo.ts";
 import { 
   performFullAnalysis, 
@@ -82,7 +85,30 @@ import {
   GRADE_RUBRIC,
   type AdvancedAnalysis,
 } from "../engine/trade-analyzer.ts";
+import {
+  getPsychologicalFairValue,
+} from "../services/psychological-fair-value.ts";
+import type { PsychologicalFairValue } from "../../../lib/utils/ts/psychological-fair-value/types.ts";
 import type { MarketRegime, Trade } from "../types/index.ts";
+
+// Shared AI Agent library (DATA PARITY: CLI uses same data as Frontend)
+import {
+  // Prompts
+  buildVictorSystemPrompt,
+  TOON_DECODER_SPEC,
+  // Tools
+  AGENT_TOOLS,
+  toOllamaTools,
+  // Classification
+  classifyQuestion as sharedClassifyQuestion,
+  extractTickers as sharedExtractTickers,
+  // DATA FETCHING (shared with Frontend for parity)
+  fetchTickerData as sharedFetchTickerData,
+  checkDataStaleness,
+  // Types
+  type QuestionClassification as SharedQuestionClassification,
+  type TickerData as SharedTickerData,
+} from "../../../lib/ai-agent/index.ts";
 
 // Instantiate yahoo-finance2
 const yahooFinance = new YahooFinance({
@@ -102,6 +128,55 @@ export interface ChatOptions {
 interface ConversationMessage {
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+interface AnalystRatings {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+  bullishPercent: number;
+}
+
+interface OwnershipData {
+  insidersPercent: number;
+  institutionsPercent: number;
+  recentSalesM: number;
+}
+
+interface TargetPrices {
+  low: number;
+  mean: number;
+  high: number;
+  upside: number;
+}
+
+interface PricePerformance {
+  day5: number;
+  month1: number;
+  month3: number;
+  ytd: number;
+}
+
+interface EarningsInfo {
+  date?: string;
+  daysUntil?: number;
+  streak?: number;
+  lastSurprise?: number;
+  avgSurprise?: number;
+}
+
+interface SectorContext {
+  name: string;
+  avgPE?: number;
+  vsAvg?: number;
+}
+
+interface VolumeAnalysisData {
+  todayPct: number;
+  trend: 'increasing' | 'stable' | 'declining';
+  unusualDays: number;
 }
 
 interface TickerData {
@@ -138,6 +213,34 @@ interface TickerData {
   supportResistance?: SupportResistance;
   news?: NewsItem[];
   dataQuality?: DataQuality;
+  // Psychological Fair Value
+  pfv?: PsychologicalFairValue;
+  // Analyst ratings
+  analystRatings?: AnalystRatings;
+  // Ownership data
+  ownership?: OwnershipData;
+  // Target prices
+  targetPrices?: TargetPrices;
+  // Price performance
+  performance?: PricePerformance;
+  // NEW: Additional context
+  earnings?: EarningsInfo;
+  sectorContext?: SectorContext;
+  volumeAnalysis?: VolumeAnalysisData;
+  // NEW: Historical volatility
+  hv20?: number;
+  // NEW: High-value additions
+  shortInterest?: {
+    shortPct: number;
+    shortRatio: number;
+  };
+  relativeStrength?: {
+    vsSPY: number;
+  };
+  optionsFlow?: {
+    pcRatioOI: number;
+    pcRatioVol: number;
+  };
 }
 
 // ============================================================================
@@ -166,187 +269,155 @@ async function getMarketRegime(): Promise<{ regime: MarketRegime; spyPrice: numb
   }
 }
 
-async function fetchTickerData(ticker: string, fetchOptions: boolean = true): Promise<TickerData | null> {
+/**
+ * Fetch ticker data using the SHARED LIBRARY for data parity with Frontend.
+ * 
+ * DATA PARITY: Both CLI and Frontend now use the same fetchTickerData from
+ * lib/ai-agent, ensuring identical data, spreads, IV, and PFV calculations.
+ * 
+ * CLI-specific enhancements (ownership, advanced analysis) are added on top.
+ */
+async function fetchTickerData(
+  ticker: string, 
+  _fetchOptions: boolean = true
+): Promise<TickerData | null> {
   try {
-    const quote = await yahooFinance.quote(ticker);
-    if (!quote?.regularMarketPrice) return null;
-
-    // Check data freshness
-    const dataQuality = checkDataStaleness(quote.regularMarketTime);
-
-    // Get historical for RSI
-    let rsi: number | undefined;
-    let ma20: number | undefined;
-    let ma50: number | undefined;
-    let ma200: number | undefined;
-    let adx: number | undefined;
-    let trendStrength: 'WEAK' | 'MODERATE' | 'STRONG' | undefined;
+    // Use SHARED library for data parity with Frontend
+    const sharedData = await sharedFetchTickerData(ticker);
+    if (!sharedData) return null;
     
+    console.log(`[CLI] Using shared fetchTickerData for ${ticker} (data parity)`);
+
+    // CLI-specific: Fetch additional ownership data (not in shared lib)
+    let ownership: OwnershipData | undefined;
     try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 365); // Need 365 days for MA200
-
-      const history = await yahooFinance.chart(ticker, {
-        period1: startDate,
-        period2: endDate,
-        interval: "1d",
+      const insights = await yahooFinance.quoteSummary(ticker, {
+        modules: ["majorHoldersBreakdown", "insiderTransactions"],
       });
-
-      if (history?.quotes && history.quotes.length >= 50) {
-        const closes = history.quotes
-          .map(q => q.close)
-          .filter((c): c is number => c !== null && c !== undefined);
+      
+      const holders = insights?.majorHoldersBreakdown;
+      const insiderTxns = insights?.insiderTransactions?.transactions ?? [];
+      
+      if (holders) {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const recentSales = insiderTxns
+          .filter(t => t.startDate && new Date(t.startDate) > sixMonthsAgo)
+          .filter(t => (t.shares ?? 0) < 0)
+          .reduce((sum, t) => sum + Math.abs((t.value ?? 0)), 0);
         
-        const highs = history.quotes
-          .map(q => q.high)
-          .filter((h): h is number => h !== null && h !== undefined);
-        
-        const lows = history.quotes
-          .map(q => q.low)
-          .filter((l): l is number => l !== null && l !== undefined);
-
-        if (closes.length >= 14) {
-          const rsiValues = RSI.calculate({ values: closes, period: 14 });
-          rsi = rsiValues[rsiValues.length - 1];
-        }
-        
-        // Calculate ADX for trend strength (needs high, low, close)
-        if (highs.length >= 28 && lows.length >= 28 && closes.length >= 28) {
-          try {
-            const adxValues = ADX.calculate({
-              high: highs,
-              low: lows,
-              close: closes,
-              period: 14,
-            });
-            if (adxValues.length > 0) {
-              adx = adxValues[adxValues.length - 1].adx;
-              // ADX interpretation: <20 = weak, 20-40 = moderate, >40 = strong
-              trendStrength = adx < 20 ? 'WEAK' : adx < 40 ? 'MODERATE' : 'STRONG';
-            }
-          } catch {
-            // ADX calculation can fail with certain data
-          }
-        }
-        
-        if (closes.length >= 20) {
-          const ma20Values = SMA.calculate({ values: closes, period: 20 });
-          ma20 = ma20Values[ma20Values.length - 1];
-        }
-        
-        if (closes.length >= 50) {
-          const ma50Values = SMA.calculate({ values: closes, period: 50 });
-          ma50 = ma50Values[ma50Values.length - 1];
-        }
-        
-        if (closes.length >= 200) {
-          const ma200Values = SMA.calculate({ values: closes, period: 200 });
-          ma200 = ma200Values[ma200Values.length - 1];
-        }
+        ownership = {
+          insidersPercent: (holders.insidersPercentHeld ?? 0) * 100,
+          institutionsPercent: (holders.institutionsPercentHeld ?? 0) * 100,
+          recentSalesM: Math.round(recentSales / 1e6),
+        };
       }
     } catch {
-      // Technical data optional
-    }
-
-    // Fetch options spread recommendation, earnings, and IV (if requested)
-    let spread: SpreadRecommendation | undefined;
-    let spreadAlternatives: SpreadRecommendation[] = [];
-    let spreadReason: string | undefined;
-    let earningsDays: number | null = null;
-    let earningsWarning = false;
-    let iv: IVAnalysis | undefined;
-    
-    // Fetch news
-    let news: NewsItem[] = [];
-    
-    if (fetchOptions) {
-      try {
-        // Fetch spreads with alternatives, earnings, IV, and news in parallel
-        // No budget limit - show best spreads regardless of cost
-        const [spreadResult, earningsResult, ivResult, newsResult] = await Promise.all([
-          findSpreadWithAlternatives(ticker, 30),
-          getEarningsInfo(ticker),
-          getIVAnalysis(ticker),
-          getTickerNews(ticker, 3),
-        ]);
+      // Ownership data optional
+        }
         
-        spread = spreadResult.primary ?? undefined;
-        spreadAlternatives = spreadResult.alternatives;
-        spreadReason = spreadResult.reason;
-        earningsDays = earningsResult.daysUntilEarnings;
-        earningsWarning = earningsResult.withinEarningsWindow;
-        iv = ivResult ?? undefined;
-        news = newsResult;
-      } catch {
-        // Options data optional
-      }
-    }
-
-    // Calculate support/resistance levels
+    // CLI-specific: Calculate support/resistance (for CLI display)
     const supportResistance = calculateSupportResistance({
-      currentPrice: quote.regularMarketPrice,
-      ma20,
-      ma50,
-      ma200,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? undefined,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? undefined,
+      currentPrice: sharedData.price,
+      ma20: sharedData.ma20,
+      ma50: sharedData.ma50,
+      ma200: sharedData.ma200,
+      fiftyTwoWeekLow: sharedData.fiftyTwoWeekLow,
+      fiftyTwoWeekHigh: sharedData.fiftyTwoWeekHigh,
     });
 
-    // Perform advanced analysis if we have spread data
+    // CLI-specific: Perform advanced trade analysis with grading
     let analysis: AdvancedAnalysis | undefined;
-    if (spread) {
+    if (sharedData.spread) {
       const analysisResult = performFullAnalysis({
-        ticker: quote.symbol ?? ticker,
-        price: quote.regularMarketPrice,
-        rsi,
-        ma200,
-        aboveMA200: ma200 ? quote.regularMarketPrice > ma200 : undefined,
-        earningsDays,
-        longStrike: spread.longStrike,
-        shortStrike: spread.shortStrike,
-        debit: spread.estimatedDebit,
-        dte: spread.dte,
-        accountSize: 1500,  // Default account size
+        ticker: sharedData.ticker,
+        price: sharedData.price,
+        rsi: sharedData.rsi,
+        ma200: sharedData.ma200,
+        aboveMA200: sharedData.aboveMA200,
+        earningsDays: sharedData.earningsDays ?? null,
+        longStrike: sharedData.spread.longStrike,
+        shortStrike: sharedData.spread.shortStrike,
+        debit: sharedData.spread.estimatedDebit,
+        dte: sharedData.spread.dte,
+        accountSize: 1500,
       });
       analysis = analysisResult ?? undefined;
     }
 
+    // Convert shared types to local types and merge CLI-specific data
+    // Note: Using type assertions for shared->local type compatibility
     return {
-      ticker: quote.symbol ?? ticker,
-      price: quote.regularMarketPrice,
-      change: quote.regularMarketChange ?? 0,
-      changePct: quote.regularMarketChangePercent ?? 0,
-      rsi,
-      aboveMA200: ma200 ? quote.regularMarketPrice > ma200 : undefined,
-      ma20,
-      ma50,
-      ma200,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? undefined,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? undefined,
-      // Fundamentals
-      marketCap: quote.marketCap ?? undefined,
-      peRatio: quote.trailingPE ?? undefined,
-      forwardPE: quote.forwardPE ?? undefined,
-      eps: quote.epsTrailingTwelveMonths ?? undefined,
-      dividendYield: quote.dividendYield ? quote.dividendYield * 100 : undefined,
-      beta: quote.beta ?? undefined,
-      // Technical indicators
-      adx,
-      trendStrength,
-      // Enhanced data
-      spread,
-      spreadAlternatives,
-      spreadReason,
-      earningsDays,
-      earningsWarning,
-      analysis,
-      iv,
+      // Core data from shared library (SAME AS FRONTEND)
+      ticker: sharedData.ticker,
+      price: sharedData.price,
+      change: sharedData.changePct * sharedData.price / 100, // Derived
+      changePct: sharedData.changePct,
+      rsi: sharedData.rsi,
+      adx: sharedData.adx,
+      trendStrength: sharedData.trendStrength as 'WEAK' | 'MODERATE' | 'STRONG',
+      aboveMA200: sharedData.aboveMA200,
+      ma20: sharedData.ma20,
+      ma50: sharedData.ma50,
+      ma200: sharedData.ma200,
+      fiftyTwoWeekLow: sharedData.fiftyTwoWeekLow,
+      fiftyTwoWeekHigh: sharedData.fiftyTwoWeekHigh,
+      marketCap: sharedData.marketCap,
+      peRatio: sharedData.peRatio,
+      forwardPE: sharedData.forwardPE,
+      eps: sharedData.eps,
+      dividendYield: sharedData.dividendYield,
+      beta: sharedData.beta,
+      
+      // Options data from shared library (SAME AS FRONTEND)
+      // Type assertions needed due to minor interface differences
+      spread: sharedData.spread as SpreadRecommendation | undefined,
+      spreadAlternatives: [], // Not in shared lib
+      spreadReason: undefined, // Not in shared lib
+      earningsDays: sharedData.earningsDays,
+      earningsWarning: sharedData.earningsWarning,
+      iv: sharedData.iv as IVAnalysis | undefined,
+      pfv: sharedData.pfv as PsychologicalFairValue | undefined,
+      
+      // Rich data from shared library (SAME AS FRONTEND)
+      analystRatings: sharedData.analystRatings,
+      targetPrices: sharedData.targetPrices,
+      performance: sharedData.performance ? {
+        day5: sharedData.performance.day5 ?? 0,
+        month1: sharedData.performance.month1 ?? 0,
+        month3: sharedData.performance.month3 ?? 0,
+        ytd: sharedData.performance.ytd ?? 0,
+      } : undefined,
+      earnings: sharedData.earnings ? {
+        date: sharedData.earnings.date,
+        daysUntil: sharedData.earnings.daysUntil,
+        streak: sharedData.earnings.streak,
+        lastSurprise: sharedData.earnings.lastSurprise,
+        avgSurprise: sharedData.earnings.avgSurprise,
+      } : undefined,
+      sectorContext: sharedData.sectorContext,
+      hv20: sharedData.hv20,
+      shortInterest: sharedData.shortInterest ? {
+        shortPct: sharedData.shortInterest.shortPct,
+        shortRatio: sharedData.shortInterest.shortRatio ?? 0,
+      } : undefined,
+      relativeStrength: sharedData.relativeStrength ? {
+        vsSPY: sharedData.relativeStrength.vsSPY,
+      } : undefined,
+      optionsFlow: sharedData.optionsFlow ? {
+        pcRatioOI: sharedData.optionsFlow.pcRatioOI,
+        pcRatioVol: sharedData.optionsFlow.pcRatioVol,
+      } : undefined,
+      news: sharedData.news as NewsItem[] | undefined,
+      dataQuality: sharedData.dataQuality,
+      
+      // CLI-specific additions
+      ownership,
       supportResistance,
-      news,
-      dataQuality,
+      analysis,
     };
-  } catch {
+  } catch (error) {
+    console.error(`[CLI] Error fetching ${ticker}:`, error);
     return null;
   }
 }
@@ -392,26 +463,8 @@ async function buildContextForAI(accountSize: number): Promise<string> {
     contextParts.push(`=== END CALENDAR ===\n`);
   }
   
-  // Get trade history and positions if database is configured
+  // Get trade history if database is configured
   if (isConfigured()) {
-    // Get open positions first
-    try {
-      const positions = await getPositions();
-      if (positions.length > 0) {
-        contextParts.push(`\n=== YOUR OPEN POSITIONS ===`);
-        for (const pos of positions) {
-          const strikes = pos.longStrike && pos.shortStrike 
-            ? `$${pos.longStrike}/$${pos.shortStrike}` 
-            : '';
-          const dte = pos.dte !== undefined ? `${pos.dte} DTE` : '';
-          contextParts.push(`${pos.ticker}: ${strikes} ${dte}, entry $${pos.entryPrice.toFixed(2)}`);
-        }
-        contextParts.push(`=== END POSITIONS ===\n`);
-      }
-    } catch {
-      // Positions unavailable
-    }
-    
     try {
       const trades = await getAllTrades();
       if (trades.length > 0) {
@@ -462,7 +515,6 @@ export type QuestionType =
   | 'price_check'    // Simple price/quote questions
   | 'trade_analysis' // Full trade analysis with spreads
   | 'research'       // News/why questions requiring web search
-  | 'position_check' // Questions about existing positions
   | 'scan'           // Market scanning requests
   | 'general';       // General conversation
 
@@ -471,7 +523,6 @@ interface QuestionClassification {
   needsOptions: boolean;
   needsNews: boolean;
   needsWebSearch: boolean;
-  needsPositions: boolean;
   needsCalendar: boolean;
 }
 
@@ -489,7 +540,6 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsOptions: true,
       needsNews: false,
       needsWebSearch: false,
-      needsPositions: false,
       needsCalendar: true,
     };
   }
@@ -501,19 +551,6 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsOptions: false,
       needsNews: true,
       needsWebSearch: true,
-      needsPositions: false,
-      needsCalendar: false,
-    };
-  }
-  
-  // Position questions - need positions data
-  if (/\b(my position|positions|holding|portfolio|what.+own)\b/.test(lower)) {
-    return {
-      type: 'position_check',
-      needsOptions: false,
-      needsNews: false,
-      needsWebSearch: false,
-      needsPositions: true,
       needsCalendar: false,
     };
   }
@@ -526,7 +563,6 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsOptions: false,
       needsNews: false,
       needsWebSearch: false,
-      needsPositions: false,
       needsCalendar: false,
     };
   }
@@ -539,7 +575,6 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsOptions: true,
       needsNews: true,
       needsWebSearch: false,
-      needsPositions: true,
       needsCalendar: true,
     };
   }
@@ -553,7 +588,6 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsOptions: true,
       needsNews: true,
       needsWebSearch: false,
-      needsPositions: true,
       needsCalendar: true,
     };
   }
@@ -564,153 +598,46 @@ export function classifyQuestion(message: string): QuestionClassification {
     needsOptions: false,
     needsNews: false,
     needsWebSearch: false,
-    needsPositions: false,
     needsCalendar: true,
   };
 }
 
 // ============================================================================
-// SYSTEM PROMPT (Optimized - ~1000 tokens vs ~1500)
+// SYSTEM PROMPT - Uses shared lib/ai-agent
 // ============================================================================
 
+/**
+ * Build system prompt using shared Victor persona from lib/ai-agent
+ * Adds CLI-specific context like TOON data parsing hints
+ */
 function buildSystemPrompt(accountSize: number, context: string): string {
-  const maxPosition = Math.round(accountSize * 0.2);
-  
-  return `You are Victor Chen - 67yo Wall Street veteran, 45 years experience. You survived Black Monday, dot-com, 2008, COVID. Now my personal analyst managing a $${accountSize} account.
-
-## Victor's Voice & Style
-You speak CONVERSATIONALLY - like a seasoned trader explaining his thinking to a colleague over coffee. NOT bullet points or formal reports. Weave data naturally into your reasoning.
-
-GOOD: "Look, IBM's sitting at $310 with RSI at 59 - that's a bit hot for my taste. I'd normally like to see RSI in the 40s or 50s before jumping in. And with FOMC tomorrow? That's a coin flip I'm not taking."
-
-BAD: "• MY CALL: WAIT • THE NUMBERS: RSI 59 • KEY RISKS: FOMC tomorrow"
-
-You're direct and decisive. You make CALLS, not suggestions. Reference your experience when relevant: "I've seen this pattern before..." or "In '08 when the Fed..." 
-
-Your conviction comes through in HOW you say things, not bullet formatting.
-
-## Strategy: Deep ITM Call Debit Spreads (CDS)
-Buy deep ITM call (6-12% ITM, δ~0.80+), sell $5 higher strike. Target 21-45 DTE.
-
-Entry Rules (RSI-based with ADX flexibility):
-- BASE: RSI 35-55 = ideal entry zone
-- EXCEPTION: In STRONG trends (ADX >40), RSI up to 65 is acceptable
-- Above MA200, no earnings within 14d
-
-CDS Math: BUY LOWER strike / SELL HIGHER strike. Max Loss = Debit. Breakeven = Long Strike + Debit.
-
-## Key Rules
-• Max position: $${maxPosition} (20% of account) | WHOLE CONTRACTS ONLY
-• RSI > 60 = wait for pullback | FOMC/CPI within 3d = WAIT or reduce size
-• IV HIGH (>50%) = spreads expensive, wait | IV LOW (<20%) = good entry
-• Always compare breakeven to support levels
-
-## Data & Tools
+  // Add CLI-specific data hints to context
+  const cliContext = `## Data & Tools
 The LIVE DATA section contains ALL available market data including fundamentals:
-• TOON format includes: Price, RSI, ADX, MAs, IV, Support/Resistance, Spread, **Market Cap (MC), P/E (PE)**
+• TOON format includes: Price, RSI, ADX, MAs, IV, Support/Resistance, Spread, \
+**Market Cap (MC), P/E (PE)**
 • If data shows "-", acknowledge the gap - don't invent values
 • READ THE TOON DATA CAREFULLY - P/E and Market Cap are at the END of each line
 
-## Tools - USE SPARINGLY
-You have tools (web_search, get_ticker_data, scan_for_opportunities) but:
-• ONLY use tools if user explicitly asks to "research", "look up", "search", or "find"
-• The LIVE DATA section already has everything you need for basic analysis
-• If data is in LIVE DATA, just USE IT - don't call tools to get the same data
-• Most questions can be answered with the provided data alone
+${context}`;
 
-When you DO use tools:
-• Make 1 tool call, synthesize results, then answer
-• Never make more than 2 tool calls per question
-
-## CRITICAL: No Hallucinations
-• ONLY cite data EXPLICITLY in LIVE DATA - check the TOON line for exact values
-• P/E is in the data (e.g., PE116 = P/E ratio of 116) - USE IT, don't invent different numbers
-• NEVER make up prices, P/E ratios, percentages, or dates
-• If you need news/sentiment data, say "I don't have recent news" - don't pretend to search
-• Double-check ticker symbols and ALL numbers before citing them
-
-## Data Rules
-• ONLY use provided data - never invent prices/RSI/MAs
-• Be PRECISE on MA comparisons (182 < 184 = BELOW MA20)
-• Missing data ("-" in TOON) = acknowledge the gap, don't fill it
-
-## Response Style
-• Conversational, not listy - explain your reasoning naturally
-• Quick questions: 50-100 words | Analysis: 150-200 words
-• Lead with your verdict, then explain WHY with data
-• End decisive conversations with a clear action: "My call: [ACTION]"
-• When citing web search: only reference what was ACTUALLY returned, don't embellish
-• If you don't know something specific, be honest: "I'd need to dig deeper on that"
-
-${getTOONDecoderSpec()}
-
-## LIVE DATA
-${context}
-
-Capital protection first, profits second.`;
+  // Use shared prompt builder from lib/ai-agent
+  return buildVictorSystemPrompt({
+    accountSize,
+    context: cliContext,
+    includeToonSpec: true,
+  });
 }
 
 // ============================================================================
-// TOOL DEFINITIONS
+// TOOL DEFINITIONS - Uses shared lib/ai-agent
 // ============================================================================
 
 /**
  * Tools available to Victor for research and analysis
+ * Using shared definitions from lib/ai-agent, converted to Ollama format
  */
-const AVAILABLE_TOOLS: ToolDefinition[] = [
-  {
-    type: "function",
-    function: {
-      name: "web_search",
-      description: "Search the web for current news, market analysis, or any " +
-        "information not in the provided data. Use this when asked to research, " +
-        "look up news, or find out why a stock is moving.",
-      parameters: {
-        type: "object",
-        required: ["query"],
-        properties: {
-          query: {
-            type: "string",
-            description: "The search query - be specific (e.g. 'NVDA stock " +
-              "news today', 'FOMC meeting December 2024 impact')",
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_ticker_data",
-      description: "Fetch real-time stock data for a ticker including price, " +
-        "RSI, moving averages, options spreads, and news. Use when analyzing " +
-        "a specific stock.",
-      parameters: {
-        type: "object",
-        required: ["ticker"],
-        properties: {
-          ticker: {
-            type: "string",
-            description: "Stock ticker symbol (e.g. NVDA, AAPL, TSLA)",
-          },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "scan_for_opportunities",
-      description: "Scan the market for trade opportunities matching our " +
-        "Deep ITM Call Debit Spread criteria. Returns graded setups.",
-      parameters: {
-        type: "object",
-        required: [],
-        properties: {},
-      },
-    },
-  },
-];
+const AVAILABLE_TOOLS: ToolDefinition[] = toOllamaTools(AGENT_TOOLS);
 
 /**
  * Execute a tool call and return the result
@@ -750,6 +677,32 @@ async function executeToolCall(
         return "No Grade A or B setups found in current market conditions.";
       }
       return formatScanResults(results);
+    }
+    
+    case "analyze_position": {
+      const ticker = (args.ticker as string).toUpperCase();
+      const longStrike = args.longStrike as number;
+      const shortStrike = args.shortStrike as number;
+      const costBasis = args.costBasis as number;
+      const currentValue = args.currentValue as number | undefined ?? null;
+      const dte = args.dte as number;
+      
+      showStatus(`📊 Analyzing ${ticker} $${longStrike}/$${shortStrike} position...`);
+      
+      const analysis = await analyzePosition(
+        ticker,
+        longStrike,
+        shortStrike,
+        costBasis,
+        currentValue,
+        dte
+      );
+      
+      if (!analysis) {
+        return `Could not analyze position for ${ticker}. Check ticker symbol and try again.`;
+      }
+      
+      return formatPositionAnalysisForAI(analysis);
     }
     
     default:
@@ -794,6 +747,11 @@ function formatTickerDataForAI(t: TickerData): string {
     for (const n of t.news.slice(0, 3)) {
       output += `  • ${n.title}\n`;
     }
+  }
+  // Include Psychological Fair Value context
+  if (t.pfv) {
+    output += `\n--- PSYCHOLOGICAL FAIR VALUE ---\n`;
+    output += t.pfv.aiContext + '\n';
   }
   output += `=== END ${t.ticker} ===\n`;
   return output;
@@ -958,6 +916,41 @@ async function prepareContext(
         earningsDays: d.earningsDays,
         marketCap: d.marketCap,
         peRatio: d.peRatio,
+        // Analyst ratings
+        analystBullishPct: d.analystRatings?.bullishPercent,
+        analystStrongBuy: d.analystRatings?.strongBuy,
+        analystBuy: d.analystRatings?.buy,
+        analystHold: d.analystRatings?.hold,
+        analystSell: d.analystRatings?.sell,
+        // Ownership
+        insidersPct: d.ownership?.insidersPercent,
+        institutionsPct: d.ownership?.institutionsPercent,
+        recentSalesM: d.ownership?.recentSalesM,
+        // Target prices
+        targetLow: d.targetPrices?.low,
+        targetMean: d.targetPrices?.mean,
+        targetHigh: d.targetPrices?.high,
+        targetUpside: d.targetPrices?.upside,
+        // Price performance
+        perf5d: d.performance?.day5,
+        perf1m: d.performance?.month1,
+        perf3m: d.performance?.month3,
+        perfYtd: d.performance?.ytd,
+        // Earnings info (earningsDays already set above)
+        earningsDate: d.earnings?.date,
+        earningsStreak: d.earnings?.streak,
+        earningsSurprise: d.earnings?.lastSurprise,
+        // Sector context
+        sectorName: d.sectorContext?.name,
+        sectorAvgPE: d.sectorContext?.avgPE,
+        sectorVsAvg: d.sectorContext?.vsAvg,
+        // Historical volatility
+        hv20: d.hv20,
+        // NEW: High-value additions
+        shortPct: d.shortInterest?.shortPct,
+        shortRatio: d.shortInterest?.shortRatio,
+        vsSPY: d.relativeStrength?.vsSPY,
+        pcRatioOI: d.optionsFlow?.pcRatioOI,
       }));
       
       tickerContext = "\n\n=== TICKER DATA (TOON) ===\n";
@@ -985,32 +978,20 @@ async function prepareContext(
         }
       }
       
-      tickerContext += "=== END TICKER DATA ===";
-      
-      // Check for open positions only if classification needs it
-      if (isConfigured() && classification.needsPositions) {
-        onStatus?.(`Checking positions...`);
-        for (const ticker of tickers.slice(0, 3)) {
-          try {
-            const positions = await getPositionsByTicker(ticker);
-            if (positions.length > 0) {
-              // Compact position format
-              tickerContext += `\n🔔 OPEN: ${ticker}`;
-              for (const pos of positions) {
-                const strikes = pos.longStrike && pos.shortStrike 
-                  ? `$${pos.longStrike}/$${pos.shortStrike}` 
-                  : '';
-                const dte = pos.dte !== undefined ? `${pos.dte}DTE` : '';
-                tickerContext += ` ${strikes} ${dte} @$${pos.entryPrice.toFixed(2)}`;
-              }
-              tickerContext += '\n';
-            }
-          } catch {
-            // Positions unavailable
+      // Add PFV context for trade analysis
+      if (classification.type === 'trade_analysis') {
+        for (const d of validData) {
+          if (d.pfv) {
+            tickerContext += `\n${d.ticker} PFV:\n`;
+            tickerContext += d.pfv.aiContext + '\n';
           }
         }
-        
-        // Get trade history for these tickers (compact format)
+      }
+      
+      tickerContext += "=== END TICKER DATA ===";
+      
+      // Get trade history for mentioned tickers (compact format)
+      if (isConfigured() && classification.type === 'trade_analysis') {
         onStatus?.(`Checking trade history...`);
         for (const ticker of tickers.slice(0, 3)) {
           try {
@@ -1018,11 +999,10 @@ async function prepareContext(
             if (trades.length > 0) {
               const history = buildTickerHistory(ticker, trades);
               // Super compact: NVDA:5tr/67%WR/$142PnL
-              tickerContext += `${ticker}:${history.totalTrades}tr/${history.winRate.toFixed(0)}%WR/$${history.totalPnl.toFixed(0)}PnL`;
+              tickerContext += `\n${ticker}:${history.totalTrades}tr/${history.winRate.toFixed(0)}%WR/$${history.totalPnl.toFixed(0)}PnL`;
               if (history.patterns.length > 0) {
                 tickerContext += `|${history.patterns[0].slice(0, 30)}`;
               }
-              tickerContext += '\n';
             }
           } catch {
             // History unavailable
@@ -1077,20 +1057,8 @@ async function prepareContext(
 export async function startChat(options: ChatOptions): Promise<void> {
   const accountSize = options.accountSize ?? DEFAULT_ACCOUNT_SIZE;
   
-  // Get position count and market regime for header
-  let positionCount = 0;
-  let regime: MarketRegimeData | null = null;
-  
-  // Fetch in parallel
-  const [positionsResult, regimeResult] = await Promise.all([
-    isConfigured() 
-      ? getPositions().catch(() => []) 
-      : Promise.resolve([]),
-    fetchMarketRegime().catch(() => null),
-  ]);
-  
-  positionCount = positionsResult.length;
-  regime = regimeResult;
+  // Get market regime for header
+  const regime = await fetchMarketRegime().catch(() => null);
   
   console.log();
   console.log(chalk.bold.cyan("  📊 YOUR ANALYST"));
@@ -1100,11 +1068,8 @@ export async function startChat(options: ChatOptions): Promise<void> {
   // Check market status
   const marketStatus = getMarketStatus();
   
-  // Show header with position count and market regime
+  // Show header with market regime
   let headerInfo = `Fund Size: $${accountSize.toLocaleString()} | Strategy: Deep ITM CDS`;
-  if (positionCount > 0) {
-    headerInfo += ` | ${chalk.yellow(`${positionCount} position${positionCount > 1 ? 's' : ''}`)}`;
-  }
   
   // Add market status badge
   const statusBadge = marketStatus.isOpen 
@@ -1302,13 +1267,77 @@ export async function startChat(options: ChatOptions): Promise<void> {
               }
               if (t.peRatio !== undefined) fundParts.push(`P/E ${t.peRatio.toFixed(1)}`);
               if (t.beta !== undefined) fundParts.push(`β${t.beta.toFixed(1)}`);
+              // Show sector vs avg P/E
+              if (t.sectorContext?.vsAvg !== undefined) {
+                const sectorStr = t.sectorContext.vsAvg > 0 
+                  ? chalk.red(`+${t.sectorContext.vsAvg}% vs sector`)
+                  : chalk.green(`${t.sectorContext.vsAvg}% vs sector`);
+                fundParts.push(sectorStr);
+              }
               if (fundParts.length > 0) {
                 console.log(chalk.dim(`  │   ${fundParts.join(' · ')}`));
               }
             }
             
-            // Show earnings info (always show when available)
-            if (t.earningsDays !== null && t.earningsDays !== undefined && t.earningsDays > 0) {
+            // Show target prices and performance
+            if (t.targetPrices) {
+              const upsideColor = t.targetPrices.upside > 20 ? chalk.green
+                : t.targetPrices.upside > 0 ? chalk.yellow
+                : chalk.red;
+              console.log(chalk.dim(`  │   `) + 
+                chalk.cyan(`🎯 Target: $${t.targetPrices.low.toFixed(0)}-$${t.targetPrices.mean.toFixed(0)}-$${t.targetPrices.high.toFixed(0)}`) +
+                chalk.dim(` (`) + upsideColor(`${t.targetPrices.upside > 0 ? '+' : ''}${t.targetPrices.upside.toFixed(0)}%`) + chalk.dim(`)`));
+            }
+            
+            // Show price performance
+            if (t.performance) {
+              const perfParts = [];
+              const colorPerf = (val: number) => val > 0 ? chalk.green(`+${val}%`) : chalk.red(`${val}%`);
+              perfParts.push(`5d: ${colorPerf(t.performance.day5)}`);
+              perfParts.push(`1m: ${colorPerf(t.performance.month1)}`);
+              perfParts.push(`YTD: ${colorPerf(t.performance.ytd)}`);
+              console.log(chalk.dim(`  │   📊 Perf: `) + perfParts.join(chalk.dim(' · ')));
+            }
+            
+            // Show analyst ratings
+            if (t.analystRatings) {
+              const bullish = t.analystRatings.bullishPercent;
+              const bullishColor = bullish >= 80 ? chalk.green : bullish >= 60 ? chalk.yellow : chalk.red;
+              console.log(chalk.dim(`  │   `) + 
+                bullishColor(`👥 ${bullish}% Bullish`) + 
+                chalk.dim(` (${t.analystRatings.strongBuy}SB ${t.analystRatings.buy}B ${t.analystRatings.hold}H ${t.analystRatings.sell}S)`));
+            }
+            
+            // Show earnings info with beat/miss history
+            if (t.earnings?.daysUntil !== undefined && t.earnings.daysUntil > 0) {
+              const earnParts = [];
+              
+              // Days until earnings
+              if (t.earningsWarning) {
+                earnParts.push(chalk.red(`⚠️ ${t.earnings.daysUntil}d - AVOID`));
+              } else if (t.earnings.daysUntil <= 30) {
+                earnParts.push(chalk.yellow(`${t.earnings.date ?? t.earnings.daysUntil + 'd'}`));
+              } else {
+                earnParts.push(chalk.green(`${t.earnings.date ?? t.earnings.daysUntil + 'd'} (safe)`));
+              }
+              
+              // Beat/miss streak
+              if (t.earnings.streak !== undefined && t.earnings.streak !== 0) {
+                const streakStr = t.earnings.streak > 0 
+                  ? chalk.green(`${t.earnings.streak} beats`)
+                  : chalk.red(`${Math.abs(t.earnings.streak)} misses`);
+                earnParts.push(streakStr);
+              }
+              
+              // Last surprise
+              if (t.earnings.lastSurprise !== undefined) {
+                const surpriseColor = t.earnings.lastSurprise > 0 ? chalk.green : chalk.red;
+                earnParts.push(surpriseColor(`${t.earnings.lastSurprise > 0 ? '+' : ''}${t.earnings.lastSurprise}% last`));
+              }
+              
+              console.log(chalk.dim(`  │   📅 Earnings: `) + earnParts.join(chalk.dim(' · ')));
+            } else if (t.earningsDays !== null && t.earningsDays !== undefined && t.earningsDays > 0) {
+              // Fallback to old format
               if (t.earningsWarning) {
                 console.log(chalk.dim(`  │   `) + chalk.red(`⚠️ EARNINGS ${t.earningsDays}d - AVOID (within 14d)`));
               } else if (t.earningsDays <= 30) {
@@ -1320,13 +1349,71 @@ export async function startChat(options: ChatOptions): Promise<void> {
               console.log(chalk.dim(`  │   📅 Earnings: Not available`));
             }
             
-            // Show IV analysis
-            if (t.iv) {
-              const ivColor = t.iv.ivLevel === 'LOW' ? chalk.green
-                : t.iv.ivLevel === 'NORMAL' ? chalk.white
-                : t.iv.ivLevel === 'ELEVATED' ? chalk.yellow
-                : chalk.red;
-              console.log(chalk.dim(`  │   `) + ivColor(`IV: ${t.iv.currentIV}% (${t.iv.ivLevel})`) + chalk.dim(` · ${t.iv.ivPercentile}th percentile`));
+            // Show IV vs HV analysis
+            if (t.iv || t.hv20) {
+              const parts = [];
+              
+              // IV part
+              if (t.iv) {
+                const ivColor = t.iv.ivLevel === 'LOW' ? chalk.green
+                  : t.iv.ivLevel === 'NORMAL' ? chalk.white
+                  : t.iv.ivLevel === 'ELEVATED' ? chalk.yellow
+                  : chalk.red;
+                parts.push(ivColor(`IV: ${t.iv.currentIV}%`));
+              }
+              
+              // HV part
+              if (t.hv20) {
+                parts.push(chalk.dim(`HV20: ${t.hv20.toFixed(1)}%`));
+              }
+              
+              // Premium comparison (IV vs HV)
+              if (t.iv && t.hv20) {
+                const ratio = t.iv.currentIV / t.hv20;
+                const premium = ratio > 1.15 ? 'expensive' : ratio < 0.85 ? 'cheap' : 'fair';
+                const premiumColor = premium === 'cheap' ? chalk.green
+                  : premium === 'fair' ? chalk.white
+                  : chalk.red;
+                parts.push(premiumColor(`Options ${premium}`));
+              } else if (t.iv) {
+                parts.push(chalk.dim(`${t.iv.ivPercentile}th pctl`));
+              }
+              
+              console.log(chalk.dim(`  │   📈 `) + parts.join(chalk.dim(' · ')));
+            }
+            
+            // Show short interest, relative strength, options flow
+            const extraParts: string[] = [];
+            
+            // Short interest
+            if (t.shortInterest && t.shortInterest.shortPct > 0) {
+              const shortColor = t.shortInterest.shortPct > 10 ? chalk.yellow
+                : t.shortInterest.shortPct > 20 ? chalk.red
+                : chalk.dim;
+              extraParts.push(shortColor(`Short ${t.shortInterest.shortPct}% (${t.shortInterest.shortRatio}d)`));
+            }
+            
+            // Relative strength
+            if (t.relativeStrength) {
+              const rsColor = t.relativeStrength.vsSPY > 5 ? chalk.green
+                : t.relativeStrength.vsSPY < -5 ? chalk.red
+                : chalk.white;
+              extraParts.push(rsColor(`vs SPY ${t.relativeStrength.vsSPY > 0 ? '+' : ''}${t.relativeStrength.vsSPY}%`));
+            }
+            
+            // Options flow (put/call ratio)
+            if (t.optionsFlow) {
+              const flowColor = t.optionsFlow.pcRatioOI < 0.7 ? chalk.green
+                : t.optionsFlow.pcRatioOI > 1.0 ? chalk.red
+                : chalk.white;
+              const sentiment = t.optionsFlow.pcRatioOI < 0.7 ? 'bullish'
+                : t.optionsFlow.pcRatioOI > 1.0 ? 'bearish'
+                : 'neutral';
+              extraParts.push(flowColor(`P/C ${t.optionsFlow.pcRatioOI} (${sentiment})`));
+            }
+            
+            if (extraParts.length > 0) {
+              console.log(chalk.dim(`  │   🔍 `) + extraParts.join(chalk.dim(' · ')));
             }
             
             // Show support/resistance
@@ -1346,7 +1433,11 @@ export async function startChat(options: ChatOptions): Promise<void> {
             // Show options spread if available
             if (t.spread) {
               const debitDollars = (t.spread.estimatedDebit * 100).toFixed(0);
+              const maxProfitDollars = (t.spread.maxProfit * 100).toFixed(0);
+              const rrRatio = (t.spread.maxProfit / t.spread.estimatedDebit).toFixed(1);
+              const popStr = t.spread.pop ? `${t.spread.pop}% PoP` : '';
               console.log(chalk.dim(`  │   `) + chalk.cyan(`📈 $${t.spread.longStrike}/$${t.spread.shortStrike} · $${debitDollars} debit · ${t.spread.cushion.toFixed(1)}% cushion`));
+              console.log(chalk.dim(`  │   `) + chalk.blue(`💰 R/R: $${maxProfitDollars}/$${debitDollars} (1:${rrRatio}) · ${t.spread.returnOnRisk.toFixed(1)}% return`) + (popStr ? chalk.dim(` · `) + chalk.green(popStr) : ''));
               
               // Only show alternatives if there's a specific reason (e.g., budget constraint)
               if (t.spreadReason) {
@@ -1379,6 +1470,59 @@ export async function startChat(options: ChatOptions): Promise<void> {
               for (const n of t.news.slice(0, 2)) {
                 const title = n.title.length > 50 ? n.title.substring(0, 47) + '...' : n.title;
                 console.log(chalk.dim(`  │      • ${title}`));
+              }
+            }
+            
+            // Show Psychological Fair Value
+            if (t.pfv) {
+              const biasColor = t.pfv.bias === 'BULLISH' ? chalk.green
+                : t.pfv.bias === 'BEARISH' ? chalk.red
+                : chalk.yellow;
+              const confColor = t.pfv.confidence === 'HIGH' ? chalk.green
+                : t.pfv.confidence === 'MEDIUM' ? chalk.yellow
+                : chalk.dim;
+              const deviationStr = t.pfv.deviationPercent >= 0 
+                ? `+${t.pfv.deviationPercent.toFixed(1)}%` 
+                : `${t.pfv.deviationPercent.toFixed(1)}%`;
+              
+              console.log(chalk.dim(`  │   `) + chalk.magenta(`🧠 PFV: $${t.pfv.fairValue.toFixed(2)}`) + 
+                chalk.dim(` (${deviationStr}) `) + biasColor(t.pfv.bias) + chalk.dim(' · ') + confColor(t.pfv.confidence));
+              
+              // Show key magnetic levels if available (full PFV type only)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const pfvFull = t.pfv as any;
+              if (pfvFull.magneticLevels) {
+                const supports = pfvFull.magneticLevels.filter((l: { distance?: number }) => 
+                  (l.distance ?? 0) < 0
+                ).slice(0, 2);
+                const resistances = pfvFull.magneticLevels.filter((l: { distance?: number }) => 
+                  (l.distance ?? 0) > 0
+                ).slice(0, 2);
+              
+              if (supports.length > 0 || resistances.length > 0) {
+                const levelParts: string[] = [];
+                if (supports.length > 0) {
+                    levelParts.push(chalk.green(
+                      `S: $${supports[0].price.toFixed(0)} (${supports[0].type.replace('_', ' ')})`
+                    ));
+                }
+                if (resistances.length > 0) {
+                    levelParts.push(chalk.red(
+                      `R: $${resistances[0].price.toFixed(0)} (${resistances[0].type.replace('_', ' ')})`
+                    ));
+                }
+                console.log(chalk.dim(`  │      `) + levelParts.join(chalk.dim(' · ')));
+              }
+              
+              // Show mean reversion signal if present
+                if (pfvFull.meanReversionSignal?.signal) {
+                  const sigColor = pfvFull.meanReversionSignal.direction === 'LONG' 
+                    ? chalk.green 
+                    : chalk.red;
+                  console.log(chalk.dim(`  │      `) + 
+                    sigColor(`⚡ ${pfvFull.meanReversionSignal.direction} signal`) + 
+                    chalk.dim(` (${pfvFull.meanReversionSignal.strength}% strength)`));
+                }
               }
             }
           }
@@ -1457,7 +1601,10 @@ export async function startChat(options: ChatOptions): Promise<void> {
             
             currentThinking = response.thinking ?? "";
             currentContent = cleanToolTokens(response.content);  // Clean raw tool tokens
-            if (response.toolCalls) {
+            
+            // IMPORTANT: On last iteration, ignore any tool calls
+            // (model may still output them from context, but we force synthesis)
+            if (response.toolCalls && !isLastIteration) {
               currentToolCalls.push(...response.toolCalls);
             }
             
@@ -1497,7 +1644,10 @@ export async function startChat(options: ChatOptions): Promise<void> {
             }
             
             currentContent = cleanToolTokens(response.content);  // Clean raw tool tokens
-            if (response.toolCalls) {
+            
+            // IMPORTANT: On last iteration, ignore any tool calls
+            // (model may still output them from context, but we force synthesis)
+            if (response.toolCalls && !isLastIteration) {
               currentToolCalls.push(...response.toolCalls);
             }
             
@@ -1562,6 +1712,45 @@ export async function startChat(options: ChatOptions): Promise<void> {
           
           console.log(chalk.dim("  └───────────────────────────────────────────────────────────────"));
           console.log();
+        }
+        
+        // CRITICAL: If we hit max iterations with tool results pending, 
+        // we need one final synthesis call
+        const lastMessage = agentMessages[agentMessages.length - 1];
+        if (iteration >= maxIterations && lastMessage?.role === "tool") {
+          showStatus('Victor is synthesizing results...');
+          
+          // Final synthesis call - explicitly disable tools
+          const synthesisResponse: AgentResponse = await chatWithTools(
+            { mode: options.aiMode, model: options.aiModel },
+            agentMessages,
+            undefined,  // No tools
+            false       // No thinking
+          );
+          
+          // Clear status
+          process.stdout.write('\r'.padEnd(70) + '\r');
+          
+          // Display synthesis
+          const synthesisContent = cleanToolTokens(synthesisResponse.content);
+          if (synthesisContent.trim()) {
+            const prefix = chalk.cyan("  Victor: ");
+            const indent = "          ";
+            const lines = wrapText(synthesisContent, 65, "  Victor: ", indent);
+            for (let i = 0; i < lines.length; i++) {
+              if (i === 0) {
+                console.log(lines[i].replace("  Victor: ", prefix));
+              } else {
+                console.log(formatWithStyles(lines[i]));
+              }
+            }
+            finalContent += synthesisContent;
+          }
+          
+          // Update token stats
+          totalPromptTokens += synthesisResponse.promptTokens;
+          totalCompletionTokens += synthesisResponse.completionTokens;
+          totalDuration += synthesisResponse.duration;
         }
         
         // Ensure we end with a newline

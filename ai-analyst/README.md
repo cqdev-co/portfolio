@@ -39,6 +39,11 @@ bun run analyze NVDA
 ## CLI Commands
 
 ```bash
+# Debug mode - see ALL raw context sent to AI (no AI call made)
+bun run debug NVDA
+bun run debug NVDA --compact   # Shorter output, hide PFV details
+bun run debug AAPL --account 3000
+
 # Analyze ticker for entry
 bun run analyze NVDA
 bun run analyze AAPL --account 3000

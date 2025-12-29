@@ -74,6 +74,11 @@ export interface PennyStockSignal {
   atr_20: number | null;
   pump_dump_risk: RiskLevel | null;
   
+  // Country risk (added Dec 2024)
+  country: string | null;
+  is_high_risk_country: boolean | null;
+  pump_dump_warning: boolean | null;
+  
   // Trend context
   trend_direction: TrendDirection | null;
   

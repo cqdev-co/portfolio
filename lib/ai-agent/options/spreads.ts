@@ -1,0 +1,364 @@
+/**
+ * Spread Recommendation Engine
+ * 
+ * Calculates REAL spread recommendations from options chain.
+ * Uses actual bid/ask prices for accurate debit and cushion.
+ * This is the same logic used by the CLI (ai-analyst).
+ */
+
+import type { 
+  SpreadRecommendation, 
+  SpreadAlternatives,
+  SpreadSelectionContext,
+  OptionContract,
+} from './types';
+import { getOptionsChain } from './chain';
+
+// ============================================================================
+// PROBABILITY HELPERS
+// ============================================================================
+
+/**
+ * Cumulative Normal Distribution Function (CDF)
+ * Approximation using Abramowitz and Stegun formula 26.2.17
+ * Accurate to ~1.5 x 10^-7
+ */
+function normalCDF(x: number): number {
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+
+  const t = 1.0 / (1.0 + p * x);
+  const y =
+    1.0 -
+    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
+
+  return 0.5 * (1.0 + sign * y);
+}
+
+/**
+ * Calculate Probability of Profit for a call debit spread
+ * Uses Black-Scholes-inspired approximation with IV
+ *
+ * @param currentPrice - Current underlying price
+ * @param breakeven - Breakeven price (need price > this for profit)
+ * @param iv - Implied volatility as decimal (e.g., 0.35 for 35%)
+ * @param dte - Days to expiration
+ * @returns Probability of profit as percentage (0-100)
+ */
+function calculatePoP(
+  currentPrice: number,
+  breakeven: number,
+  iv: number,
+  dte: number
+): number {
+  if (iv <= 0 || dte <= 0) {
+    // If no IV or DTE, use simple cushion-based estimate
+    return currentPrice > breakeven ? 75 : 25;
+  }
+
+  // Convert DTE to years
+  const T = dte / 365;
+
+  // Z-score: how many standard deviations is breakeven from current price
+  const z = Math.log(currentPrice / breakeven) / (iv * Math.sqrt(T));
+
+  // Probability that price will be above breakeven at expiration
+  const pop = normalCDF(z) * 100;
+
+  // Clamp between reasonable bounds
+  return Math.min(95, Math.max(5, Math.round(pop)));
+}
+
+// ============================================================================
+// SPREAD FINDING
+// ============================================================================
+
+/**
+ * Find optimal deep ITM call debit spread
+ *
+ * Strategy:
+ * - Long strike: 6-12% ITM
+ * - Short strike: $5 higher than long
+ * - Target DTE: 21-45 days
+ *
+ * @param symbol - Ticker symbol
+ * @param targetDTE - Target days to expiration
+ * @returns Spread recommendation or null
+ */
+export async function findOptimalSpread(
+  symbol: string,
+  targetDTE: number = 30
+): Promise<SpreadRecommendation | null> {
+  const chain = await getOptionsChain(symbol, targetDTE);
+  if (!chain || chain.calls.length === 0) return null;
+
+  const { calls, underlyingPrice, expiration, dte } = chain;
+
+  // Sort calls by strike
+  const sortedCalls = [...calls].sort((a, b) => a.strike - b.strike);
+
+  // Find strikes that are 6-12% ITM
+  const minITM = underlyingPrice * 0.88; // 12% ITM
+  const maxITM = underlyingPrice * 0.94; // 6% ITM
+
+  // Find long strike in the ITM range
+  let longCall: OptionContract | null = null;
+  for (const call of sortedCalls) {
+    if (call.strike >= minITM && call.strike <= maxITM) {
+      longCall = call;
+      break;
+    }
+  }
+
+  // If no call in ideal range, find closest ITM call
+  if (!longCall) {
+    for (const call of sortedCalls) {
+      if (call.strike < underlyingPrice) {
+        longCall = call;
+      }
+    }
+  }
+
+  if (!longCall) return null;
+
+  // Find short strike ($5 above long)
+  const targetShortStrike = longCall.strike + 5;
+  let shortCall: OptionContract | null = null;
+  for (const call of sortedCalls) {
+    if (call.strike >= targetShortStrike) {
+      shortCall = call;
+      break;
+    }
+  }
+
+  if (!shortCall) return null;
+
+  // Calculate spread metrics
+  const spreadWidth = shortCall.strike - longCall.strike;
+  let estimatedDebit = longCall.mid - shortCall.mid;
+
+  // If debit is bad (0, negative, or exceeds width), estimate properly
+  if (estimatedDebit <= 0 || estimatedDebit >= spreadWidth) {
+    const itmPercent = 
+      (underlyingPrice - longCall.strike) / underlyingPrice;
+    const estimatedDebitRatio = 0.75 + itmPercent * 0.2;
+    estimatedDebit = spreadWidth * Math.min(0.95, estimatedDebitRatio);
+  }
+
+  const maxProfit = spreadWidth - estimatedDebit;
+  const breakeven = longCall.strike + estimatedDebit;
+  const cushion = ((underlyingPrice - breakeven) / underlyingPrice) * 100;
+
+  // Reject spreads with poor risk/reward (< 10% return)
+  const returnOnRisk = maxProfit / estimatedDebit;
+  if (returnOnRisk < 0.1) {
+    return null;
+  }
+
+  // Approximate delta based on how deep ITM
+  const itmPercent = 
+    (underlyingPrice - longCall.strike) / underlyingPrice;
+  const longDelta = Math.min(0.95, 0.5 + itmPercent * 3);
+
+  // Calculate PoP using IV from the long call
+  const iv = longCall.impliedVolatility || 0.3;
+  const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
+
+  return {
+    longStrike: longCall.strike,
+    shortStrike: shortCall.strike,
+    expiration,
+    dte,
+    estimatedDebit: Math.round(estimatedDebit * 100) / 100,
+    maxProfit: Math.round(maxProfit * 100) / 100,
+    breakeven: Math.round(breakeven * 100) / 100,
+    cushion: Math.round(cushion * 10) / 10,
+    longDelta: Math.round(longDelta * 100) / 100,
+    returnOnRisk: Math.round(returnOnRisk * 1000) / 10,
+    spreadWidth,
+    pop,
+  };
+}
+
+/**
+ * Find spread with alternatives and smart selection
+ * 
+ * Uses technical context (MAs, support levels) to choose
+ * the best spread strikes.
+ */
+export async function findSpreadWithAlternatives(
+  symbol: string,
+  targetDTE: number = 30,
+  maxDebit?: number,
+  context?: SpreadSelectionContext
+): Promise<SpreadAlternatives> {
+  const chain = await getOptionsChain(symbol, targetDTE);
+  if (!chain || chain.calls.length === 0) {
+    return { primary: null, alternatives: [] };
+  }
+
+  const { calls, underlyingPrice, expiration, dte } = chain;
+  const sortedCalls = [...calls].sort((a, b) => a.strike - b.strike);
+
+  // Define ITM range (wider for more alternatives)
+  const minITM = underlyingPrice * 0.85; // 15% ITM
+  const maxITM = underlyingPrice * 0.98; // 2% ITM
+
+  // Find all viable long calls
+  const viableLongs = sortedCalls.filter(
+    c => c.strike >= minITM && c.strike <= maxITM && c.openInterest > 10
+  );
+
+  if (viableLongs.length === 0) {
+    return { primary: null, alternatives: [] };
+  }
+
+  // Build all possible spreads
+  const allSpreads: SpreadRecommendation[] = [];
+
+  for (const longCall of viableLongs) {
+    // Try $5 and $10 wide spreads
+    for (const width of [5, 10]) {
+      const targetShort = longCall.strike + width;
+      const shortCall = sortedCalls.find(c => c.strike === targetShort);
+
+      if (!shortCall || shortCall.openInterest < 5) continue;
+
+      const spreadWidth = shortCall.strike - longCall.strike;
+      let estimatedDebit = longCall.mid - shortCall.mid;
+
+      if (estimatedDebit <= 0 || estimatedDebit >= spreadWidth) {
+        const itmPct = 
+          (underlyingPrice - longCall.strike) / underlyingPrice;
+        const ratio = 0.75 + itmPct * 0.2;
+        estimatedDebit = spreadWidth * Math.min(0.95, ratio);
+      }
+
+      const maxProfit = spreadWidth - estimatedDebit;
+      const breakeven = longCall.strike + estimatedDebit;
+      const cushion = 
+        ((underlyingPrice - breakeven) / underlyingPrice) * 100;
+
+      const returnOnRisk = maxProfit / estimatedDebit;
+      if (returnOnRisk < 0.1 || cushion < 0) continue;
+
+      // Score based on liquidity
+      const liquidityScore =
+        Math.min(100, Math.log10((longCall.openInterest + 1) * 
+          (shortCall.openInterest + 1)) * 20);
+
+      // Score based on bid-ask spread
+      const longSpread = longCall.ask - longCall.bid;
+      const shortSpread = shortCall.ask - shortCall.bid;
+      const avgSpread = (longSpread + shortSpread) / 2;
+      const bidAskScore = Math.max(0, 100 - avgSpread * 200);
+
+      // Context-aware scoring
+      let contextScore = 50;
+      if (context) {
+        // Prefer breakeven above key support
+        if (context.supportLevels?.some(s => breakeven < s)) {
+          contextScore += 15;
+        }
+        if (context.putWalls?.some(
+          p => Math.abs(breakeven - p) / breakeven < 0.02
+        )) {
+          contextScore += 10;
+        }
+        // Prefer breakeven below MA200
+        if (context.ma200 && breakeven < context.ma200) {
+          contextScore += 10;
+        }
+      }
+
+      // Cushion score (higher cushion = better)
+      const cushionScore = Math.min(100, cushion * 15);
+
+      const totalScore =
+        cushionScore * 0.4 +
+        liquidityScore * 0.25 +
+        bidAskScore * 0.2 +
+        contextScore * 0.15;
+
+      const itmPct = 
+        (underlyingPrice - longCall.strike) / underlyingPrice;
+      const longDelta = Math.min(0.95, 0.5 + itmPct * 3);
+      const iv = longCall.impliedVolatility || 0.3;
+      const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
+
+      allSpreads.push({
+        longStrike: longCall.strike,
+        shortStrike: shortCall.strike,
+        expiration,
+        dte,
+        estimatedDebit: Math.round(estimatedDebit * 100) / 100,
+        maxProfit: Math.round(maxProfit * 100) / 100,
+        breakeven: Math.round(breakeven * 100) / 100,
+        cushion: Math.round(cushion * 10) / 10,
+        longDelta: Math.round(longDelta * 100) / 100,
+        returnOnRisk: Math.round(returnOnRisk * 1000) / 10,
+        spreadWidth,
+        pop,
+        liquidityScore: Math.round(liquidityScore),
+        bidAskScore: Math.round(bidAskScore),
+        totalScore: Math.round(totalScore),
+      });
+    }
+  }
+
+  if (allSpreads.length === 0) {
+    return { primary: null, alternatives: [] };
+  }
+
+  // Sort by total score
+  allSpreads.sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0));
+
+  // Find primary ($5 width preferred)
+  let primary =
+    allSpreads.find(
+      s =>
+        s.spreadWidth === 5 &&
+        (s.totalScore ?? 0) >= (allSpreads[0].totalScore ?? 0) - 10
+    ) ?? allSpreads[0];
+
+  let reason: string | undefined;
+
+  // If maxDebit specified, find affordable alternative
+  if (maxDebit && primary.estimatedDebit * 100 > maxDebit) {
+    const affordable = allSpreads.filter(
+      s => s.estimatedDebit * 100 <= maxDebit
+    );
+    if (affordable.length > 0) {
+      const newPrimary = affordable[0];
+      reason =
+        `$${primary.longStrike}/$${primary.shortStrike} costs ` +
+        `$${(primary.estimatedDebit * 100).toFixed(0)} (exceeds ` +
+        `$${maxDebit} limit). Suggesting $${newPrimary.spreadWidth} ` +
+        `wide spread instead.`;
+      primary = newPrimary;
+    } else {
+      reason =
+        `All spreads exceed $${maxDebit} budget. Consider ` +
+        `waiting for pullback or reducing DTE.`;
+    }
+  }
+
+  // Get alternatives
+  const alternatives = allSpreads
+    .filter(
+      s =>
+        s.longStrike !== primary.longStrike ||
+        s.spreadWidth !== primary.spreadWidth
+    )
+    .slice(0, 2);
+
+  return { primary, alternatives, reason };
+}
+

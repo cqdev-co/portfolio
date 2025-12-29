@@ -1,0 +1,16 @@
+{
+  "name": "@portfolio/ai-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared AI agent logic for CLI and Frontend",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0",
+    "yahoo-finance2": "^3.10.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
+

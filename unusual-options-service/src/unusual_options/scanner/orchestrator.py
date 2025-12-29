@@ -313,13 +313,14 @@ class ScanOrchestrator:
         # This filters out day-trader noise while preserving legitimate unusual activity
         days_to_expiry = (contract.expiry - contract.timestamp.date()).days
         
-        # Filter 0DTE and 1DTE contracts (configurable, default: 2 days minimum)
-        # 0DTE = expires today (day traders)
-        # 1DTE = expires tomorrow (still mostly day trading)
-        # ≥2 DTE = legitimate directional plays worth flagging
-        min_dte = self.config.get("MIN_DTE_ALL_TICKERS", 2)
+        # Filter short DTE contracts (configurable, default: 10 days minimum)
+        # Analysis showed: Short DTE (≤10d) = 27% win rate (noise)
+        #                  Mid DTE (11-21d) = 60% win rate (edge)
+        # 0-10 DTE = mostly day trading, market makers, expiry pinning
+        # ≥10 DTE = legitimate directional plays worth flagging
+        min_dte = self.config.get("MIN_DTE_ALL_TICKERS", 10)
         if days_to_expiry < min_dte:
-            logger.debug(f"Filtered {ticker} contract: {days_to_expiry} DTE < {min_dte} minimum (0DTE filter)")
+            logger.debug(f"Filtered {ticker} contract: {days_to_expiry} DTE < {min_dte} minimum")
             return False
         
         # Filter out extremely OTM options (> 30% away from current price)
@@ -330,6 +331,14 @@ class ScanOrchestrator:
         # Filter out very low volume (< 50 contracts)
         if contract.volume < 50:
             return False
+        
+        # Optional: Exclude PUT signals (default: False)
+        # Note: In bearish weeks, PUTs could be the edge - don't exclude by default
+        # Use hedge_analyzer.py to identify likely hedges instead
+        if self.config.get("EXCLUDE_PUT_SIGNALS", False):
+            if contract.option_type.upper() == 'PUT':
+                logger.debug(f"Filtered {ticker} PUT signal (PUT exclusion enabled)")
+                return False
         
         # Filter out options with very wide spreads (> 20% of mid price)
         if contract.bid > 0 and contract.ask > 0:
@@ -351,16 +360,17 @@ class ScanOrchestrator:
             True if signal should be kept
         """
         # Enhanced DTE filtering based on ticker type
+        # Analysis showed: Mid DTE (11-21d) = 60% win rate (edge!)
         if signal.days_to_expiry is not None:
             # Apply stricter filtering for high 0DTE activity tickers
             if should_apply_strict_dte_filtering(signal.ticker):
-                # Require minimum days for high 0DTE activity tickers (configurable)
-                min_dte = self.config.get("MIN_DTE_HIGH_0DTE_TICKERS", 7)
+                # Require minimum 14 days for high 0DTE activity tickers (TSLA, SPY, etc.)
+                min_dte = self.config.get("MIN_DTE_HIGH_0DTE_TICKERS", 14)
                 if signal.days_to_expiry < min_dte:
                     return False
             else:
-                # Standard filtering: minimum days for other tickers (configurable)
-                min_dte = self.config.get("MIN_DTE_STANDARD", 5)
+                # Standard filtering: minimum 10 days for other tickers
+                min_dte = self.config.get("MIN_DTE_STANDARD", 10)
                 if signal.days_to_expiry < min_dte:
                     return False
         

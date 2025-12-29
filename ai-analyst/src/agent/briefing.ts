@@ -11,11 +11,9 @@ import {
 } from "../services/calendar.ts";
 import { 
   getWatchlist, 
-  getPositions, 
   saveBriefing,
   markBriefingDelivered,
   type WatchlistItem, 
-  type Position,
   type Briefing as DBBriefing,
 } from "../services/supabase.ts";
 import { scanForOpportunities, type ScanResult } from "../services/scanner.ts";
@@ -39,14 +37,6 @@ export interface WatchlistAlert {
   priority: "HIGH" | "MEDIUM" | "LOW";
 }
 
-export interface PositionUpdate {
-  ticker: string;
-  status: string;
-  dte?: number;
-  cushion?: number;
-  action?: string;
-}
-
 export interface Briefing {
   date: Date;
   marketPulse: {
@@ -60,7 +50,6 @@ export interface Briefing {
     warnings: string[];
   };
   watchlistAlerts: WatchlistAlert[];
-  positionUpdates: PositionUpdate[];
   aiCommentary: string;
 }
 
@@ -79,15 +68,14 @@ export async function generateMorningBriefing(options?: {
   const now = new Date();
   
   // Fetch all data in parallel
-  const [marketRegime, calendarContext, watchlist, positions] = await Promise.all([
+  const [marketRegime, calendarContext, watchlist] = await Promise.all([
     getMarketRegime(),
     getCalendarContext(),
     getWatchlist(),
-    getPositions(),
   ]);
 
   // Scan watchlist tickers for opportunities
-  const watchlistTickers = watchlist.map(w => w.ticker);
+  const watchlistTickers = watchlist.map((w: WatchlistItem) => w.ticker);
   const scanResults = watchlistTickers.length > 0
     ? await scanForOpportunities(watchlistTickers, {
         minGrade: "C",
@@ -99,15 +87,11 @@ export async function generateMorningBriefing(options?: {
   // Generate watchlist alerts
   const watchlistAlerts = generateWatchlistAlerts(watchlist, scanResults);
 
-  // Generate position updates
-  const positionUpdates = generatePositionUpdates(positions);
-
   // Generate AI commentary
   const aiCommentary = await generateAICommentary({
     marketRegime,
     calendarContext,
     watchlistAlerts,
-    positionUpdates,
     aiMode: options?.aiMode ?? "cloud",
     aiModel: options?.aiModel,
   });
@@ -132,7 +116,6 @@ export async function generateMorningBriefing(options?: {
       warnings: calendarContext.warnings,
     },
     watchlistAlerts,
-    positionUpdates,
     aiCommentary,
   };
 
@@ -146,7 +129,6 @@ export async function generateMorningBriefing(options?: {
       regime: briefing.marketPulse.regime,
     },
     watchlistAlerts,
-    positionUpdates,
     calendarEvents: calendarContext.upcomingEvents,
     aiCommentary,
   });
@@ -229,60 +211,12 @@ function generateWatchlistAlerts(
 }
 
 /**
- * Generate position updates from current positions
- */
-function generatePositionUpdates(positions: Position[]): PositionUpdate[] {
-  const updates: PositionUpdate[] = [];
-
-  for (const pos of positions) {
-    const dte = pos.dte ?? 0;
-    const cushion = pos.entryUnderlying && pos.longStrike
-      ? ((pos.entryUnderlying - pos.longStrike) / pos.entryUnderlying) * 100
-      : undefined;
-
-    let status = "";
-    let action: string | undefined;
-
-    // Check for risk conditions
-    if (dte <= 5 && dte > 0) {
-      status = `⚠️ ${dte} DTE remaining`;
-      action = "Consider rolling or closing";
-    } else if (dte <= 0) {
-      status = "🔴 Expired or expiring today";
-      action = "Close position";
-    } else if (cushion !== undefined && cushion < 5) {
-      status = `⚠️ Low cushion (${cushion.toFixed(1)}%)`;
-      action = "Monitor closely, consider exit";
-    } else if (dte <= 10) {
-      status = `${dte} DTE - approaching expiration`;
-      action = "Plan exit strategy";
-    } else {
-      status = `${dte} DTE - on track`;
-    }
-
-    updates.push({
-      ticker: pos.ticker,
-      status,
-      dte,
-      cushion,
-      action,
-    });
-  }
-
-  // Sort by DTE (lowest first)
-  updates.sort((a, b) => (a.dte ?? 999) - (b.dte ?? 999));
-
-  return updates;
-}
-
-/**
  * Generate AI commentary for the briefing
  */
 async function generateAICommentary(context: {
   marketRegime: MarketRegime;
   calendarContext: CalendarContext;
   watchlistAlerts: WatchlistAlert[];
-  positionUpdates: PositionUpdate[];
   aiMode: OllamaMode;
   aiModel?: string;
 }): Promise<string> {
@@ -312,7 +246,6 @@ function buildBriefingPrompt(context: {
   marketRegime: MarketRegime;
   calendarContext: CalendarContext;
   watchlistAlerts: WatchlistAlert[];
-  positionUpdates: PositionUpdate[];
 }): string {
   let prompt = `You are Victor, a trading assistant. Generate a brief morning commentary (2-3 sentences).
 
@@ -340,17 +273,9 @@ MARKET CONDITIONS:
     prompt += "\n";
   }
 
-  if (context.positionUpdates.length > 0) {
-    prompt += `POSITION STATUS:\n`;
-    for (const update of context.positionUpdates.slice(0, 3)) {
-      prompt += `- ${update.ticker}: ${update.status}\n`;
-    }
-    prompt += "\n";
-  }
-
   prompt += `Write a concise, actionable morning summary. Focus on:
 1. Overall market stance (bullish/cautious/defensive)
-2. Key focus for today (watchlist opportunity or position management)
+2. Key watchlist opportunities for today
 3. Any calendar events to watch
 
 Keep it conversational and direct. No greetings or sign-offs.`;
@@ -373,10 +298,6 @@ function toBriefingEmbed(briefing: Briefing): BriefingEmbed {
     watchlistAlerts: briefing.watchlistAlerts.slice(0, 5).map(a => ({
       ticker: a.ticker,
       reason: a.reason,
-    })),
-    positionUpdates: briefing.positionUpdates.slice(0, 5).map(p => ({
-      ticker: p.ticker,
-      status: p.status,
     })),
     aiCommentary: briefing.aiCommentary,
   };
@@ -437,19 +358,6 @@ export function formatBriefingForCLI(briefing: Briefing): string {
     output += "\n";
   } else {
     output += `  🎯 WATCHLIST ALERTS\n  No alerts at this time.\n\n`;
-  }
-
-  if (briefing.positionUpdates.length > 0) {
-    output += `  💼 POSITION CHECK\n`;
-    for (const update of briefing.positionUpdates) {
-      output += `  • ${update.ticker}: ${update.status}\n`;
-      if (update.action) {
-        output += `    → ${update.action}\n`;
-      }
-    }
-    output += "\n";
-  } else {
-    output += `  💼 POSITION CHECK\n  No open positions.\n\n`;
   }
 
   output += `  💭 VICTOR'S TAKE

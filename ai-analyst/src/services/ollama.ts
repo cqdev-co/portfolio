@@ -54,7 +54,7 @@ export interface AgentMessage {
 
 const DEFAULT_MODELS: Record<OllamaMode, string> = {
   local: "llama3.2",
-  cloud: "deepseek-v3.1:671b",
+  cloud: "deepseek-v3.2:cloud",
 };
 
 function createClient(mode: OllamaMode): Ollama {

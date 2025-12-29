@@ -6,7 +6,7 @@
 import { generateCompletion, type OllamaMode } from "../services/ollama.ts";
 import type { ScanResult } from "../services/scanner.ts";
 import type { MarketRegime } from "../services/market-regime.ts";
-import type { Position, Alert, AlertType, AlertPriority } from "../services/supabase.ts";
+import type { Alert, AlertType, AlertPriority } from "../services/supabase.ts";
 
 // ============================================================================
 // TYPES
@@ -21,7 +21,6 @@ export interface AIReviewResult {
 
 export interface ReviewContext {
   regime: MarketRegime;
-  positions: Position[];
   recentAlerts: Alert[];
 }
 

@@ -19,6 +19,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { 
   PennyStockSignal, 
   PennyStockFilters, 
@@ -44,7 +50,9 @@ import {
   ExternalLink,
   DollarSign,
   Target,
-  Zap
+  Zap,
+  AlertTriangle,
+  Globe
 } from "lucide-react";
 
 // Helper function to safely parse numeric values
@@ -534,21 +542,53 @@ export default function PennyStockScanner() {
                   onClick={() => handleRowClick(signal)}
                 >
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {signal.symbol}
-                      {signal.is_breakout && (
-                        <Zap 
-                          className="h-3 w-3 text-yellow-500" 
-                          title="Breakout" 
-                        />
-                      )}
-                      {signal.is_consolidating && (
-                        <Target 
-                          className="h-3 w-3 text-blue-500" 
-                          title="Consolidating" 
-                        />
-                      )}
-                    </div>
+                    <TooltipProvider delayDuration={100}>
+                      <div className="flex items-center gap-2">
+                        {signal.symbol}
+                        {signal.is_breakout && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Zap className="h-3 w-3 text-yellow-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Breakout detected</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {signal.is_consolidating && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Target className="h-3 w-3 text-blue-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Consolidating pattern</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {signal.pump_dump_warning && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle 
+                                className="h-3 w-3 text-red-500" 
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-red-600">
+                              <p>⚠️ Pump & Dump Warning</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {signal.is_high_risk_country && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Globe className="h-3 w-3 text-orange-500" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-orange-600">
+                              <p>High-risk country: {signal.country}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TooltipProvider>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
@@ -970,6 +1010,55 @@ export default function PennyStockScanner() {
 
                 <Separator />
 
+                {/* Risk Warnings */}
+                {(selectedSignal.pump_dump_warning || 
+                  selectedSignal.is_high_risk_country) && (
+                  <>
+                    <div className="space-y-2">
+                      <h3 
+                        className="text-xs font-medium text-red-500
+                          uppercase tracking-wide flex items-center gap-1"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        Risk Warnings
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedSignal.pump_dump_warning && (
+                          <div 
+                            className="flex items-center gap-2 p-2 
+                              bg-red-50 dark:bg-red-950 rounded-md"
+                          >
+                            <AlertTriangle 
+                              className="h-4 w-4 text-red-500 shrink-0" 
+                            />
+                            <span className="text-xs text-red-700 
+                              dark:text-red-300">
+                              Potential pump & dump detected (extreme 
+                              volume + high score pattern)
+                            </span>
+                          </div>
+                        )}
+                        {selectedSignal.is_high_risk_country && (
+                          <div 
+                            className="flex items-center gap-2 p-2 
+                              bg-orange-50 dark:bg-orange-950 rounded-md"
+                          >
+                            <Globe 
+                              className="h-4 w-4 text-orange-500 shrink-0" 
+                            />
+                            <span className="text-xs text-orange-700 
+                              dark:text-orange-300">
+                              High-risk country: {selectedSignal.country} 
+                              (historically poor performance)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+
                 {/* Risk Management */}
                 {selectedSignal.stop_loss_level && (
                   <>
@@ -1026,6 +1115,22 @@ export default function PennyStockScanner() {
                             >
                               {selectedSignal.pump_dump_risk}
                             </Badge>
+                          </div>
+                        )}
+                        {selectedSignal.country && (
+                          <div 
+                            className="flex items-center 
+                              justify-between"
+                          >
+                            <span className="text-xs">Country</span>
+                            <span className={cn(
+                              "text-xs font-medium",
+                              selectedSignal.is_high_risk_country 
+                                ? "text-orange-600" 
+                                : "text-muted-foreground"
+                            )}>
+                              {selectedSignal.country}
+                            </span>
                           </div>
                         )}
                       </div>
