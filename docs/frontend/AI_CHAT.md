@@ -99,6 +99,7 @@ floating navbar dock with matching shadows and glass morphism effects.
 
 Features:
 - Matches navbar dock styling (shadows, borders, glassmorphism)
+- Vertically aligned with navbar (`h-full max-h-14` + `items-center`)
 - Positioned to the right of the navbar
 - Tooltip on hover showing "AI Chat"
 - Smooth scale animation on hover
@@ -255,7 +256,7 @@ To update Victor's behavior:
 // src/app/api/chat/route.ts
 import { buildVictorLitePrompt } from "@lib/ai-agent";
 
-const systemPrompt = buildVictorLitePrompt({ accountSize: 1500 });
+const systemPrompt = buildVictorLitePrompt({ accountSize: 1750 });
 ```
 
 ### Default Model

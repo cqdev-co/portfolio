@@ -76,6 +76,9 @@ export interface TickerData {
     confidence: 'HIGH' | 'MEDIUM' | 'LOW';
     deviationPercent: number;
   };
+  
+  // Explanation when no viable spread is found
+  noSpreadReason?: string;
 }
 
 // ============================================================================

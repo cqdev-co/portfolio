@@ -95,7 +95,7 @@ async function isUserAuthorized(): Promise<{ authorized: boolean; email?: string
 
 // Use Victor Lite prompt with tools enabled
 const systemPrompt = buildVictorLitePrompt({ 
-  accountSize: 1500,
+  accountSize: 1750,
   withTools: true,  // Enable tool instructions
 });
 

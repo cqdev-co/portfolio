@@ -340,7 +340,7 @@ async function fetchTickerData(
         shortStrike: sharedData.spread.shortStrike,
         debit: sharedData.spread.estimatedDebit,
         dte: sharedData.spread.dte,
-        accountSize: 1500,
+        accountSize: 1750,
       });
       analysis = analysisResult ?? undefined;
     }

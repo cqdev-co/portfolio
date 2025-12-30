@@ -259,7 +259,9 @@ export async function fetchTickerData(
             console.log(`[Yahoo] Spread note: ${spreadResult.reason}`);
           }
         } else {
-          console.log(`[Yahoo] No options spread available for ${ticker}`);
+          console.log(`[Yahoo] No viable spread for ${ticker} - options too expensive or illiquid`);
+          // Explicitly tell the AI there's no viable spread
+          data.noSpreadReason = "No viable deep ITM call spread found - options are either too expensive (debit > 80% of width), have insufficient cushion (< 5%), or probability of profit is too low (< 70%)";
         }
       } catch (optionsError) {
         console.error(`[Yahoo] Options data fetch failed for ${ticker}:`, optionsError);

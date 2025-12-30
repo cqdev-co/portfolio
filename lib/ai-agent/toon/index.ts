@@ -102,6 +102,10 @@ export function encodeTickerToTOON(data: TickerData): string {
         : null,
       pop: data.spread.pop ? `${Math.round(data.spread.pop)}%` : null,
     };
+  } else if (data.noSpreadReason) {
+    // Explicitly tell the AI when no viable spread exists
+    tickerData.spread = "NONE_VIABLE";
+    tickerData.spreadNote = data.noSpreadReason;
   }
   
   // Trade grade

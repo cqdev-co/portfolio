@@ -28,6 +28,12 @@ bun run scan --list sp500 --min-score 50
 
 # Scan specific tickers
 bun run scan --tickers NVDA,AAPL,GOOGL --min-score 70
+
+# Find tickers with viable deep ITM spreads
+bun run scan-spreads --list mega
+
+# Use relaxed criteria to see "almost viable" setups
+bun run scan-spreads --list growth --relaxed
 ```
 
 **Note**: Environment variables are loaded from the repository root `.env` file.
@@ -99,6 +105,57 @@ Position analysis shows:
 | Analyst     | 20        | Targets, Upgrades, Revisions |
 | **Total**   | **100**   | |
 
+## Spread Scanner
+
+Find tickers with viable deep ITM call spreads meeting conservative criteria.
+
+### Two-Stage Workflow (Recommended)
+
+```bash
+# Stage 1: Run technical/fundamental scan
+bun run scan --list sp500
+
+# Stage 2: Find spreads for ENTER-worthy tickers
+bun run scan-spreads --from-scan --relaxed
+```
+
+This workflow:
+1. First scans for technically sound stocks (score ≥70)
+2. Then finds viable spreads only on those pre-qualified tickers
+
+### Direct Scanning
+
+```bash
+# Scan mega-cap stocks (default)
+bun run scan-spreads
+
+# Scan from database (like regular scan does)
+bun run scan-spreads --list db
+
+# Scan different lists: mega, growth, etf, value
+bun run scan-spreads --list growth
+
+# Scan specific tickers
+bun run scan-spreads --tickers NVDA,AAPL,AMZN
+
+# Use relaxed criteria (60% PoP vs 70%)
+bun run scan-spreads --relaxed
+```
+
+### Criteria
+
+**Strict Criteria** (default):
+- Debit: 55-80% of spread width
+- Cushion: ≥5% below current price
+- PoP: ≥70% probability of profit
+- Return: ≥20% return on risk
+
+**Relaxed Criteria** (`--relaxed`):
+- Debit: 50-85% of spread width
+- Cushion: ≥3% below current price
+- PoP: ≥60% probability of profit
+- Return: ≥15% return on risk
+
 ## CLI Commands
 
 ```bash
@@ -122,6 +179,13 @@ bun run src/index.ts scan [options]
 bun run src/index.ts trends [options]
   -d, --days <n>           # Days to look back (default: 7)
   -m, --min-delta <n>      # Min score improvement (default: 10)
+
+# Spread scanner command
+bun run src/index.ts scan-spreads [options]
+  -l, --list <name>        # Predefined list (mega, growth, etf, value)
+  -t, --tickers <symbols>  # Comma-separated tickers
+  -r, --relaxed            # Use relaxed criteria
+  -v, --verbose            # Verbose output
 ```
 
 ## Configuration

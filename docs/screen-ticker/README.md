@@ -8,6 +8,7 @@ to identify high-conviction entry points.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| v2.1.0 | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads |
 | v1.7.1 | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps) |
 | v1.7.0 | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest |
 | v2.0.0 | Nov 2024 | AI-first architecture, cloud mode |
@@ -40,7 +41,35 @@ bun run analyze NVDA --position "165/170 Call Debit Spread"
 
 # View score trends
 bun run trends --days 7
+
+# Two-stage workflow (RECOMMENDED):
+# Stage 1: Find technically sound stocks
+bun run scan --list sp500
+
+# Stage 2: Find spreads for qualified tickers
+bun run scan-spreads --from-scan --relaxed
+
+# Direct spread scanning
+bun run scan-spreads --list db
+bun run scan-spreads --list mega --relaxed
 ```
+
+### Spread Scanner (Two-Stage Workflow)
+
+The spread scanner finds tickers with viable deep ITM call spreads.
+Best results with the **two-stage workflow**:
+
+1. **`bun run scan`** - identifies technically sound stocks (ENTER decisions)
+2. **`bun run scan-spreads --from-scan`** - finds spreads for those tickers
+
+| Criteria | Strict (default) | Relaxed (`--relaxed`) |
+|----------|------------------|------------------------|
+| Debit | 55-80% of width | 50-85% of width |
+| Cushion | ≥5% | ≥3% |
+| PoP | ≥70% | ≥60% |
+| Return | ≥20% | ≥15% |
+
+Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 
 ### Scoring System
 

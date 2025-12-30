@@ -17,12 +17,12 @@
  * 
  * // Full context (CLI)
  * const prompt = buildVictorSystemPrompt({
- *   accountSize: 1500,
+ *   accountSize: 1750,
  *   context: toonEncodedData,
  * });
  * 
  * // Lite version (Frontend)
- * const prompt = buildVictorLitePrompt({ accountSize: 1500 });
+ * const prompt = buildVictorLitePrompt({ accountSize: 1750 });
  * ```
  */
 
@@ -242,7 +242,7 @@ export function buildVictorSystemPrompt(config: VictorPromptConfig): string {
  * Optional: Tool instructions (when withTools: true)
  */
 export function buildVictorLitePrompt(config?: VictorLiteConfig): string {
-  const accountSize = config?.accountSize ?? 1500;
+  const accountSize = config?.accountSize ?? 1750;
   const maxPosition = Math.round(accountSize * 0.2);
   const withTools = config?.withTools ?? false;
   

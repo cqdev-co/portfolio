@@ -30,10 +30,12 @@ export function ChatButton() {
               stiffness: 300 
             }}
             className={cn(
-              // Match navbar positioning
+              // Match navbar positioning exactly
               "pointer-events-none fixed z-30",
               "bottom-0 mb-4",
-              "flex items-end",
+              // Match navbar height & centering
+              "h-full max-h-14",
+              "flex items-center",
               // Position next to navbar (centered + offset)
               "left-1/2 translate-x-[calc(170px+8px)]"
             )}

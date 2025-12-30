@@ -60,6 +60,7 @@ import {
   type PositionContext,
   type CatalystContext,
 } from "./utils/ai-narrative.ts";
+import { scanSpreads, type ScanSpreadsOptions } from "./commands/scan-spreads.ts";
 
 // Load .env from repository root (parent of screen-ticker)
 const rootEnvPath = join(process.cwd(), "..", ".env");
@@ -469,6 +470,45 @@ program
         chalk.red(`${passCount} PASS`)
       );
       console.log();
+    } catch (error) {
+      logger.error(`Scan failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * Scan-spreads command - find tickers with viable deep ITM spreads
+ * 
+ * Two-stage workflow:
+ * 1. Run `bun run scan` to find technically sound stocks
+ * 2. Run `bun run scan-spreads --from-scan` to find viable spreads
+ */
+program
+  .command("scan-spreads")
+  .description("Find tickers with viable deep ITM call spreads")
+  .alias("ss")
+  .option(
+    "-l, --list <name>",
+    "Predefined list: mega, growth, etf, value, db, sp500",
+    "mega"
+  )
+  .option("-t, --tickers <symbols>", "Comma-separated tickers to scan")
+  .option("-v, --verbose", "Verbose output", false)
+  .option("-r, --relaxed", "Use relaxed criteria (60% PoP, 3% cushion)", false)
+  .option("-f, --from-scan", "Use tickers from today's scan results (ENTER/WAIT)", false)
+  .option("-m, --min-score <number>", "Min score for --from-scan (default: 70)", "70")
+  .action(async (opts) => {
+    const options: ScanSpreadsOptions = {
+      list: opts.list,
+      tickers: opts.tickers,
+      verbose: opts.verbose,
+      relaxed: opts.relaxed,
+      fromScan: opts.fromScan,
+      minScore: parseInt(opts.minScore, 10),
+    };
+
+    try {
+      await scanSpreads(options);
     } catch (error) {
       logger.error(`Scan failed: ${error}`);
       process.exit(1);

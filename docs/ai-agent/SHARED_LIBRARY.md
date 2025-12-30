@@ -52,7 +52,7 @@ analysis.
 import { buildVictorSystemPrompt } from 'lib/ai-agent';
 
 const prompt = buildVictorSystemPrompt({
-  accountSize: 1500,
+  accountSize: 1750,
   context: "... TOON data and calendar ...",
   includeToonSpec: true,
 });
@@ -260,7 +260,7 @@ const context = await buildContext(classification);
 
 // Create system prompt
 const systemPrompt = buildVictorSystemPrompt({
-  accountSize: 1500,
+  accountSize: 1750,
   context,
   includeToonSpec: true,
 });

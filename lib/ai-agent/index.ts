@@ -20,7 +20,7 @@
  * const tools = toOllamaTools(AGENT_TOOLS);
  * const classification = classifyQuestion(userMessage);
  * const systemPrompt = buildVictorSystemPrompt({
- *   accountSize: 1500,
+ *   accountSize: 1750,
  *   context: await buildContext(classification),
  * });
  * 
