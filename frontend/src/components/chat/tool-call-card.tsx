@@ -300,10 +300,10 @@ function TickerDataSummary({ data }: { data: TickerData }) {
                 }
               />
             )}
-            {data.shortInterest && (
+            {data.shortInterest && data.shortInterest.shortPct !== undefined && (
               <DataRow 
                 label="Short" 
-                value={`${data.shortInterest.shortPct.toFixed(1)}% (${data.shortInterest.daysToCover?.toFixed(1) || "—"}d)`} 
+                value={`${data.shortInterest.shortPct.toFixed(1)}% (${data.shortInterest.shortRatio?.toFixed(1) || "—"}d)`} 
               />
             )}
           </div>

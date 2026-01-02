@@ -6,6 +6,9 @@
  * 
  * NOTE: This module now uses REAL options data for IV and spreads.
  * No more approximations!
+ * 
+ * PROXY SUPPORT: When YAHOO_PROXY_URL is set, routes requests through
+ * Cloudflare Worker to bypass IP-based rate limiting.
  */
 
 import type {
@@ -25,39 +28,444 @@ import type {
 } from './types';
 
 // Import REAL options functions (same as CLI uses)
-import { getIVAnalysis } from '../options/iv';
+import { getOptionsChain } from '../options/chain';
+import type { OptionsChain, IVAnalysis as IVAnalysisType } from '../options/types';
 import { findSpreadWithAlternatives } from '../options/spreads';
 import { getPsychologicalFairValue, extractWallsFromPFV } from '../pfv';
+
+// Polygon.io fallback
+import { fetchTickerDataFromPolygon } from './polygon';
+
+// Cloudflare Worker proxy (bypasses Yahoo rate limits)
+import {
+  isProxyConfigured,
+  fetchAllViaProxy,  // Combined endpoint (5x more efficient)
+  fetchQuoteViaProxy,
+  fetchChartViaProxy,
+  fetchOptionsViaProxy,
+  fetchSummaryViaProxy,
+  fetchNewsViaProxy,
+} from './yahoo-proxy';
+
+/**
+ * Extract IV from an already-fetched options chain
+ * Avoids extra API call since we already have the chain
+ */
+function getIVFromChain(chain: OptionsChain): IVAnalysisType | null {
+  const { calls, underlyingPrice } = chain;
+  
+  // Find ATM options (within 5% of current price)
+  const atmCalls = calls
+    .filter(c => 
+      Math.abs(c.strike - underlyingPrice) / underlyingPrice < 0.05
+    )
+    .sort((a, b) => 
+      Math.abs(a.strike - underlyingPrice) - 
+      Math.abs(b.strike - underlyingPrice)
+    );
+
+  if (atmCalls.length === 0) return null;
+
+  // Average IV of ATM options (filter out zero IV)
+  const validIVCalls = atmCalls.filter(c => c.impliedVolatility > 0.01);
+  if (validIVCalls.length === 0) return null;
+
+  const avgIV = validIVCalls
+    .slice(0, 3)
+    .reduce((sum, c) => sum + c.impliedVolatility, 0) /
+    Math.min(3, validIVCalls.length);
+
+  const currentIV = avgIV * 100;
+
+  let ivPercentile: number;
+  let ivLevel: IVAnalysisType['ivLevel'];
+
+  if (currentIV < 20) {
+    ivPercentile = currentIV * 2;
+    ivLevel = 'LOW';
+  } else if (currentIV < 35) {
+    ivPercentile = 30 + (currentIV - 20) * 2;
+    ivLevel = 'NORMAL';
+  } else if (currentIV < 50) {
+    ivPercentile = 60 + (currentIV - 35) * 1.5;
+    ivLevel = 'ELEVATED';
+  } else {
+    ivPercentile = Math.min(99, 80 + (currentIV - 50) * 0.4);
+    ivLevel = 'HIGH';
+  }
+
+  return {
+    currentIV: Math.round(currentIV * 10) / 10,
+    ivPercentile: Math.round(ivPercentile),
+    ivLevel,
+  };
+}
+
+// ============================================================================
+// RATE LIMITING & RETRY LOGIC
+// ============================================================================
+
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Rate limiter to prevent 429 errors
+ * Yahoo Finance has aggressive rate limits on their crumb system
+ */
+let lastRequestTime = 0;
+let yahooRateLimited = false;  // Track if we've been rate limited
+let rateLimitExpiry = 0;       // When to try Yahoo again
+const MIN_REQUEST_DELAY_MS = 1500;
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minute cooldown after rate limit
+
+/**
+ * Check if Yahoo is currently rate limited
+ */
+export function isYahooRateLimited(): boolean {
+  if (!yahooRateLimited) return false;
+  if (Date.now() > rateLimitExpiry) {
+    yahooRateLimited = false;
+    console.log('[Yahoo] Rate limit cooldown expired, will try again');
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Mark Yahoo as rate limited
+ */
+function setYahooRateLimited(): void {
+  yahooRateLimited = true;
+  rateLimitExpiry = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+  console.log('[Yahoo] Rate limited - switching to Polygon fallback for 5 min');
+}
+
+async function rateLimitedRequest<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  baseDelay = 2000
+): Promise<T> {
+  // Enforce minimum delay between requests
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  if (timeSinceLastRequest < MIN_REQUEST_DELAY_MS) {
+    await sleep(MIN_REQUEST_DELAY_MS - timeSinceLastRequest);
+  }
+  lastRequestTime = Date.now();
+  
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMsg = lastError.message.toLowerCase();
+      
+      // Check if it's a rate limit error (429) or crumb error
+      const isRateLimit = errorMsg.includes('429') || 
+                          errorMsg.includes('too many requests') ||
+                          errorMsg.includes('rate limit') ||
+                          errorMsg.includes('crumb');
+      
+      if (isRateLimit) {
+        if (attempt < retries - 1) {
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(
+            `[Yahoo] Rate limited, waiting ${Math.round(delay / 1000)}s ` +
+            `(attempt ${attempt + 1}/${retries})...`
+          );
+          await sleep(delay);
+          lastRequestTime = Date.now();
+        } else {
+          // All retries exhausted - mark as rate limited
+          setYahooRateLimited();
+        }
+      } else {
+        // Non-rate-limit error, don't retry
+        throw lastError;
+      }
+    }
+  }
+  
+  throw lastError ?? new Error('Unknown error after retries');
+}
 
 // ============================================================================
 // YAHOO FINANCE WRAPPER
 // ============================================================================
 
+// Singleton instance to reuse crumb/cookies across requests
+let yahooFinanceInstance: InstanceType<
+  typeof import('yahoo-finance2').default
+> | null = null;
+
+async function getYahooFinance() {
+  if (yahooFinanceInstance) return yahooFinanceInstance;
+  
+  const YahooFinance = (await import('yahoo-finance2')).default;
+  yahooFinanceInstance = new YahooFinance({ 
+    suppressNotices: ["yahooSurvey", "rippiReport"],
+  });
+  return yahooFinanceInstance;
+}
+
+/**
+ * Clear Yahoo Finance cache (useful if rate limited)
+ */
+function clearYahooCache(): void {
+  yahooFinanceInstance = null;
+  lastRequestTime = 0;
+  console.log('[Yahoo] Cache cleared');
+}
+
+// ============================================================================
+// PROXY-BASED FETCHING (Cloudflare Worker)
+// ============================================================================
+
+/**
+ * Fetch ticker data via Cloudflare Worker proxy
+ * Bypasses Yahoo's IP-based rate limiting
+ */
+async function fetchTickerDataViaProxy(
+  ticker: string
+): Promise<TickerData | null> {
+  const symbol = ticker.toUpperCase();
+  console.log(`[Yahoo Proxy] Fetching ${symbol} via combined endpoint (1 request)...`);
+  
+  try {
+    // Use combined endpoint - 5x more efficient (1 request vs 5)
+    const combined = await fetchAllViaProxy(symbol);
+    if (!combined?.quote) {
+      console.log(`[Yahoo Proxy] No data for ${symbol}`);
+      return null;
+    }
+    
+    const { quote, chart, earnings, analysts, shortInterest, options, news } = combined;
+    const price = quote.price;
+    console.log(`[Yahoo Proxy] Got ${symbol}: $${price} (${combined.elapsed_ms}ms)`);
+    
+    // Build ticker data from clean combined response
+    const data: TickerData = {
+      ticker: symbol,
+      price,
+      change: quote.change ?? 0,
+      changePct: quote.changePct ?? 0,
+      ma20: quote.fiftyDayAverage,
+      ma50: quote.fiftyDayAverage,
+      ma200: quote.twoHundredDayAverage,
+      aboveMA200: quote.twoHundredDayAverage 
+        ? price > quote.twoHundredDayAverage 
+        : undefined,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+      marketCap: quote.marketCap,
+      peRatio: quote.peRatio,
+      forwardPE: quote.forwardPE,
+      eps: quote.eps,
+      dividendYield: quote.dividendYield,
+      beta: quote.beta,
+      dataQuality: {
+        isStale: false,
+        ageHours: 0,
+      },
+    };
+    
+    // Process chart data for RSI, support/resistance
+    if (chart?.quotes && chart.quotes.length >= 14) {
+      const validCloses = chart.quotes
+        .map(q => q.close)
+        .filter((c): c is number => c !== null && c !== undefined);
+      const validHighs = chart.quotes
+        .map(q => q.high)
+        .filter((h): h is number => h !== null && h !== undefined);
+      const validLows = chart.quotes
+        .map(q => q.low)
+        .filter((l): l is number => l !== null && l !== undefined);
+      
+      if (validCloses.length >= 14) {
+        data.rsi = calculateRSI(validCloses);
+        data.hv20 = calculateHistoricalVolatility(validCloses, 20);
+        
+        // Support/Resistance from recent highs/lows
+        const recentHighs = validHighs.slice(-20);
+        const recentLows = validLows.slice(-20);
+        if (recentHighs.length > 0 && recentLows.length > 0) {
+          data.support = Math.round(Math.min(...recentLows));
+          data.resistance = Math.round(Math.max(...recentHighs));
+        }
+        
+        // Performance calculations
+        if (validCloses.length >= 5) {
+          const current = validCloses[validCloses.length - 1];
+          const d5 = validCloses[validCloses.length - 6] || current;
+          const d20 = validCloses[validCloses.length - 21] || current;
+          
+          data.performance = {
+            day5: Math.round(((current - d5) / d5) * 1000) / 10,
+            month1: Math.round(((current - d20) / d20) * 1000) / 10,
+          };
+        }
+      }
+    }
+    
+    // Earnings (already extracted by worker)
+    if (earnings) {
+      data.earningsDate = earnings.date;
+      data.daysToEarnings = earnings.daysUntil;
+      // Set legacy fields for formatter compatibility
+      data.earningsDays = earnings.daysUntil > 0 ? earnings.daysUntil : null;
+      data.earningsWarning = earnings.daysUntil <= 14;
+    }
+    
+    // Analyst ratings (already extracted by worker)
+    if (analysts && analysts.total > 0) {
+      data.analystRatings = {
+        strongBuy: analysts.strongBuy,
+        buy: analysts.buy,
+        hold: analysts.hold,
+        sell: analysts.sell,
+        strongSell: analysts.strongSell,
+        total: analysts.total,
+        bullishPercent: analysts.bullishPct,
+      };
+    }
+    
+    // Short interest (already extracted by worker)
+    if (shortInterest) {
+      data.shortInterest = {
+        shortRatio: shortInterest.shortRatio ?? 0,
+        shortPct: shortInterest.shortPctFloat ?? 0,
+      };
+    }
+    
+    // News (already cleaned by worker)
+    if (news && news.length > 0) {
+      data.news = news.slice(0, 3).map(n => ({
+        title: n.title,
+        url: n.link || '',
+        source: n.source || 'Unknown',
+        date: n.date || new Date().toISOString(),
+      }));
+    }
+    
+    // Options data (already summarized by worker)
+    if (options) {
+      // IV analysis
+      if (options.atmIV !== null) {
+        const currentIV = options.atmIV;
+        let ivLevel: 'LOW' | 'NORMAL' | 'ELEVATED' | 'HIGH';
+        let ivPercentile: number;
+        
+        if (currentIV < 20) {
+          ivPercentile = currentIV * 2;
+          ivLevel = 'LOW';
+        } else if (currentIV < 35) {
+          ivPercentile = 30 + (currentIV - 20) * 2;
+          ivLevel = 'NORMAL';
+        } else if (currentIV < 50) {
+          ivPercentile = 60 + (currentIV - 35) * 1.5;
+          ivLevel = 'ELEVATED';
+        } else {
+          ivPercentile = Math.min(99, 80 + (currentIV - 50) * 0.4);
+          ivLevel = 'HIGH';
+        }
+        
+        data.iv = {
+          currentIV: Math.round(currentIV * 10) / 10,
+          hv20: data.hv20,
+          ivPercentile: Math.round(ivPercentile),
+          ivLevel,
+          premium: ivLevel === 'LOW' ? 'cheap' :
+                   ivLevel === 'HIGH' ? 'expensive' : 'fair',
+        };
+      }
+      
+      // Options flow (already calculated by worker)
+      if (options.callVolume > 0 || options.callOI > 0) {
+        const sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 
+          options.callVolume > options.putVolume * 1.5 
+            ? 'BULLISH' 
+            : options.putVolume > options.callVolume * 1.5 
+              ? 'BEARISH' 
+              : 'NEUTRAL';
+        
+        data.optionsFlow = {
+          pcRatioOI: options.pcRatioOI ?? undefined,
+          pcRatioVol: options.pcRatioVol ?? undefined,
+          sentiment,
+        };
+      }
+    }
+    
+    // Calculate grade if we have enough data
+    if (data.rsi && data.price) {
+      data.grade = calculateTradeGrade(data);
+    }
+    
+    console.log(`[Yahoo Proxy] Successfully fetched ${symbol}`);
+    return data;
+    
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[Yahoo Proxy] Error fetching ${symbol}:`, msg);
+    
+    // Fall back to Polygon if proxy fails
+    console.log(`[Yahoo Proxy] Falling back to Polygon...`);
+    return fetchTickerDataFromPolygon(ticker);
+  }
+}
+
+// ============================================================================
+// DIRECT YAHOO FINANCE FETCHING
+// ============================================================================
+
 /**
  * Fetch basic ticker data from Yahoo Finance
- * Works in both CLI and Frontend environments
+ * 
+ * Priority order:
+ * 1. Cloudflare Worker proxy (if YAHOO_PROXY_URL configured)
+ * 2. Direct Yahoo Finance (if not rate limited)
+ * 3. Polygon.io fallback (if Yahoo rate limited)
+ * 
+ * Architecture optimized to minimize API calls:
+ * - Options chain fetched ONCE and shared across IV/spread/PFV analysis
+ * - Total: ~5-6 API calls instead of 15+
  */
 export async function fetchTickerData(
   ticker: string
 ): Promise<TickerData | null> {
-  console.log(`[Yahoo] Fetching data for ${ticker}...`);
+  // PRIORITY 1: Use Cloudflare Worker proxy if configured
+  if (isProxyConfigured()) {
+    console.log(`[Yahoo] Using Cloudflare Worker proxy for ${ticker}...`);
+    return fetchTickerDataViaProxy(ticker);
+  }
   
-  // Dynamic import to work in both environments
-  let YahooFinance;
+  // PRIORITY 2: Check if Yahoo is rate limited
+  if (isYahooRateLimited()) {
+    console.log(`[Yahoo] Currently rate limited, using Polygon fallback...`);
+    return fetchTickerDataFromPolygon(ticker);
+  }
+  
+  console.log(`[Yahoo] Fetching data for ${ticker} (direct)...`);
+  
+  let yahooFinance;
   try {
-    YahooFinance = (await import('yahoo-finance2')).default;
+    yahooFinance = await getYahooFinance();
   } catch (importError) {
     console.error(`[Yahoo] Failed to import yahoo-finance2:`, importError);
     throw new Error('Yahoo Finance library not available');
   }
   
-  const yahooFinance = new YahooFinance({ 
-    suppressNotices: ["yahooSurvey"] 
-  });
-  
   try {
     console.log(`[Yahoo] Calling quote API for ${ticker}...`);
-    const quote = await yahooFinance.quote(ticker.toUpperCase());
+    const quote = await rateLimitedRequest(
+      () => yahooFinance.quote(ticker.toUpperCase())
+    );
     
     if (!quote?.regularMarketPrice) {
       console.log(`[Yahoo] No price data for ${ticker}`);
@@ -96,14 +504,15 @@ export async function fetchTickerData(
       dataQuality,
     };
     
-    // Fetch additional data
+    // Fetch additional data (sequential to avoid rate limits)
     try {
-      const [summary, history, newsData, optionsFlow] = await Promise.all([
-        fetchSummaryData(yahooFinance, ticker, price),
-        fetchHistoricalData(yahooFinance, ticker),
-        fetchNewsData(yahooFinance, ticker),
-        fetchOptionsFlow(yahooFinance, ticker),
-      ]);
+      // Run sequentially instead of Promise.all to respect rate limits
+      const summary = await fetchSummaryData(yahooFinance, ticker, price);
+      const history = await fetchHistoricalData(yahooFinance, ticker);
+      const newsData = await fetchNewsData(yahooFinance, ticker);
+      
+      // Skip separate options flow call - we'll get this from the unified chain fetch below
+      const optionsFlow: OptionsFlow | null = null;
       
       // Merge summary data
       if (summary) {
@@ -143,7 +552,7 @@ export async function fetchTickerData(
             month1: ((now - m1) / m1) * 100,
           };
           
-          // Fetch relative strength vs SPY (same as CLI)
+          // Fetch relative strength vs SPY
           const relStrength = await fetchRelativeStrength(
             yahooFinance, 
             ticker, 
@@ -171,17 +580,44 @@ export async function fetchTickerData(
       
       // ================================================================
       // REAL OPTIONS DATA (IV, Spread, PFV)
-      // Uses the EXACT SAME functions as CLI - no approximations
+      // OPTIMIZED: Fetch options chain ONCE and share across all analysis
       // ================================================================
       try {
-        console.log(`[Yahoo] Fetching REAL options data for ${ticker}...`);
+        console.log(`[Yahoo] Fetching options data for ${ticker}...`);
         
-        // Fetch IV and PFV in parallel first
-        // PFV gives us put/call walls for smart spread selection
-        const [ivResult, pfvResult] = await Promise.all([
-          getIVAnalysis(ticker),
-          getPsychologicalFairValue(ticker),
-        ]);
+        // SINGLE options chain fetch - shared across IV, spreads, PFV
+        const optionsChain = await getOptionsChain(ticker, 30);
+        
+        // Calculate options flow from the chain we already have
+        if (optionsChain) {
+          const { calls, puts } = optionsChain;
+          const totalCallOI = calls.reduce((sum, c) => sum + c.openInterest, 0);
+          const totalPutOI = puts.reduce((sum, p) => sum + p.openInterest, 0);
+          const totalCallVol = calls.reduce((sum, c) => sum + c.volume, 0);
+          const totalPutVol = puts.reduce((sum, p) => sum + p.volume, 0);
+          
+          if (totalCallOI > 0) {
+            const pcRatioOI = Math.round((totalPutOI / totalCallOI) * 100) / 100;
+            const pcRatioVol = totalCallVol > 0 
+              ? Math.round((totalPutVol / totalCallVol) * 100) / 100 
+              : 0;
+            const sentiment: 'bullish' | 'neutral' | 'bearish' = 
+              pcRatioOI < 0.7 ? 'bullish' : 
+              pcRatioOI > 1.0 ? 'bearish' : 
+              'neutral';
+            
+            data.optionsFlow = { pcRatioOI, pcRatioVol, sentiment };
+            console.log(`[Yahoo] Options flow: P/C ${pcRatioOI} (${sentiment})`);
+          }
+        }
+        
+        // Get IV from the chain we already have (no extra API call)
+        const ivResult = optionsChain 
+          ? getIVFromChain(optionsChain)
+          : null;
+        
+        // PFV still needs multiple expirations - but we'll optimize it too
+        const pfvResult = await getPsychologicalFairValue(ticker);
         
         // Build spread context using PFV walls (same as CLI does)
         let putWalls: number[] | undefined;
@@ -203,9 +639,9 @@ export async function fetchTickerData(
           callWalls,
         };
         
-        // Now fetch spread with full context
+        // Pass the pre-fetched chain to avoid another API call
         const spreadResult = await findSpreadWithAlternatives(
-          ticker, 30, undefined, spreadContext
+          ticker, 30, undefined, spreadContext, optionsChain
         );
         
         if (ivResult) {
@@ -279,7 +715,19 @@ export async function fetchTickerData(
     
     return data;
   } catch (error) {
-    console.error(`Error fetching ${ticker}:`, error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[Yahoo] Error fetching ${ticker}:`, errorMsg);
+    
+    // Check if it's a rate limit error
+    const isRateLimit = errorMsg.toLowerCase().includes('429') || 
+                        errorMsg.toLowerCase().includes('too many requests') ||
+                        errorMsg.toLowerCase().includes('crumb');
+    
+    if (isRateLimit) {
+      console.log(`[Yahoo] Rate limited - falling back to Polygon...`);
+      return fetchTickerDataFromPolygon(ticker);
+    }
+    
     return null;
   }
 }
@@ -308,7 +756,8 @@ async function fetchSummaryData(
   currentPrice: number
 ): Promise<Partial<TickerData> | null> {
   try {
-    const insights = await yahooFinance.quoteSummary(ticker, {
+    const insights = await rateLimitedRequest(() => 
+      yahooFinance.quoteSummary(ticker, {
       modules: [
         "financialData",
         "defaultKeyStatistics",
@@ -318,7 +767,8 @@ async function fetchSummaryData(
         "summaryDetail",
         "earningsHistory",  // Added for beat/miss streak
       ],
-    });
+      })
+    );
     
     const result: Partial<TickerData> = {};
     
@@ -461,11 +911,13 @@ async function fetchHistoricalData(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 60); // 60 days for better calculations
     
-    const history = await yahooFinance.chart(ticker, {
+    const history = await rateLimitedRequest(() => 
+      yahooFinance.chart(ticker, {
       period1: startDate,
       period2: endDate,
       interval: '1d',
-    });
+      })
+    );
     
     const quotes = history?.quotes ?? [];
     const closes = quotes
@@ -494,7 +946,9 @@ async function fetchNewsData(
   ticker: string
 ): Promise<NewsItem[] | null> {
   try {
-    const search = await yahooFinance.search(ticker, { newsCount: 5 });
+    const search = await rateLimitedRequest(() => 
+      yahooFinance.search(ticker, { newsCount: 5 })
+    );
     const news = search?.news ?? [];
     
     return news.slice(0, 3).map(n => ({
@@ -519,7 +973,9 @@ async function fetchOptionsFlow(
   ticker: string
 ): Promise<OptionsFlow | null> {
   try {
-    const options = await yahooFinance.options(ticker);
+    const options = await rateLimitedRequest(() => 
+      yahooFinance.options(ticker)
+    );
     
     let totalCallOI = 0;
     let totalPutOI = 0;
@@ -569,11 +1025,13 @@ async function fetchRelativeStrength(
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const spyHistory = await yahooFinance.chart('SPY', {
+    const spyHistory = await rateLimitedRequest(() => 
+      yahooFinance.chart('SPY', {
       period1: thirtyDaysAgo,
       period2: new Date(),
       interval: '1d',
-    });
+      })
+    );
     
     if (!spyHistory?.quotes || spyHistory.quotes.length < 5) return null;
     
@@ -784,5 +1242,11 @@ function checkDataStaleness(
 // EXPORTS
 // ============================================================================
 
-export { calculateRSI, calculateADX, getTrendStrength, checkDataStaleness };
+export { 
+  calculateRSI, 
+  calculateADX, 
+  getTrendStrength, 
+  checkDataStaleness,
+  clearYahooCache,
+};
 

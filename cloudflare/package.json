@@ -1,0 +1,23 @@
+{
+  "name": "yahoo-proxy-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:local": "wrangler dev & sleep 3 && node tests/integration.mjs",
+    "debug": "node scripts/debug-endpoint.mjs"
+  },
+  "dependencies": {
+    "yahoo-finance2": "^2.14.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.0",
+    "@cloudflare/workers-types": "^4.20260101.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.54.0"
+  }
+}

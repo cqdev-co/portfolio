@@ -10,11 +10,6 @@ interface Scanner {
 
 const scanners: Scanner[] = [
   {
-    name: "Volatility Squeeze Scanner",
-    path: "/volatility-squeeze-scanner",
-    winRate: "68%",
-  },
-  {
     name: "Unusual Options Scanner", 
     path: "/unusual-options-scanner",
   },

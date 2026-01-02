@@ -12,7 +12,7 @@
  * const ollamaTools = toOllamaTools(AGENT_TOOLS);
  * 
  * // For custom implementation
- * const tools = AGENT_TOOLS.filter(t => t.name !== 'scan_for_opportunities');
+ * const tools = AGENT_TOOLS.filter(t => t.name !== 'get_financials_deep');
  * ```
  */
 
@@ -92,7 +92,7 @@ export const GET_TICKER_DATA_TOOL: AgentTool = {
   name: "get_ticker_data",
   description: 
     "Fetch real-time stock data for a ticker including price, " +
-    "RSI, moving averages, options spreads, and news. Use when " +
+    "RSI, moving averages, IV, options flow, and news. Use when " +
     "analyzing a specific stock.",
   parameters: {
     type: "object",
@@ -107,61 +107,78 @@ export const GET_TICKER_DATA_TOOL: AgentTool = {
 };
 
 /**
- * Scan for opportunities tool - find trade setups
+ * Get financials deep - fetch detailed financial statements
  */
-export const SCAN_OPPORTUNITIES_TOOL: AgentTool = {
-  name: "scan_for_opportunities",
+export const GET_FINANCIALS_DEEP_TOOL: AgentTool = {
+  name: "get_financials_deep",
   description: 
-    "Scan the market for trade opportunities matching our " +
-    "Deep ITM Call Debit Spread criteria. Returns graded setups.",
+    "Fetch detailed financial statements including income statement, " +
+    "balance sheet, and cash flow data. Use when analyzing a " +
+    "company's fundamentals, profitability, debt, or cash position.",
   parameters: {
     type: "object",
-    required: [],
-    properties: {},
+    required: ["ticker"],
+    properties: {
+      ticker: {
+        type: "string",
+        description: "Stock ticker symbol (e.g. NVDA, AAPL, TSLA)",
+      },
+    },
   },
 };
 
 /**
- * Analyze position tool - evaluate existing spread positions
+ * Get institutional holdings - fetch 13F institutional ownership data
  */
-export const ANALYZE_POSITION_TOOL: AgentTool = {
-  name: "analyze_position",
+export const GET_INSTITUTIONAL_HOLDINGS_TOOL: AgentTool = {
+  name: "get_institutional_holdings",
   description: 
-    "Analyze an existing call debit spread position. Use this when " +
-    "the user asks about a position they already hold, whether to " +
-    "close/hold/roll, or for P&L calculations. Provides accurate " +
-    "profit calculations and recommendations. ALWAYS use this tool " +
-    "for position math - never calculate spread P&L manually.",
+    "Fetch institutional ownership data including top holders, " +
+    "ownership percentage, and recent position changes. Use when " +
+    "analyzing who owns the stock and institutional sentiment.",
   parameters: {
     type: "object",
-    required: ["ticker", "longStrike", "shortStrike", "costBasis", "dte"],
+    required: ["ticker"],
     properties: {
       ticker: {
         type: "string",
-        description: "Stock ticker symbol (e.g. NVDA, AAPL)",
+        description: "Stock ticker symbol (e.g. NVDA, AAPL, TSLA)",
       },
-      longStrike: {
-        type: "number",
-        description: "The long (lower) strike price of the call spread",
+    },
+  },
+};
+
+/**
+ * Get unusual options activity - fetch signals from Supabase
+ */
+export const GET_UNUSUAL_OPTIONS_TOOL: AgentTool = {
+  name: "get_unusual_options_activity",
+  description: 
+    "Fetch unusual options activity signals from the database. Shows " +
+    "large block trades, sweeps, and volume anomalies that may " +
+    "indicate institutional positioning. Can filter by ticker or get " +
+    "all recent high-grade signals.",
+  parameters: {
+    type: "object",
+    required: [],
+    properties: {
+      ticker: {
+        type: "string",
+        description: 
+          "Optional: Filter to specific ticker (e.g. NVDA). " +
+          "If not provided, returns top signals across all tickers.",
       },
-      shortStrike: {
-        type: "number",
-        description: "The short (higher) strike price of the call spread",
+      minGrade: {
+        type: "string",
+        description: 
+          "Minimum signal grade to return (S, A, B, C, D). " +
+          "Defaults to 'B' if not specified.",
+        enum: ["S", "A", "B", "C", "D"],
       },
-      costBasis: {
+      limit: {
         type: "number",
         description: 
-          "Original debit paid per share (e.g., 3.62 for a $362 debit)",
-      },
-      currentValue: {
-        type: "number",
-        description: 
-          "Current mid price of the spread per share (optional - " +
-          "will estimate if not provided)",
-      },
-      dte: {
-        type: "number",
-        description: "Days to expiration",
+          "Maximum number of signals to return. Defaults to 10.",
       },
     },
   },
@@ -177,17 +194,19 @@ export const ANALYZE_POSITION_TOOL: AgentTool = {
 export const AGENT_TOOLS: AgentTool[] = [
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
-  ANALYZE_POSITION_TOOL,
+  GET_FINANCIALS_DEEP_TOOL,
+  GET_INSTITUTIONAL_HOLDINGS_TOOL,
+  GET_UNUSUAL_OPTIONS_TOOL,
 ];
 
 /**
- * Tools for research/analysis (no scanning)
+ * Tools for research/analysis
  */
 export const RESEARCH_TOOLS: AgentTool[] = [
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
-  ANALYZE_POSITION_TOOL,
+  GET_FINANCIALS_DEEP_TOOL,
+  GET_INSTITUTIONAL_HOLDINGS_TOOL,
 ];
 
 /**
@@ -239,6 +258,11 @@ export default {
   AGENT_TOOLS,
   RESEARCH_TOOLS,
   BASIC_TOOLS,
+  WEB_SEARCH_TOOL,
+  GET_TICKER_DATA_TOOL,
+  GET_FINANCIALS_DEEP_TOOL,
+  GET_INSTITUTIONAL_HOLDINGS_TOOL,
+  GET_UNUSUAL_OPTIONS_TOOL,
   toOllamaTools,
   getToolByName,
   filterTools,

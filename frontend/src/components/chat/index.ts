@@ -1,4 +1,3 @@
-export { ChatButton } from "./chat-button";
 export { ChatPanel } from "./chat-panel";
 export { ChatInput } from "./chat-input";
 export { ChatMessages } from "./chat-messages";

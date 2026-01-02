@@ -71,8 +71,9 @@ export {
   // Individual tools
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
-  ANALYZE_POSITION_TOOL,
+  GET_FINANCIALS_DEEP_TOOL,
+  GET_INSTITUTIONAL_HOLDINGS_TOOL,
+  GET_UNUSUAL_OPTIONS_TOOL,
   
   // Converters
   toOllamaTools,
@@ -108,8 +109,15 @@ export {
 // ============================================================================
 
 export {
-  // Data fetching
+  // Data fetching (Yahoo with Polygon fallback)
   fetchTickerData,
+  clearYahooCache,
+  isYahooRateLimited,
+  fetchTickerDataFromPolygon,
+  
+  // Cloudflare Worker proxy
+  isProxyConfigured,
+  checkProxyHealth,
   
   // Formatters
   formatTickerDataForAI,
@@ -138,6 +146,15 @@ export {
   type RelativeStrength,
   type EarningsHistory,
   type SearchResult,
+  // New financial types
+  type IncomeStatement,
+  type BalanceSheet,
+  type CashFlow,
+  type FinancialsDeep,
+  type InstitutionalHolder,
+  type InstitutionalHoldings,
+  type UnusualOptionsSignal,
+  type UnusualOptionsActivity,
 } from './data';
 
 // ============================================================================
@@ -148,8 +165,9 @@ export {
   // Individual handlers
   handleGetTickerData,
   handleWebSearch,
-  handleAnalyzePosition,
-  handleScanOpportunities,
+  handleGetFinancialsDeep,
+  handleGetInstitutionalHoldings,
+  handleGetUnusualOptionsActivity,
   
   // Unified executor
   executeToolCall,
@@ -160,6 +178,9 @@ export {
   type ToolResult,
   type TickerToolResult,
   type SearchToolResult,
+  type FinancialsToolResult,
+  type HoldingsToolResult,
+  type UnusualOptionsToolResult,
   type OutputFormat,
 } from './handlers';
 

@@ -24,16 +24,39 @@ export type {
   TickerToolResult,
   SearchToolResult,
   SearchResult,
+  // New financial types
+  IncomeStatement,
+  BalanceSheet,
+  CashFlow,
+  FinancialsDeep,
+  FinancialsToolResult,
+  InstitutionalHolder,
+  InstitutionalHoldings,
+  HoldingsToolResult,
+  UnusualOptionsSignal,
+  UnusualOptionsActivity,
+  UnusualOptionsToolResult,
 } from './types';
 
-// Data fetching
+// Data fetching (Yahoo with Polygon fallback)
 export {
   fetchTickerData,
   calculateRSI,
   calculateADX,
   getTrendStrength,
   checkDataStaleness,
+  clearYahooCache,
+  isYahooRateLimited,
 } from './yahoo';
+
+// Polygon.io fallback
+export { fetchTickerDataFromPolygon } from './polygon';
+
+// Cloudflare Worker proxy (bypasses Yahoo rate limits)
+export {
+  isProxyConfigured,
+  checkProxyHealth,
+} from './yahoo-proxy';
 
 // Formatters
 export {

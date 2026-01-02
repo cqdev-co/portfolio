@@ -189,6 +189,141 @@ export interface EarningsHistory {
 }
 
 // ============================================================================
+// FINANCIAL STATEMENTS (Deep Fundamentals)
+// ============================================================================
+
+export interface IncomeStatement {
+  revenue: number;
+  revenueGrowth?: number;           // YoY growth %
+  grossProfit: number;
+  grossMargin: number;              // %
+  operatingIncome: number;
+  operatingMargin: number;          // %
+  netIncome: number;
+  netMargin: number;                // %
+  eps: number;
+  epsGrowth?: number;               // YoY growth %
+}
+
+export interface BalanceSheet {
+  totalAssets: number;
+  totalLiabilities: number;
+  totalEquity: number;
+  cash: number;
+  totalDebt: number;
+  debtToEquity: number;
+  currentRatio: number;
+  quickRatio?: number;
+}
+
+export interface CashFlow {
+  operatingCashFlow: number;
+  capitalExpenditure: number;
+  freeCashFlow: number;
+  fcfYield?: number;                // FCF / Market Cap %
+  dividendsPaid?: number;
+}
+
+export interface FinancialsDeep {
+  ticker: string;
+  currency: string;
+  fiscalYear: string;
+  income: IncomeStatement;
+  balance: BalanceSheet;
+  cashFlow: CashFlow;
+  valuationMetrics?: {
+    peRatio?: number;
+    forwardPE?: number;
+    pegRatio?: number;
+    priceToBook?: number;
+    priceToSales?: number;
+    evToEbitda?: number;
+  };
+}
+
+// ============================================================================
+// INSTITUTIONAL HOLDINGS
+// ============================================================================
+
+export interface InstitutionalHolder {
+  holder: string;
+  shares: number;
+  value: number;
+  percentOfPortfolio?: number;
+  change?: number;                  // Change in shares
+  changeType?: 'NEW' | 'INCREASED' | 'DECREASED' | 'SOLD_OUT' | 'UNCHANGED';
+}
+
+export interface InstitutionalHoldings {
+  ticker: string;
+  institutionalOwnership: number;   // % owned by institutions
+  numberOfHolders: number;
+  topHolders: InstitutionalHolder[];
+  recentActivity?: {
+    newPositions: number;
+    increasedPositions: number;
+    decreasedPositions: number;
+    soldOut: number;
+  };
+  insiderOwnership?: number;        // % owned by insiders
+}
+
+// ============================================================================
+// UNUSUAL OPTIONS ACTIVITY
+// ============================================================================
+
+export interface UnusualOptionsSignal {
+  signalId: string;
+  ticker: string;
+  optionSymbol: string;
+  strike: number;
+  expiry: string;                   // ISO date
+  optionType: 'call' | 'put';
+  daysToExpiry: number;
+  moneyness: 'ITM' | 'ATM' | 'OTM';
+  
+  // Volume metrics
+  currentVolume: number;
+  averageVolume: number;
+  volumeRatio: number;
+  
+  // Premium flow
+  premiumFlow: number;
+  
+  // Flags
+  hasVolumeAnomaly: boolean;
+  hasOISpike: boolean;
+  hasSweep: boolean;
+  hasBlockTrade: boolean;
+  
+  // Scoring
+  overallScore: number;             // 0-1
+  grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+  
+  // Context
+  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
+  underlyingPrice: number;
+  impliedVolatility?: number;
+  
+  // Metadata
+  detectionTimestamp: string;
+  isNew: boolean;
+  detectionCount: number;
+}
+
+export interface UnusualOptionsActivity {
+  signals: UnusualOptionsSignal[];
+  summary?: {
+    totalSignals: number;
+    bullishCount: number;
+    bearishCount: number;
+    avgScore: number;
+    topGrade: string;
+  };
+}
+
+// ============================================================================
 // TOOL RESULT TYPES
 // ============================================================================
 
@@ -205,6 +340,18 @@ export interface TickerToolResult extends ToolResult {
 
 export interface SearchToolResult extends ToolResult {
   data?: SearchResult[];
+}
+
+export interface FinancialsToolResult extends ToolResult {
+  data?: FinancialsDeep;
+}
+
+export interface HoldingsToolResult extends ToolResult {
+  data?: InstitutionalHoldings;
+}
+
+export interface UnusualOptionsToolResult extends ToolResult {
+  data?: UnusualOptionsActivity;
 }
 
 export interface SearchResult {

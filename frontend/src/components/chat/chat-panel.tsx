@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 
 // Parse error message for user-friendly display
 function getErrorDisplay(error: Error | undefined): {
@@ -86,11 +87,9 @@ type ChatPanelProps = {
   onClose: () => void;
 };
 
-const DEFAULT_MODEL = "gpt-oss:120b";
-
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   const [input, setInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_CHAT_MODEL);
   const [chatKey, setChatKey] = useState(0);
 
   // Create transport with API endpoint and model in body

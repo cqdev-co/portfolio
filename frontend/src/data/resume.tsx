@@ -178,30 +178,6 @@ export const DATA = {
       image: "",
       video: "https://cdn.magicui.design/bento-grid.mp4",
     },
-    {
-      title: "Odyssey",
-      href: "/odyssey",
-      dates: "November 2025 - Present",
-      active: true,
-      description:
-        "Modern trading dashboard for market overview and opportunity detection",
-      technologies: [
-        "Next.js",
-        "TypeScript",
-        "ShadCN",
-        "Recharts",
-        "yfinance",
-      ],
-      links: [
-        {
-          type: "Dashboard",
-          href: "/odyssey",
-          icon: <Icons.globe className="size-3" />,
-        },
-      ],
-      image: "",
-      video: "",
-    },
   ],
   certifications: [
     {

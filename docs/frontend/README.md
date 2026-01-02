@@ -140,19 +140,18 @@ The portfolio now features a unified scanner navigation system that provides use
 - **Responsive Layout**: Optimized for all screen sizes with focused content
 
 ### Available Scanners
-1. **Volatility Squeeze Scanner** (`/volatility-squeeze-scanner`)
-   - Status: Active
-   - Focus: Technical analysis using Bollinger Bands and Keltner Channels
-   - Win Rate: 68% with 2.1% average returns
-
-2. **Unusual Options Scanner** (`/unusual-options-scanner`)
+1. **Unusual Options Scanner** (`/unusual-options-scanner`)
    - Status: Active  
    - Focus: Insider detection through options flow analysis
    - Features: Real-time data with 0DTE exclusion filters
 
+2. **Penny Stock Scanner** (`/penny-stock-scanner`)
+   - Status: Active
+   - Focus: Penny stock explosion setups with volume analysis
+
 ### Navigation Updates
-- **Dock Icon**: Scanner icon now points to `/scanners` instead of directly to volatility squeeze scanner
-- **Label Change**: Updated from "Scanner" to "Scanners" to reflect multiple options
+- **Dock Icon**: Scanner icon points to `/scanners` for unified scanner access
+- **Label**: "Scanners" reflects multiple available options
 - **User Experience**: Improved discoverability of all available analysis tools
 
 ## Public Access Model
@@ -212,8 +211,6 @@ src/app/
 ├── opengraph-image.tsx    # Main site OG image (serene-gold)
 ├── about/
 │   └── opengraph-image.tsx # About page OG image (serene-gold)
-├── volatility-squeeze-scanner/
-│   └── opengraph-image.tsx # VSS page OG image (serene-gold)
 └── blog/[slug]/
     └── opengraph-image.tsx # Blog post OG images (default)
 ```

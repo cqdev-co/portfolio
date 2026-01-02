@@ -105,6 +105,10 @@ import {
   // DATA FETCHING (shared with Frontend for parity)
   fetchTickerData as sharedFetchTickerData,
   checkDataStaleness,
+  // Tool Handlers (shared implementations)
+  handleGetFinancialsDeep,
+  handleGetInstitutionalHoldings,
+  handleGetUnusualOptionsActivity,
   // Types
   type QuestionClassification as SharedQuestionClassification,
   type TickerData as SharedTickerData,
@@ -670,39 +674,41 @@ async function executeToolCall(
       }
     }
     
-    case "scan_for_opportunities": {
-      showStatus(`🔍 Scanning market for opportunities...`);
-      const results = await quickScan();
-      if (results.length === 0) {
-        return "No Grade A or B setups found in current market conditions.";
+    case "get_financials_deep": {
+      const ticker = (args.ticker as string).toUpperCase();
+      showStatus(`📈 Fetching ${ticker} financials...`);
+      const result = await handleGetFinancialsDeep({ ticker });
+      if (!result.success) {
+        return result.error ?? `Could not fetch financials for ${ticker}`;
       }
-      return formatScanResults(results);
+      return result.formatted ?? 'No financial data available';
     }
     
-    case "analyze_position": {
+    case "get_institutional_holdings": {
       const ticker = (args.ticker as string).toUpperCase();
-      const longStrike = args.longStrike as number;
-      const shortStrike = args.shortStrike as number;
-      const costBasis = args.costBasis as number;
-      const currentValue = args.currentValue as number | undefined ?? null;
-      const dte = args.dte as number;
-      
-      showStatus(`📊 Analyzing ${ticker} $${longStrike}/$${shortStrike} position...`);
-      
-      const analysis = await analyzePosition(
-        ticker,
-        longStrike,
-        shortStrike,
-        costBasis,
-        currentValue,
-        dte
-      );
-      
-      if (!analysis) {
-        return `Could not analyze position for ${ticker}. Check ticker symbol and try again.`;
+      showStatus(`🏦 Fetching ${ticker} institutional holdings...`);
+      const result = await handleGetInstitutionalHoldings({ ticker });
+      if (!result.success) {
+        return result.error ?? `Could not fetch holdings for ${ticker}`;
       }
-      
-      return formatPositionAnalysisForAI(analysis);
+      return result.formatted ?? 'No holdings data available';
+    }
+    
+    case "get_unusual_options_activity": {
+      const ticker = args.ticker as string | undefined;
+      showStatus(ticker 
+        ? `🔥 Fetching unusual options for ${ticker}...` 
+        : `🔥 Fetching unusual options activity...`
+      );
+      const result = await handleGetUnusualOptionsActivity({
+        ticker,
+        minGrade: args.minGrade as string | undefined,
+        limit: args.limit as number | undefined,
+      });
+      if (!result.success) {
+        return result.error ?? 'Could not fetch unusual options activity';
+      }
+      return result.formatted ?? 'No unusual options signals found';
     }
     
     default:

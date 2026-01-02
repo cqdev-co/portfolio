@@ -1,0 +1,15 @@
+# Yahoo Finance Proxy Worker
+# Proxies requests to Yahoo Finance using Cloudflare's IP pool
+# to avoid rate limiting on blocked IPs
+
+name = "yahoo-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Uncomment to set account_id (or use CLOUDFLARE_ACCOUNT_ID env var)
+# account_id = "your_account_id"
+
+[observability]
+enabled = true
+

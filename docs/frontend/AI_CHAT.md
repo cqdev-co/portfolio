@@ -16,17 +16,18 @@ frontend/src/
 ├── app/api/chat/
 │   ├── route.ts              # Streaming API with tool calling
 │   └── models/route.ts       # API to fetch available models
-├── components/chat/
-│   ├── index.ts              # Export barrel
-│   ├── chat-button.tsx       # Floating action button (FAB)
-│   ├── chat-panel.tsx        # Main chat panel with useChat hook
-│   ├── chat-messages.tsx     # Message list with tool data cards
-│   ├── chat-message.tsx      # Individual message bubble
-│   ├── chat-input.tsx        # Input with send/stop functionality
-│   ├── chat-greeting.tsx     # Empty state with suggestions
-│   ├── chat-model-selector.tsx  # Model dropdown selector
-│   ├── ticker-data-card.tsx  # Data card for ticker info
-│   └── chat-icons.tsx        # SVG icons (SparklesIcon, etc.)
+├── components/
+│   ├── navbar.tsx            # Floating navbar with AI Chat button
+│   └── chat/
+│       ├── index.ts              # Export barrel
+│       ├── chat-panel.tsx        # Main chat panel with useChat hook
+│       ├── chat-messages.tsx     # Message list with tool data cards
+│       ├── chat-message.tsx      # Individual message bubble
+│       ├── chat-input.tsx        # Input with send/stop functionality
+│       ├── chat-greeting.tsx     # Empty state with suggestions
+│       ├── chat-model-selector.tsx  # Model dropdown selector
+│       ├── ticker-data-card.tsx  # Data card for ticker info
+│       └── chat-icons.tsx        # SVG icons (SparklesIcon, etc.)
 ├── hooks/
 │   └── use-scroll-to-bottom.ts  # Auto-scroll behavior
 └── lib/ai/
@@ -52,7 +53,8 @@ frontend/src/
 |----------|---------|-------------|
 | `OLLAMA_API_KEY` | - | **Required.** Your Ollama Cloud API key |
 | `OLLAMA_BASE_URL` | `https://ollama.com/api` | Ollama Cloud API endpoint |
-| `OLLAMA_MODEL` | `gpt-oss:120b` | Default model to use |
+| `OLLAMA_MODEL` | `llama3.3:70b-cloud` | Default model for API route |
+| `NEXT_PUBLIC_OLLAMA_MODEL` | `llama3.3:70b-cloud` | Default model for frontend |
 
 ### Setup
 
@@ -63,7 +65,8 @@ frontend/src/
 ```bash
 OLLAMA_API_KEY=your_api_key_here
 OLLAMA_BASE_URL=https://ollama.com/api
-OLLAMA_MODEL=gpt-oss:120b
+OLLAMA_MODEL=llama3.3:70b-cloud
+NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
 ```
 
 ## Available Models
@@ -78,12 +81,11 @@ fetched from `/api/chat/models` which proxies the Ollama API.
 
 | Model ID | Description |
 |----------|-------------|
-| `gpt-oss:120b` | Most capable open-source model (default) |
-| `gpt-oss:20b` | Faster, smaller GPT-OSS variant |
-| `deepseek-v3.2` | DeepSeek's latest model |
-| `qwen3-coder:480b` | Qwen3 optimized for code |
-| `kimi-k2:1t` | Kimi's 1 trillion parameter model |
-| `gemma3:27b` | Google's Gemma 3 |
+| `llama3.3:70b-cloud` | Fast and capable Meta model (default) |
+| `gpt-oss:120b` | Most capable open-source model |
+| `qwen3:235b-cloud` | Large reasoning model |
+| `deepseek-r1:671b-cloud` | Advanced reasoning model |
+| `llama3.1:405b-cloud` | Largest Llama model |
 
 See all available models: https://ollama.com/search?c=cloud
 
@@ -92,24 +94,38 @@ all currently available Ollama Cloud models.
 
 ## Components
 
-### ChatButton
+### AI Chat in Navbar
 
-Floating action button that triggers the chat panel. Styled to match the 
-floating navbar dock with matching shadows and glass morphism effects.
+The AI Chat button is integrated directly into the main floating navbar alongside
+other navigation items. This provides a unified experience with consistent styling.
 
 Features:
-- Matches navbar dock styling (shadows, borders, glassmorphism)
-- Vertically aligned with navbar (`h-full max-h-14` + `items-center`)
-- Positioned to the right of the navbar
+- Part of the main `Dock` component in `navbar.tsx`
+- Magnification effect on hover (same as other navbar icons)
 - Tooltip on hover showing "AI Chat"
-- Smooth scale animation on hover
 - Uses `SparklesIcon` for AI branding
+- Opens `ChatPanel` when clicked
+
+The navbar manages the chat panel state internally:
 
 ```tsx
-import { ChatButton } from "@/components/chat";
+// In navbar.tsx
+const [isChatOpen, setIsChatOpen] = useState(false);
 
-// In your layout or page
-<ChatButton />
+// AI Chat button in the Dock
+<DockIcon>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button onClick={() => setIsChatOpen(true)}>
+        <SparklesIcon size={16} />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent>AI Chat</TooltipContent>
+  </Tooltip>
+</DockIcon>
+
+// Chat Panel rendered outside the Dock
+<ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 ```
 
 ### ChatPanel
@@ -261,10 +277,18 @@ const systemPrompt = buildVictorLitePrompt({ accountSize: 1750 });
 
 ### Default Model
 
-Change `OLLAMA_MODEL` environment variable or update the fallback:
+Change `NEXT_PUBLIC_OLLAMA_MODEL` environment variable for the frontend:
+
+```bash
+# In .env.local
+NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
+```
+
+Or update the fallback in `lib/ai/models.ts`:
 
 ```typescript
-const selectedModel = process.env.OLLAMA_MODEL || "llama3.3:70b-cloud";
+export const DEFAULT_CHAT_MODEL = 
+  process.env.NEXT_PUBLIC_OLLAMA_MODEL || "llama3.3:70b-cloud";
 ```
 
 ### Suggested Actions

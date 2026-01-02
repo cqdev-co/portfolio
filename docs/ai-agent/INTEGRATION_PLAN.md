@@ -2,7 +2,7 @@
 
 **Status**: Complete ✅  
 **Started**: December 27, 2025  
-**Updated**: December 27, 2025  
+**Updated**: December 31, 2025  
 **Goal**: Share AI agent logic between CLI and Frontend
 
 ## Overview
@@ -113,6 +113,15 @@ Created `lib/ai-agent/tools/definitions.ts`:
 - `BASIC_TOOLS` - Minimal set for simple queries
 - `toOllamaTools()` - Convert to Ollama SDK format
 
+**Available Tools (Updated Dec 31, 2025)**:
+| Tool | Description |
+|------|-------------|
+| `web_search` | Search web for news/analysis |
+| `get_ticker_data` | Real-time price, IV, technicals, news |
+| `get_financials_deep` | Income statement, balance sheet, cash flow |
+| `get_institutional_holdings` | 13F ownership data, top holders |
+| `get_unusual_options_activity` | Signals from Supabase (sweeps, blocks) |
+
 ### Phase 3: Extract Question Classification ✅
 
 Created `lib/ai-agent/classification.ts`:
@@ -153,14 +162,23 @@ lib/ai-agent/                    # Source of truth
 │   └── victor.ts                # Victor persona & prompt builders
 ├── tools/
 │   ├── index.ts
-│   └── definitions.ts           # Tool schemas
+│   └── definitions.ts           # Tool schemas (5 tools)
 ├── data/
 │   ├── index.ts
-│   ├── types.ts                 # TickerData interface
+│   ├── types.ts                 # TickerData, Financials, Holdings types
 │   ├── yahoo.ts                 # Yahoo Finance fetching
 │   └── formatters.ts            # AI-friendly formatting
 ├── handlers/
-│   └── index.ts                 # Tool execution handlers
+│   └── index.ts                 # Tool execution handlers (5 handlers)
+├── options/
+│   ├── chain.ts                 # Options chain fetching
+│   ├── iv.ts                    # IV analysis
+│   ├── spreads.ts               # Spread recommendations
+│   └── types.ts                 # Options types
+├── pfv/
+│   └── index.ts                 # Psychological Fair Value
+├── market/
+│   └── index.ts                 # Market regime detection
 └── toon/
     └── index.ts                 # TOON encoding for reduced tokens
 ```
@@ -196,7 +214,9 @@ Created shared data layer in `lib/ai-agent/data/`:
 Created shared tool handlers in `lib/ai-agent/handlers/`:
 - `handleGetTickerData()` - Fetch and format ticker data
 - `handleWebSearch()` - Web search (requires search function injection)
-- `handleAnalyzePosition()` - Position analysis calculations
+- `handleGetFinancialsDeep()` - Detailed financial statements
+- `handleGetInstitutionalHoldings()` - 13F ownership data
+- `handleGetUnusualOptionsActivity()` - Supabase signals query
 - `executeToolCall()` - Unified tool executor
 
 ### Phase 8: Frontend Tool Calling ✅
@@ -262,19 +282,198 @@ Created `lib/ai-agent/options/` with REAL options chain logic:
 
 ## Future Enhancements
 
-### Phase 11: Real Options Data (Optional)
+### Phase 11: Real Options Data ✅ (Completed)
 
-Move CLI's options functions to `lib/ai-agent/options/`:
+Moved CLI's options functions to `lib/ai-agent/options/`:
 - `getOptionsChain()` - Fetch real options data
 - `getIVAnalysis()` - Calculate real IV from ATM options
 - `findSpreadWithAlternatives()` - Real spread recommendations
 
-**Challenges**:
-- Yahoo Finance options API has rate limits
-- Requires proper error handling for illiquid options
-- May need caching strategy for frontend
+### Phase 12: Financial Tools ✅ (Completed Dec 31, 2025)
 
-### Phase 12: TOON Context Builder (Optional)
+Added new fundamental analysis tools:
+- `get_financials_deep` - Income statement, balance sheet, cash flow
+- `get_institutional_holdings` - 13F data from Yahoo Finance
+- `get_unusual_options_activity` - Signals from Supabase database
+
+**Removed Tools**:
+- `analyze_position` - Removed (too specific to spread strategy)
+- `scan_for_opportunities` - Removed (not generally useful)
+
+### Phase 12b: Rate Limiting & Architecture Optimization ✅ (Dec 31, 2025)
+
+**Rate Limiting**:
+- `rateLimitedRequest()` - Wrapper with exponential backoff (4 retries)
+- 1.5s minimum delay between API requests
+- 3s/6s/12s/24s backoff on rate limit errors
+- Sequential execution instead of `Promise.all` for multiple calls
+- Singleton Yahoo Finance instance to reuse auth cookies
+- `clearYahooCache()` - Function to reset if persistently rate limited
+
+**Architecture Optimization** - Reduced API calls from 15+ to ~6-7 per ticker:
+
+| Before | After |
+|--------|-------|
+| Options chain fetched 4x (IV, spreads, PFV, flow) | Options chain fetched **once** and shared |
+| ~15+ API calls per ticker | ~6-7 API calls per ticker |
+
+Key changes:
+- `getIVFromChain()` - Extract IV from pre-fetched chain (no API call)
+- `findSpreadWithAlternatives()` - Accepts optional `preloadedChain` param
+- Options flow calculated from existing chain data
+- `fetchTickerData()` fetches chain once and passes to all analyzers
+
+**API Call Breakdown** (per ticker):
+1. `quote` - Price, basic info
+2. `quoteSummary` - Fundamentals, analyst ratings, earnings
+3. `chart` - Historical data for RSI/ADX
+4. `search` - News
+5. `chart` (SPY) - Relative strength comparison
+6. `options` - Chain for IV, flow, spreads (fetched ONCE)
+
+### Phase 12c: Polygon.io Fallback ✅ (Dec 31, 2025)
+
+Added Polygon.io as fallback when Yahoo Finance rate limits:
+- Auto-detects 429 errors and switches to Polygon
+- 5 minute cooldown before retrying Yahoo
+- Free tier: 5 calls/min, EOD data, 2 years history
+
+**Environment Variable**: `POLYGON_API_TOKEN` (in root `.env`)
+
+**Polygon Data** (free tier limitations):
+- End of day prices (not real-time)
+- Historical data for RSI, support/resistance
+- News headlines
+- Market cap, sector info
+- NO options data (Yahoo-only feature)
+
+### Phase 12d: Cloudflare Worker Proxy ✅ (Jan 2, 2026)
+
+Added Cloudflare Worker to proxy Yahoo Finance requests, bypassing IP-based
+rate limiting. Yahoo aggressively blocks residential IPs and cloud provider
+IPs (Vercel, AWS, etc.) after heavy usage.
+
+**Solution**: Route Yahoo Finance requests through Cloudflare's massive IP pool.
+The worker uses the `yahoo-finance2` library directly, which handles all the
+complex cookie/crumb authentication that Yahoo requires.
+
+**Environment Variable**: `YAHOO_PROXY_URL`
+
+**Required Setup for both CLI and Frontend**:
+- CLI: Add to root `.env`: `YAHOO_PROXY_URL=https://yahoo-proxy.xxx.workers.dev`
+- Frontend: Add to `frontend/.env.local`: `YAHOO_PROXY_URL=https://yahoo-proxy.xxx.workers.dev`
+
+**New Files**:
+- `cloudflare/` - Cloudflare Worker project
+  - `src/index.ts` - Worker code (uses `yahoo-finance2` library)
+  - `wrangler.toml` - Cloudflare config with `nodejs_compat` flag
+  - `package.json` - Dependencies including `yahoo-finance2`
+  - `README.md` - Setup instructions
+  - `tests/` - Integration tests
+- `lib/ai-agent/data/yahoo-proxy.ts` - Proxy client (handles `yahoo-finance2` response format)
+
+**Data Flow (Priority Order)**:
+```
+fetchTickerData(ticker)
+├── 1. if YAHOO_PROXY_URL set → use Cloudflare Worker proxy
+├── 2. if yahooRateLimited → use Polygon fallback
+├── 3. try direct Yahoo Finance
+│      └── on 429 → fall back to Polygon
+└── return data (from whichever source succeeds)
+```
+
+**Worker Endpoints**:
+| Endpoint | Requests | Description |
+|----------|----------|-------------|
+| `GET /ticker/:symbol` | **1** | **RECOMMENDED** - All data in one request |
+| `GET /quote/:ticker` | 1 | Stock quote only |
+| `GET /chart/:ticker` | 1 | Historical OHLCV only |
+| `GET /options/:ticker` | 1 | Options chain only |
+| `GET /summary/:ticker` | 1 | Detailed summary only |
+| `GET /search?q=TICKER` | 1 | Search/news only |
+| `GET /health` | 1 | Health check |
+
+**Request Efficiency**:
+- Old approach: 5 requests per ticker (quote + chart + summary + options + search)
+- New approach: 1 request per ticker via `/ticker/:symbol`
+- **5x improvement** in Cloudflare request usage
+
+**Clean Response Format** (Jan 2, 2026):
+The combined endpoint returns focused data for AI analysis - no noise:
+```json
+{
+  "ticker": "AAPL",
+  "elapsed_ms": 233,
+  "quote": { "price", "change", "changePct", "marketCap", "peRatio", ... },
+  "chart": { "dataPoints": 64, "quotes": [{ "date", "close", ... }] },
+  "earnings": { "date": "2026-01-30", "daysUntil": 28 },
+  "analysts": { "strongBuy", "buy", "hold", "sell", "total", "bullishPct" },
+  "shortInterest": { "shortRatio", "shortPctFloat" },
+  "options": { "atmIV", "pcRatioVol", "pcRatioOI", "callVolume", ... },
+  "news": [{ "title", "source", "link", "date" }]
+}
+```
+Removed: thumbnails, uuids, widths/heights, individual contract details, etc.
+
+**Setup**:
+```bash
+cd cloudflare
+bun install
+npx wrangler login
+bun run deploy
+# Returns URL like: https://yahoo-proxy.your-subdomain.workers.dev
+```
+
+**Post-Deploy Configuration**:
+```bash
+# For CLI (ai-analyst)
+echo "YAHOO_PROXY_URL=https://yahoo-proxy.xxx.workers.dev" >> ../.env
+
+# For Frontend
+echo "YAHOO_PROXY_URL=https://yahoo-proxy.xxx.workers.dev" >> ../frontend/.env.local
+```
+
+**Benefits**:
+- Free tier: 100k requests/day
+- Cloudflare's IP pool rarely blocked by Yahoo
+- Works for both CLI and Frontend
+- Uses `yahoo-finance2` library for proper auth handling
+- Falls back to Polygon if proxy fails
+
+**Important**: Both CLI and Frontend need `YAHOO_PROXY_URL` in their respective env files:
+- CLI: Root `.env` 
+- Frontend: `frontend/.env.local`
+
+### Phase 12e: Response Format Compatibility ✅ (Jan 2, 2026)
+
+Fixed parsing issues between raw Yahoo API format and `yahoo-finance2` library format:
+
+| Field | Raw API Format | yahoo-finance2 Format |
+|-------|----------------|----------------------|
+| Earnings Date | `{ raw: unixTimestamp }` | Date object or ISO string |
+| Short Ratio | `{ raw: number }` | Direct number |
+| Chart Data | `indicators.quote[0].close[]` | `quotes[].close` |
+| News Date | Unix timestamp (seconds) | Date object or string |
+
+The proxy client (`yahoo-proxy.ts`) now handles all formats gracefully with fallbacks.
+
+Also fixed `optionsFlow` field naming to use consistent `pcRatioOI`/`pcRatioVol` 
+structure across both proxy and direct Yahoo paths.
+
+**Debug Tool**: Added `cloudflare/scripts/debug-endpoint.mjs` for printing raw 
+worker responses (requires `YAHOO_PROXY_URL` environment variable):
+```bash
+cd cloudflare
+bun run debug AAPL           # Combined endpoint (default, most efficient)
+bun run debug TSLA ticker    # Same as above (explicit)
+bun run debug NVDA quote     # Quote only
+bun run debug RIVN options   # Options only
+```
+
+**Note**: Local development not supported due to `yahoo-finance2` compatibility 
+issues with Wrangler's local environment. Always test against production worker.
+
+### Phase 13: TOON Context Builder (Optional)
 
 Move `ai-analyst/src/context/toon.ts` to `lib/ai-agent/context/`:
 - TOON encoding functions
@@ -307,9 +506,12 @@ frontend needs full context building.
 - `lib/ai-agent/data/index.ts`
 - `lib/ai-agent/data/types.ts` - TickerData interface
 - `lib/ai-agent/data/yahoo.ts` - Yahoo Finance data fetching
+- `lib/ai-agent/data/yahoo-proxy.ts` - Cloudflare Worker proxy client
+- `lib/ai-agent/data/polygon.ts` - Polygon.io fallback
 - `lib/ai-agent/data/formatters.ts` - AI formatting
 - `lib/ai-agent/handlers/index.ts` - Tool execution
 - `lib/ai-agent/toon/index.ts` - TOON encoding for ticker data
+- `cloudflare/` - Cloudflare Worker for Yahoo proxy (uses yahoo-finance2)
 - `docs/ai-agent/INTEGRATION_PLAN.md`
 - `docs/ai-agent/SHARED_LIBRARY.md`
 - `docs/ai-agent/DATA_PARITY.md` - CLI vs Frontend data analysis

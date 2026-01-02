@@ -14,13 +14,6 @@ Professional-grade scanner for identifying penny stocks before they explode.
 - **Recent Fixes**: [Bug Fixes Nov 2025](penny-stock-scanner/bug-fixes-nov-2025.md)
 - [System Overview](penny-stock-scanner/system-overview.md) | [User Guide](penny-stock-scanner/user-guide.md) | [Frontend Integration](penny-stock-scanner/frontend-integration.md)
 
-#### [Volatility Squeeze Scanner](volatility-squeeze-scanner/)
-Enterprise-grade scanner for volatility squeeze patterns.
-- **Strategy**: Bollinger Band compression detection
-- **Key Features**: ATR-based signals, AI analysis, backtesting
-- **Status**: Production-ready
-- [System Overview](volatility-squeeze-scanner/system-overview.md) | [User Guide](volatility-squeeze-scanner/user-guide.md)
-
 #### [Unusual Options Service](unusual-options-service/)
 Real-time unusual options activity tracker.
 - **Strategy**: Volume, OI, and premium analysis
@@ -71,13 +64,6 @@ AI "Employee" - a 67-year-old veteran Wall Street analyst with 45 years experien
 - **Status**: Production-ready (v1.7.0 - Thinking Mode)
 - [README](ai-analyst/README.md)
 
-#### [Odyssey](odyssey/) 🆕 ✅ New Nov 2025
-Modern trading dashboard for market overview and opportunity detection.
-- **Strategy**: Modular, extensible opportunity detection (Options, Technicals, Fundamentals)
-- **Key Features**: Credit spread detection, market overview, sector analysis, configurable strategies
-- **Status**: Production-ready
-- [README](odyssey/README.md) | [Strategy Guide](odyssey/strategy-guide.md) | [User Guide](odyssey/user-guide.md)
-
 ### Shared Libraries
 
 #### [AI Agent Shared Library](ai-agent/) 🆕 ✅ New Dec 2025
@@ -96,7 +82,7 @@ Centralized database schemas and migrations.
 #### [Frontend](frontend/)
 Next.js-based web interface for all services.
 - **Features**: Dashboard, signal visualization, performance tracking, real-time updates
-- **Scanners**: Volatility Squeeze, Unusual Options, Penny Stock Scanner
+- **Scanners**: Unusual Options, Penny Stock Scanner
 - [README](frontend/README.md) | [Vercel Build Fixes](frontend/vercel-build-fixes.md)
 
 ## 🔍 Service Comparison
@@ -104,11 +90,9 @@ Next.js-based web interface for all services.
 | Service | Focus | Data Sources | Update Frequency | Best For |
 |---------|-------|--------------|------------------|----------|
 | Penny Stock Scanner | Penny stocks explosion setups | YFinance, Supabase | Daily | Finding penny breakouts |
-| Volatility Squeeze Scanner | Volatility patterns | YFinance | Daily | Day/swing trading setups |
 | Unusual Options | Options flow | Market data APIs | Real-time | Options trading signals |
 | RDS Ticker Analysis | Social sentiment | Reddit, Market data | On-demand | Sentiment-driven trades |
 | ML Options Predictor | Options prediction | Historical options | Batch | ML-based forecasting |
-| Odyssey | Opportunity detection | YFinance | Real-time | Multi-strategy opportunity scanning |
 | Stock Scanner | Buy opportunity scoring | YFinance | Daily | High-conviction long entries |
 | AI Analyst | Entry decisions with history | YFinance, Supabase | On-demand | Ticker analysis + strategy |
 
@@ -123,13 +107,6 @@ poetry run penny-scanner scan-all --min-score 0.50 --max-symbols 100
 
 # Full scan (1715 symbols, ~15-20 minutes)
 poetry run penny-scanner scan-all --min-score 0.50
-```
-
-### "I want to find volatility squeeze setups"
-→ Use **[Volatility Squeeze Scanner](volatility-squeeze-scanner/)**
-```bash
-cd volatility-squeeze-scanner
-volatility-scanner scan-all --min-score 0.7
 ```
 
 ### "I want to track unusual options activity"
@@ -151,14 +128,6 @@ rds-analyze AEMD --fast
 ```bash
 cd analyze-options-service
 analyze-options AAPL --with-ml
-```
-
-### "I want a dashboard to monitor market conditions and opportunities"
-→ Use **[Odyssey](odyssey/)**
-```
-Navigate to /odyssey in the frontend
-Configure watchlist and strategy parameters
-View real-time market overview and detected opportunities
 ```
 
 ### "I want to find high-conviction buy opportunities across S&P 500"
@@ -204,7 +173,6 @@ Frontend Dashboard (Visualization)
 - `penny_tickers`: ~2000 penny stocks ($0.10-$5.00)
 - `tickers`: ~12,000 all market tickers
 - `penny_stock_signals`: Penny stock explosion signals
-- `volatility_squeeze_signals`: Squeeze signals
 - `unusual_options_activity`: Options flow data
 - `signal_performance_tracking`: Performance metrics
 - `stock_opportunities`: Daily buy opportunity scores
@@ -279,6 +247,6 @@ Proprietary software. All rights reserved.
 
 ---
 
-**Last Updated**: 2025-12-27
-**Services Count**: 10 active services + 1 shared library
+**Last Updated**: 2026-01-02
+**Services Count**: 8 active services + 1 shared library
 **Documentation Coverage**: 100%

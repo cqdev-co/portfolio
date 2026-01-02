@@ -7,6 +7,59 @@
 
 import type { OptionsChain, OptionContract } from './types';
 
+// ============================================================================
+// RATE LIMITING
+// ============================================================================
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+let lastRequestTime = 0;
+const MIN_REQUEST_DELAY_MS = 1500; // 1.5s between requests
+
+async function rateLimitedRequest<T>(
+  fn: () => Promise<T>,
+  retries = 4,
+  baseDelay = 3000  // Start with 3s delay
+): Promise<T> {
+  const now = Date.now();
+  const timeSince = now - lastRequestTime;
+  if (timeSince < MIN_REQUEST_DELAY_MS) {
+    await sleep(MIN_REQUEST_DELAY_MS - timeSince);
+  }
+  lastRequestTime = Date.now();
+  
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const msg = lastError.message.toLowerCase();
+      const isRateLimit = msg.includes('429') || 
+        msg.includes('too many requests') ||
+        msg.includes('crumb');
+      
+      if (isRateLimit && attempt < retries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`[Options] Rate limited, waiting ${Math.round(delay / 1000)}s...`);
+        await sleep(delay);
+        lastRequestTime = Date.now();
+      } else if (!isRateLimit) {
+        throw lastError;
+      }
+    }
+  }
+  
+  throw lastError ?? new Error('Unknown error after retries');
+}
+
+// ============================================================================
+// OPTIONS CHAIN FETCHING
+// ============================================================================
+
 /**
  * Fetch options chain for a symbol
  * 
@@ -25,13 +78,17 @@ export async function getOptionsChain(
       suppressNotices: ['yahooSurvey', 'rippiReport'],
     });
 
-    // Get quote for underlying price
-    const quote = await yahooFinance.quote(symbol);
+    // Get quote for underlying price (with rate limiting)
+    const quote = await rateLimitedRequest(() => 
+      yahooFinance.quote(symbol)
+    );
     const underlyingPrice = quote?.regularMarketPrice;
     if (!underlyingPrice) return null;
 
-    // Get available expiration dates
-    const expirations = await yahooFinance.options(symbol);
+    // Get available expiration dates (with rate limiting)
+    const expirations = await rateLimitedRequest(() => 
+      yahooFinance.options(symbol)
+    );
     if (!expirations?.expirationDates?.length) return null;
 
     // Find expiration closest to target DTE
@@ -51,8 +108,10 @@ export async function getOptionsChain(
       }
     }
 
-    // Fetch options for that expiration
-    const chain = await yahooFinance.options(symbol, { date: closestExp });
+    // Fetch options for that expiration (with rate limiting)
+    const chain = await rateLimitedRequest(() => 
+      yahooFinance.options(symbol, { date: closestExp })
+    );
     if (!chain?.options?.[0]) return null;
 
     const opts = chain.options[0];

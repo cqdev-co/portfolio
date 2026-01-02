@@ -11,6 +11,7 @@ import type {
   SpreadAlternatives,
   SpreadSelectionContext,
   OptionContract,
+  OptionsChain,
 } from './types';
 import { getOptionsChain } from './chain';
 
@@ -232,14 +233,22 @@ export async function findOptimalSpread(
  * 
  * Uses technical context (MAs, support levels) to choose
  * the best spread strikes.
+ * 
+ * @param symbol - Ticker symbol
+ * @param targetDTE - Target days to expiration
+ * @param maxDebit - Maximum debit to pay (optional)
+ * @param context - Technical context for smart selection
+ * @param preloadedChain - Pre-fetched options chain to avoid extra API call
  */
 export async function findSpreadWithAlternatives(
   symbol: string,
   targetDTE: number = 30,
   maxDebit?: number,
-  context?: SpreadSelectionContext
+  context?: SpreadSelectionContext,
+  preloadedChain?: OptionsChain | null
 ): Promise<SpreadAlternatives> {
-  const chain = await getOptionsChain(symbol, targetDTE);
+  // Use preloaded chain if provided, otherwise fetch
+  const chain = preloadedChain ?? await getOptionsChain(symbol, targetDTE);
   if (!chain || chain.calls.length === 0) {
     return { primary: null, alternatives: [] };
   }

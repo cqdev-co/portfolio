@@ -13,7 +13,6 @@ import { Analytics } from "@vercel/analytics/react";
 import { PersonSchema, WebsiteSchema } from "@/components/schema";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { PortalProvider } from "@/components/portal-provider";
-import { ChatButton } from "@/components/chat";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -133,7 +132,6 @@ export default function RootLayout({
                 </main>
                 <Navbar />
                 <Footer />
-                <ChatButton />
               </TooltipProvider>
             </ThemeProvider>
           </AuthProvider>

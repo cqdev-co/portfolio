@@ -18,7 +18,7 @@ export const maxDuration = 60;
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 
   "https://ollama.com/api";
 const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "gpt-oss:120b";
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "llama3.3:70b-cloud";
 
 // ============================================================================
 // AI CHAT WHITELIST
