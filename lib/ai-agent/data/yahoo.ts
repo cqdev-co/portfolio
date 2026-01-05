@@ -249,26 +249,37 @@ async function fetchTickerDataViaProxy(
     const price = quote.price;
     console.log(`[Yahoo Proxy] Got ${symbol}: $${price} (${combined.elapsed_ms}ms)`);
     
+    // Debug: log what we got from proxy
+    console.log(`[Yahoo Proxy] Raw quote data:`, {
+      marketCap: quote.marketCap,
+      peRatio: quote.peRatio,
+      beta: quote.beta,
+      eps: quote.eps,
+    });
+    console.log(`[Yahoo Proxy] Has analysts:`, !!analysts, analysts?.total);
+    console.log(`[Yahoo Proxy] Has options:`, !!options, options?.atmIV);
+    
     // Build ticker data from clean combined response
+    // Convert null to undefined where needed (TickerData uses undefined for optional fields)
     const data: TickerData = {
       ticker: symbol,
       price,
       change: quote.change ?? 0,
       changePct: quote.changePct ?? 0,
-      ma20: quote.fiftyDayAverage,
-      ma50: quote.fiftyDayAverage,
-      ma200: quote.twoHundredDayAverage,
+      ma20: quote.fiftyDayAverage ?? undefined,
+      ma50: quote.fiftyDayAverage ?? undefined,
+      ma200: quote.twoHundredDayAverage ?? undefined,
       aboveMA200: quote.twoHundredDayAverage 
         ? price > quote.twoHundredDayAverage 
         : undefined,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
-      marketCap: quote.marketCap,
-      peRatio: quote.peRatio,
-      forwardPE: quote.forwardPE,
-      eps: quote.eps,
-      dividendYield: quote.dividendYield,
-      beta: quote.beta,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? undefined,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? undefined,
+      marketCap: quote.marketCap ?? undefined,
+      peRatio: quote.peRatio ?? undefined,
+      forwardPE: quote.forwardPE ?? undefined,
+      eps: quote.eps ?? undefined,
+      dividendYield: quote.dividendYield ?? undefined,
+      beta: quote.beta ?? undefined,
       dataQuality: {
         isStale: false,
         ageHours: 0,
@@ -317,9 +328,11 @@ async function fetchTickerDataViaProxy(
     if (earnings) {
       data.earningsDate = earnings.date;
       data.daysToEarnings = earnings.daysUntil;
-      // Set legacy fields for formatter compatibility
-      data.earningsDays = earnings.daysUntil > 0 ? earnings.daysUntil : null;
-      data.earningsWarning = earnings.daysUntil <= 14;
+      // Set earningsDays - keep actual value for display
+      // Negative means earnings passed, positive means upcoming
+      data.earningsDays = earnings.daysUntil;
+      // Warning only for upcoming earnings within 14 days
+      data.earningsWarning = earnings.daysUntil > 0 && earnings.daysUntil <= 14;
     }
     
     // Analyst ratings (already extracted by worker)
@@ -387,12 +400,13 @@ async function fetchTickerDataViaProxy(
       
       // Options flow (already calculated by worker)
       if (options.callVolume > 0 || options.callOI > 0) {
-        const sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 
+        // Use lowercase to match OptionsFlow type definition
+        const sentiment: 'bullish' | 'bearish' | 'neutral' = 
           options.callVolume > options.putVolume * 1.5 
-            ? 'BULLISH' 
+            ? 'bullish' 
             : options.putVolume > options.callVolume * 1.5 
-              ? 'BEARISH' 
-              : 'NEUTRAL';
+              ? 'bearish' 
+              : 'neutral';
         
         data.optionsFlow = {
           pcRatioOI: options.pcRatioOI ?? undefined,
@@ -854,10 +868,11 @@ async function fetchSummaryData(
       };
       
       // Also set legacy fields for backward compatibility
-      result.earningsDays = daysUntil !== undefined && daysUntil > 0 
-        ? daysUntil 
-        : null;
-      result.earningsWarning = daysUntil !== undefined && daysUntil <= 14;
+      // Keep actual value (negative = passed, positive = upcoming)
+      result.earningsDays = daysUntil ?? null;
+      // Warning only for upcoming earnings within 14 days
+      result.earningsWarning = daysUntil !== undefined && 
+        daysUntil > 0 && daysUntil <= 14;
     }
     
     // Sector with P/E comparison (same as CLI)

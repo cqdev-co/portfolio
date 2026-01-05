@@ -14,6 +14,11 @@ import {
   encodeTickerToTOON, 
   encodeSearchToTOON 
 } from '../toon';
+import {
+  isProxyConfigured,
+  fetchFinancialsViaProxy,
+  fetchHoldingsViaProxy,
+} from '../data/yahoo-proxy';
 import type { 
   ToolResult,
   TickerToolResult,
@@ -239,10 +244,16 @@ export async function handleGetTickerData(
       };
     }
     
+    // Log summary for debugging (full data sent to frontend)
     console.log(`[Handler] Got data for ${ticker}:`, {
       price: data.price,
       rsi: data.rsi,
       hasSpread: !!data.spread,
+      peRatio: data.peRatio,
+      beta: data.beta,
+      marketCap: data.marketCap,
+      hasAnalysts: !!data.analystRatings,
+      hasOptions: !!data.optionsFlow,
     });
     
     // Use TOON format by default for token efficiency
@@ -349,6 +360,77 @@ export async function handleGetFinancialsDeep(
   
   console.log(`[Handler] Fetching financials for: ${ticker}`);
   
+  // Try proxy first (no rate limiting issues)
+  if (isProxyConfigured()) {
+    try {
+      const proxyData = await fetchFinancialsViaProxy(ticker);
+      if (proxyData) {
+        const financials: FinancialsDeep = {
+          ticker: proxyData.ticker,
+          currency: proxyData.currency,
+          fiscalYear: proxyData.fiscalYear,
+          income: proxyData.income,
+          balance: proxyData.balance,
+          cashFlow: proxyData.cashFlow,
+          valuationMetrics: proxyData.valuationMetrics,
+        };
+        
+        const formatted = `
+=== FINANCIALS: ${ticker} (FY${financials.fiscalYear}) ===
+
+📊 INCOME STATEMENT
+Revenue: ${formatLargeNumber(proxyData.income.revenue)}${
+  proxyData.income.revenueGrowth 
+    ? ` (${proxyData.income.revenueGrowth > 0 ? '+' : ''}${
+        proxyData.income.revenueGrowth}% YoY)` 
+    : ''
+}
+Gross Margin: ${proxyData.income.grossMargin}%
+Operating Margin: ${proxyData.income.operatingMargin}%
+Net Margin: ${proxyData.income.netMargin}%
+EPS: $${proxyData.income.eps.toFixed(2)}${
+  proxyData.income.epsGrowth 
+    ? ` (${proxyData.income.epsGrowth > 0 ? '+' : ''}${
+        proxyData.income.epsGrowth}% growth)` 
+    : ''
+}
+
+📋 BALANCE SHEET
+Total Assets: ${formatLargeNumber(proxyData.balance.totalAssets)}
+Cash: ${formatLargeNumber(proxyData.balance.cash)}
+Total Debt: ${formatLargeNumber(proxyData.balance.totalDebt)}
+Debt/Equity: ${proxyData.balance.debtToEquity}x
+Current Ratio: ${proxyData.balance.currentRatio}x
+
+💰 CASH FLOW
+Operating CF: ${formatLargeNumber(proxyData.cashFlow.operatingCashFlow)}
+CapEx: ${formatLargeNumber(proxyData.cashFlow.capitalExpenditure)}
+Free Cash Flow: ${formatLargeNumber(proxyData.cashFlow.freeCashFlow)}${
+  proxyData.cashFlow.fcfYield 
+    ? ` (${proxyData.cashFlow.fcfYield}% yield)` 
+    : ''
+}
+
+📈 VALUATION
+P/E: ${proxyData.valuationMetrics?.peRatio?.toFixed(1) ?? 'N/A'}
+Forward P/E: ${proxyData.valuationMetrics?.forwardPE?.toFixed(1) ?? 'N/A'}
+PEG: ${proxyData.valuationMetrics?.pegRatio?.toFixed(2) ?? 'N/A'}
+P/B: ${proxyData.valuationMetrics?.priceToBook?.toFixed(2) ?? 'N/A'}
+EV/EBITDA: ${proxyData.valuationMetrics?.evToEbitda?.toFixed(1) ?? 'N/A'}
+`.trim();
+        
+        return {
+          success: true,
+          data: financials,
+          formatted,
+        };
+      }
+    } catch (proxyError) {
+      console.log(`[Handler] Proxy financials failed, falling back:`, proxyError);
+    }
+  }
+  
+  // Fallback to direct yahoo-finance2
   try {
     const YahooFinance = (await import('yahoo-finance2')).default;
     const yahooFinance = new YahooFinance({ 
@@ -557,6 +639,50 @@ export async function handleGetInstitutionalHoldings(
   
   console.log(`[Handler] Fetching institutional holdings for: ${ticker}`);
   
+  // Try proxy first (no rate limiting issues)
+  if (isProxyConfigured()) {
+    try {
+      const proxyData = await fetchHoldingsViaProxy(ticker);
+      if (proxyData) {
+        const holdings: InstitutionalHoldings = {
+          ticker: proxyData.ticker,
+          institutionalOwnership: proxyData.institutionsPercent ?? 0,
+          numberOfHolders: proxyData.institutionsCount ?? 0,
+          topHolders: proxyData.topHolders.map(h => ({
+            holder: h.name,
+            shares: 0, // Not available in proxy response
+            value: h.value,
+            percentOfPortfolio: h.pctHeld,
+          })),
+          insiderOwnership: proxyData.insidersPercent ?? undefined,
+        };
+        
+        const formatted = `
+=== INSTITUTIONAL HOLDINGS: ${ticker} ===
+
+📊 OWNERSHIP BREAKDOWN
+Institutional: ${holdings.institutionalOwnership}%
+Insider: ${holdings.insiderOwnership ?? 'N/A'}%
+Number of Institutions: ${holdings.numberOfHolders}
+
+🏦 TOP HOLDERS
+${proxyData.topHolders.slice(0, 5).map((h, i) => 
+  `${i + 1}. ${h.name}: ${formatLargeNumber(h.value)} (${h.pctHeld}%)`
+).join('\n')}
+`.trim();
+        
+        return {
+          success: true,
+          data: holdings,
+          formatted,
+        };
+      }
+    } catch (proxyError) {
+      console.log(`[Handler] Proxy holdings failed, falling back:`, proxyError);
+    }
+  }
+  
+  // Fallback to direct yahoo-finance2
   try {
     const YahooFinance = (await import('yahoo-finance2')).default;
     const yahooFinance = new YahooFinance({ 

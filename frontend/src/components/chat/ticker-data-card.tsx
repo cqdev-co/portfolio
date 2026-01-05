@@ -30,6 +30,7 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
   const {
     ticker,
     price,
+    change,
     changePct,
     rsi,
     adx,
@@ -39,6 +40,12 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
     ma200,
     marketCap,
     peRatio,
+    forwardPE,
+    eps,
+    beta,
+    dividendYield,
+    fiftyTwoWeekLow,
+    fiftyTwoWeekHigh,
     analystRatings,
     targetPrices,
     performance,
@@ -127,7 +134,10 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
               "text-sm font-medium tabular-nums",
               isPositive ? "text-emerald-600" : "text-red-500"
             )}>
-              {formatPct(changePct)}
+              {change !== undefined && (
+                <span>{change >= 0 ? "+" : ""}{change.toFixed(2)} </span>
+              )}
+              ({formatPct(changePct)})
             </div>
           </div>
         </div>
@@ -210,6 +220,50 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
                 <span className="text-muted-foreground">P/E</span>
                 <span className="font-medium tabular-nums">
                   {peRatio.toFixed(1)}
+                </span>
+              </div>
+            )}
+            
+            {forwardPE && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Fwd P/E</span>
+                <span className="font-medium tabular-nums">
+                  {forwardPE.toFixed(1)}
+                </span>
+              </div>
+            )}
+            
+            {eps !== undefined && eps !== null && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">EPS</span>
+                <span className={cn(
+                  "font-medium tabular-nums",
+                  eps < 0 ? "text-red-500" : "text-foreground"
+                )}>
+                  ${eps.toFixed(2)}
+                </span>
+              </div>
+            )}
+            
+            {beta !== undefined && beta !== null && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Beta</span>
+                <span className={cn(
+                  "font-medium tabular-nums",
+                  beta > 1.5 ? "text-amber-500" :
+                  beta < 0.7 ? "text-blue-500" :
+                  "text-foreground"
+                )}>
+                  {beta.toFixed(2)}
+                </span>
+              </div>
+            )}
+            
+            {dividendYield !== undefined && dividendYield > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Div Yield</span>
+                <span className="font-medium tabular-nums text-emerald-600">
+                  {(dividendYield * 100).toFixed(2)}%
                 </span>
               </div>
             )}
@@ -327,6 +381,50 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
               {ma20 && <span>20: <span className="text-foreground font-medium">${ma20.toFixed(0)}</span></span>}
               {ma50 && <span>50: <span className="text-foreground font-medium">${ma50.toFixed(0)}</span></span>}
               {ma200 && <span>200: <span className="text-foreground font-medium">${ma200.toFixed(0)}</span></span>}
+            </div>
+          </div>
+        )}
+        
+        {/* 52-Week Range */}
+        {(fiftyTwoWeekLow || fiftyTwoWeekHigh) && (
+          <div className={cn(
+            "mt-3 pt-3 border-t border-border/40",
+            "text-xs"
+          )}>
+            <div className="text-[10px] font-medium text-muted-foreground 
+                            uppercase tracking-wider mb-2">
+              52-Week Range
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-red-500 font-medium tabular-nums">
+                ${fiftyTwoWeekLow?.toFixed(2)}
+              </span>
+              <div className="flex-1 h-2 bg-muted rounded-full relative overflow-hidden">
+                {fiftyTwoWeekLow && fiftyTwoWeekHigh && (
+                  <div 
+                    className="absolute h-full bg-primary/60 rounded-full"
+                    style={{ 
+                      left: 0, 
+                      width: `${Math.min(100, Math.max(0, 
+                        ((price - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow)) * 100
+                      ))}%` 
+                    }}
+                  />
+                )}
+                {fiftyTwoWeekLow && fiftyTwoWeekHigh && (
+                  <div 
+                    className="absolute w-1 h-full bg-foreground rounded-full"
+                    style={{ 
+                      left: `${Math.min(100, Math.max(0, 
+                        ((price - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow)) * 100
+                      ))}%` 
+                    }}
+                  />
+                )}
+              </div>
+              <span className="text-emerald-600 font-medium tabular-nums">
+                ${fiftyTwoWeekHigh?.toFixed(2)}
+              </span>
             </div>
           </div>
         )}

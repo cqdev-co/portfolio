@@ -14,6 +14,9 @@ node_modules
 .bun
 bun.lockb
 
+# data
+data/pf.csv
+
 # testing
 /coverage
 

@@ -438,6 +438,9 @@ export async function checkProxyHealth(): Promise<boolean> {
 /**
  * Clean, focused response from combined endpoint
  * No noise - only data useful for AI analysis
+ * 
+ * NOTE: Many fields can be null for companies with unavailable data
+ * (e.g., peRatio is null for loss-making companies)
  */
 interface CombinedTickerResponse {
   ticker: string;
@@ -452,10 +455,10 @@ interface CombinedTickerResponse {
     volume: number;
     avgVolume: number;
     marketCap: number;
-    peRatio: number;
-    forwardPE: number;
-    eps: number;
-    beta: number;
+    peRatio: number | null;
+    forwardPE: number | null;
+    eps: number | null;
+    beta: number | null;
     dividendYield: number;
     fiftyDayAverage: number;
     twoHundredDayAverage: number;
@@ -545,9 +548,121 @@ export async function fetchAllViaProxy(
     }
     
     console.log(`[Yahoo Proxy] Combined fetch: ${data.elapsed_ms}ms`);
+    
+    // Debug: dump what proxy returned
+    console.log(`[Yahoo Proxy] Response keys:`, Object.keys(data));
+    console.log(`[Yahoo Proxy] Quote fields:`, data.quote ? Object.keys(data.quote) : 'none');
+    console.log(`[Yahoo Proxy] Quote sample:`, JSON.stringify({
+      marketCap: data.quote?.marketCap,
+      peRatio: data.quote?.peRatio,
+      beta: data.quote?.beta,
+      eps: data.quote?.eps,
+    }));
+    console.log(`[Yahoo Proxy] Analysts:`, data.analysts ? JSON.stringify(data.analysts) : 'null/undefined');
+    console.log(`[Yahoo Proxy] Options:`, data.options ? 'present' : 'null/undefined');
+    console.log(`[Yahoo Proxy] Errors:`, data.errors ? JSON.stringify(data.errors) : 'none');
+    
     return data;
   } catch (error) {
     console.error(`[Yahoo Proxy] Combined fetch failed:`, error);
+    return null;
+  }
+}
+
+// ============================================================================
+// FINANCIALS VIA PROXY
+// ============================================================================
+
+interface ProxyFinancialsResponse {
+  ticker: string;
+  currency: string;
+  fiscalYear: string;
+  income: {
+    revenue: number;
+    revenueGrowth: number | null;
+    grossProfit: number;
+    grossMargin: number;
+    operatingIncome: number;
+    operatingMargin: number;
+    netIncome: number;
+    netMargin: number;
+    eps: number;
+    epsGrowth: number | null;
+  };
+  balance: {
+    totalAssets: number;
+    totalLiabilities: number;
+    totalEquity: number;
+    cash: number;
+    totalDebt: number;
+    debtToEquity: number;
+    currentRatio: number;
+  };
+  cashFlow: {
+    operatingCashFlow: number;
+    capitalExpenditure: number;
+    freeCashFlow: number;
+    fcfYield: number | null;
+    dividendsPaid: number | null;
+  };
+  valuationMetrics: {
+    peRatio: number | null;
+    forwardPE: number | null;
+    pegRatio: number | null;
+    priceToBook: number | null;
+    priceToSales: number | null;
+    evToEbitda: number | null;
+  };
+}
+
+/**
+ * Fetch deep financial data via proxy
+ */
+export async function fetchFinancialsViaProxy(
+  ticker: string
+): Promise<ProxyFinancialsResponse | null> {
+  try {
+    const data = await proxyFetch<ProxyFinancialsResponse>(
+      `/financials/${ticker.toUpperCase()}`
+    );
+    return data;
+  } catch (error) {
+    console.error(`[Yahoo Proxy] Financials fetch failed:`, error);
+    return null;
+  }
+}
+
+// ============================================================================
+// HOLDINGS VIA PROXY
+// ============================================================================
+
+interface ProxyHoldingsResponse {
+  ticker: string;
+  insidersPercent: number | null;
+  institutionsPercent: number | null;
+  institutionsFloatPercent: number | null;
+  institutionsCount: number | null;
+  topHolders: Array<{
+    name: string;
+    pctHeld: number;
+    value: number;
+    reportDate: string | null;
+  }>;
+}
+
+/**
+ * Fetch institutional holdings via proxy
+ */
+export async function fetchHoldingsViaProxy(
+  ticker: string
+): Promise<ProxyHoldingsResponse | null> {
+  try {
+    const data = await proxyFetch<ProxyHoldingsResponse>(
+      `/holdings/${ticker.toUpperCase()}`
+    );
+    return data;
+  } catch (error) {
+    console.error(`[Yahoo Proxy] Holdings fetch failed:`, error);
     return null;
   }
 }

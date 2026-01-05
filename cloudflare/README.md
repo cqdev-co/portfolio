@@ -1,160 +1,197 @@
-# Yahoo Finance Proxy Worker
+# Yahoo Finance Proxy Worker v4.0
 
-Cloudflare Worker that proxies Yahoo Finance API requests using Cloudflare's
-IP pool to bypass rate limiting on blocked IPs.
+Cloudflare Worker that proxies Yahoo Finance API requests using a custom
+crumb authentication flow. Returns data format expected by `lib/ai-agent`.
 
-## Setup
+**No external libraries** - pure fetch implementation (47 KiB bundle).
 
-1. Install dependencies:
-```bash
-cd yahoo-proxy-worker
-npm install
-```
+## Features
 
-2. Login to Cloudflare:
-```bash
-npx wrangler login
-```
-
-3. Deploy:
-```bash
-npm run deploy
-```
-
-4. Add the worker URL to your `.env`:
-```bash
-YAHOO_PROXY_URL=https://yahoo-proxy.<your-subdomain>.workers.dev
-```
+- **Modular architecture** - Clean separation of concerns
+- **Manual crumb auth** - Bypasses library issues with Yahoo's consent flow
+- **Response caching** - Cloudflare Cache API
+- **Retry with backoff** - Handles 429 errors gracefully
+- **All Yahoo data** - Quotes, charts, options, earnings, analysts, financials
 
 ## Endpoints
 
-### Combined (Recommended)
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /ticker/:symbol` | Yes | All data (recommended) |
+| `GET /quote/:ticker` | Yes | Stock quote with fundamentals |
+| `GET /chart/:ticker` | No | Historical OHLCV data |
+| `GET /options/:ticker` | Yes | Options chain summary |
+| `GET /financials/:ticker` | Yes | Income, balance, cash flow |
+| `GET /holdings/:ticker` | Yes | Institutional ownership |
+| `GET /health` | No | Health check |
 
-| Endpoint | Requests | Description |
-|----------|----------|-------------|
-| `GET /ticker/:symbol` | **1** | All data in ONE request (5x more efficient) |
+## Project Structure
 
-### Individual (for debugging)
-
-| Endpoint | Requests | Description |
-|----------|----------|-------------|
-| `GET /quote/:ticker` | 1 | Stock quote only |
-| `GET /chart/:ticker` | 1 | Historical OHLCV only |
-| `GET /options/:ticker` | 1 | Options chain only |
-| `GET /summary/:ticker` | 1 | Detailed summary only |
-| `GET /search?q=TICKER` | 1 | Search/news only |
-| `GET /health` | 1 | Health check |
-
-**Request Efficiency**:
-- 200k free requests/day from Cloudflare
-- Combined endpoint: 200k ticker lookups/day
-- Individual endpoints: 40k ticker lookups/day (5 requests each)
-
-## Examples
-
-```bash
-# RECOMMENDED: All data in one request
-curl https://yahoo-proxy.xxx.workers.dev/ticker/AAPL
-
-# Individual endpoints (for debugging)
-curl https://yahoo-proxy.xxx.workers.dev/quote/AAPL
-curl "https://yahoo-proxy.xxx.workers.dev/chart/AAPL?range=1mo&interval=1d"
-curl https://yahoo-proxy.xxx.workers.dev/options/AAPL
-curl "https://yahoo-proxy.xxx.workers.dev/summary/AAPL?modules=price,summaryDetail"
-curl "https://yahoo-proxy.xxx.workers.dev/search?q=AAPL&newsCount=5"
+```
+cloudflare/src/
+├── index.ts              # Router only (~130 lines)
+├── config.ts             # Configuration constants
+├── types/
+│   └── index.ts          # TypeScript interfaces
+├── utils/
+│   ├── response.ts       # CORS & JSON helpers
+│   ├── cache.ts          # Cloudflare Cache API wrapper
+│   └── retry.ts          # Retry with exponential backoff
+├── auth/
+│   └── crumb.ts          # Yahoo crumb authentication
+├── fetchers/
+│   ├── quote.ts          # Stock quote fetcher
+│   ├── chart.ts          # Historical data fetcher
+│   ├── summary.ts        # Earnings, analysts, short interest
+│   ├── options.ts        # Options chain fetcher
+│   ├── news.ts           # News headlines fetcher
+│   └── index.ts          # Barrel export
+└── handlers/
+    ├── ticker.ts         # Main combined endpoint
+    ├── quote.ts          # Quote-only endpoint
+    ├── chart.ts          # Chart-only endpoint
+    ├── options.ts        # Options-only endpoint
+    ├── financials.ts     # Deep financials endpoint
+    ├── holdings.ts       # Institutional holdings endpoint
+    └── index.ts          # Barrel export
 ```
 
-## Testing
+## Response Format
 
-```bash
-# Run unit tests (uses vitest + Cloudflare workers pool)
-npm test
+The `/ticker/:symbol` endpoint returns data matching `lib/ai-agent` format:
 
-# Run integration tests against local dev server
-npm run dev &
-node tests/integration.mjs
-
-# Run integration tests against deployed worker
-WORKER_URL=https://yahoo-proxy.xxx.workers.dev node tests/integration.mjs
+```json
+{
+  "ticker": "AAPL",
+  "timestamp": "2026-01-05T...",
+  "elapsed_ms": 572,
+  
+  "quote": {
+    "price": 271.01,
+    "change": -0.31,
+    "changePct": -0.11,
+    "volume": 37838054,
+    "avgVolume": 45105998,
+    "marketCap": 4021894250496,
+    "peRatio": 36.37,        // null for loss-making companies
+    "forwardPE": 32.5,       // null if unavailable
+    "eps": 7.45,             // negative for loss-making companies
+    "beta": 1.25,            // null if unavailable
+    "dividendYield": 0.44,
+    "fiftyDayAverage": 272.83,
+    "twoHundredDayAverage": 232.04,
+    "fiftyTwoWeekLow": 169.21,
+    "fiftyTwoWeekHigh": 288.62
+  },
+  
+  "chart": {
+    "dataPoints": 63,
+    "quotes": [
+      {"date": "...", "open": 272.26, "high": 277.84, ...}
+    ]
+  },
+  
+  "earnings": { "date": "2026-01-29", "daysUntil": 25 },
+  
+  "analysts": {
+    "strongBuy": 5, "buy": 24, "hold": 16,
+    "sell": 1, "strongSell": 3,
+    "total": 49, "bullishPct": 59
+  },
+  
+  "shortInterest": { "shortRatio": 2.83, "shortPctFloat": 0.83 },
+  
+  "options": {
+    "expirations": 20, "nearestExpiry": "2026-01-10",
+    "atmIV": 31.36, "callVolume": 12345, "putVolume": 6789,
+    "pcRatioVol": 0.5, "pcRatioOI": 0.55
+  },
+  
+  "news": [{"title": "...", "source": "...", "link": "..."}]
+}
 ```
 
-### Test Coverage
-
-| Endpoint | Tests |
-|----------|-------|
-| `/health` | Health check, service name |
-| `/quote/:ticker` | Valid ticker, lowercase, invalid ticker |
-| `/chart/:ticker` | Historical data, default params |
-| `/options/:ticker` | Options chain, calls/puts |
-| `/summary/:ticker` | Quote summary, modules |
-| `/search` | News search, missing query error |
-| Error handling | 404, 405, CORS |
-
-## Development
-
-**Note**: Local dev (`bun run dev`) doesn't work due to `yahoo-finance2` 
-compatibility issues with Wrangler's local environment. Deploy to test:
+## Setup
 
 ```bash
-# Deploy to production
+cd cloudflare
+bun install
+npx wrangler login
 bun run deploy
-
-# View live logs
-bun run tail
-
-# Run tests (unit tests only)
-bun run test
 ```
 
-## Debug Tool
+## Cache Configuration
 
-Print raw data from any endpoint (requires `YAHOO_PROXY_URL` env var):
+| Data Type | TTL | Notes |
+|-----------|-----|-------|
+| Crumb | 1 hour | Auth token |
+| Quote | 1 min | Real-time price |
+| Chart | 5 min | Historical data |
+| Summary | 5 min | Earnings, analysts |
+| Options | 2 min | Options chain |
+| News | 10 min | Headlines |
+| Financials | 1 hour | Deep financials |
+| Holdings | 1 hour | Institutional data |
 
-```bash
-# Combined endpoint (default, most efficient)
-bun run debug AAPL
+## Architecture
 
-# Specific endpoint
-bun run debug TSLA ticker    # Same as default
-bun run debug NVDA quote     # Quote only
-bun run debug RIVN options   # Options only
+```
+lib/ai-agent Request
+       ↓
+   Cloudflare Worker (Router)
+       ↓
+   Handler (ticker/quote/chart/...)
+       ↓
+   Check cache → HIT → Return cached
+       ↓ MISS
+   Auth (get/refresh crumb)
+       ↓
+   Fetcher (fetch from Yahoo)
+       ↓
+   Cache response
+       ↓
+   Return formatted data
 ```
 
-**Output includes:**
-- Raw JSON response
-- Response time
-- Quick stats summary (price, market cap, etc.)
-- Options/chart/news summaries
+### Yahoo APIs Used
 
-**Note**: Local development not supported. Always test against production.
+| Endpoint | Auth | Data |
+|----------|------|------|
+| `/v7/finance/quote` | Crumb | Price, fundamentals |
+| `/v8/finance/chart` | None | OHLCV history |
+| `/v10/finance/quoteSummary` | Crumb | Earnings, analysts |
+| `/v7/finance/options` | Crumb | Options chain |
+| `/v1/finance/search` | Crumb | News |
 
-## Why This Exists
+## Changelog
 
-Yahoo Finance aggressively rate limits IPs, especially:
-- Residential IPs after heavy usage
-- Cloud provider IPs (Vercel, AWS, etc.)
+### v4.0.0 (January 2026)
+- **Modular architecture** - Split 1,276-line monolith into modules
+- `index.ts` now router only (~130 lines)
+- Separate modules: config, types, utils, auth, fetchers, handlers
+- Better maintainability and testability
+- Bundle: 47 KiB
 
-This worker routes requests through Cloudflare's massive IP pool,
-effectively bypassing Yahoo's IP-based rate limiting.
+### v3.3.0
+- **Fixed P/E handling**: Now returns `null` for loss-making companies
+- peRatio, forwardPE, eps, beta properly preserve `null` values
+- Bundle: 46 KiB
 
-## Data Availability
+### v3.2.0
+- Added `/financials/:ticker` endpoint
+- Added `/holdings/:ticker` endpoint
+- Fixed beta/eps from quoteSummary when quote returns null
 
-| Endpoint | Status | Notes |
-|----------|--------|-------|
-| `/quote/:ticker` | ✅ Full | Real-time price, P/E, market cap, etc. |
-| `/chart/:ticker` | ✅ Full | Historical OHLCV data |
-| `/options/:ticker` | ✅ Full | Options chain with IV, Greeks |
-| `/summary/:ticker` | ✅ Full | Financials, earnings, recommendations |
-| `/search` | ✅ Full | News and search results |
+### v3.1.0
+- Added earnings, analysts, shortInterest, news
+- Fixed field names to match lib/ai-agent format
 
-**How it works:** The worker uses the `yahoo-finance2` library which handles 
-all the cookie/crumb authentication automatically. Running through Cloudflare's 
-IP pool bypasses Yahoo's rate limits on blocked IPs.
+### v3.0.0
+- Removed yahoo-finance2 library
+- Implemented manual crumb auth
 
-## Free Tier Limits
+### v2.0.0
+- Added caching and retry logic
 
-Cloudflare Workers free tier:
-- 100,000 requests/day
-- 10ms CPU time per request
-- No credit card required
-
+### v1.0.0
+- Initial release with yahoo-finance2

@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "yahoo-proxy" generated at 2026-01-05T04:36:02.949Z.

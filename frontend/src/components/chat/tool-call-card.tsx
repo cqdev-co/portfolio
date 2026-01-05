@@ -311,11 +311,14 @@ function TickerDataSummary({ data }: { data: TickerData }) {
       )}
       
       {/* Earnings with history */}
-      {(data.earningsDays !== undefined || data.earnings) && (
+      {(data.earningsDays !== undefined && data.earningsDays !== null || data.earnings) && (
         <div className="pt-2 border-t border-border/50">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {data.earningsDays !== undefined && (
-        <DataRow label="Earnings" value={`${data.earningsDays}d`} />
+            {data.earningsDays !== undefined && data.earningsDays !== null && (
+              <DataRow 
+                label="Earnings" 
+                value={data.earningsDays > 0 ? `${data.earningsDays}d` : 'Passed'} 
+              />
             )}
             {data.earnings?.streak && (
               <DataRow 

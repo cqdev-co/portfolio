@@ -2,7 +2,7 @@
 
 **Status**: ✅ FULLY RESOLVED  
 **Priority**: Complete  
-**Last Updated**: December 28, 2025
+**Last Updated**: January 5, 2026 (v4.0.0 modular architecture, earnings display fix)
 
 ## Overview
 
@@ -240,6 +240,33 @@ different **features**:
 | Interactive UI | ❌ | ✅ |
 | Data Cards | ✅ Rich | ✅ Rich (now identical) |
 | Streaming | Terminal | Web |
+
+### ✅ P/E Null Handling (January 5, 2026)
+
+Cloudflare Worker v3.3 now properly handles null P/E ratios:
+
+| Scenario | Old Behavior | New Behavior |
+|----------|--------------|--------------|
+| Loss-making company | `peRatio: 0` | `peRatio: null` |
+| Negative EPS | `eps: 0` | `eps: -3.1` (actual value) |
+| Beta unavailable | `beta: 0` | `beta: null` |
+
+This allows the frontend to distinguish between:
+- "P/E is zero" (mathematically possible but rare)
+- "P/E is unavailable" (loss-making company)
+
+### ✅ Enhanced Ticker Data Card (January 5, 2026)
+
+The `ticker-data-card.tsx` component now displays all proxy data:
+
+| New Field | Display |
+|-----------|---------|
+| Beta | Color-coded (high/normal/low volatility) |
+| EPS | Dollar value, red if negative |
+| Forward P/E | Valuation metric |
+| Dividend Yield | Green percentage |
+| 52-Week Range | Visual progress bar with current position |
+| Price Change | Dollar amount + percentage |
 
 ### Caching Strategy (TODO)
 
