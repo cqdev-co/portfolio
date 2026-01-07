@@ -284,6 +284,10 @@ async function findViableSpread(
       }
     }
 
+    if (!closestExp) {
+      result.reason = 'No expiration found';
+      return result;
+    }
     const dte = Math.ceil(
       (closestExp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
@@ -503,6 +507,7 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   // Scan each ticker
   for (let i = 0; i < tickers.length; i++) {
     const ticker = tickers[i];
+    if (!ticker) continue;
     process.stdout.write(
       chalk.gray(`  [${i + 1}/${tickers.length}] ${ticker.padEnd(6)}`)
     );
@@ -580,21 +585,23 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
 
     // Best pick
     const best = viable.sort((a, b) => (b.cushion ?? 0) - (a.cushion ?? 0))[0];
-    console.log(
-      chalk.bold.white('  🏆 Best Setup: ') +
-        chalk.cyan(best.ticker) +
-        chalk.gray(' - ') +
-        chalk.white(`${best.spread}`) +
-        chalk.gray(` @ $${best.debit?.toFixed(2)}`)
-    );
-    console.log(
-      chalk.gray('     ') +
-        chalk.green(`${best.cushion?.toFixed(1)}% cushion`) +
-        chalk.gray(' | ') +
-        chalk.cyan(`${best.pop}% PoP`) +
-        chalk.gray(' | ') +
-        chalk.green(`${best.returnPct?.toFixed(0)}% return`)
-    );
+    if (best) {
+      console.log(
+        chalk.bold.white('  🏆 Best Setup: ') +
+          chalk.cyan(best.ticker) +
+          chalk.gray(' - ') +
+          chalk.white(`${best.spread}`) +
+          chalk.gray(` @ $${best.debit?.toFixed(2)}`)
+      );
+      console.log(
+        chalk.gray('     ') +
+          chalk.green(`${best.cushion?.toFixed(1)}% cushion`) +
+          chalk.gray(' | ') +
+          chalk.cyan(`${best.pop}% PoP`) +
+          chalk.gray(' | ') +
+          chalk.green(`${best.returnPct?.toFixed(0)}% return`)
+      );
+    }
   }
 
   console.log();

@@ -60,27 +60,36 @@ export function calculateRSI(
 
   const changes: number[] = [];
   for (let i = 1; i < closes.length; i++) {
-    changes.push(closes[i] - closes[i - 1]);
+    const curr = closes[i];
+    const prev = closes[i - 1];
+    if (curr !== undefined && prev !== undefined) {
+      changes.push(curr - prev);
+    }
   }
 
   let gains = 0;
   let losses = 0;
 
   for (let i = 0; i < period; i++) {
-    if (changes[i] >= 0) gains += changes[i];
-    else losses -= changes[i];
+    const change = changes[i];
+    if (change !== undefined) {
+      if (change >= 0) gains += change;
+      else losses -= change;
+    }
   }
 
   let avgGain = gains / period;
   let avgLoss = losses / period;
 
   for (let i = period; i < changes.length; i++) {
-    if (changes[i] >= 0) {
-      avgGain = (avgGain * (period - 1) + changes[i]) / period;
+    const change = changes[i];
+    if (change === undefined) continue;
+    if (change >= 0) {
+      avgGain = (avgGain * (period - 1) + change) / period;
       avgLoss = (avgLoss * (period - 1)) / period;
     } else {
       avgGain = (avgGain * (period - 1)) / period;
-      avgLoss = (avgLoss * (period - 1) - changes[i]) / period;
+      avgLoss = (avgLoss * (period - 1) - change) / period;
     }
   }
 
@@ -128,6 +137,7 @@ export function checkBounceConfirmed(
   const lateLowest = Math.min(...lateLows);
 
   const currentPrice = closes[closes.length - 1];
+  if (currentPrice === undefined) return false;
 
   return currentPrice > lateLowest && lateLowest >= earlyLowest * 0.98;
 }

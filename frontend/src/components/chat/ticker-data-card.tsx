@@ -694,16 +694,18 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-semibold tabular-nums">
-                  ${pfv.value.toFixed(2)}
+                  ${pfv.fairValue.toFixed(2)}
                 </span>
                 <span
                   className={cn(
                     'font-medium tabular-nums text-[11px]',
-                    pfv.divergence < 0 ? 'text-red-500' : 'text-emerald-600'
+                    pfv.deviationPercent < 0
+                      ? 'text-red-500'
+                      : 'text-emerald-600'
                   )}
                 >
-                  ({pfv.divergence >= 0 ? '+' : ''}
-                  {pfv.divergence.toFixed(1)}%)
+                  ({pfv.deviationPercent >= 0 ? '+' : ''}
+                  {pfv.deviationPercent.toFixed(1)}%)
                 </span>
               </div>
               <span
@@ -719,11 +721,6 @@ export function TickerDataCard({ data, className }: TickerDataCardProps) {
                 {pfv.bias}
               </span>
             </div>
-            {pfv.summary && (
-              <div className="mt-1.5 text-[10px] text-muted-foreground">
-                {pfv.summary}
-              </div>
-            )}
           </div>
         )}
 

@@ -335,10 +335,53 @@ lib/utils/ts/psychological-fair-value/
 
 ---
 
+## Shared Library Usage
+
+The PFV module is a **shared library** used by multiple packages:
+
+### Import Paths
+
+```typescript
+// From ai-analyst (CLI)
+import { getPsychologicalFairValue } from '../services/psychological-fair-value';
+import type { PsychologicalFairValue } from '../../../lib/utils/ts/psychological-fair-value/types';
+
+// From lib/ai-agent (shared tools)
+import type { PsychologicalFairValue, PFVSummary } from '@lib/ai-agent';
+
+// From frontend
+import type { PFVSummary, ConfidenceLevel, BiasSentiment } from '@lib/ai-agent';
+```
+
+### Types for Display vs Full Analysis
+
+| Type                     | Use Case                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `PFVSummary`             | Simplified type for TickerData display (fairValue, bias, confidence, deviationPercent) |
+| `PsychologicalFairValue` | Full analysis with components, magnetic levels, zones, aiContext                       |
+
+### Frontend Integration
+
+The frontend receives PFV data via the chat API through `TickerData.pfv`:
+
+```typescript
+// In ticker-data-card.tsx
+{pfv && (
+  <div>
+    <span>${pfv.value.toFixed(2)}</span>
+    <span>{pfv.divergence.toFixed(1)}%</span>
+    <span>{pfv.bias}</span>
+  </div>
+)}
+```
+
+---
+
 ## Future Enhancements
 
+- [x] ~~Frontend visualization component~~ ✅ Implemented in chat cards
+- [x] ~~Shared types with frontend~~ ✅ Via @lib/ai-agent
 - [ ] Historical validation script (backtest PFV accuracy)
 - [ ] Real-time OI updates integration
 - [ ] Volume profile integration
-- [ ] Frontend visualization component
 - [ ] Python port for scanner integration

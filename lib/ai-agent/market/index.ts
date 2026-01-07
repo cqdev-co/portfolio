@@ -217,12 +217,14 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
         if (changePct > 1) momentum = 'LEADING';
         else if (changePct < -1) momentum = 'LAGGING';
 
-        sectors.push({
-          ticker: sector.ticker,
-          name: sector.name,
-          changePct: Math.round(changePct * 100) / 100,
-          momentum,
-        });
+        if (sector) {
+          sectors.push({
+            ticker: sector.ticker,
+            name: sector.name,
+            changePct: Math.round(changePct * 100) / 100,
+            momentum,
+          });
+        }
       }
     }
 
@@ -316,7 +318,9 @@ function generateSummary(
   // Leading sector
   if (sectors.length > 0) {
     const leader = sectors[0];
-    parts.push(`${leader.name} leading (+${leader.changePct}%)`);
+    if (leader) {
+      parts.push(`${leader.name} leading (+${leader.changePct}%)`);
+    }
   }
 
   return parts.join(' | ');

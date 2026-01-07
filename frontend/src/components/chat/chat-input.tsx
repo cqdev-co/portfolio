@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from 'react';
-import type { ChatStatus } from '@ai-sdk/react';
+import type { ChatStatus } from 'ai';
 import { cn } from '@/lib/utils';
 import { ArrowUpIcon, StopIcon } from './chat-icons';
 

@@ -44,15 +44,20 @@ export async function GET() {
 
     // Fetch real data from Yahoo Finance
     const symbols = sectors.map((s) => s.symbol);
-    const quotes = await yahooFinance.quote(symbols);
+    const quotesResponse = await yahooFinance.quote(symbols);
 
-    for (let i = 0; i < quotes.length; i++) {
-      const quote = quotes[i];
+    const quotesArray = (
+      Array.isArray(quotesResponse) ? quotesResponse : [quotesResponse]
+    ) as any[];
+
+    for (let i = 0; i < quotesArray.length; i++) {
+      const quote = quotesArray[i];
       const sector = sectors[i];
 
-      if (quote) {
-        const price = quote.regularMarketPrice || 0;
-        const previousClose = quote.regularMarketPreviousClose || price;
+      if (quote && sector) {
+        const price = (quote.regularMarketPrice as number) || 0;
+        const previousClose =
+          (quote.regularMarketPreviousClose as number) || price;
         const change = price - previousClose;
         const changePercent =
           previousClose !== 0 ? (change / previousClose) * 100 : 0;

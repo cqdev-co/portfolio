@@ -13,13 +13,6 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitOverride": true
   },
-  "exclude": [
-    "node_modules",
-    "**/node_modules",
-    "**/dist",
-    "**/.next",
-    "**/cache",
-    "venv",
-    "**/__pycache__"
-  ]
+  "include": ["ts/**/*.ts"],
+  "exclude": ["node_modules"]
 }

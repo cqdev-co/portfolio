@@ -66,7 +66,7 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
   };
 
   // Get ticker from args if available
-  const ticker = (args as { ticker?: string })?.ticker;
+  const ticker: string | undefined = (args as { ticker?: string })?.ticker;
 
   // Format result preview
   const getResultPreview = () => {
@@ -157,16 +157,16 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground">{config.name}</span>
-            {ticker && (
+            {ticker ? (
               <span
                 className={cn(
                   'px-1.5 py-0.5 rounded text-[10px] font-semibold',
                   'bg-primary/10 text-primary uppercase'
                 )}
               >
-                {ticker}
+                {String(ticker)}
               </span>
-            )}
+            ) : null}
           </div>
 
           <div className="text-xs text-muted-foreground">
@@ -187,7 +187,7 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
         </div>
 
         {/* Expand indicator */}
-        {status === 'complete' && result && (
+        {status === 'complete' && result != null ? (
           <svg
             className={cn(
               'w-4 h-4 text-muted-foreground transition-transform',
@@ -204,12 +204,12 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
               strokeLinejoin="round"
             />
           </svg>
-        )}
+        ) : null}
       </button>
 
       {/* Expandable Data Section */}
       <AnimatePresence>
-        {isExpanded && result && (
+        {isExpanded && result != null ? (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -241,7 +241,7 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
               )}
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   );

@@ -31,22 +31,27 @@ export async function GET() {
 
     // Fetch all quotes in a single call for efficiency
     try {
-      const quotes = await yahooFinance.quote(symbols);
+      const quotesResponse = await yahooFinance.quote(symbols);
 
-      for (const quote of quotes) {
+      const quotesArray = (
+        Array.isArray(quotesResponse) ? quotesResponse : [quotesResponse]
+      ) as any[];
+
+      for (const quote of quotesArray) {
         if (quote) {
-          const price = quote.regularMarketPrice || 0;
-          const previousClose = quote.regularMarketPreviousClose || price;
+          const price = (quote.regularMarketPrice as number) || 0;
+          const previousClose =
+            (quote.regularMarketPreviousClose as number) || price;
           const change = price - previousClose;
           const changePercent =
             previousClose !== 0 ? (change / previousClose) * 100 : 0;
 
           data.push({
-            symbol: quote.symbol || '',
+            symbol: (quote.symbol as string) || '',
             price: Number(price.toFixed(2)),
             change: Number(change.toFixed(2)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: quote.regularMarketVolume || 0,
+            volume: (quote.regularMarketVolume as number) || 0,
           });
         }
       }
@@ -58,18 +63,21 @@ export async function GET() {
           const quote = await yahooFinance.quote(symbol);
 
           if (quote) {
-            const price = quote.regularMarketPrice || 0;
-            const previousClose = quote.regularMarketPreviousClose || price;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const q = quote as any;
+            const price = (q.regularMarketPrice as number) || 0;
+            const previousClose =
+              (q.regularMarketPreviousClose as number) || price;
             const change = price - previousClose;
             const changePercent =
               previousClose !== 0 ? (change / previousClose) * 100 : 0;
 
             data.push({
-              symbol: quote.symbol || symbol,
+              symbol: (q.symbol as string) || symbol,
               price: Number(price.toFixed(2)),
               change: Number(change.toFixed(2)),
               changePercent: Number(changePercent.toFixed(2)),
-              volume: quote.regularMarketVolume || 0,
+              volume: (q.regularMarketVolume as number) || 0,
             });
           }
         } catch (err) {

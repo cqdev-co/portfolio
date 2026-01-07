@@ -65,7 +65,9 @@ async function fetchInvestingComEvents(
         'X-Requested-With': 'XMLHttpRequest',
         'User-Agent': 'Mozilla/5.0 (compatible)',
       },
-      body: new URLSearchParams(body as Record<string, string>).toString(),
+      body: new URLSearchParams(
+        body as unknown as Record<string, string>
+      ).toString(),
     });
 
     if (!response.ok) {

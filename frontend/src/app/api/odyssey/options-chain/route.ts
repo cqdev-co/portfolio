@@ -37,14 +37,16 @@ export async function GET(request: NextRequest) {
     const data: OptionsData[] = [];
 
     // Fetch options data from Yahoo Finance
-    const result = await yahooFinance.options(symbol, {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = (await yahooFinance.options(symbol, {})) as any;
 
-    if (!result || !result.options || result.options.length === 0) {
+    const optionsData = result?.options;
+    if (!optionsData || optionsData.length === 0) {
       throw new Error('No options data available');
     }
 
     // Process each expiration date
-    for (const optionChain of result.options) {
+    for (const optionChain of optionsData) {
       // Handle different date formats from yahoo-finance2
       let expiration: string;
       const expDate = optionChain.expirationDate;

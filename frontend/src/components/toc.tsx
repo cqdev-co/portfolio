@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, ListFilter } from 'lucide-react';
 
@@ -15,7 +15,7 @@ interface Heading {
 }
 
 function extractHeadings(html: string): Heading[] {
-  if (!html) return [];
+  if (!html || typeof document === 'undefined') return [];
 
   // Create a temporary div to parse the HTML
   const div = document.createElement('div');
@@ -44,9 +44,12 @@ function extractHeadings(html: string): Heading[] {
 export default function TableOfContents({ html }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>('');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [headings, setHeadings] = useState<Heading[]>([]);
 
-  // Extract headings using useMemo to avoid re-parsing on every render
-  const headings = useMemo(() => extractHeadings(html), [html]);
+  // Extract headings on mount (client-side only)
+  useEffect(() => {
+    setHeadings(extractHeadings(html));
+  }, [html]);
 
   // Track active heading during scroll
   useEffect(() => {

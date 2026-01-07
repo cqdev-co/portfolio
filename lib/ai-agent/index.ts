@@ -164,6 +164,12 @@ export {
   type InstitutionalHoldings,
   type UnusualOptionsSignal,
   type UnusualOptionsActivity,
+  // PFV types (from shared library)
+  type PFVSummary,
+  type ConfidenceLevel,
+  type BiasSentiment,
+  type MagneticLevel,
+  type PFVComponentBreakdown,
 } from './data';
 
 // ============================================================================

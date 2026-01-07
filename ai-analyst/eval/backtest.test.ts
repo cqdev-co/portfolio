@@ -360,7 +360,7 @@ describe('Outcome Evaluation', () => {
       type: 'CALL_DEBIT',
       longStrike: 185,
       shortStrike: 190,
-      expiration: '2025-12-31',
+      expiration: '2026-12-31',
       estimatedDebit: 3.8,
       estimatedMaxProfit: 1.2,
       breakeven: 188.8,

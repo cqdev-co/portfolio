@@ -36,6 +36,13 @@ export type {
   UnusualOptionsSignal,
   UnusualOptionsActivity,
   UnusualOptionsToolResult,
+  // PFV types (from shared library)
+  PFVSummary,
+  PsychologicalFairValue,
+  ConfidenceLevel,
+  BiasSentiment,
+  MagneticLevel,
+  PFVComponentBreakdown,
 } from './types';
 
 // Data fetching (Yahoo with Polygon fallback)

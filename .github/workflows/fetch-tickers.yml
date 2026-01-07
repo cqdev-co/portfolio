@@ -29,7 +29,6 @@ permissions:
 jobs:
   fetch-tickers:
     runs-on: ubuntu-latest
-    timeout-minutes: 45 # Advanced checks can take 15-20 min
 
     steps:
       - name: Checkout repository

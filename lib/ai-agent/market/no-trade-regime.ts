@@ -28,12 +28,10 @@ import {
 
 import {
   getChopAnalysis,
-  getATRAnalysis,
   getADXAnalysis,
   countDirectionReversals,
   isWhipsawCondition,
   type ChopAnalysis,
-  type ATRData,
   type ADXAnalysis,
 } from './chop-index';
 
@@ -478,18 +476,12 @@ export async function analyzeTradingRegime(
 
   // Calculate technical indicators from price history
   let chop: ChopAnalysis | null = null;
-  let _atr: ATRData | null = null;
   let adx: ADXAnalysis | null = null;
   let reversals = 0;
   let whipsaw = false;
 
   if (priceHistory && priceHistory.closes.length >= 15) {
     chop = getChopAnalysis(
-      priceHistory.highs,
-      priceHistory.lows,
-      priceHistory.closes
-    );
-    _atr = getATRAnalysis(
       priceHistory.highs,
       priceHistory.lows,
       priceHistory.closes

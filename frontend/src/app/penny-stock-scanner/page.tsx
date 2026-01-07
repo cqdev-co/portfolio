@@ -30,8 +30,8 @@ import {
   fetchPennyStockSignals,
   fetchPennyStockStats,
   subscribeToPennyStockUpdates,
-  type PennyStockStats,
 } from '@/lib/api/penny-stock-signals';
+import type { PennyStockStats } from '@/lib/types/penny-stock';
 import { cn } from '@/lib/utils';
 import {
   ArrowUpDown,

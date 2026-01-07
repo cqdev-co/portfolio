@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import type { UIMessage } from 'ai';
-import type { ChatStatus } from '@ai-sdk/react';
+import type { ChatStatus } from 'ai';
 import { ArrowDownIcon } from './chat-icons';
 import { ChatMessage, ThinkingMessage } from './chat-message';
 import { ChatGreeting } from './chat-greeting';

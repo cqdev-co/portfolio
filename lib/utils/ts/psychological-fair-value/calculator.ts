@@ -560,7 +560,7 @@ function generateInterpretation(
   // Add expiration context
   if (expirationAnalysis.length > 0) {
     const primary = expirationAnalysis[0];
-    if (primary.isMonthlyOpex && primary.dte <= 7) {
+    if (primary && primary.isMonthlyOpex && primary.dte <= 7) {
       interpretation += ` Monthly OPEX in ${primary.dte} days - max pain magnetism strongest.`;
     }
   }

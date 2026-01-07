@@ -4,6 +4,31 @@
  * Types used by both CLI and Frontend for ticker analysis.
  */
 
+// Re-export PFV types from shared library
+export type {
+  PsychologicalFairValue,
+  ConfidenceLevel,
+  BiasSentiment,
+  MagneticLevel,
+  PFVComponentBreakdown,
+} from '../../utils/ts/psychological-fair-value/types';
+
+import type {
+  ConfidenceLevel,
+  BiasSentiment,
+} from '../../utils/ts/psychological-fair-value/types';
+
+/**
+ * Simplified PFV summary for TickerData display.
+ * Use full PsychologicalFairValue for detailed analysis.
+ */
+export interface PFVSummary {
+  fairValue: number;
+  bias: BiasSentiment;
+  confidence: ConfidenceLevel;
+  deviationPercent: number;
+}
+
 // ============================================================================
 // TICKER DATA
 // ============================================================================
@@ -69,13 +94,8 @@ export interface TickerData {
   relativeStrength?: RelativeStrength;
   earnings?: EarningsHistory;
 
-  // Psychological Fair Value (PFV)
-  pfv?: {
-    fairValue: number;
-    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-    confidence: 'HIGH' | 'MEDIUM' | 'LOW';
-    deviationPercent: number;
-  };
+  // Psychological Fair Value (PFV) - uses shared types
+  pfv?: PFVSummary;
 
   // Explanation when no viable spread is found
   noSpreadReason?: string;

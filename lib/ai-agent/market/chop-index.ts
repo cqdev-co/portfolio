@@ -83,7 +83,13 @@ export function calculateATR(
 
   // Calculate True Range for each bar (starting from index 1)
   for (let i = 1; i < closes.length; i++) {
-    const tr = calculateTrueRange(highs[i], lows[i], closes[i - 1]);
+    const high = highs[i];
+    const low = lows[i];
+    const prevClose = closes[i - 1];
+    if (high === undefined || low === undefined || prevClose === undefined) {
+      continue;
+    }
+    const tr = calculateTrueRange(high, low, prevClose);
     trueRanges.push(tr);
   }
 
@@ -95,7 +101,10 @@ export function calculateATR(
 
   // Subsequent values use smoothing
   for (let i = period; i < trueRanges.length; i++) {
-    atr = (atr * (period - 1) + trueRanges[i]) / period;
+    const tr = trueRanges[i];
+    if (tr !== undefined) {
+      atr = (atr * (period - 1) + tr) / period;
+    }
   }
 
   return Math.round(atr * 100) / 100;
@@ -114,6 +123,7 @@ export function getATRAnalysis(
   if (!currentATR) return null;
 
   const currentPrice = closes[closes.length - 1];
+  if (currentPrice === undefined) return null;
   const atrPercent = (currentATR / currentPrice) * 100;
 
   // Calculate ATR from 5 bars ago to check if expanding
@@ -173,7 +183,13 @@ export function calculateChopIndex(
   for (let i = 1; i <= period; i++) {
     const idx = closes.length - period - 1 + i;
     if (idx > 0 && idx < closes.length) {
-      const tr = calculateTrueRange(highs[idx], lows[idx], closes[idx - 1]);
+      const high = highs[idx];
+      const low = lows[idx];
+      const prevClose = closes[idx - 1];
+      if (high === undefined || low === undefined || prevClose === undefined) {
+        continue;
+      }
+      const tr = calculateTrueRange(high, low, prevClose);
       trueRanges.push(tr);
     }
   }
@@ -263,7 +279,10 @@ export function countDirectionReversals(
   let lastDirection: 'up' | 'down' | null = null;
 
   for (let i = 1; i < recentCloses.length; i++) {
-    const change = recentCloses[i] - recentCloses[i - 1];
+    const current = recentCloses[i];
+    const prev = recentCloses[i - 1];
+    if (current === undefined || prev === undefined) continue;
+    const change = current - prev;
     const direction: 'up' | 'down' = change >= 0 ? 'up' : 'down';
 
     if (lastDirection !== null && direction !== lastDirection) {
@@ -368,6 +387,17 @@ export function calculateADX(
     const prevLow = lows[i - 1];
     const prevClose = closes[i - 1];
 
+    // Skip if any values are undefined
+    if (
+      high === undefined ||
+      low === undefined ||
+      prevHigh === undefined ||
+      prevLow === undefined ||
+      prevClose === undefined
+    ) {
+      continue;
+    }
+
     // True Range
     const tr = calculateTrueRange(high, low, prevClose);
     trueRanges.push(tr);
@@ -400,10 +430,21 @@ export function calculateADX(
   const dxValues: number[] = [];
 
   for (let i = period; i < trueRanges.length; i++) {
+    const currentTR = trueRanges[i];
+    const currentPlusDM = plusDMs[i];
+    const currentMinusDM = minusDMs[i];
+    if (
+      currentTR === undefined ||
+      currentPlusDM === undefined ||
+      currentMinusDM === undefined
+    ) {
+      continue;
+    }
     // Wilder's smoothing: smoothed = prior - (prior/period) + current
-    smoothedTR = smoothedTR - smoothedTR / period + trueRanges[i];
-    smoothedPlusDM = smoothedPlusDM - smoothedPlusDM / period + plusDMs[i];
-    smoothedMinusDM = smoothedMinusDM - smoothedMinusDM / period + minusDMs[i];
+    smoothedTR = smoothedTR - smoothedTR / period + currentTR;
+    smoothedPlusDM = smoothedPlusDM - smoothedPlusDM / period + currentPlusDM;
+    smoothedMinusDM =
+      smoothedMinusDM - smoothedMinusDM / period + currentMinusDM;
 
     // Calculate +DI and -DI
     const plusDI = smoothedTR > 0 ? (smoothedPlusDM / smoothedTR) * 100 : 0;
@@ -422,7 +463,10 @@ export function calculateADX(
   let adx = dxValues.slice(0, period).reduce((a, b) => a + b, 0) / period;
 
   for (let i = period; i < dxValues.length; i++) {
-    adx = (adx * (period - 1) + dxValues[i]) / period;
+    const dx = dxValues[i];
+    if (dx !== undefined) {
+      adx = (adx * (period - 1) + dx) / period;
+    }
   }
 
   // Get final +DI and -DI values

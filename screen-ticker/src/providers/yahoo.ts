@@ -880,6 +880,9 @@ export class YahooProvider {
       targetDate.setDate(targetDate.getDate() + targetDTE);
 
       let closestExp = expirations.expirationDates[0];
+      if (!closestExp) {
+        return null;
+      }
       let closestDiff = Math.abs(closestExp.getTime() - targetDate.getTime());
 
       for (const exp of expirations.expirationDates) {
@@ -940,7 +943,11 @@ export class YahooProvider {
         })
       );
 
-      const result = { calls, puts, expiration: closestExp };
+      const result = {
+        calls,
+        puts,
+        expiration: closestExp as Date,
+      };
       this.setCache(cacheKey, result, 'options');
       return result;
     } catch (error) {

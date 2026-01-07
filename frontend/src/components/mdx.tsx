@@ -85,21 +85,39 @@ function CustomLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
 }
 
 type ImageProps = {
-  src?: string;
+  src?: string | Blob;
   alt?: string;
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   className?: string;
   [key: string]: unknown;
 };
 
 function RoundedImage(props: ImageProps) {
   // Handle both img element props and Next.js Image props
+  // Convert Blob to string if needed (though this shouldn't happen for markdown)
+  const srcString =
+    typeof props.src === 'string' ? props.src : props.src ? '' : '';
+
+  // Convert width/height to numbers for Next.js Image
+  const width =
+    typeof props.width === 'number'
+      ? props.width
+      : typeof props.width === 'string'
+        ? parseInt(props.width, 10) || 1200
+        : 1200;
+  const height =
+    typeof props.height === 'number'
+      ? props.height
+      : typeof props.height === 'string'
+        ? parseInt(props.height, 10) || 630
+        : 630;
+
   const imageProps = {
-    src: props.src || '',
+    src: srcString,
     alt: props.alt || '',
-    width: props.width || 1200,
-    height: props.height || 630,
+    width,
+    height,
     className: props.className,
   };
 
@@ -195,8 +213,10 @@ export const globalComponents = {
   h4: createHeading(4),
   h5: createHeading(5),
   h6: createHeading(6),
-  img: RoundedImage, // react-markdown uses 'img' not 'Image'
-  Image: RoundedImage, // Keep this for compatibility
+  // Cast to any to satisfy react-markdown's strict component typing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  img: RoundedImage as any,
+  Image: RoundedImage,
   a: CustomLink,
   Table,
   pre: CodeBlock,
