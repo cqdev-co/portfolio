@@ -815,6 +815,7 @@ export class YahooProvider {
   /**
    * Fetch options chain for a symbol
    * Returns calls and puts for the nearest monthly expiration
+   * v1.9.0: Uses withRetry for better rate limit handling
    */
   async getOptionsChain(
     symbol: string,
@@ -865,95 +866,93 @@ export class YahooProvider {
 
     if (cached) return cached;
 
-    try {
-      await this.rateLimit();
+    // Use withRetry for options fetching (options API is more prone to rate limits)
+    const expirations = await this.withRetry(
+      () => yahooFinance.options(symbol),
+      symbol,
+      'options-expirations'
+    );
 
-      // First get available expiration dates
-      const expirations = await yahooFinance.options(symbol);
-
-      if (!expirations?.expirationDates?.length) {
-        return null;
-      }
-
-      // Find expiration closest to target DTE
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + targetDTE);
-
-      let closestExp = expirations.expirationDates[0];
-      if (!closestExp) {
-        return null;
-      }
-      let closestDiff = Math.abs(closestExp.getTime() - targetDate.getTime());
-
-      for (const exp of expirations.expirationDates) {
-        const diff = Math.abs(exp.getTime() - targetDate.getTime());
-        if (diff < closestDiff) {
-          closestDiff = diff;
-          closestExp = exp;
-        }
-      }
-
-      // Fetch options for that expiration
-      await this.rateLimit();
-      const chain = await yahooFinance.options(symbol, {
-        date: closestExp,
-      });
-
-      if (!chain?.options?.[0]) {
-        return null;
-      }
-
-      const opts = chain.options[0];
-
-      const calls = (opts.calls ?? []).map(
-        (c: {
-          strike: number;
-          bid?: number;
-          ask?: number;
-          openInterest?: number;
-          volume?: number;
-          impliedVolatility?: number;
-        }) => ({
-          strike: c.strike,
-          expiration: closestExp,
-          bid: c.bid ?? 0,
-          ask: c.ask ?? 0,
-          openInterest: c.openInterest ?? 0,
-          volume: c.volume ?? 0,
-          impliedVolatility: c.impliedVolatility ?? 0,
-        })
-      );
-
-      const puts = (opts.puts ?? []).map(
-        (p: {
-          strike: number;
-          bid?: number;
-          ask?: number;
-          openInterest?: number;
-          volume?: number;
-          impliedVolatility?: number;
-        }) => ({
-          strike: p.strike,
-          expiration: closestExp,
-          bid: p.bid ?? 0,
-          ask: p.ask ?? 0,
-          openInterest: p.openInterest ?? 0,
-          volume: p.volume ?? 0,
-          impliedVolatility: p.impliedVolatility ?? 0,
-        })
-      );
-
-      const result = {
-        calls,
-        puts,
-        expiration: closestExp as Date,
-      };
-      this.setCache(cacheKey, result, 'options');
-      return result;
-    } catch (error) {
-      logger.warn(`Failed to fetch options for ${symbol}: ${error}`);
+    if (!expirations?.expirationDates?.length) {
       return null;
     }
+
+    // Find expiration closest to target DTE
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + targetDTE);
+
+    let closestExp = expirations.expirationDates[0];
+    if (!closestExp) {
+      return null;
+    }
+    let closestDiff = Math.abs(closestExp.getTime() - targetDate.getTime());
+
+    for (const exp of expirations.expirationDates) {
+      const diff = Math.abs(exp.getTime() - targetDate.getTime());
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestExp = exp;
+      }
+    }
+
+    // Fetch options chain for that expiration with retry
+    const chain = await this.withRetry(
+      () => yahooFinance.options(symbol, { date: closestExp }),
+      symbol,
+      'options-chain'
+    );
+
+    if (!chain?.options?.[0]) {
+      return null;
+    }
+
+    const opts = chain.options[0];
+
+    const calls = (opts.calls ?? []).map(
+      (c: {
+        strike: number;
+        bid?: number;
+        ask?: number;
+        openInterest?: number;
+        volume?: number;
+        impliedVolatility?: number;
+      }) => ({
+        strike: c.strike,
+        expiration: closestExp,
+        bid: c.bid ?? 0,
+        ask: c.ask ?? 0,
+        openInterest: c.openInterest ?? 0,
+        volume: c.volume ?? 0,
+        impliedVolatility: c.impliedVolatility ?? 0,
+      })
+    );
+
+    const puts = (opts.puts ?? []).map(
+      (p: {
+        strike: number;
+        bid?: number;
+        ask?: number;
+        openInterest?: number;
+        volume?: number;
+        impliedVolatility?: number;
+      }) => ({
+        strike: p.strike,
+        expiration: closestExp,
+        bid: p.bid ?? 0,
+        ask: p.ask ?? 0,
+        openInterest: p.openInterest ?? 0,
+        volume: p.volume ?? 0,
+        impliedVolatility: p.impliedVolatility ?? 0,
+      })
+    );
+
+    const result = {
+      calls,
+      puts,
+      expiration: closestExp as Date,
+    };
+    this.setCache(cacheKey, result, 'options');
+    return result;
   }
 
   /**

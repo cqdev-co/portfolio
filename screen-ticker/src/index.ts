@@ -431,6 +431,7 @@ function getQuickDecision(score: StockScore): QuickDecisionResult {
 
 /**
  * Scan command - main screening functionality
+ * v2.5.0: Added market regime awareness and debug indicators
  */
 program
   .command('scan')
@@ -447,24 +448,137 @@ program
   .option('-v, --verbose', 'Verbose output', false)
   .option('-a, --actionable', 'Only show ENTER or WAIT decisions', false)
   .option('--debug', 'Show proxy/cache stats after scan', false)
+  .option(
+    '--debug-indicators',
+    'Show detailed indicator values for each ticker',
+    false
+  )
+  .option(
+    '--ignore-regime',
+    'Skip market regime check (use base min-score)',
+    false
+  )
   .action(async (opts) => {
-    const options: ScanOptions = {
-      list: opts.list,
-      tickers: opts.tickers,
-      top: opts.top ? parseInt(opts.top, 10) : undefined,
-      minScore: parseInt(opts.minScore, 10),
-      dryRun: opts.dryRun,
-      verbose: opts.verbose,
-    };
+    const baseMinScore = parseInt(opts.minScore, 10);
     const actionableOnly = opts.actionable;
     const showDebug = opts.debug;
+    const debugIndicators = opts.debugIndicators;
+    const ignoreRegime = opts.ignoreRegime;
 
-    logger.setVerbose(options.verbose);
+    logger.setVerbose(opts.verbose);
 
     // Reset stats at the start of scan
     yahooProvider.resetStats();
 
     try {
+      // ═══════════════════════════════════════════════════════════════════
+      // MARKET REGIME CHECK (v2.5.0)
+      // ═══════════════════════════════════════════════════════════════════
+      let effectiveMinScore = baseMinScore;
+      let marketContext: MarketContext | null = null;
+
+      if (!ignoreRegime) {
+        console.log(chalk.gray('  Checking market regime...'));
+        marketContext = await getMarketRegime();
+
+        if (marketContext) {
+          // Import strategy config loader
+          const { getRegimeAdjustments, checkNoTradeConditions } =
+            await import('./config/strategy.ts');
+
+          // Check for no-trade conditions
+          const spyPctBelowMA200 =
+            ((marketContext.spyPrice - marketContext.spyMA200) /
+              marketContext.spyMA200) *
+            100;
+          const noTradeCheck = checkNoTradeConditions(
+            spyPctBelowMA200,
+            marketContext.vix
+          );
+
+          if (noTradeCheck.noTrade) {
+            console.log();
+            console.log(chalk.red.bold('  🚫 NO-TRADE CONDITIONS DETECTED'));
+            console.log(chalk.red(`     ${noTradeCheck.reason}`));
+            console.log(
+              chalk.gray(
+                '     Recommend avoiding new entries. ' +
+                  'Use --ignore-regime to override.'
+              )
+            );
+            console.log();
+            return;
+          }
+
+          // Get regime-specific adjustments
+          const adjustments = getRegimeAdjustments(marketContext.regime);
+
+          // Display regime info
+          const regimeEmoji =
+            marketContext.regime === 'bull'
+              ? '🟢'
+              : marketContext.regime === 'bear'
+                ? '🔴'
+                : '🟡';
+          const regimeColor =
+            marketContext.regime === 'bull'
+              ? chalk.green
+              : marketContext.regime === 'bear'
+                ? chalk.red
+                : chalk.yellow;
+
+          console.log();
+          console.log(
+            `  ${regimeEmoji} Market Regime: ` +
+              regimeColor(marketContext.regime.toUpperCase())
+          );
+          console.log(
+            chalk.gray(
+              `     SPY: $${marketContext.spyPrice.toFixed(2)} | ` +
+                `MA50: $${marketContext.spyMA50.toFixed(2)} | ` +
+                `MA200: $${marketContext.spyMA200.toFixed(2)}`
+            )
+          );
+          console.log(
+            chalk.gray(`     ${marketContext.signals.slice(0, 3).join(' | ')}`)
+          );
+
+          // Adjust min score based on regime
+          effectiveMinScore = Math.max(baseMinScore, adjustments.min_score);
+
+          if (effectiveMinScore !== baseMinScore) {
+            console.log(
+              chalk.gray(
+                `     Min score adjusted: ${baseMinScore} → ` +
+                  chalk.white(effectiveMinScore.toString()) +
+                  ` (${marketContext.regime} market)`
+              )
+            );
+          }
+          console.log();
+        } else {
+          console.log(
+            chalk.yellow(
+              '  ⚠ Could not determine market regime, using defaults'
+            )
+          );
+          console.log();
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      // RUN SCANNER
+      // ═══════════════════════════════════════════════════════════════════
+      const options: ScanOptions = {
+        list: opts.list,
+        tickers: opts.tickers,
+        top: opts.top ? parseInt(opts.top, 10) : undefined,
+        minScore: effectiveMinScore,
+        dryRun: opts.dryRun,
+        verbose: opts.verbose,
+        debugIndicators,
+      };
+
       const results = await runScreener(options);
 
       if (results.length === 0) {

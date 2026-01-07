@@ -11,6 +11,8 @@
  * Two-stage workflow:
  * 1. Run `bun run scan` to find technically sound stocks (ENTER decisions)
  * 2. Run `bun run scan-spreads --from-scan` to find viable spreads
+ *
+ * v1.9.0: Uses YahooProvider with proxy support to avoid rate limiting
  */
 
 import chalk from 'chalk';
@@ -21,12 +23,7 @@ import {
   isTickerDBConfigured,
 } from '../providers/tickers.ts';
 import { createClient } from '@supabase/supabase-js';
-
-// Dynamic import for yahoo-finance2 (ES module)
-async function getYahooFinance() {
-  const YahooFinance = (await import('yahoo-finance2')).default;
-  return new YahooFinance({ suppressNotices: ['yahooSurvey'] });
-}
+import { yahooProvider } from '../providers/yahoo.ts';
 
 // Ticker lists
 const TICKER_LISTS: Record<string, string[]> = {
@@ -232,11 +229,9 @@ function calculatePoP(
 
 /**
  * Find viable spread for a ticker
+ * v1.9.0: Uses YahooProvider with built-in rate limiting and retry logic
  */
-async function findViableSpread(
-  yahooFinance: Awaited<ReturnType<typeof getYahooFinance>>,
-  ticker: string
-): Promise<SpreadResult> {
+async function findViableSpread(ticker: string): Promise<SpreadResult> {
   const result: SpreadResult = {
     ticker,
     price: 0,
@@ -253,49 +248,30 @@ async function findViableSpread(
   };
 
   try {
-    // Get quote
-    const quote = await yahooFinance.quote(ticker);
-    const price = quote.regularMarketPrice;
+    // Get quote using YahooProvider (uses proxy first, then fallback)
+    const quote = await yahooProvider.getQuote(ticker);
+    const price = quote?.regularMarketPrice;
     if (!price) {
       result.reason = 'No price data';
       return result;
     }
     result.price = price;
 
-    // Get options
-    const optionsBase = await yahooFinance.options(ticker);
-    if (!optionsBase.expirationDates?.length) {
+    // Get options chain using YahooProvider (has built-in rate limiting)
+    const optionsChain = await yahooProvider.getOptionsChain(
+      ticker,
+      CRITERIA.targetDTE
+    );
+    if (!optionsChain) {
       result.reason = 'No options';
       return result;
     }
 
-    // Find expiration closest to target DTE
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + CRITERIA.targetDTE);
-
-    let closestExp = optionsBase.expirationDates[0];
-    let closestDiff = Infinity;
-
-    for (const exp of optionsBase.expirationDates) {
-      const diff = Math.abs(exp.getTime() - targetDate.getTime());
-      if (diff < closestDiff) {
-        closestDiff = diff;
-        closestExp = exp;
-      }
-    }
-
-    if (!closestExp) {
-      result.reason = 'No expiration found';
-      return result;
-    }
+    const { calls, expiration } = optionsChain;
     const dte = Math.ceil(
-      (closestExp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (expiration.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     result.dte = dte;
-
-    // Fetch options for that expiration
-    const options = await yahooFinance.options(ticker, { date: closestExp });
-    const calls = options.options?.[0]?.calls || [];
 
     if (calls.length === 0) {
       result.reason = 'No calls';
@@ -369,8 +345,7 @@ async function findViableSpread(
         if (returnOnRisk < CRITERIA.minReturn) continue;
 
         // Calculate PoP
-        const iv =
-          (longCall as { impliedVolatility?: number }).impliedVolatility || 0.3;
+        const iv = longCall.impliedVolatility || 0.3;
         const pop = calculatePoP(price, breakeven, iv, dte);
 
         if (pop < CRITERIA.minPoP) continue;
@@ -501,10 +476,12 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   console.log(chalk.gray(`    • Target DTE: ~${CRITERIA.targetDTE} days`));
   console.log();
 
-  const yahooFinance = await getYahooFinance();
+  // Reset proxy stats for clean tracking
+  yahooProvider.resetStats();
+
   const results: SpreadResult[] = [];
 
-  // Scan each ticker
+  // Scan each ticker using YahooProvider (has built-in rate limiting)
   for (let i = 0; i < tickers.length; i++) {
     const ticker = tickers[i];
     if (!ticker) continue;
@@ -512,7 +489,7 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
       chalk.gray(`  [${i + 1}/${tickers.length}] ${ticker.padEnd(6)}`)
     );
 
-    const result = await findViableSpread(yahooFinance, ticker);
+    const result = await findViableSpread(ticker);
     results.push(result);
 
     if (result.viable) {
@@ -525,8 +502,8 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
       console.log(chalk.gray(` ❌ ${result.reason}`));
     }
 
-    // Small delay to avoid rate limiting
-    await new Promise((r) => setTimeout(r, 200));
+    // YahooProvider handles rate limiting internally, but add small delay for UX
+    await new Promise((r) => setTimeout(r, 100));
   }
 
   // Display results
@@ -537,12 +514,60 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   console.log();
 
   if (viable.length === 0) {
-    console.log(chalk.yellow('  ⚠️  No tickers found with viable spreads'));
-    console.log(
-      chalk.gray(
-        '  Try a different list or check back when market conditions improve'
-      )
+    // Check if we had options API issues (rate limiting)
+    const optionsErrors = results.filter((r) =>
+      r.reason.toLowerCase().includes('no options')
     );
+    const rateErrors = results.filter(
+      (r) =>
+        r.reason.toLowerCase().includes('429') ||
+        r.reason.toLowerCase().includes('rate') ||
+        r.reason.toLowerCase().includes('crumb')
+    );
+
+    if (rateErrors.length > 0 || optionsErrors.length === results.length) {
+      console.log(chalk.yellow('  ⚠️  Yahoo Options API rate limited'));
+      console.log(
+        chalk.gray(
+          '  The options chain API has stricter rate limits than quote data.'
+        )
+      );
+      console.log(chalk.gray('  Suggestions:'));
+      console.log(chalk.gray('    1. Wait 5-10 minutes and try again'));
+      console.log(
+        chalk.gray('    2. Use fewer tickers at a time (--tickers AAPL,MSFT)')
+      );
+      console.log(
+        chalk.gray('    3. Check your broker directly for options chains')
+      );
+      console.log();
+
+      // Show manual calculation hint for tickers we have price data for
+      const tickersWithPrice = results.filter((r) => r.price > 0);
+      if (tickersWithPrice.length > 0) {
+        console.log(chalk.cyan('  📊 Manual Spread Calculator'));
+        console.log(chalk.gray('  For deep ITM call debit spreads, target:'));
+        console.log(chalk.gray('    • Long strike: 6-12% below current price'));
+        console.log(chalk.gray('    • Width: $5 or $10'));
+        console.log(chalk.gray('    • Debit: 55-80% of width'));
+        console.log();
+        for (const t of tickersWithPrice.slice(0, 5)) {
+          const deep = (t.price * 0.9).toFixed(0);
+          const target = (t.price * 0.94).toFixed(0);
+          console.log(
+            chalk.white(`  ${t.ticker}: $${t.price.toFixed(2)}`) +
+              chalk.gray(` → Look for strikes around $${deep}-$${target}`)
+          );
+        }
+      }
+    } else {
+      console.log(chalk.yellow('  ⚠️  No tickers found with viable spreads'));
+      console.log(
+        chalk.gray(
+          '  Try a different list or check back when market conditions improve'
+        )
+      );
+    }
   } else {
     console.log(
       chalk.bold.green(

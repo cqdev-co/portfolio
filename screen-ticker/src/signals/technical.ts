@@ -9,14 +9,19 @@ interface TechnicalResult {
 }
 
 /**
- * Calculate RSI with GRADUATED scoring
- * - RSI < 30: Full points (strongly oversold)
- * - RSI 30-40: Partial points (approaching oversold)
- * - RSI 40-50: Small points (neutral-bearish)
+ * Calculate RSI with scoring aligned to strategy.config.yaml
+ *
+ * Per strategy config:
+ * - RSI ideal range: 35-50 (sweet spot for CDS entry)
+ * - RSI acceptable: 30-55
+ * - RSI < 30: Oversold (potential falling knife)
+ * - RSI > 55: Extended (wait for pullback)
+ *
+ * v2.5.0: Restructured to reward ideal entry zone, not just oversold
  */
 function checkRSI(
   closes: number[],
-  thresholds = defaultThresholds.technical
+  _thresholds = defaultThresholds.technical
 ): Signal | null {
   if (closes.length < 15) return null;
 
@@ -28,40 +33,154 @@ function checkRSI(
   const currentRSI = rsiResult[rsiResult.length - 1];
   if (currentRSI === undefined) return null;
 
-  // Strongly oversold - full points
-  if (currentRSI < 30) {
+  // IDEAL ENTRY ZONE (35-50) - Best for CDS spreads
+  // Stock has pulled back but isn't broken
+  if (currentRSI >= 35 && currentRSI <= 50) {
     return {
-      name: 'RSI Oversold',
+      name: 'RSI Entry Zone',
       category: 'technical',
-      points: defaultWeights.technical.rsiOversold,
-      description: `RSI(14) = ${currentRSI.toFixed(1)} (strongly oversold)`,
+      points: 10, // Highest RSI score - this is the sweet spot
+      description: `RSI(14) = ${currentRSI.toFixed(1)} (ideal entry zone)`,
       value: currentRSI,
     };
   }
 
-  // Approaching oversold - partial points
-  if (currentRSI < thresholds.rsiOversold) {
+  // APPROACHING OVERSOLD (30-35) - Good entry but watch for more downside
+  if (currentRSI >= 30 && currentRSI < 35) {
     return {
       name: 'RSI Approaching Oversold',
       category: 'technical',
-      points: Math.floor(defaultWeights.technical.rsiOversold * 0.6),
+      points: 7,
       description: `RSI(14) = ${currentRSI.toFixed(1)} (approaching oversold)`,
       value: currentRSI,
     };
   }
 
-  // Neutral-bearish range - small bonus
-  if (currentRSI < 50) {
+  // OVERSOLD (<30) - Potential falling knife, lower score
+  // Could bounce, but verify trend before entry
+  if (currentRSI < 30) {
     return {
-      name: 'RSI Neutral-Bearish',
+      name: 'RSI Oversold',
       category: 'technical',
-      points: 3,
-      description: `RSI(14) = ${currentRSI.toFixed(1)} (neutral, room to run)`,
+      points: 5,
+      description: `RSI(14) = ${currentRSI.toFixed(1)} (oversold - verify trend)`,
       value: currentRSI,
     };
   }
 
+  // SLIGHTLY EXTENDED (50-55) - Acceptable but not ideal
+  if (currentRSI > 50 && currentRSI <= 55) {
+    return {
+      name: 'RSI Acceptable',
+      category: 'technical',
+      points: 4,
+      description: `RSI(14) = ${currentRSI.toFixed(1)} (slightly extended)`,
+      value: currentRSI,
+    };
+  }
+
+  // EXTENDED (55-70) - Wait for pullback
+  if (currentRSI > 55 && currentRSI < 70) {
+    return {
+      name: 'RSI Extended',
+      category: 'technical',
+      points: 1,
+      description: `RSI(14) = ${currentRSI.toFixed(1)} (extended - wait)`,
+      value: currentRSI,
+    };
+  }
+
+  // OVERBOUGHT (>70) - No points, skip
   return null;
+}
+
+/**
+ * v2.5.0: Check for pullback-in-uptrend (ideal CDS entry setup)
+ *
+ * This is THE signal we want for deep ITM call debit spreads:
+ * - Long-term trend is UP (above MA200)
+ * - Price has pulled back to moving average support
+ * - Not broken down (still in healthy uptrend structure)
+ *
+ * Awards high points because this is the core entry setup.
+ */
+function checkPullbackInUptrend(
+  currentPrice: number,
+  closes: number[]
+): Signal[] {
+  const signals: Signal[] = [];
+
+  if (closes.length < 200) return signals;
+
+  // Calculate moving averages
+  const sma20 = SMA.calculate({ values: closes, period: 20 });
+  const sma50 = SMA.calculate({ values: closes, period: 50 });
+  const sma200 = SMA.calculate({ values: closes, period: 200 });
+
+  const ma20 = sma20[sma20.length - 1];
+  const ma50 = sma50[sma50.length - 1];
+  const ma200 = sma200[sma200.length - 1];
+
+  if (ma20 === undefined || ma50 === undefined || ma200 === undefined) {
+    return signals;
+  }
+
+  // Core requirement: Must be above MA200 (long-term uptrend)
+  if (currentPrice <= ma200) return signals;
+
+  // Calculate distances
+  const distToMA20 = (currentPrice - ma20) / currentPrice;
+  const distToMA50 = (currentPrice - ma50) / currentPrice;
+
+  // Check for healthy trend structure
+  const healthyStructure = ma50 > ma200;
+  const strongStructure = ma20 > ma50 && ma50 > ma200;
+
+  // BEST SIGNAL: Pullback to MA50 in healthy uptrend
+  // Price within 3% of MA50, above MA200, MA50 > MA200
+  if (healthyStructure && Math.abs(distToMA50) < 0.03) {
+    signals.push({
+      name: 'Pullback to MA50',
+      category: 'technical',
+      points: 12, // High value - this is THE entry setup
+      description: `Uptrend intact, pulled back to MA50 support`,
+      value: ma50,
+    });
+  }
+
+  // GOOD SIGNAL: Pullback to MA20 in strong uptrend
+  // Price within 2% of MA20, strong structure (MA20 > MA50 > MA200)
+  if (strongStructure && Math.abs(distToMA20) < 0.02) {
+    signals.push({
+      name: 'Pullback to MA20',
+      category: 'technical',
+      points: 8,
+      description: `Strong uptrend, testing MA20 support`,
+      value: ma20,
+    });
+  }
+
+  // Check for healthy pullback from recent high
+  // Find 20-day high
+  const recent20 = closes.slice(-20);
+  const high20 = Math.max(...recent20);
+  const pullbackPct = (high20 - currentPrice) / high20;
+
+  // GOOD SIGNAL: 5-15% pullback from high, still above MA200
+  // Not too shallow (just noise) and not too deep (broken)
+  if (pullbackPct >= 0.05 && pullbackPct <= 0.15 && currentPrice > ma200) {
+    signals.push({
+      name: 'Healthy Pullback',
+      category: 'technical',
+      points: 7,
+      description:
+        `${(pullbackPct * 100).toFixed(0)}% pullback from high, ` +
+        `trend intact`,
+      value: pullbackPct,
+    });
+  }
+
+  return signals;
 }
 
 /**
@@ -748,6 +867,7 @@ function checkBollingerBands(
 /**
  * Signal group caps to prevent excessive scoring from related signals
  * v1.7.1: Added to prevent MA-related signal stacking
+ * v2.5.0: Added pullback group for entry setup signals
  */
 const SIGNAL_GROUP_CAPS: Record<
   string,
@@ -764,6 +884,10 @@ const SIGNAL_GROUP_CAPS: Record<
   pricePosition: {
     keywords: ['52-week', 'support', 'bollinger'],
     maxPoints: 12, // Cap price position signals at 12 points
+  },
+  pullback: {
+    keywords: ['pullback', 'pulled back'],
+    maxPoints: 15, // Cap pullback signals (can overlap with entry setup)
   },
 };
 
@@ -831,10 +955,16 @@ export function calculateTechnicalSignals(
   const volumes = historical.map((d) => d.volume);
   const currentPrice = quote.regularMarketPrice ?? closes[closes.length - 1];
 
-  // RSI (now graduated)
+  // RSI (v2.5.0: rewards ideal entry zone 35-50)
   const rsiSignal = checkRSI(closes);
   if (rsiSignal) {
     signals.push(rsiSignal);
+  }
+
+  // v2.5.0: Pullback-in-uptrend detection (core CDS entry signal)
+  const pullbackSignals = checkPullbackInUptrend(currentPrice ?? 0, closes);
+  for (const signal of pullbackSignals) {
+    signals.push(signal);
   }
 
   // Golden Cross

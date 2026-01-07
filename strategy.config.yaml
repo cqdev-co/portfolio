@@ -228,6 +228,54 @@ universe:
     min_market_cap_b: 10 # $10B minimum for scanner
 
 # =============================================================================
+# MARKET REGIME ADJUSTMENTS
+# =============================================================================
+# Adjust entry criteria based on market conditions (SPY-based)
+market_regime:
+  # --- Bull Market (SPY above MA200, golden cross active) ---
+  bull:
+    enabled: true
+    description: 'Standard entry criteria, full position sizes'
+    adjustments:
+      min_score: 65 # Lower threshold - more opportunities
+      rsi_max: 60 # Allow slightly extended stocks
+      position_size_multiplier: 1.0 # Full positions
+      max_concurrent_positions: 6
+      require_ma50_above: false # MA200 sufficient
+
+  # --- Neutral Market (SPY near MA200, mixed signals) ---
+  neutral:
+    enabled: true
+    description: 'Selective entries, reduced sizes'
+    adjustments:
+      min_score: 70 # Higher bar for entry
+      rsi_max: 55 # Stricter RSI limit
+      position_size_multiplier: 0.75 # 75% position size
+      max_concurrent_positions: 4
+      require_ma50_above: true # Both MAs required
+
+  # --- Bear Market (SPY below MA200, death cross) ---
+  bear:
+    enabled: true
+    description: 'Defensive mode, only high-conviction trades'
+    adjustments:
+      min_score: 80 # Very high bar
+      rsi_max: 50 # Only buy on weakness
+      rsi_min: 25 # Avoid severe oversold (falling knife)
+      position_size_multiplier: 0.50 # Half positions
+      max_concurrent_positions: 2
+      require_ma50_above: true
+      require_golden_cross: true # Stock must have healthy structure
+      cushion_minimum_pct: 10.0 # Extra cushion required
+
+  # --- No-Trade Conditions (circuit breaker) ---
+  no_trade:
+    # When these conditions are met, avoid new entries entirely
+    spy_below_ma200_pct: -10 # SPY 10%+ below MA200
+    vix_above: 35 # VIX spike (fear)
+    consecutive_down_days: 5 # Extended selloff
+
+# =============================================================================
 # ALERTS & NOTIFICATIONS
 # =============================================================================
 alerts:

@@ -337,14 +337,37 @@ class EfficientTickerFilter:
         cfd_count = 0
         exchange_filtered = 0
         symbol_filtered = 0
+        hyphen_filtered = 0
 
         for ticker in tickers:
             symbol = ticker.get("symbol", "") or ""
             exchange = ticker.get("exchange", "") or ""
             name = ticker.get("name", "") or ""
 
-            # RELAXED: Allow 1-5 character symbols (include more legitimate stocks)
-            if not symbol or len(symbol) < 1 or len(symbol) > 5:
+            # FAST: Skip tickers with "-" that are warrants/units/rights
+            # Allow share classes like BRK-B, but skip -WS, -WT, -U, -UN, -R, -RT
+            if "-" in symbol:
+                upper_sym = symbol.upper()
+                # Skip warrants, units, rights (common hyphenated patterns)
+                skip_hyphen_patterns = [
+                    "-WS", "-WT", "-W",   # Warrants
+                    "-UN", "-U",           # Units
+                    "-RT", "-R",           # Rights
+                    "-PR", "-P",           # Preferred
+                    "-CL",                 # Class (some formats)
+                ]
+                if any(upper_sym.endswith(p) for p in skip_hyphen_patterns):
+                    hyphen_filtered += 1
+                    continue
+                # Also skip if hyphen is followed by more than 1 char (likely special)
+                parts = symbol.split("-")
+                if len(parts) == 2 and len(parts[1]) > 2:
+                    hyphen_filtered += 1
+                    continue
+
+            # RELAXED: Allow 1-6 character symbols (include BRK-B style)
+            clean_symbol = symbol.replace("-", "")
+            if not symbol or len(clean_symbol) < 1 or len(clean_symbol) > 5:
                 symbol_filtered += 1
                 continue
 
@@ -361,7 +384,7 @@ class EfficientTickerFilter:
                 symbol_filtered += 1
                 continue
 
-            # Skip warrants, units, preferred shares, etc.
+            # Skip warrants, units, preferred shares, etc. (non-hyphenated)
             skip_suffixes = ["W", "U", "R", "P", "Q", "V", "X", "Y", "Z"]
             if any(symbol.endswith(suffix) for suffix in skip_suffixes):
                 continue
@@ -434,6 +457,7 @@ class EfficientTickerFilter:
 
         logger.info(
             f"AGGRESSIVE pre-filtering complete: {len(filtered)} potential US stocks remaining\n"
+            f"  - Filtered out {hyphen_filtered} warrants/units/rights (hyphenated)\n"
             f"  - Filtered out {cfd_count} CFDs\n"
             f"  - Filtered out {symbol_filtered} invalid symbols\n"
             f"  - Filtered out {exchange_filtered} non-US/unlisted stocks"

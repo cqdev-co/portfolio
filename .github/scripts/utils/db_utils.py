@@ -13,6 +13,95 @@ from .constants import DEFAULT_BATCH_SIZE, RATE_LIMIT_DELAY_SECONDS
 logger = logging.getLogger(__name__)
 
 
+def clear_inactive_tickers(
+    supabase: Client,
+    table_name: str,
+    new_symbols: list[str],
+    dry_run: bool = False,
+) -> int:
+    """
+    Mark tickers not in the new list as inactive.
+    
+    This ensures old/delisted tickers don't persist in active queries
+    while preserving historical data.
+    
+    Args:
+        supabase: Supabase client instance
+        table_name: Name of the table
+        new_symbols: List of symbols that should remain active
+        dry_run: If True, don't actually update
+        
+    Returns:
+        Number of tickers marked inactive
+    """
+    if dry_run:
+        logger.info(f"DRY RUN: Would mark inactive tickers not in {len(new_symbols)} new symbols")
+        return 0
+    
+    try:
+        # First, mark ALL tickers as inactive
+        logger.info(f"Marking all existing tickers as inactive in {table_name}...")
+        
+        result = (
+            supabase.table(table_name)
+            .update({"is_active": False})
+            .neq("symbol", "")  # Match all non-empty symbols
+            .execute()
+        )
+        
+        deactivated = len(result.data) if result.data else 0
+        logger.info(f"Marked {deactivated} existing tickers as inactive")
+        
+        return deactivated
+        
+    except Exception as e:
+        logger.error(f"Error marking tickers inactive: {e}")
+        return 0
+
+
+def delete_all_tickers(
+    supabase: Client,
+    table_name: str,
+    dry_run: bool = False,
+) -> bool:
+    """
+    Delete all tickers from the table (fresh start).
+    
+    Use this for a complete refresh of the ticker list.
+    
+    Args:
+        supabase: Supabase client instance
+        table_name: Name of the table
+        dry_run: If True, don't actually delete
+        
+    Returns:
+        True if successful
+    """
+    if dry_run:
+        logger.info(f"DRY RUN: Would delete all tickers from {table_name}")
+        return True
+    
+    try:
+        logger.info(f"Deleting all tickers from {table_name}...")
+        
+        # Delete all rows (Supabase requires a filter, use neq empty string)
+        result = (
+            supabase.table(table_name)
+            .delete()
+            .neq("symbol", "")
+            .execute()
+        )
+        
+        deleted = len(result.data) if result.data else 0
+        logger.info(f"Deleted {deleted} tickers from {table_name}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error deleting tickers: {e}")
+        return False
+
+
 def store_tickers(
     supabase: Client,
     tickers: list,
@@ -20,6 +109,7 @@ def store_tickers(
     dry_run: bool = False,
     batch_size: int = DEFAULT_BATCH_SIZE,
     rate_limit_delay: float = RATE_LIMIT_DELAY_SECONDS,
+    clear_first: bool = True,
 ) -> bool:
     """
     Store tickers in Supabase database.
@@ -31,6 +121,7 @@ def store_tickers(
         dry_run: If True, don't actually store data
         batch_size: Number of tickers per batch
         rate_limit_delay: Delay between batches in seconds
+        clear_first: If True, mark existing tickers inactive before insert
 
     Returns:
         True if successful, False otherwise
@@ -38,6 +129,10 @@ def store_tickers(
     if dry_run:
         logger.info(f"DRY RUN: Would store {len(tickers)} tickers in {table_name}")
         return True
+    
+    # Clear existing tickers first (mark as inactive)
+    if clear_first:
+        clear_inactive_tickers(supabase, table_name, [], dry_run=dry_run)
 
     try:
         # Prepare data for batch insert

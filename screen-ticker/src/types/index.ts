@@ -336,6 +336,8 @@ export interface ScanOptions {
   minScore: number;
   dryRun: boolean;
   verbose: boolean;
+  /** v2.5.0: Print detailed indicator values for debugging */
+  debugIndicators?: boolean;
 }
 
 export interface TrendsOptions {

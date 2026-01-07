@@ -107,12 +107,74 @@ export async function getTickersToScan(
 }
 
 /**
+ * Debug output for indicator values
+ * v2.5.0: Helps troubleshoot scoring issues
+ */
+function printDebugIndicators(
+  symbol: string,
+  quote: import('../types/index.ts').QuoteData,
+  summary: import('../types/index.ts').QuoteSummary,
+  historical: HistoricalData[],
+  score: StockScore
+): void {
+  const price = quote.regularMarketPrice ?? 0;
+  const ma50 = quote.fiftyDayAverage;
+  const ma200 = quote.twoHundredDayAverage;
+
+  // Calculate RSI manually for display
+  let rsiValue = 'N/A';
+  if (historical.length >= 15) {
+    const closes = historical.map((h) => h.close);
+    const rsiSignal = score.signals.find((s) =>
+      s.name.toLowerCase().includes('rsi')
+    );
+    if (rsiSignal && typeof rsiSignal.value === 'number') {
+      rsiValue = rsiSignal.value.toFixed(1);
+    }
+  }
+
+  // Get 20-day high for pullback calculation
+  const recent20 = historical.slice(-20);
+  const high20 =
+    recent20.length > 0 ? Math.max(...recent20.map((h) => h.close)) : price;
+  const pullbackPct = ((high20 - price) / high20) * 100;
+
+  console.log(`\n  ┌─ ${symbol} DEBUG INDICATORS ───────────────────────`);
+  console.log(`  │ Price:     $${price.toFixed(2)}`);
+  console.log(
+    `  │ MA50:      ${ma50 ? `$${ma50.toFixed(2)} (${price > ma50 ? '↑ above' : '↓ below'})` : 'N/A'}`
+  );
+  console.log(
+    `  │ MA200:     ${ma200 ? `$${ma200.toFixed(2)} (${price > ma200 ? '↑ above' : '↓ below'})` : 'N/A'}`
+  );
+  console.log(`  │ RSI(14):   ${rsiValue}`);
+  console.log(`  │ Pullback:  ${pullbackPct.toFixed(1)}% from 20d high`);
+  console.log(`  │`);
+  console.log(`  │ SCORES:`);
+  console.log(`  │   Technical:   ${score.technicalScore}/50`);
+  console.log(`  │   Fundamental: ${score.fundamentalScore}/30`);
+  console.log(`  │   Analyst:     ${score.analystScore}/20`);
+  console.log(`  │   TOTAL:       ${score.totalScore}/100`);
+  console.log(`  │`);
+  console.log(`  │ SIGNALS (${score.signals.length}):`);
+  for (const signal of score.signals.slice(0, 8)) {
+    const pts = signal.points > 0 ? `+${signal.points}` : signal.points;
+    console.log(`  │   [${pts.toString().padStart(3)}] ${signal.name}`);
+  }
+  if (score.signals.length > 8) {
+    console.log(`  │   ... and ${score.signals.length - 8} more`);
+  }
+  console.log(`  └────────────────────────────────────────────────\n`);
+}
+
+/**
  * Scan a single ticker and return its score
  * Uses debug logging for batch scans to reduce noise
+ * v2.5.0: Added debugIndicators option
  */
 export async function scanTicker(
   symbol: string,
-  options: { verbose?: boolean } = {}
+  options: { verbose?: boolean; debugIndicators?: boolean } = {}
 ): Promise<StockScore | null> {
   try {
     const { quote, summary, historical } =
@@ -129,7 +191,14 @@ export async function scanTicker(
       return null;
     }
 
-    return calculateStockScore(symbol, quote, summary, historical);
+    const score = calculateStockScore(symbol, quote, summary, historical);
+
+    // v2.5.0: Print debug indicators if requested
+    if (options.debugIndicators && score.totalScore >= 60) {
+      printDebugIndicators(symbol, quote, summary, historical, score);
+    }
+
+    return score;
   } catch (error) {
     // Only log errors that aren't expected during batch scans
     if (options.verbose) {
@@ -201,10 +270,15 @@ export async function analyzeTicker(
  * v1.4.1: Reduced verbosity for skipped tickers
  * v1.7.1: Batch concurrent scanning for 3-5x performance improvement
  * v2.4.0: Reduced batch size to respect proxy rate limits
+ * v2.5.0: Added debugIndicators option
  */
 export async function scanTickers(
   tickers: string[],
-  options: { verbose?: boolean; batchSize?: number } = {}
+  options: {
+    verbose?: boolean;
+    batchSize?: number;
+    debugIndicators?: boolean;
+  } = {}
 ): Promise<StockScore[]> {
   const results: StockScore[] = [];
   const total = tickers.length;
@@ -233,7 +307,10 @@ export async function scanTickers(
         }
         return {
           ticker,
-          score: await scanTicker(ticker, { verbose: options.verbose }),
+          score: await scanTicker(ticker, {
+            verbose: options.verbose,
+            debugIndicators: options.debugIndicators,
+          }),
         };
       })
     );
@@ -277,6 +354,7 @@ export async function scanTickers(
 
 /**
  * Run the full screening process
+ * v2.5.0: Added debugIndicators support
  */
 export async function runScreener(options: ScanOptions): Promise<StockScore[]> {
   const tickers = await getTickersToScan(options);
@@ -286,9 +364,15 @@ export async function runScreener(options: ScanOptions): Promise<StockScore[]> {
   logger.info(`Tickers to scan: ${tickers.length}`);
   logger.info(`Minimum Score: ${options.minScore}`);
   logger.info(`Dry Run: ${options.dryRun}`);
+  if (options.debugIndicators) {
+    logger.info(`Debug Indicators: enabled (score >= 60)`);
+  }
   logger.divider();
 
-  const scores = await scanTickers(tickers, { verbose: options.verbose });
+  const scores = await scanTickers(tickers, {
+    verbose: options.verbose,
+    debugIndicators: options.debugIndicators,
+  });
 
   // Filter by minimum score
   const filtered = scores.filter((s) => s.totalScore >= options.minScore);

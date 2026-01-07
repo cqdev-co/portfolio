@@ -216,6 +216,8 @@ MAX_GAP_RATIO = 0.05                 # Was: 0.10, Now: 0.05 (5%)
 - [x] Update quality scoring algorithm
 - [x] Add float/shares outstanding validation
 - [x] Update YFinance validator thresholds
+- [x] Add hyphen filter for warrants/units/rights (-WS, -WT, -U, etc.)
+- [x] Add clear_first option to mark old tickers inactive before insert
 - [ ] Add unit tests for new filters
 - [ ] Run comparison test: old vs new criteria
 
