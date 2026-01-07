@@ -1,6 +1,6 @@
 /**
  * Shared Options Types
- * 
+ *
  * Used by both CLI (ai-analyst) and Frontend (portfolio).
  * These are the REAL types from the CLI's options chain logic.
  */
@@ -88,4 +88,3 @@ export interface SpreadSelectionContext {
   /** Call wall prices (concentrated call OI) */
   callWalls?: number[];
 }
-

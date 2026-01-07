@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, ListFilter } from "lucide-react";
+import { useEffect, useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronUp, ListFilter } from 'lucide-react';
 
 interface TableOfContentsProps {
   html: string;
@@ -14,38 +14,39 @@ interface Heading {
   level: number;
 }
 
+function extractHeadings(html: string): Heading[] {
+  if (!html) return [];
+
+  // Create a temporary div to parse the HTML
+  const div = document.createElement('div');
+  div.innerHTML = html;
+
+  // Find all headings (h2 and h3 only)
+  const elements = div.querySelectorAll('h2, h3, h4');
+  const headingsList: Heading[] = [];
+
+  elements.forEach((el) => {
+    const id = el.id;
+    const text = el.textContent || '';
+    const level = Number(el.tagName.substring(1));
+
+    if (id && text) {
+      headingsList.push({ id, text, level });
+    }
+  });
+
+  return headingsList;
+}
+
 /**
  * Extracts headings from HTML content to generate a table of contents
  */
 export default function TableOfContents({ html }: TableOfContentsProps) {
-  const [headings, setHeadings] = useState<Heading[]>([]);
-  const [activeId, setActiveId] = useState<string>("");
+  const [activeId, setActiveId] = useState<string>('');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Extract headings from the HTML content
-  useEffect(() => {
-    if (!html) return;
-
-    // Create a temporary div to parse the HTML
-    const div = document.createElement("div");
-    div.innerHTML = html;
-
-    // Find all headings (h2 and h3 only)
-    const elements = div.querySelectorAll("h2, h3, h4");
-    const headingsList: Heading[] = [];
-
-    elements.forEach((el) => {
-      const id = el.id;
-      const text = el.textContent || "";
-      const level = Number(el.tagName.substring(1)); // Get the heading level (2 or 3)
-
-      if (id && text) {
-        headingsList.push({ id, text, level });
-      }
-    });
-
-    setHeadings(headingsList);
-  }, [html]);
+  // Extract headings using useMemo to avoid re-parsing on every render
+  const headings = useMemo(() => extractHeadings(html), [html]);
 
   // Track active heading during scroll
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
           }
         });
       },
-      { rootMargin: "-100px 0px -80% 0px" }
+      { rootMargin: '-100px 0px -80% 0px' }
     );
 
     headings.forEach(({ id }) => {
@@ -84,7 +85,7 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
   }
 
   // Count the number of visible sections
-  const sectionCount = headings.filter(h => h.level === 2).length;
+  const sectionCount = headings.filter((h) => h.level === 2).length;
 
   return (
     <div className="toc-container">
@@ -92,14 +93,24 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
         <h2 className="flex items-center gap-1 m-0">
           <ListFilter className="size-3" />
           <span>CONTENTS</span>
-          {sectionCount > 0 && <span className="text-[0.6rem] opacity-60">{sectionCount}</span>}
+          {sectionCount > 0 && (
+            <span className="text-[0.6rem] opacity-60">{sectionCount}</span>
+          )}
         </h2>
-        <button 
+        <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="text-muted-foreground/70 hover:text-foreground size-4 flex items-center justify-center rounded-sm hover:bg-secondary/50 transition-colors -mr-0.5"
-          aria-label={isCollapsed ? "Expand table of contents" : "Collapse table of contents"}
+          aria-label={
+            isCollapsed
+              ? 'Expand table of contents'
+              : 'Collapse table of contents'
+          }
         >
-          {isCollapsed ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+          {isCollapsed ? (
+            <ChevronDown className="size-3" />
+          ) : (
+            <ChevronUp className="size-3" />
+          )}
         </button>
       </div>
       {!isCollapsed && (
@@ -109,23 +120,23 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
               <li
                 key={heading.id}
                 className={cn(
-                  heading.level === 3 && "depth-3",
-                  heading.level === 4 && "depth-4"
+                  heading.level === 3 && 'depth-3',
+                  heading.level === 4 && 'depth-4'
                 )}
               >
                 <a
                   href={`#${heading.id}`}
-                  className={cn(
-                    activeId === heading.id && "active"
-                  )}
-                  aria-current={activeId === heading.id ? "location" : undefined}
+                  className={cn(activeId === heading.id && 'active')}
+                  aria-current={
+                    activeId === heading.id ? 'location' : undefined
+                  }
                   onClick={(e) => {
                     e.preventDefault();
                     document.querySelector(`#${heading.id}`)?.scrollIntoView({
-                      behavior: "smooth",
+                      behavior: 'smooth',
                     });
                     // Update URL hash without jumping
-                    window.history.pushState(null, "", `#${heading.id}`);
+                    window.history.pushState(null, '', `#${heading.id}`);
                   }}
                 >
                   {heading.text}
@@ -137,4 +148,4 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
       )}
     </div>
   );
-} 
+}

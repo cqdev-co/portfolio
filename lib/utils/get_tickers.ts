@@ -1,18 +1,18 @@
 /**
  * TypeScript/JavaScript Ticker Utility Functions
- * 
+ *
  * Frontend-compatible utility functions for retrieving ticker data.
  * Works with Next.js, React, and other JavaScript frameworks.
  */
 
 import { createClient } from '@supabase/supabase-js';
-import type { 
-  Ticker, 
-  TickerSearchParams, 
+import type {
+  Ticker,
+  TickerSearchParams,
   TickerFilters,
   TickerQueryResult,
   GetTickersResponse,
-  SearchTickersResponse 
+  SearchTickersResponse,
 } from '../types/ticker';
 
 // Supabase client singleton
@@ -22,16 +22,16 @@ function getSupabaseClient() {
   if (!supabaseClient) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
+
     if (!url || !anonKey) {
       throw new Error(
         'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
       );
     }
-    
+
     supabaseClient = createClient(url, anonKey);
   }
-  
+
   return supabaseClient;
 }
 
@@ -44,32 +44,30 @@ export async function getAllTickers(
   try {
     const { active_only = true, limit, offset = 0 } = params;
     const supabase = getSupabaseClient();
-    
-    let query = supabase
-      .from('tickers')
-      .select('*', { count: 'exact' });
-    
+
+    let query = supabase.from('tickers').select('*', { count: 'exact' });
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     if (limit) {
       query = query.limit(limit);
     }
-    
+
     if (offset > 0) {
       query = query.range(offset, offset + (limit || 1000) - 1);
     }
-    
+
     query = query.order('symbol');
-    
+
     const { data, error, count } = await query;
-    
+
     if (error) {
       console.error('Error fetching tickers:', error);
       return { data: [], error: error.message };
     }
-    
+
     return { data: data || [], count: count || 0 };
   } catch (error) {
     console.error('Error in getAllTickers:', error);
@@ -80,16 +78,18 @@ export async function getAllTickers(
 /**
  * Get a specific ticker by symbol
  */
-export async function getTickerBySymbol(symbol: string): Promise<Ticker | null> {
+export async function getTickerBySymbol(
+  symbol: string
+): Promise<Ticker | null> {
   try {
     const supabase = getSupabaseClient();
-    
+
     const { data, error } = await supabase
       .from('tickers')
       .select('*')
       .eq('symbol', symbol.toUpperCase())
       .single();
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         // No rows returned
@@ -98,7 +98,7 @@ export async function getTickerBySymbol(symbol: string): Promise<Ticker | null> 
       console.error('Error fetching ticker:', error);
       return null;
     }
-    
+
     return data;
   } catch (error) {
     console.error('Error in getTickerBySymbol:', error);
@@ -116,29 +116,29 @@ export async function getTickersByExchange(
   try {
     const { active_only = true, limit } = params;
     const supabase = getSupabaseClient();
-    
+
     let query = supabase
       .from('tickers')
       .select('*', { count: 'exact' })
       .eq('exchange', exchange.toUpperCase());
-    
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     if (limit) {
       query = query.limit(limit);
     }
-    
+
     query = query.order('symbol');
-    
+
     const { data, error, count } = await query;
-    
+
     if (error) {
       console.error('Error fetching tickers by exchange:', error);
       return { data: [], error: error.message };
     }
-    
+
     return { data: data || [], count: count || 0 };
   } catch (error) {
     console.error('Error in getTickersByExchange:', error);
@@ -156,29 +156,29 @@ export async function getTickersByCountry(
   try {
     const { active_only = true, limit } = params;
     const supabase = getSupabaseClient();
-    
+
     let query = supabase
       .from('tickers')
       .select('*', { count: 'exact' })
       .eq('country', country.toUpperCase());
-    
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     if (limit) {
       query = query.limit(limit);
     }
-    
+
     query = query.order('symbol');
-    
+
     const { data, error, count } = await query;
-    
+
     if (error) {
       console.error('Error fetching tickers by country:', error);
       return { data: [], error: error.message };
     }
-    
+
     return { data: data || [], count: count || 0 };
   } catch (error) {
     console.error('Error in getTickersByCountry:', error);
@@ -196,29 +196,29 @@ export async function getTickersBySector(
   try {
     const { active_only = true, limit } = params;
     const supabase = getSupabaseClient();
-    
+
     let query = supabase
       .from('tickers')
       .select('*', { count: 'exact' })
       .ilike('sector', `%${sector}%`);
-    
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     if (limit) {
       query = query.limit(limit);
     }
-    
+
     query = query.order('symbol');
-    
+
     const { data, error, count } = await query;
-    
+
     if (error) {
       console.error('Error fetching tickers by sector:', error);
       return { data: [], error: error.message };
     }
-    
+
     return { data: data || [], count: count || 0 };
   } catch (error) {
     console.error('Error in getTickersBySector:', error);
@@ -238,52 +238,52 @@ export async function searchTickers(
   } = {}
 ): Promise<SearchTickersResponse> {
   try {
-    const { 
-      search_fields = ['symbol', 'name'], 
-      active_only = true, 
-      limit = 50 
+    const {
+      search_fields = ['symbol', 'name'],
+      active_only = true,
+      limit = 50,
     } = options;
-    
+
     const supabase = getSupabaseClient();
-    
+
     // Build OR conditions for search fields
-    const conditions = search_fields.map(field => 
-      `${field}.ilike.%${searchQuery}%`
-    ).join(',');
-    
+    const conditions = search_fields
+      .map((field) => `${field}.ilike.%${searchQuery}%`)
+      .join(',');
+
     let query = supabase
       .from('tickers')
       .select('*', { count: 'exact' })
       .or(conditions);
-    
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     query = query.limit(limit).order('symbol');
-    
+
     const { data, error, count } = await query;
-    
+
     if (error) {
       console.error('Error searching tickers:', error);
-      return { 
-        results: [], 
-        query: searchQuery, 
-        total_matches: 0 
+      return {
+        results: [],
+        query: searchQuery,
+        total_matches: 0,
       };
     }
-    
+
     return {
       results: data || [],
       query: searchQuery,
-      total_matches: count || 0
+      total_matches: count || 0,
     };
   } catch (error) {
     console.error('Error in searchTickers:', error);
-    return { 
-      results: [], 
-      query: searchQuery, 
-      total_matches: 0 
+    return {
+      results: [],
+      query: searchQuery,
+      total_matches: 0,
     };
   }
 }
@@ -291,25 +291,27 @@ export async function searchTickers(
 /**
  * Get ticker count
  */
-export async function getTickerCount(active_only: boolean = true): Promise<number> {
+export async function getTickerCount(
+  active_only: boolean = true
+): Promise<number> {
   try {
     const supabase = getSupabaseClient();
-    
+
     let query = supabase
       .from('tickers')
       .select('id', { count: 'exact', head: true });
-    
+
     if (active_only) {
       query = query.eq('is_active', true);
     }
-    
+
     const { count, error } = await query;
-    
+
     if (error) {
       console.error('Error getting ticker count:', error);
       return 0;
     }
-    
+
     return count || 0;
   } catch (error) {
     console.error('Error in getTickerCount:', error);
@@ -323,23 +325,25 @@ export async function getTickerCount(active_only: boolean = true): Promise<numbe
 export async function getExchanges(): Promise<string[]> {
   try {
     const supabase = getSupabaseClient();
-    
+
     const { data, error } = await supabase
       .from('tickers')
       .select('exchange')
       .not('exchange', 'is', null);
-    
+
     if (error) {
       console.error('Error fetching exchanges:', error);
       return [];
     }
-    
-    const exchanges = [...new Set(
-      data
-        .map(item => item.exchange)
-        .filter(Boolean)
-    )].sort();
-    
+
+    const exchanges = [
+      ...new Set(
+        data
+          .map((item: { exchange: string | null }) => item.exchange)
+          .filter(Boolean)
+      ),
+    ].sort() as string[];
+
     return exchanges;
   } catch (error) {
     console.error('Error in getExchanges:', error);
@@ -353,23 +357,25 @@ export async function getExchanges(): Promise<string[]> {
 export async function getCountries(): Promise<string[]> {
   try {
     const supabase = getSupabaseClient();
-    
+
     const { data, error } = await supabase
       .from('tickers')
       .select('country')
       .not('country', 'is', null);
-    
+
     if (error) {
       console.error('Error fetching countries:', error);
       return [];
     }
-    
-    const countries = [...new Set(
-      data
-        .map(item => item.country)
-        .filter(Boolean)
-    )].sort();
-    
+
+    const countries = [
+      ...new Set(
+        data
+          .map((item: { country: string | null }) => item.country)
+          .filter(Boolean)
+      ),
+    ].sort() as string[];
+
     return countries;
   } catch (error) {
     console.error('Error in getCountries:', error);
@@ -383,23 +389,25 @@ export async function getCountries(): Promise<string[]> {
 export async function getSectors(): Promise<string[]> {
   try {
     const supabase = getSupabaseClient();
-    
+
     const { data, error } = await supabase
       .from('tickers')
       .select('sector')
       .not('sector', 'is', null);
-    
+
     if (error) {
       console.error('Error fetching sectors:', error);
       return [];
     }
-    
-    const sectors = [...new Set(
-      data
-        .map(item => item.sector)
-        .filter(Boolean)
-    )].sort();
-    
+
+    const sectors = [
+      ...new Set(
+        data
+          .map((item: { sector: string | null }) => item.sector)
+          .filter(Boolean)
+      ),
+    ].sort() as string[];
+
     return sectors;
   } catch (error) {
     console.error('Error in getSectors:', error);
@@ -411,9 +419,9 @@ export async function getSectors(): Promise<string[]> {
 export async function getSP500Tickers(): Promise<Ticker[]> {
   const [nyse, nasdaq] = await Promise.all([
     getTickersByExchange('NYSE'),
-    getTickersByExchange('NASDAQ')
+    getTickersByExchange('NASDAQ'),
   ]);
-  
+
   return [...nyse.data, ...nasdaq.data];
 }
 
@@ -425,22 +433,26 @@ export async function getTechTickers(limit: number = 100): Promise<Ticker[]> {
 /**
  * Get recently updated tickers
  */
-export async function getRecentlyUpdatedTickers(hours: number = 24): Promise<Ticker[]> {
+export async function getRecentlyUpdatedTickers(
+  hours: number = 24
+): Promise<Ticker[]> {
   try {
     const supabase = getSupabaseClient();
-    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-    
+    const cutoffTime = new Date(
+      Date.now() - hours * 60 * 60 * 1000
+    ).toISOString();
+
     const { data, error } = await supabase
       .from('tickers')
       .select('*')
       .gte('updated_at', cutoffTime)
       .order('updated_at', { ascending: false });
-    
+
     if (error) {
       console.error('Error fetching recently updated tickers:', error);
       return [];
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('Error in getRecentlyUpdatedTickers:', error);

@@ -3,15 +3,15 @@
  * Parses transaction history and detects spreads
  */
 
-import { parse } from "csv-parse/sync";
-import { readFileSync } from "fs";
-import chalk from "chalk";
-import type { 
-  RobinhoodTransaction, 
-  ParsedSpread, 
-  TradeType 
-} from "../types/index.ts";
-import { insertTrade } from "../services/supabase.ts";
+import { parse } from 'csv-parse/sync';
+import { readFileSync } from 'fs';
+import chalk from 'chalk';
+import type {
+  RobinhoodTransaction,
+  ParsedSpread,
+  TradeType,
+} from '../types/index.ts';
+import { insertTrade } from '../services/supabase.ts';
 
 // ============================================================================
 // CSV PARSING
@@ -21,44 +21,45 @@ import { insertTrade } from "../services/supabase.ts";
  * Parse Robinhood CSV export
  */
 export function parseRobinhoodCSV(filePath: string): RobinhoodTransaction[] {
-  const content = readFileSync(filePath, "utf-8");
-  
+  const content = readFileSync(filePath, 'utf-8');
+
   // Clean the CSV - remove empty lines and disclaimer at the end
-  const lines = content.split("\n").filter(line => {
+  const lines = content.split('\n').filter((line) => {
     const trimmed = line.trim();
     // Skip empty lines, disclaimer lines, and lines starting with just quotes
     if (!trimmed || trimmed === '""') return false;
-    if (trimmed.includes("The data provided is for informational")) return false;
+    if (trimmed.includes('The data provided is for informational'))
+      return false;
     return true;
   });
-  
-  const cleanedContent = lines.join("\n");
-  
+
+  const cleanedContent = lines.join('\n');
+
   const records = parse(cleanedContent, {
     columns: true,
     skip_empty_lines: true,
     trim: true,
-    relax_quotes: true,      // Handle multiline fields better
+    relax_quotes: true, // Handle multiline fields better
     relax_column_count: true, // Allow varying column counts
   });
 
   return records.map((row: Record<string, string>) => ({
-    activityDate: parseDate(row["Activity Date"]),
-    processDate: parseDate(row["Process Date"]),
-    settleDate: parseDate(row["Settle Date"]),
-    instrument: row["Instrument"] ?? "",
-    description: row["Description"] ?? "",
-    transCode: row["Trans Code"] ?? "",
-    quantity: parseFloat(row["Quantity"]) || 0,
-    price: parseFloat(row["Price"]) || 0,
-    amount: parseFloat(row["Amount"]) || 0,
+    activityDate: parseDate(row['Activity Date']),
+    processDate: parseDate(row['Process Date']),
+    settleDate: parseDate(row['Settle Date']),
+    instrument: row['Instrument'] ?? '',
+    description: row['Description'] ?? '',
+    transCode: row['Trans Code'] ?? '',
+    quantity: parseFloat(row['Quantity']) || 0,
+    price: parseFloat(row['Price']) || 0,
+    amount: parseFloat(row['Amount']) || 0,
   }));
 }
 
 function parseDate(dateStr: string): Date {
   if (!dateStr) return new Date();
   // Robinhood format: MM/DD/YYYY
-  const [month, day, year] = dateStr.split("/");
+  const [month, day, year] = dateStr.split('/');
   return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 }
 
@@ -70,8 +71,8 @@ interface ParsedOption {
   ticker: string;
   strike: number;
   expiration: Date;
-  type: "call" | "put";
-  action: "buy" | "sell";
+  type: 'call' | 'put';
+  action: 'buy' | 'sell';
   quantity: number;
   price: number;
   date: Date;
@@ -96,17 +97,17 @@ function parseOptionDescription(
   if (!match) return null;
 
   const [, ticker, expStr, strikeStr, typeStr] = match;
-  
+
   // Determine buy/sell from trans code
-  let action: "buy" | "sell";
-  if (transCode === "BTO" || transCode === "Buy to Open") {
-    action = "buy";
-  } else if (transCode === "STO" || transCode === "Sell to Open") {
-    action = "sell";
-  } else if (transCode === "BTC" || transCode === "Buy to Close") {
-    action = "buy";
-  } else if (transCode === "STC" || transCode === "Sell to Close") {
-    action = "sell";
+  let action: 'buy' | 'sell';
+  if (transCode === 'BTO' || transCode === 'Buy to Open') {
+    action = 'buy';
+  } else if (transCode === 'STO' || transCode === 'Sell to Open') {
+    action = 'sell';
+  } else if (transCode === 'BTC' || transCode === 'Buy to Close') {
+    action = 'buy';
+  } else if (transCode === 'STC' || transCode === 'Sell to Close') {
+    action = 'sell';
   } else {
     return null;
   }
@@ -115,7 +116,7 @@ function parseOptionDescription(
     ticker,
     strike: parseFloat(strikeStr),
     expiration: parseDate(expStr),
-    type: typeStr.toLowerCase() as "call" | "put",
+    type: typeStr.toLowerCase() as 'call' | 'put',
     action,
     quantity: Math.abs(quantity),
     price: Math.abs(price),
@@ -135,13 +136,14 @@ export function detectSpreads(
   transactions: RobinhoodTransaction[]
 ): ParsedSpread[] {
   const spreads: ParsedSpread[] = [];
-  
+
   // Filter to option transactions only
-  const optionTxns = transactions.filter(t => 
-    t.transCode === "BTO" || 
-    t.transCode === "STO" ||
-    t.transCode === "Buy to Open" ||
-    t.transCode === "Sell to Open"
+  const optionTxns = transactions.filter(
+    (t) =>
+      t.transCode === 'BTO' ||
+      t.transCode === 'STO' ||
+      t.transCode === 'Buy to Open' ||
+      t.transCode === 'Sell to Open'
   );
 
   // Parse each transaction
@@ -170,8 +172,8 @@ export function detectSpreads(
 
   // Find spreads (matching buy + sell on same day)
   for (const [, options] of grouped) {
-    const buys = options.filter(o => o.action === "buy");
-    const sells = options.filter(o => o.action === "sell");
+    const buys = options.filter((o) => o.action === 'buy');
+    const sells = options.filter((o) => o.action === 'sell');
 
     if (buys.length > 0 && sells.length > 0) {
       // Match buys and sells to form spreads
@@ -204,16 +206,16 @@ function buildSpread(
   let longStrike: number;
   let shortStrike: number;
 
-  if (buyOption.type === "call") {
+  if (buyOption.type === 'call') {
     // Call spread
     if (buyOption.strike < sellOption.strike) {
       // Bull call spread (debit)
-      tradeType = "call_debit";
+      tradeType = 'call_debit';
       longStrike = buyOption.strike;
       shortStrike = sellOption.strike;
     } else {
       // Bear call spread (credit)
-      tradeType = "call_credit";
+      tradeType = 'call_credit';
       longStrike = sellOption.strike;
       shortStrike = buyOption.strike;
     }
@@ -221,12 +223,12 @@ function buildSpread(
     // Put spread
     if (buyOption.strike > sellOption.strike) {
       // Bear put spread (debit)
-      tradeType = "put_debit";
+      tradeType = 'put_debit';
       longStrike = buyOption.strike;
       shortStrike = sellOption.strike;
     } else {
       // Bull put spread (credit)
-      tradeType = "put_credit";
+      tradeType = 'put_credit';
       longStrike = sellOption.strike;
       shortStrike = buyOption.strike;
     }
@@ -236,16 +238,17 @@ function buildSpread(
   // For debit spreads: buy.price - sell.price (pay net)
   // For credit spreads: sell.price - buy.price (receive net)
   let openPremium: number;
-  if (tradeType === "call_debit" || tradeType === "put_debit") {
+  if (tradeType === 'call_debit' || tradeType === 'put_debit') {
     openPremium = buyOption.price - sellOption.price;
   } else {
     openPremium = sellOption.price - buyOption.price;
   }
 
   // Find related transactions for this spread
-  const relatedTxns = allTransactions.filter(t => 
-    t.instrument.includes(buyOption.ticker) &&
-    (t.activityDate.toDateString() === buyOption.date.toDateString())
+  const relatedTxns = allTransactions.filter(
+    (t) =>
+      t.instrument.includes(buyOption.ticker) &&
+      t.activityDate.toDateString() === buyOption.date.toDateString()
   );
 
   return {
@@ -299,7 +302,7 @@ export async function importFromCSV(
     console.log(chalk.gray(`  Found ${transactions.length} transactions`));
 
     // Detect spreads
-    console.log(chalk.gray("  Detecting spreads..."));
+    console.log(chalk.gray('  Detecting spreads...'));
     const spreads = detectSpreads(transactions);
     result.spreadsDetected = spreads.length;
     console.log(chalk.gray(`  Detected ${spreads.length} spreads`));
@@ -308,36 +311,37 @@ export async function importFromCSV(
       for (const spread of spreads) {
         console.log(
           chalk.cyan(`    ${spread.ticker}`) +
-          chalk.gray(` ${spread.longStrike}/${spread.shortStrike} `) +
-          chalk.white(formatSpreadType(spread.type)) +
-          chalk.gray(` exp ${spread.expiration.toLocaleDateString()}`)
+            chalk.gray(` ${spread.longStrike}/${spread.shortStrike} `) +
+            chalk.white(formatSpreadType(spread.type)) +
+            chalk.gray(` exp ${spread.expiration.toLocaleDateString()}`)
         );
       }
     }
 
     if (options.dryRun) {
-      console.log(chalk.yellow("  Dry run - not importing to database"));
+      console.log(chalk.yellow('  Dry run - not importing to database'));
       return result;
     }
 
     // Import to database
-    console.log(chalk.gray("  Importing to database..."));
+    console.log(chalk.gray('  Importing to database...'));
     for (const spread of spreads) {
       try {
         const spreadWidth = Math.abs(spread.shortStrike - spread.longStrike);
-        const maxProfit = spread.type.includes("debit")
+        const maxProfit = spread.type.includes('debit')
           ? spreadWidth - spread.openPremium
           : spread.openPremium;
-        const maxLoss = spread.type.includes("debit")
+        const maxLoss = spread.type.includes('debit')
           ? spread.openPremium
           : spreadWidth - spread.openPremium;
 
         await insertTrade({
           ticker: spread.ticker,
           tradeType: spread.type,
-          direction: spread.type === "call_debit" || spread.type === "put_credit"
-            ? "bullish"
-            : "bearish",
+          direction:
+            spread.type === 'call_debit' || spread.type === 'put_credit'
+              ? 'bullish'
+              : 'bearish',
           longStrike: spread.longStrike,
           shortStrike: spread.shortStrike,
           expiration: spread.expiration,
@@ -346,8 +350,8 @@ export async function importFromCSV(
           openPremium: spread.openPremium,
           maxProfit,
           maxLoss,
-          status: "open",
-          tags: ["imported"],
+          status: 'open',
+          tags: ['imported'],
         });
         result.spreadsImported++;
       } catch (err) {
@@ -356,10 +360,7 @@ export async function importFromCSV(
       }
     }
 
-    console.log(
-      chalk.green(`  ✓ Imported ${result.spreadsImported} spreads`)
-    );
-
+    console.log(chalk.green(`  ✓ Imported ${result.spreadsImported} spreads`));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`Import failed: ${msg}`);
@@ -371,14 +372,14 @@ export async function importFromCSV(
 
 function formatSpreadType(type: TradeType): string {
   switch (type) {
-    case "call_debit":
-      return "CDS";
-    case "put_credit":
-      return "PCS";
-    case "call_credit":
-      return "CCS";
-    case "put_debit":
-      return "PDS";
+    case 'call_debit':
+      return 'CDS';
+    case 'put_credit':
+      return 'PCS';
+    case 'call_credit':
+      return 'CCS';
+    case 'put_debit':
+      return 'PDS';
     default:
       return type;
   }
@@ -389,12 +390,12 @@ function formatSpreadType(type: TradeType): string {
  */
 export function displayImportSummary(result: ImportResult): void {
   console.log();
-  console.log(chalk.bold.white("  Import Summary"));
-  console.log(chalk.gray("  ────────────────────────────────────────"));
+  console.log(chalk.bold.white('  Import Summary'));
+  console.log(chalk.gray('  ────────────────────────────────────────'));
   console.log(`  Transactions: ${result.totalTransactions}`);
   console.log(`  Spreads Detected: ${result.spreadsDetected}`);
   console.log(`  Spreads Imported: ${result.spreadsImported}`);
-  
+
   if (result.errors.length > 0) {
     console.log(chalk.red(`  Errors: ${result.errors.length}`));
     for (const error of result.errors) {
@@ -403,4 +404,3 @@ export function displayImportSummary(result: ImportResult): void {
   }
   console.log();
 }
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Debug script to print raw data from the Yahoo Proxy Worker
- * 
+ *
  * Usage:
  *   node scripts/debug-endpoint.mjs AAPL           # Combined endpoint (recommended)
  *   node scripts/debug-endpoint.mjs AAPL ticker    # Same as above (explicit)
@@ -10,10 +10,10 @@
  *   node scripts/debug-endpoint.mjs AAPL options   # Options chain
  *   node scripts/debug-endpoint.mjs AAPL summary   # Full summary
  *   node scripts/debug-endpoint.mjs AAPL search    # News/search
- * 
+ *
  * Environment:
  *   YAHOO_PROXY_URL - Worker URL (from .env.local or environment)
- * 
+ *
  * NOTE: Can't run worker locally due to yahoo-finance2 compatibility.
  *       Always test against production worker.
  */
@@ -81,7 +81,7 @@ if (!ticker) {
 
 const ENDPOINTS = {
   health: '/health',
-  ticker: `/ticker/${ticker}`,  // RECOMMENDED: All data in 1 request
+  ticker: `/ticker/${ticker}`, // RECOMMENDED: All data in 1 request
   quote: `/quote/${ticker}`,
   chart: `/chart/${ticker}?range=3mo&interval=1d`,
   options: `/options/${ticker}`,
@@ -94,20 +94,22 @@ async function fetchEndpoint(name, path) {
   console.log(`\n${'─'.repeat(70)}`);
   console.log(`📡 ${name.toUpperCase()}: ${url}`);
   console.log('─'.repeat(70));
-  
+
   try {
     const start = Date.now();
     const response = await fetch(url);
     const elapsed = Date.now() - start;
-    
-    console.log(`⏱️  Response: ${response.status} ${response.statusText} (${elapsed}ms)`);
-    
+
+    console.log(
+      `⏱️  Response: ${response.status} ${response.statusText} (${elapsed}ms)`
+    );
+
     const data = await response.json();
-    
+
     // Pretty print with syntax highlighting simulation
     console.log('\n📦 Response Data:');
     console.log(JSON.stringify(data, null, 2));
-    
+
     // Summary stats
     if (name === 'quote' && data.quoteResponse?.result?.[0]) {
       const q = data.quoteResponse.result[0];
@@ -116,7 +118,7 @@ async function fetchEndpoint(name, path) {
       console.log(`   Change: ${q.regularMarketChangePercent?.toFixed(2)}%`);
       console.log(`   Market Cap: $${(q.marketCap / 1e9)?.toFixed(2)}B`);
     }
-    
+
     if (name === 'options' && data.optionChain?.result?.[0]) {
       const o = data.optionChain.result[0];
       console.log('\n📊 Options Summary:');
@@ -128,7 +130,7 @@ async function fetchEndpoint(name, path) {
         console.log(`   Puts: ${opts.puts?.length || 0}`);
       }
     }
-    
+
     if (name === 'chart' && data.chart?.result?.[0]) {
       const c = data.chart.result[0];
       const quotes = c.quotes || [];
@@ -139,45 +141,57 @@ async function fetchEndpoint(name, path) {
         console.log(`   Last: ${quotes[quotes.length - 1]?.date}`);
       }
     }
-    
+
     if (name === 'summary' && data.quoteSummary?.result?.[0]) {
       const s = data.quoteSummary.result[0];
       console.log('\n📊 Summary Modules:');
       console.log(`   Keys: ${Object.keys(s).join(', ')}`);
       if (s.calendarEvents?.earnings?.earningsDate) {
-        console.log(`   Earnings Date: ${s.calendarEvents.earnings.earningsDate[0]}`);
+        console.log(
+          `   Earnings Date: ${s.calendarEvents.earnings.earningsDate[0]}`
+        );
       }
       if (s.recommendationTrend?.trend?.[0]) {
         const t = s.recommendationTrend.trend[0];
-        console.log(`   Analysts: ${t.strongBuy}SB/${t.buy}B/${t.hold}H/${t.sell}S`);
+        console.log(
+          `   Analysts: ${t.strongBuy}SB/${t.buy}B/${t.hold}H/${t.sell}S`
+        );
       }
     }
-    
+
     if (name === 'search' && data.news) {
       console.log('\n📰 News:');
       data.news.slice(0, 3).forEach((n, i) => {
         console.log(`   ${i + 1}. ${n.title?.slice(0, 60)}...`);
       });
     }
-    
+
     // Combined ticker endpoint summary
     if (name === 'ticker' && data.quote) {
       console.log('\n📊 Combined Response Summary:');
       console.log(`   Price: $${data.quote.regularMarketPrice}`);
-      console.log(`   Change: ${data.quote.regularMarketChangePercent?.toFixed(2)}%`);
-      console.log(`   Market Cap: $${(data.quote.marketCap / 1e9)?.toFixed(2)}B`);
+      console.log(
+        `   Change: ${data.quote.regularMarketChangePercent?.toFixed(2)}%`
+      );
+      console.log(
+        `   Market Cap: $${(data.quote.marketCap / 1e9)?.toFixed(2)}B`
+      );
       console.log(`   P/E: ${data.quote.trailingPE?.toFixed(1) || 'N/A'}`);
-      
+
       if (data.chart?.quotes) {
         console.log(`   Chart: ${data.chart.quotes.length} data points`);
       }
       if (data.options?.options?.[0]) {
         const opts = data.options.options[0];
-        console.log(`   Options: ${opts.calls?.length || 0} calls, ${opts.puts?.length || 0} puts`);
+        console.log(
+          `   Options: ${opts.calls?.length || 0} calls, ${opts.puts?.length || 0} puts`
+        );
       }
       if (data.summary?.recommendationTrend?.trend?.[0]) {
         const t = data.summary.recommendationTrend.trend[0];
-        console.log(`   Analysts: ${t.strongBuy}SB/${t.buy}B/${t.hold}H/${t.sell}S`);
+        console.log(
+          `   Analysts: ${t.strongBuy}SB/${t.buy}B/${t.hold}H/${t.sell}S`
+        );
       }
       if (data.news?.length) {
         console.log(`   News: ${data.news.length} articles`);
@@ -187,7 +201,7 @@ async function fetchEndpoint(name, path) {
       }
       console.log(`   ⏱️  Total time: ${data.elapsed_ms}ms`);
     }
-    
+
     return { success: true, data };
   } catch (error) {
     console.log(`❌ Error: ${error.message}`);
@@ -198,7 +212,7 @@ async function fetchEndpoint(name, path) {
 async function main() {
   console.log(`\n🔍 Yahoo Proxy Debug - ${ticker}`);
   console.log(`🌐 Worker URL: ${BASE_URL}`);
-  
+
   // Check health first
   const health = await fetchEndpoint('health', ENDPOINTS.health);
   if (!health.success) {
@@ -206,7 +220,7 @@ async function main() {
     console.log('   Check if worker is deployed correctly.');
     process.exit(1);
   }
-  
+
   if (endpoint && ENDPOINTS[endpoint]) {
     // Single endpoint
     await fetchEndpoint(endpoint, ENDPOINTS[endpoint]);
@@ -215,13 +229,14 @@ async function main() {
     console.log(`   Available: ${Object.keys(ENDPOINTS).join(', ')}`);
   } else {
     // Default: Use combined ticker endpoint (most efficient)
-    console.log('\n💡 Using combined /ticker endpoint (1 request for all data)');
+    console.log(
+      '\n💡 Using combined /ticker endpoint (1 request for all data)'
+    );
     await fetchEndpoint('ticker', ENDPOINTS.ticker);
   }
-  
+
   console.log('\n' + '═'.repeat(70));
   console.log('✅ Debug complete');
 }
 
 main().catch(console.error);
-

@@ -1,6 +1,6 @@
 /**
  * Round Number Magnetism
- * 
+ *
  * Humans have cognitive bias toward round numbers.
  * Stocks tend to gravitate toward and respect round price levels.
  */
@@ -16,11 +16,11 @@ import type { RoundNumberLevel, RoundNumbersResult } from './types';
  */
 export function analyzeRoundNumbers(
   currentPrice: number,
-  range: number = 0.20 // Look 20% above and below
+  range: number = 0.2 // Look 20% above and below
 ): RoundNumbersResult {
   const minPrice = currentPrice * (1 - range);
   const maxPrice = currentPrice * (1 + range);
-  
+
   const levels: RoundNumberLevel[] = [];
 
   // Determine appropriate intervals based on price magnitude
@@ -30,15 +30,15 @@ export function analyzeRoundNumbers(
   for (const { interval, significance } of intervals) {
     // Find first round number below minPrice
     const startLevel = Math.floor(minPrice / interval) * interval;
-    
+
     for (let price = startLevel; price <= maxPrice; price += interval) {
       if (price <= 0) continue;
       if (price < minPrice) continue;
 
       const distance = ((price - currentPrice) / currentPrice) * 100;
       const magneticPull = calculateMagneticPull(
-        price, 
-        currentPrice, 
+        price,
+        currentPrice,
         significance
       );
 
@@ -58,9 +58,10 @@ export function analyzeRoundNumbers(
   uniqueLevels.sort((a, b) => b.magneticPull - a.magneticPull);
 
   // Find nearest major level
-  const nearestMajor = uniqueLevels
-    .filter(l => l.significance === 'MAJOR')
-    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
+  const nearestMajor =
+    uniqueLevels
+      .filter((l) => l.significance === 'MAJOR')
+      .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
 
   // Calculate magnetic center (weighted average of nearby round numbers)
   const magneticCenter = calculateMagneticCenter(uniqueLevels, currentPrice);
@@ -132,7 +133,7 @@ function getIntervals(price: number): IntervalConfig[] {
 
 /**
  * Calculate magnetic pull of a round number
- * 
+ *
  * Factors:
  * - Significance (major > moderate > minor)
  * - Distance (closer = stronger pull)
@@ -174,7 +175,10 @@ function deduplicateLevels(levels: RoundNumberLevel[]): RoundNumberLevel[] {
 
   for (const level of levels) {
     const existing = priceMap.get(level.price);
-    if (!existing || getSignificanceRank(level) > getSignificanceRank(existing)) {
+    if (
+      !existing ||
+      getSignificanceRank(level) > getSignificanceRank(existing)
+    ) {
       priceMap.set(level.price, level);
     }
   }
@@ -220,16 +224,16 @@ export function findStrongestMagnet(
   maxDistancePercent: number = 5.0
 ): RoundNumberLevel | null {
   const result = analyzeRoundNumbers(currentPrice, maxDistancePercent / 100);
-  
+
   // Filter to only levels within max distance
   const nearbyLevels = result.levels.filter(
-    l => Math.abs(l.distance) <= maxDistancePercent
+    (l) => Math.abs(l.distance) <= maxDistancePercent
   );
 
   if (nearbyLevels.length === 0) return null;
 
   // Return the one with highest magnetic pull
-  return nearbyLevels.reduce((best, current) => 
+  return nearbyLevels.reduce((best, current) =>
     current.magneticPull > best.magneticPull ? current : best
   );
 }
@@ -242,7 +246,7 @@ export function isAtRoundNumber(
   tolerancePercent: number = 0.5
 ): { isRound: boolean; level: RoundNumberLevel | null } {
   const result = analyzeRoundNumbers(currentPrice, 0.05);
-  
+
   for (const level of result.levels) {
     if (Math.abs(level.distance) <= tolerancePercent) {
       return { isRound: true, level };
@@ -258,15 +262,17 @@ export function isAtRoundNumber(
  */
 export function getMidpointLevels(currentPrice: number): number[] {
   const intervals = getIntervals(currentPrice);
-  const majorInterval = intervals.find(i => i.significance === 'MAJOR')!.interval;
-  
+  const majorInterval = intervals.find(
+    (i) => i.significance === 'MAJOR'
+  )!.interval;
+
   const midpoints: number[] = [];
   const baseMajor = Math.floor(currentPrice / majorInterval) * majorInterval;
-  
+
   // Get midpoints around current price
   for (let i = -2; i <= 2; i++) {
-    const major = baseMajor + (i * majorInterval);
-    const midpoint = major + (majorInterval / 2);
+    const major = baseMajor + i * majorInterval;
+    const midpoint = major + majorInterval / 2;
     if (midpoint > 0) {
       midpoints.push(midpoint);
     }
@@ -277,7 +283,7 @@ export function getMidpointLevels(currentPrice: number): number[] {
 
 /**
  * Determine bias based on position relative to round numbers
- * 
+ *
  * If just above a major round number → bullish (support below)
  * If just below a major round number → bearish (resistance above)
  */
@@ -285,25 +291,25 @@ export function getRoundNumberBias(
   currentPrice: number
 ): 'BULLISH' | 'NEUTRAL' | 'BEARISH' {
   const result = analyzeRoundNumbers(currentPrice, 0.05);
-  const majorLevels = result.levels.filter(l => l.significance === 'MAJOR');
+  const majorLevels = result.levels.filter((l) => l.significance === 'MAJOR');
 
   if (majorLevels.length === 0) return 'NEUTRAL';
 
   // Find nearest above and below
   const below = majorLevels
-    .filter(l => l.price < currentPrice)
+    .filter((l) => l.price < currentPrice)
     .sort((a, b) => b.price - a.price)[0];
   const above = majorLevels
-    .filter(l => l.price > currentPrice)
+    .filter((l) => l.price > currentPrice)
     .sort((a, b) => a.price - b.price)[0];
 
   if (!below && !above) return 'NEUTRAL';
 
-  const distBelow = below 
-    ? Math.abs((currentPrice - below.price) / currentPrice) 
+  const distBelow = below
+    ? Math.abs((currentPrice - below.price) / currentPrice)
     : Infinity;
-  const distAbove = above 
-    ? Math.abs((above.price - currentPrice) / currentPrice) 
+  const distAbove = above
+    ? Math.abs((above.price - currentPrice) / currentPrice)
     : Infinity;
 
   // If much closer to level below → bullish (just broke above)
@@ -332,28 +338,32 @@ export function formatRoundNumbers(
     const direction = m.price > currentPrice ? '↑' : '↓';
     lines.push(
       `🧲 Nearest Major: $${m.price.toFixed(2)} ` +
-      `(${direction} ${Math.abs(m.distance).toFixed(1)}%)`
+        `(${direction} ${Math.abs(m.distance).toFixed(1)}%)`
     );
   }
 
   lines.push('', 'Significant Levels:');
-  
+
   // Show top levels by pull
   const topLevels = result.levels.slice(0, 10);
   for (const level of topLevels) {
-    const icon = level.significance === 'MAJOR' ? '●' :
-                 level.significance === 'MODERATE' ? '◐' : '○';
-    const distStr = level.distance > 0 
-      ? `+${level.distance.toFixed(1)}%` 
-      : `${level.distance.toFixed(1)}%`;
+    const icon =
+      level.significance === 'MAJOR'
+        ? '●'
+        : level.significance === 'MODERATE'
+          ? '◐'
+          : '○';
+    const distStr =
+      level.distance > 0
+        ? `+${level.distance.toFixed(1)}%`
+        : `${level.distance.toFixed(1)}%`;
     const pullStr = `${(level.magneticPull * 100).toFixed(0)}%`;
-    
+
     lines.push(
       `  ${icon} $${level.price.toFixed(2)} - ${level.significance} ` +
-      `(${distStr}, pull: ${pullStr})`
+        `(${distStr}, pull: ${pullStr})`
     );
   }
 
   return lines.join('\n');
 }
-

@@ -11,7 +11,7 @@ This document provides a comprehensive overview of what has been created for the
 **Type**: CLI Tool  
 **Language**: Python 3.11+  
 **Package Manager**: Poetry  
-**Database**: Supabase (PostgreSQL)  
+**Database**: Supabase (PostgreSQL)
 
 ## What Has Been Created
 
@@ -19,20 +19,21 @@ This document provides a comprehensive overview of what has been created for the
 
 All documentation is located in `/docs/unusual-options-service/`:
 
-| Document | Purpose | Status |
-|----------|---------|--------|
-| `README.md` | Documentation index and navigation | ✅ Complete |
-| `system-overview.md` | High-level architecture and core concepts | ✅ Complete |
-| `technical-implementation.md` | Implementation guide with code examples | ✅ Complete |
-| `database-schema.md` | Complete database design and SQL | ✅ Complete |
-| `understanding-unusual-activity.md` | Educational guide on options activity | ✅ Complete |
-| `quick-start.md` | Getting started guide | ✅ Complete |
+| Document                            | Purpose                                   | Status      |
+| ----------------------------------- | ----------------------------------------- | ----------- |
+| `README.md`                         | Documentation index and navigation        | ✅ Complete |
+| `system-overview.md`                | High-level architecture and core concepts | ✅ Complete |
+| `technical-implementation.md`       | Implementation guide with code examples   | ✅ Complete |
+| `database-schema.md`                | Complete database design and SQL          | ✅ Complete |
+| `understanding-unusual-activity.md` | Educational guide on options activity     | ✅ Complete |
+| `quick-start.md`                    | Getting started guide                     | ✅ Complete |
 
 ### 2. Database Schema (Complete ✅)
 
 Located at `/db/unusual_options_schema.sql`:
 
 **Tables Created**:
+
 - `unusual_options_signals` - Core signals table
 - `signal_performance` - Performance tracking
 - `options_flow_history` - Raw flow data
@@ -40,11 +41,13 @@ Located at `/db/unusual_options_schema.sql`:
 - `backtest_results` - Backtest metrics
 
 **Views Created**:
+
 - `v_recent_high_grade_signals` - Recent quality signals
 - `v_signal_performance_summary` - Performance analytics
 - `v_daily_activity_summary` - Daily statistics
 
 **Functions Created**:
+
 - Auto-update timestamps
 - Win/loss calculation
 - Similar signal performance lookup
@@ -81,17 +84,18 @@ unusual-options-service/
 
 The following commands are defined but need implementation:
 
-| Command | Purpose | Status |
-|---------|---------|--------|
-| `unusual-options init` | Initialize project | ✅ Implemented |
-| `unusual-options status` | Check system status | ✅ Implemented |
-| `unusual-options scan <tickers>` | Scan for unusual activity | ⚙️ Scaffolded |
-| `unusual-options signals` | List recent signals | ⚙️ Scaffolded |
-| `unusual-options backtest` | Run historical backtest | ⚙️ Scaffolded |
+| Command                          | Purpose                   | Status         |
+| -------------------------------- | ------------------------- | -------------- |
+| `unusual-options init`           | Initialize project        | ✅ Implemented |
+| `unusual-options status`         | Check system status       | ✅ Implemented |
+| `unusual-options scan <tickers>` | Scan for unusual activity | ⚙️ Scaffolded  |
+| `unusual-options signals`        | List recent signals       | ⚙️ Scaffolded  |
+| `unusual-options backtest`       | Run historical backtest   | ⚙️ Scaffolded  |
 
 ### 5. Dependencies (Defined ✅)
 
 **Production Dependencies**:
+
 - `click` - CLI framework
 - `rich` - Terminal formatting
 - `supabase` - Database client
@@ -104,6 +108,7 @@ The following commands are defined but need implementation:
 - `loguru` - Logging
 
 **Development Dependencies**:
+
 - `pytest` - Testing framework
 - `pytest-asyncio` - Async testing
 - `pytest-cov` - Coverage reporting
@@ -116,12 +121,14 @@ The following commands are defined but need implementation:
 ### Phase 1: Core Detection (Priority: High)
 
 **1. Data Provider Integration**
+
 - [ ] Abstract base provider class
 - [ ] YFinance provider implementation
 - [ ] Polygon.io provider (optional)
 - [ ] Data caching layer
 
 **2. Detection Engine**
+
 - [ ] Volume anomaly detection
 - [ ] Open interest spike detection
 - [ ] Premium flow calculation
@@ -129,12 +136,14 @@ The following commands are defined but need implementation:
 - [ ] Put/call ratio analysis
 
 **3. Scoring System**
+
 - [ ] Multi-factor score calculation
 - [ ] Grade assignment (S/A/B/C/D/F)
 - [ ] Confidence scoring
 - [ ] Risk assessment
 
 **4. Storage Layer**
+
 - [ ] Supabase client implementation
 - [ ] Signal persistence
 - [ ] Query methods
@@ -143,18 +152,21 @@ The following commands are defined but need implementation:
 ### Phase 2: Enhancement (Priority: Medium)
 
 **1. Alert System**
+
 - [ ] Discord webhook integration
 - [ ] Alert filtering by grade
 - [ ] Alert formatting
 - [ ] Rate limiting
 
 **2. Performance Tracking**
+
 - [ ] Automated forward return calculation
 - [ ] Win/loss classification
 - [ ] Historical performance queries
 - [ ] Performance analytics
 
 **3. Backtesting**
+
 - [ ] Historical data replay
 - [ ] Performance metrics calculation
 - [ ] Grade breakdown analysis
@@ -163,17 +175,20 @@ The following commands are defined but need implementation:
 ### Phase 3: Advanced Features (Priority: Low)
 
 **1. Watchlist Management**
+
 - [ ] Watchlist CRUD operations
 - [ ] Bulk scanning from watchlist
 - [ ] Watchlist presets (tech, finance, etc.)
 
 **2. Advanced Analytics**
+
 - [ ] Pattern recognition
 - [ ] Correlation analysis
 - [ ] Signal clustering
 - [ ] Predictive modeling
 
 **3. UI/UX Improvements**
+
 - [ ] Interactive dashboard (Streamlit)
 - [ ] Real-time streaming
 - [ ] Chart visualization
@@ -184,6 +199,7 @@ The following commands are defined but need implementation:
 ### Immediate (Week 1-2)
 
 1. **Set Up Development Environment**
+
    ```bash
    cd unusual-options-service
    poetry install
@@ -281,18 +297,21 @@ make lint
 ### Testing Strategy
 
 **Unit Tests**:
+
 - Test individual detection algorithms
 - Test scoring logic
 - Test data models
 - Target: 80%+ coverage
 
 **Integration Tests**:
+
 - Test end-to-end scanning
 - Test database operations
 - Test provider integrations
 - Focus on real-world scenarios
 
 **Manual Testing**:
+
 - Test with live market data
 - Validate signal quality
 - Check alert delivery
@@ -370,34 +389,36 @@ make lint
 ### Technical Risks
 
 1. **Data Quality**: Free data providers may have gaps/delays
-   - *Mitigation*: Support multiple providers, validate data
+   - _Mitigation_: Support multiple providers, validate data
 
 2. **Rate Limits**: API throttling can slow scans
-   - *Mitigation*: Caching, request batching, paid tier option
+   - _Mitigation_: Caching, request batching, paid tier option
 
 3. **False Positives**: Noise in signal detection
-   - *Mitigation*: Multi-factor scoring, grade system, backtesting
+   - _Mitigation_: Multi-factor scoring, grade system, backtesting
 
 ### Business/Legal Risks
 
 1. **Insider Trading Concerns**: Detecting unusual activity
-   - *Mitigation*: Disclaimers, educational focus, public data only
+   - _Mitigation_: Disclaimers, educational focus, public data only
 
 2. **Data Provider ToS**: API usage restrictions
-   - *Mitigation*: Respect rate limits, follow ToS, offer alternatives
+   - _Mitigation_: Respect rate limits, follow ToS, offer alternatives
 
 3. **Financial Advice**: Tool might be misconstrued as advice
-   - *Mitigation*: Clear disclaimers, educational framing
+   - _Mitigation_: Clear disclaimers, educational framing
 
 ## Resources
 
 ### Documentation
+
 - [Quick Start](quick-start.md)
 - [System Overview](system-overview.md)
 - [Technical Implementation](technical-implementation.md)
 - [Understanding Unusual Activity](understanding-unusual-activity.md)
 
 ### External Resources
+
 - [Options Trading Basics](https://www.optionseducation.org/)
 - [Unusual Options Activity Research](https://www.investopedia.com/terms/u/unusual-options-activity.asp)
 - [Supabase Documentation](https://supabase.com/docs)
@@ -406,6 +427,7 @@ make lint
 ## Contact & Support
 
 For questions or issues:
+
 1. Check documentation first
 2. Review code comments
 3. Search existing issues
@@ -420,4 +442,3 @@ For questions or issues:
 **Estimated Time to MVP**: 4-6 weeks with focused effort
 
 Good luck building! 🚀
-

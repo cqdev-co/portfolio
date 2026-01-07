@@ -31,17 +31,20 @@ A sleek, minimal, and professional portfolio website built with Next.js, TypeScr
 ### Installation
 
 1. Clone the repository
+
    ```bash
    git clone https://github.com/cqdev-co/portfolio.git
    cd portfolio/frontend
    ```
 
 2. Install dependencies
+
    ```bash
    bun install
    ```
 
 3. Run the development server
+
    ```bash
    bun dev
    ```

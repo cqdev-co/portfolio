@@ -18,12 +18,13 @@ import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 from .common_filters import is_cfd_ticker
+from .advanced_quality_checks import AdvancedQualityChecker, AdvancedQualityMetrics
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class EfficientTickerMetrics:
-    """Lightweight ticker metrics for efficient processing"""
+    """Comprehensive ticker metrics for quality filtering"""
     symbol: str
     market_cap: Optional[float] = None
     price: Optional[float] = None
@@ -34,6 +35,14 @@ class EfficientTickerMetrics:
     is_valid: bool = False
     quality_score: float = 0.0
     rejection_reason: Optional[str] = None
+    
+    # Advanced quality metrics (populated by AdvancedQualityChecker)
+    has_options: bool = False
+    institutional_ownership: float = 0.0
+    revenue: Optional[float] = None
+    is_profitable: bool = False
+    float_shares: Optional[float] = None
+    advanced_quality_score: float = 0.0
 
 class EfficientTickerFilter:
     """High-performance ticker filtering with batch processing"""
@@ -43,11 +52,12 @@ class EfficientTickerFilter:
         self.fmp_key = fmp_key
         self.setup_logging()
         
-        # Optimized thresholds for quick filtering - more inclusive for 2000 tickers
-        self.min_market_cap = 25_000_000  # $25M (reduced from $50M for more small caps)
-        self.min_price = 0.50  # $0.50 minimum (avoid true penny stocks but include more)
+        # STRICTER thresholds for institutional-grade tickers
+        self.min_market_cap = 100_000_000  # $100M minimum (was $25M)
+        self.min_price = 2.00              # $2 minimum (was $0.50)
         self.max_price = 10_000.0
-        self.min_volume = 25_000  # Reduced from 50k to include more stocks
+        self.min_volume = 100_000          # 100K minimum (was 25K)
+        self.min_dollar_volume = 500_000   # $500K/day minimum (NEW)
         
         # US exchanges - more restrictive list for better quality
         self.us_exchanges = {
@@ -59,8 +69,17 @@ class EfficientTickerFilter:
             'NASDAQ', 'NYSE'
         }
         
-        # Known high-quality symbols (S&P 500 subset) for quick validation
+        # Known high-quality symbols for quality scoring
         self.sp500_symbols = self._load_sp500_symbols()
+        self.nasdaq100_symbols = self._load_nasdaq100_symbols()
+        self.dow30_symbols = self._load_dow30_symbols()
+        
+        # Combined quality index set for quick lookups
+        self.quality_indexed_symbols = (
+            self.sp500_symbols | 
+            self.nasdaq100_symbols | 
+            self.dow30_symbols
+        )
         
     def setup_logging(self):
         """Setup logging"""
@@ -87,6 +106,31 @@ class EfficientTickerFilter:
             'ISRG', 'SO', 'ZTS', 'MMC', 'DUK', 'PLD', 'ICE', 'GE', 'USB',
             'TGT', 'MDLZ', 'PNC', 'SHW', 'LRCX', 'AON', 'CME', 'CCI', 'ITW',
             'EOG', 'FDX', 'APD', 'NOC', 'BSX', 'EQIX', 'KLAC', 'CL', 'HCA'
+        }
+    
+    def _load_nasdaq100_symbols(self) -> Set[str]:
+        """Load NASDAQ-100 symbols for quality bonus"""
+        return {
+            'AAPL', 'MSFT', 'AMZN', 'NVDA', 'META', 'GOOGL', 'GOOG', 'TSLA',
+            'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 'CSCO', 'TMUS',
+            'INTC', 'INTU', 'CMCSA', 'TXN', 'AMGN', 'QCOM', 'HON', 'AMAT',
+            'ISRG', 'BKNG', 'SBUX', 'VRTX', 'ADP', 'GILD', 'ADI', 'MDLZ',
+            'REGN', 'LRCX', 'MU', 'PYPL', 'CSX', 'SNPS', 'PANW', 'KLAC',
+            'CDNS', 'MELI', 'CHTR', 'ORLY', 'MAR', 'MNST', 'ABNB', 'WDAY',
+            'NXPI', 'CTAS', 'KDP', 'FTNT', 'LULU', 'MRVL', 'KHC', 'EXC',
+            'AEP', 'PAYX', 'PCAR', 'DXCM', 'CPRT', 'ODFL', 'AZN', 'BIIB',
+            'MRNA', 'ROST', 'IDXX', 'CTSH', 'CRWD', 'FAST', 'EA', 'VRSK',
+            'CSGP', 'XEL', 'DLTR', 'BKR', 'ANSS', 'GFS', 'FANG', 'TEAM',
+            'ILMN', 'ZS', 'WBD', 'SIRI', 'JD', 'PDD', 'DDOG', 'ALGN'
+        }
+    
+    def _load_dow30_symbols(self) -> Set[str]:
+        """Load Dow Jones 30 symbols for quality bonus"""
+        return {
+            'AAPL', 'MSFT', 'JPM', 'V', 'JNJ', 'UNH', 'PG', 'HD', 'CVX',
+            'MRK', 'KO', 'DIS', 'MCD', 'CSCO', 'VZ', 'NKE', 'INTC', 'IBM',
+            'WMT', 'GS', 'CAT', 'HON', 'AXP', 'BA', 'AMGN', 'TRV', 'CRM',
+            'MMM', 'DOW', 'WBA'
         }
     
 
@@ -211,52 +255,58 @@ class EfficientTickerFilter:
         return metrics
     
     def _create_heuristic_quality_metrics(self, symbol: str) -> EfficientTickerMetrics:
-        """Create quality metrics using heuristics (no API calls)"""
+        """
+        Create quality metrics using index membership and heuristics.
+        
+        Prioritizes index membership over symbol characteristics for
+        more reliable quality signals.
+        """
         # Start with base score
-        quality_score = 50.0
+        quality_score = 40.0
         
-        # Symbol length scoring (shorter symbols tend to be more established)
-        if len(symbol) <= 3:
-            quality_score += 15  # Very established (e.g., IBM, GE, GM)
-        elif len(symbol) == 4:
-            quality_score += 10  # Common for established companies
+        # INDEX MEMBERSHIP - strongest quality signal
+        if symbol in self.dow30_symbols:
+            quality_score += 30  # Dow 30 - highest quality
+        elif symbol in self.sp500_symbols:
+            quality_score += 25  # S&P 500 - very high quality
+        elif symbol in self.nasdaq100_symbols:
+            quality_score += 22  # NASDAQ 100 - high quality
+        elif symbol in self.quality_indexed_symbols:
+            quality_score += 20  # Any major index
+        
+        # Symbol format bonus (secondary signal)
+        if symbol.isalpha() and symbol.isupper():
+            quality_score += 5
+        if len(symbol) <= 4:
+            quality_score += 3
+        
+        # Penalize suspicious patterns
+        if any(p in symbol.lower() for p in ['test', 'temp', 'xxx', 'null']):
+            quality_score -= 40
+        
+        # Estimate defaults based on index membership
+        if symbol in self.quality_indexed_symbols:
+            # Indexed symbols have known quality
+            estimated_market_cap = 5_000_000_000   # $5B default
+            estimated_price = 75.0                  # $75 default
+            estimated_volume = 1_000_000            # 1M volume
+        elif len(symbol) <= 3:
+            # Short symbols tend to be larger
+            estimated_market_cap = 500_000_000     # $500M
+            estimated_price = 40.0
+            estimated_volume = 300_000
         else:
-            quality_score += 5   # Longer symbols, still valid
-        
-        # Alphabetic symbols are generally more legitimate
-        if symbol.isalpha():
-            quality_score += 10
-        
-        # Uppercase format indicates proper ticker
-        if symbol.isupper():
-            quality_score += 5
-        
-        # Penalize obvious test/temporary symbols
-        if any(pattern in symbol.lower() for pattern in ['test', 'temp', 'new', 'old', 'xxx']):
-            quality_score -= 30
-        
-        # Bonus for common established company patterns
-        if len(symbol) <= 4 and symbol.isalpha() and symbol.isupper():
-            quality_score += 5
-        
-        # Estimate reasonable defaults for missing data
-        estimated_market_cap = 100_000_000  # $100M default
-        estimated_price = 15.0  # $15 default
-        estimated_volume = 100_000  # 100k volume default
-        
-        # Adjust estimates based on symbol characteristics
-        if len(symbol) <= 3:
-            # Shorter symbols tend to be larger companies
-            estimated_market_cap = 1_000_000_000  # $1B
-            estimated_price = 50.0
-            estimated_volume = 500_000
+            # Conservative defaults for unknowns
+            estimated_market_cap = 150_000_000     # $150M
+            estimated_price = 20.0
+            estimated_volume = 150_000
         
         return EfficientTickerMetrics(
             symbol=symbol,
             market_cap=estimated_market_cap,
             price=estimated_price,
             volume=estimated_volume,
-            exchange='NASDAQ',  # Default to major exchange
+            exchange='NASDAQ',
             country='US',
             is_valid=True,
             quality_score=quality_score
@@ -290,46 +340,68 @@ class EfficientTickerFilter:
                     volume = item.get('volume')
                     exchange = item.get('exchange')
                     
-                    # Quality check - more inclusive thresholds for 2000 tickers
+                    # Calculate dollar volume for liquidity check
+                    dollar_volume = (price or 0) * (volume or 0)
+                    
+                    # STRICTER quality checks for institutional-grade tickers
                     is_valid = (
                         market_cap and market_cap >= self.min_market_cap and
                         price and self.min_price <= price <= self.max_price and
-                        volume and volume >= self.min_volume
+                        volume and volume >= self.min_volume and
+                        dollar_volume >= self.min_dollar_volume  # NEW: dollar volume
                     )
                     
                     quality_score = 0
+                    rejection_reason = None
+                    
                     if is_valid:
-                        # More generous scoring for 2000 tickers target
-                        if market_cap >= 10_000_000_000:
-                            quality_score += 45  # Increased from 40
-                        elif market_cap >= 1_000_000_000:
-                            quality_score += 40  # Increased from 35
-                        elif market_cap >= 100_000_000:
-                            quality_score += 30  # Increased from 25
-                        elif market_cap >= 50_000_000:
-                            quality_score += 25  # Increased from 18
-                        elif market_cap >= 25_000_000:
-                            quality_score += 20  # Increased from 15
+                        # Market cap scoring (25 pts max)
+                        if market_cap >= 10_000_000_000:      # $10B+
+                            quality_score += 25
+                        elif market_cap >= 2_000_000_000:     # $2B+
+                            quality_score += 22
+                        elif market_cap >= 500_000_000:       # $500M+
+                            quality_score += 18
+                        elif market_cap >= 100_000_000:       # $100M+
+                            quality_score += 12
                         
-                        if 10 <= price <= 1000:
-                            quality_score += 20
+                        # Price scoring (15 pts max)
+                        if 10 <= price <= 500:
+                            quality_score += 15  # Sweet spot
+                        elif 5 <= price <= 1000:
+                            quality_score += 12
                         elif 2 <= price <= 2000:
-                            quality_score += 18  # Good range including growth stocks
-                        elif 0.50 <= price < 2:
-                            quality_score += 15  # Increased from 12 - more generous for low-price stocks
-                        elif 0.10 <= price < 0.50:
-                            quality_score += 10  # Increased from 8 - give more credit to very low price stocks
+                            quality_score += 8   # Acceptable
                         
-                        if volume >= 1_000_000:
+                        # Volume scoring (20 pts max) - dollar volume
+                        if dollar_volume >= 50_000_000:       # $50M+/day
                             quality_score += 20
-                        elif volume >= 100_000:
-                            quality_score += 15
-                        elif volume >= 50_000:
-                            quality_score += 12  # Increased from 10
-                        elif volume >= 25_000:
-                            quality_score += 8   # New tier for lower volume stocks
+                        elif dollar_volume >= 10_000_000:     # $10M+/day
+                            quality_score += 17
+                        elif dollar_volume >= 1_000_000:      # $1M+/day
+                            quality_score += 13
+                        elif dollar_volume >= 500_000:        # $500K+/day
+                            quality_score += 8
                         
-                        quality_score += 20  # Increased base score from 15 to 20
+                        # Index membership bonus (15 pts max)
+                        if symbol in self.dow30_symbols:
+                            quality_score += 15
+                        elif symbol in self.sp500_symbols:
+                            quality_score += 12
+                        elif symbol in self.nasdaq100_symbols:
+                            quality_score += 10
+                        
+                        quality_score += 10  # Base score for passing all checks
+                    else:
+                        # Track rejection reason
+                        if not market_cap or market_cap < self.min_market_cap:
+                            rejection_reason = f"Market cap ${market_cap/1e6:.1f}M < ${self.min_market_cap/1e6:.0f}M"
+                        elif not price or price < self.min_price:
+                            rejection_reason = f"Price ${price:.2f} < ${self.min_price}"
+                        elif not volume or volume < self.min_volume:
+                            rejection_reason = f"Volume {volume:,.0f} < {self.min_volume:,.0f}"
+                        elif dollar_volume < self.min_dollar_volume:
+                            rejection_reason = f"Dollar volume ${dollar_volume/1e3:.0f}K < ${self.min_dollar_volume/1e3:.0f}K"
                     
                     metrics[symbol] = EfficientTickerMetrics(
                         symbol=symbol,
@@ -340,7 +412,7 @@ class EfficientTickerFilter:
                         country='US',
                         is_valid=is_valid,
                         quality_score=quality_score,
-                        rejection_reason=None if is_valid else "Failed basic criteria"
+                        rejection_reason=rejection_reason
                     )
                 
                 # Rate limiting
@@ -396,23 +468,39 @@ class EfficientTickerFilter:
                         price = recent_data['Close'].iloc[-1] if 'Close' in recent_data else None
                         volume = recent_data['Volume'].mean() if 'Volume' in recent_data else None
                         
-                        # Simple validation - inclusive of penny stocks
+                        # Calculate dollar volume
+                        dollar_volume = (price or 0) * (volume or 0)
+                        
+                        # STRICTER validation for quality tickers
                         is_valid = (
                             price and self.min_price <= price <= self.max_price and
-                            volume and volume >= self.min_volume
+                            volume and volume >= self.min_volume and
+                            dollar_volume >= self.min_dollar_volume
                         )
                         
-                        # More generous scoring for 2000 tickers target
+                        # Quality scoring based on index and price
                         quality_score = 0
                         if is_valid:
-                            if price >= 10:
-                                quality_score = 65  # Increased from 60 - established stocks
+                            # Base score for passing validation
+                            quality_score = 40
+                            
+                            # Price tier bonus
+                            if price >= 50:
+                                quality_score += 15  # Established stocks
+                            elif price >= 20:
+                                quality_score += 12
+                            elif price >= 10:
+                                quality_score += 8
                             elif price >= 2:
-                                quality_score = 60  # Increased from 55 - growth stocks
-                            elif price >= 0.50:
-                                quality_score = 55  # Increased from 45 - more inclusive for penny stocks
-                            else:
-                                quality_score = 50  # Increased from 30 - very low price stocks with potential
+                                quality_score += 5
+                            
+                            # Index membership bonus
+                            if symbol in self.dow30_symbols:
+                                quality_score += 15
+                            elif symbol in self.sp500_symbols:
+                                quality_score += 12
+                            elif symbol in self.nasdaq100_symbols:
+                                quality_score += 10
                         
                         metrics[symbol] = EfficientTickerMetrics(
                             symbol=symbol,
@@ -515,3 +603,179 @@ class EfficientTickerFilter:
         }
         
         return summary
+    
+    def apply_advanced_quality_checks(
+        self,
+        symbols: List[str],
+        metrics: Dict[str, EfficientTickerMetrics],
+        verbose: bool = False
+    ) -> Tuple[List[str], Dict[str, EfficientTickerMetrics]]:
+        """
+        Apply advanced quality checks (options, institutional, fundamentals, float).
+        
+        This adds up to 33 bonus points to quality scores for tickers that pass
+        all advanced checks, significantly improving final ticker quality.
+        
+        Args:
+            symbols: List of ticker symbols that passed basic filtering
+            metrics: Dictionary of basic metrics for each symbol
+            verbose: Enable progress logging
+            
+        Returns:
+            Tuple of (updated_symbols, updated_metrics) with advanced scores
+        """
+        logger.info(
+            f"Applying advanced quality checks to {len(symbols)} tickers "
+            "(options, institutional, fundamentals, float)..."
+        )
+        
+        checker = AdvancedQualityChecker(
+            require_options=True,
+            min_option_expiries=2,
+            min_institutional_ownership=0.10,
+            min_institutional_holders=5,
+            min_revenue=10_000_000,
+            require_positive_revenue=True,
+            min_float_shares=5_000_000,
+            min_float_percent=0.20,
+            max_short_percent=0.50,
+            max_workers=3,
+            request_delay=0.5
+        )
+        
+        # Run advanced checks
+        advanced_results = checker.check_batch(symbols, verbose=verbose)
+        
+        # Update metrics with advanced scores
+        updated_metrics = {}
+        for symbol in symbols:
+            basic_metric = metrics.get(symbol)
+            advanced_metric = advanced_results.get(symbol)
+            
+            if basic_metric is None:
+                continue
+            
+            # Update basic metric with advanced data
+            if advanced_metric:
+                basic_metric.has_options = advanced_metric.has_options
+                basic_metric.institutional_ownership = \
+                    advanced_metric.institutional_ownership
+                basic_metric.revenue = advanced_metric.revenue
+                basic_metric.is_profitable = advanced_metric.is_profitable
+                basic_metric.float_shares = advanced_metric.float_shares
+                basic_metric.advanced_quality_score = \
+                    advanced_metric.advanced_quality_score
+                
+                # Add advanced score to total quality score
+                basic_metric.quality_score += advanced_metric.advanced_quality_score
+            
+            updated_metrics[symbol] = basic_metric
+        
+        # Generate summary
+        summary = checker.get_summary(advanced_results)
+        logger.info(
+            f"Advanced checks complete: "
+            f"{summary.get('with_options', 0)} have options, "
+            f"{summary.get('passes_institutional', 0)} pass institutional, "
+            f"{summary.get('profitable', 0)} profitable, "
+            f"avg advanced score: {summary.get('avg_advanced_score', 0):.1f}/33"
+        )
+        
+        return list(updated_metrics.keys()), updated_metrics
+    
+    def filter_with_advanced_checks(
+        self,
+        tickers: List[Dict],
+        min_quality_score: float = 60.0,
+        max_tickers: int = 2000,
+        enable_advanced_checks: bool = True,
+        verbose: bool = False
+    ) -> Tuple[List[str], List[EfficientTickerMetrics]]:
+        """
+        Full filtering pipeline including advanced quality checks.
+        
+        This is the recommended method for highest quality ticker filtering.
+        It combines basic filtering with advanced checks for options, 
+        institutional ownership, fundamentals, and float validation.
+        
+        Args:
+            tickers: Raw ticker list from data sources
+            min_quality_score: Minimum total quality score (0-100+)
+            max_tickers: Maximum tickers to return
+            enable_advanced_checks: Run advanced checks (adds ~10-15 min)
+            verbose: Enable progress logging
+            
+        Returns:
+            Tuple of (symbols, metrics) for highest quality tickers
+        """
+        start_time = time.time()
+        
+        # Step 1: Run basic filtering
+        logger.info("Step 1/3: Running basic quality filtering...")
+        basic_symbols, basic_metrics = self.filter_high_quality_tickers(
+            tickers,
+            min_quality_score=min_quality_score - 20,  # Lower threshold, advanced adds points
+            max_tickers=max_tickers * 2  # Get more candidates for advanced filtering
+        )
+        
+        if not basic_symbols:
+            logger.warning("No tickers passed basic filtering")
+            return [], []
+        
+        # Convert metrics list to dict
+        metrics_dict = {m.symbol: m for m in basic_metrics}
+        
+        # Step 2: Apply advanced checks if enabled
+        if enable_advanced_checks and len(basic_symbols) > 0:
+            logger.info(
+                f"Step 2/3: Running advanced quality checks on "
+                f"{len(basic_symbols)} tickers..."
+            )
+            basic_symbols, metrics_dict = self.apply_advanced_quality_checks(
+                basic_symbols,
+                metrics_dict,
+                verbose=verbose
+            )
+        else:
+            logger.info("Step 2/3: Advanced checks disabled, skipping...")
+        
+        # Step 3: Final filtering by quality score
+        logger.info("Step 3/3: Final quality filtering and ranking...")
+        
+        final_candidates = []
+        for symbol in basic_symbols:
+            metric = metrics_dict.get(symbol)
+            if metric and metric.quality_score >= min_quality_score:
+                final_candidates.append((symbol, metric))
+        
+        # Sort by total quality score (descending)
+        final_candidates.sort(key=lambda x: x[1].quality_score, reverse=True)
+        
+        # Limit to max_tickers
+        if len(final_candidates) > max_tickers:
+            final_candidates = final_candidates[:max_tickers]
+        
+        final_symbols = [x[0] for x in final_candidates]
+        final_metrics = [x[1] for x in final_candidates]
+        
+        elapsed = time.time() - start_time
+        
+        # Summary statistics
+        avg_score = np.mean([m.quality_score for m in final_metrics]) \
+            if final_metrics else 0
+        with_options = sum(1 for m in final_metrics if m.has_options)
+        profitable = sum(1 for m in final_metrics if m.is_profitable)
+        
+        logger.info(
+            f"\n{'='*60}\n"
+            f"FILTERING COMPLETE in {elapsed:.1f}s\n"
+            f"{'='*60}\n"
+            f"  Final tickers: {len(final_symbols)}\n"
+            f"  Avg quality score: {avg_score:.1f}\n"
+            f"  With options: {with_options} ({with_options/len(final_symbols)*100:.0f}%)\n"
+            f"  Profitable: {profitable} ({profitable/len(final_symbols)*100:.0f}%)\n"
+            f"  S&P 500: {len([s for s in final_symbols if s in self.sp500_symbols])}\n"
+            f"{'='*60}"
+        )
+        
+        return final_symbols, final_metrics

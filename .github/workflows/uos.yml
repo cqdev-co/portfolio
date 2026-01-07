@@ -3,23 +3,23 @@ name: Unusual Options Scanner
 on:
   schedule:
     # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
-    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
-    - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
-    - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
-    - cron: '0 15 * * 1-5'   # 11:00 AM EDT (15:00 UTC)
-    - cron: '30 15 * * 1-5'  # 11:30 AM EDT (15:30 UTC)
-    - cron: '0 16 * * 1-5'   # 12:00 PM EDT (16:00 UTC)
-    - cron: '30 16 * * 1-5'  # 12:30 PM EDT (16:30 UTC)
-    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (17:00 UTC)
-    - cron: '30 17 * * 1-5'  # 1:30 PM EDT (17:30 UTC)
-    - cron: '0 18 * * 1-5'   # 2:00 PM EDT (18:00 UTC)
-    - cron: '30 18 * * 1-5'  # 2:30 PM EDT (18:30 UTC)
-    - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
-    - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
-    - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
+    - cron: '30 13 * * 1-5' # 9:30 AM EDT (13:30 UTC)
+    - cron: '0 14 * * 1-5' # 10:00 AM EDT (14:00 UTC)
+    - cron: '30 14 * * 1-5' # 10:30 AM EDT (14:30 UTC)
+    - cron: '0 15 * * 1-5' # 11:00 AM EDT (15:00 UTC)
+    - cron: '30 15 * * 1-5' # 11:30 AM EDT (15:30 UTC)
+    - cron: '0 16 * * 1-5' # 12:00 PM EDT (16:00 UTC)
+    - cron: '30 16 * * 1-5' # 12:30 PM EDT (16:30 UTC)
+    - cron: '0 17 * * 1-5' # 1:00 PM EDT (17:00 UTC)
+    - cron: '30 17 * * 1-5' # 1:30 PM EDT (17:30 UTC)
+    - cron: '0 18 * * 1-5' # 2:00 PM EDT (18:00 UTC)
+    - cron: '30 18 * * 1-5' # 2:30 PM EDT (18:30 UTC)
+    - cron: '0 19 * * 1-5' # 3:00 PM EDT (19:00 UTC)
+    - cron: '30 19 * * 1-5' # 3:30 PM EDT (19:30 UTC)
+    - cron: '0 20 * * 1-5' # 4:00 PM EDT (20:00 UTC) - Market close
     # Weekly performance report (Sundays at 6 PM ET)
-    - cron: '0 23 * * 0'     # Sunday 6 PM EDT (23:00 UTC)
-  
+    - cron: '0 23 * * 0' # Sunday 6 PM EDT (23:00 UTC)
+
   workflow_dispatch:
     inputs:
       job_type:
@@ -51,23 +51,23 @@ jobs:
   scan-unusual-options:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
           version: 1.7.1
           virtualenvs-create: true
           virtualenvs-in-project: true
-      
+
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
         with:
@@ -75,11 +75,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
-      
+
       - name: Install dependencies
         working-directory: unusual-options-service
         run: poetry install --no-interaction
-      
+
       - name: Run scanner with continuity tracking
         if: github.event.inputs.job_type != 'performance_report' && github.event.schedule != '0 23 * * 0'
         working-directory: unusual-options-service
@@ -97,7 +97,7 @@ jobs:
             --min-grade ${{ github.event.inputs.min_grade || 'B' }} \
             $LIMIT_FLAG \
             --store
-      
+
       - name: Send Discord alerts for high-conviction plays
         if: github.event.inputs.job_type != 'performance_report' && github.event.schedule != '0 23 * * 0'
         working-directory: unusual-options-service
@@ -114,7 +114,7 @@ jobs:
           else
             echo "Discord webhook not configured, skipping alerts"
           fi
-      
+
       - name: Run weekly performance report
         if: github.event.inputs.job_type == 'performance_report' || github.event.schedule == '0 23 * * 0'
         working-directory: unusual-options-service
@@ -131,7 +131,7 @@ jobs:
           echo "=== Hedge vs Directional Breakdown ==="
           echo ""
           poetry run python scripts/hedge_analyzer.py --days 7 --min-grade A
-      
+
       - name: Send Discord weekly performance report
         if: github.event.inputs.job_type == 'performance_report' || github.event.schedule == '0 23 * * 0'
         working-directory: unusual-options-service

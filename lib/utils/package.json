@@ -1,0 +1,23 @@
+{
+  "name": "@portfolio/utils",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared utility functions",
+  "main": "./ts/index.ts",
+  "types": "./ts/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ts/"
+  },
+  "exports": {
+    ".": "./ts/index.ts",
+    "./entry-grade": "./ts/entry-grade/index.ts",
+    "./pfv": "./ts/psychological-fair-value/index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,13 +1,13 @@
 /**
  * Spread Recommendation Engine
- * 
+ *
  * Calculates REAL spread recommendations from options chain.
  * Uses actual bid/ask prices for accurate debit and cushion.
  * This is the same logic used by the CLI (ai-analyst).
  */
 
-import type { 
-  SpreadRecommendation, 
+import type {
+  SpreadRecommendation,
   SpreadAlternatives,
   SpreadSelectionContext,
   OptionContract,
@@ -37,8 +37,7 @@ function normalCDF(x: number): number {
 
   const t = 1.0 / (1.0 + p * x);
   const y =
-    1.0 -
-    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
+    1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
 
   return 0.5 * (1.0 + sign * y);
 }
@@ -143,22 +142,22 @@ export async function findOptimalSpread(
 
   // Calculate spread metrics
   const spreadWidth = shortCall.strike - longCall.strike;
-  
+
   // Calculate BOTH market and mid prices to assess viability
-  const marketDebit = longCall.ask - shortCall.bid;  // What you'd actually pay
-  const midDebit = longCall.mid - shortCall.mid;     // Theoretical mid
-  
+  const marketDebit = longCall.ask - shortCall.bid; // What you'd actually pay
+  const midDebit = longCall.mid - shortCall.mid; // Theoretical mid
+
   // Sweet spot for $5 spread: $3.00-$4.00 debit (60-80% of width)
   // This gives 25-67% return on risk - good risk/reward
-  const minDebitRatio = 0.55;  // Below this = suspicious data or illiquid
-  const maxDebitRatio = 0.80;  // Above this = not enough profit margin
-  
+  const minDebitRatio = 0.55; // Below this = suspicious data or illiquid
+  const maxDebitRatio = 0.8; // Above this = not enough profit margin
+
   let estimatedDebit: number;
-  
+
   // Use market prices if valid and in the sweet spot
   if (isFinite(marketDebit) && marketDebit > 0) {
     const marketRatio = marketDebit / spreadWidth;
-    
+
     if (marketRatio > maxDebitRatio) {
       return null; // Too expensive - not enough profit
     }
@@ -166,8 +165,8 @@ export async function findOptimalSpread(
       estimatedDebit = marketDebit; // Market price is in sweet spot
     } else if (marketRatio < minDebitRatio) {
       // Suspiciously cheap - use mid + slippage instead
-      if (midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.10) {
-        estimatedDebit = midDebit * 1.10; // Add 10% slippage
+      if (midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.1) {
+        estimatedDebit = midDebit * 1.1; // Add 10% slippage
         if (estimatedDebit / spreadWidth > maxDebitRatio) return null;
       } else {
         return null;
@@ -175,9 +174,9 @@ export async function findOptimalSpread(
     } else {
       return null;
     }
-  } else if (midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.10) {
+  } else if (midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.1) {
     // No valid market price - use mid + slippage buffer
-    estimatedDebit = midDebit * 1.10;
+    estimatedDebit = midDebit * 1.1;
     if (estimatedDebit / spreadWidth > maxDebitRatio) return null;
   } else {
     return null;
@@ -189,24 +188,23 @@ export async function findOptimalSpread(
 
   // Require minimum 20% return on risk (80% debit = 25% return)
   const returnOnRisk = maxProfit / estimatedDebit;
-  if (returnOnRisk < 0.20) {
+  if (returnOnRisk < 0.2) {
     return null;
   }
-  
+
   // Require minimum 5% cushion - need room for the stock to move
   if (cushion < 5) {
     return null;
   }
 
   // Approximate delta based on how deep ITM
-  const itmPercent = 
-    (underlyingPrice - longCall.strike) / underlyingPrice;
+  const itmPercent = (underlyingPrice - longCall.strike) / underlyingPrice;
   const longDelta = Math.min(0.95, 0.5 + itmPercent * 3);
 
   // Calculate PoP using IV from the long call
   const iv = longCall.impliedVolatility || 0.3;
   const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
-  
+
   // Require minimum 70% probability of profit for conservative strategy
   if (pop < 70) {
     return null;
@@ -230,10 +228,10 @@ export async function findOptimalSpread(
 
 /**
  * Find spread with alternatives and smart selection
- * 
+ *
  * Uses technical context (MAs, support levels) to choose
  * the best spread strikes.
- * 
+ *
  * @param symbol - Ticker symbol
  * @param targetDTE - Target days to expiration
  * @param maxDebit - Maximum debit to pay (optional)
@@ -248,7 +246,7 @@ export async function findSpreadWithAlternatives(
   preloadedChain?: OptionsChain | null
 ): Promise<SpreadAlternatives> {
   // Use preloaded chain if provided, otherwise fetch
-  const chain = preloadedChain ?? await getOptionsChain(symbol, targetDTE);
+  const chain = preloadedChain ?? (await getOptionsChain(symbol, targetDTE));
   if (!chain || chain.calls.length === 0) {
     return { primary: null, alternatives: [] };
   }
@@ -262,7 +260,7 @@ export async function findSpreadWithAlternatives(
 
   // Find all viable long calls
   const viableLongs = sortedCalls.filter(
-    c => c.strike >= minITM && c.strike <= maxITM && c.openInterest > 10
+    (c) => c.strike >= minITM && c.strike <= maxITM && c.openInterest > 10
   );
 
   if (viableLongs.length === 0) {
@@ -276,36 +274,43 @@ export async function findSpreadWithAlternatives(
     // Try $5 and $10 wide spreads
     for (const width of [5, 10]) {
       const targetShort = longCall.strike + width;
-      const shortCall = sortedCalls.find(c => c.strike === targetShort);
+      const shortCall = sortedCalls.find((c) => c.strike === targetShort);
 
       if (!shortCall || shortCall.openInterest < 5) continue;
 
       const spreadWidth = shortCall.strike - longCall.strike;
-      
+
       // Calculate BOTH market and mid prices
       const marketDebit = longCall.ask - shortCall.bid;
       const midDebit = longCall.mid - shortCall.mid;
 
       // Sweet spot: 60-80% of width ($3-$4 for $5 spread)
       const minDebitRatio = 0.55;
-      const maxDebitRatio = 0.80;
-      
+      const maxDebitRatio = 0.8;
+
       let estimatedDebit: number;
-      
+
       if (isFinite(marketDebit) && marketDebit > 0) {
         const marketRatio = marketDebit / spreadWidth;
-        
+
         if (marketRatio > maxDebitRatio) continue; // Too expensive
         if (marketRatio >= minDebitRatio && marketRatio <= maxDebitRatio) {
           estimatedDebit = marketDebit;
-        } else if (marketRatio < minDebitRatio && midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.10) {
-          estimatedDebit = midDebit * 1.10;
+        } else if (
+          marketRatio < minDebitRatio &&
+          midDebit > 0 &&
+          midDebit / spreadWidth <= maxDebitRatio - 0.1
+        ) {
+          estimatedDebit = midDebit * 1.1;
           if (estimatedDebit / spreadWidth > maxDebitRatio) continue;
         } else {
           continue;
         }
-      } else if (midDebit > 0 && midDebit / spreadWidth <= maxDebitRatio - 0.10) {
-        estimatedDebit = midDebit * 1.10;
+      } else if (
+        midDebit > 0 &&
+        midDebit / spreadWidth <= maxDebitRatio - 0.1
+      ) {
+        estimatedDebit = midDebit * 1.1;
         if (estimatedDebit / spreadWidth > maxDebitRatio) continue;
       } else {
         continue;
@@ -313,19 +318,20 @@ export async function findSpreadWithAlternatives(
 
       const maxProfit = spreadWidth - estimatedDebit;
       const breakeven = longCall.strike + estimatedDebit;
-      const cushion = 
-        ((underlyingPrice - breakeven) / underlyingPrice) * 100;
+      const cushion = ((underlyingPrice - breakeven) / underlyingPrice) * 100;
 
       const returnOnRisk = maxProfit / estimatedDebit;
-      if (returnOnRisk < 0.20) continue;
-      
+      if (returnOnRisk < 0.2) continue;
+
       // Require minimum 5% cushion for conservative strategy
       if (cushion < 5) continue;
 
       // Score based on liquidity
-      const liquidityScore =
-        Math.min(100, Math.log10((longCall.openInterest + 1) * 
-          (shortCall.openInterest + 1)) * 20);
+      const liquidityScore = Math.min(
+        100,
+        Math.log10((longCall.openInterest + 1) * (shortCall.openInterest + 1)) *
+          20
+      );
 
       // Score based on bid-ask spread
       const longSpread = longCall.ask - longCall.bid;
@@ -337,12 +343,14 @@ export async function findSpreadWithAlternatives(
       let contextScore = 50;
       if (context) {
         // Prefer breakeven above key support
-        if (context.supportLevels?.some(s => breakeven < s)) {
+        if (context.supportLevels?.some((s) => breakeven < s)) {
           contextScore += 15;
         }
-        if (context.putWalls?.some(
-          p => Math.abs(breakeven - p) / breakeven < 0.02
-        )) {
+        if (
+          context.putWalls?.some(
+            (p) => Math.abs(breakeven - p) / breakeven < 0.02
+          )
+        ) {
           contextScore += 10;
         }
         // Prefer breakeven below MA200
@@ -360,12 +368,11 @@ export async function findSpreadWithAlternatives(
         bidAskScore * 0.2 +
         contextScore * 0.15;
 
-      const itmPct = 
-        (underlyingPrice - longCall.strike) / underlyingPrice;
+      const itmPct = (underlyingPrice - longCall.strike) / underlyingPrice;
       const longDelta = Math.min(0.95, 0.5 + itmPct * 3);
       const iv = longCall.impliedVolatility || 0.3;
       const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
-      
+
       // Require minimum 70% probability of profit for conservative strategy
       if (pop < 70) continue;
 
@@ -399,7 +406,7 @@ export async function findSpreadWithAlternatives(
   // Find primary ($5 width preferred)
   let primary =
     allSpreads.find(
-      s =>
+      (s) =>
         s.spreadWidth === 5 &&
         (s.totalScore ?? 0) >= (allSpreads[0].totalScore ?? 0) - 10
     ) ?? allSpreads[0];
@@ -409,7 +416,7 @@ export async function findSpreadWithAlternatives(
   // If maxDebit specified, find affordable alternative
   if (maxDebit && primary.estimatedDebit * 100 > maxDebit) {
     const affordable = allSpreads.filter(
-      s => s.estimatedDebit * 100 <= maxDebit
+      (s) => s.estimatedDebit * 100 <= maxDebit
     );
     if (affordable.length > 0) {
       const newPrimary = affordable[0];
@@ -429,7 +436,7 @@ export async function findSpreadWithAlternatives(
   // Get alternatives
   const alternatives = allSpreads
     .filter(
-      s =>
+      (s) =>
         s.longStrike !== primary.longStrike ||
         s.spreadWidth !== primary.spreadWidth
     )
@@ -437,4 +444,3 @@ export async function findSpreadWithAlternatives(
 
   return { primary, alternatives, reason };
 }
-

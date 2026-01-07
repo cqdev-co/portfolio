@@ -64,6 +64,7 @@ poetry run unusual-options status
 ```
 
 You should see:
+
 ```
 ✓ Supabase: Connected
 ✓ Data Provider: yfinance
@@ -79,6 +80,7 @@ poetry run unusual-options scan AAPL
 ```
 
 Expected output:
+
 ```
 Scanning AAPL...
 
@@ -128,14 +130,14 @@ poetry run unusual-options signals --days 30 --min-grade B
 
 ### Signal Table Columns
 
-| Column | Meaning |
-|--------|---------|
-| **Ticker** | Stock symbol |
-| **Grade** | S/A/B/C/D/F quality rating |
-| **Contract** | Option contract symbol |
-| **Volume** | Current day's volume |
-| **OI Change** | % change in open interest |
-| **Premium** | Total premium flow (dollars) |
+| Column        | Meaning                                               |
+| ------------- | ----------------------------------------------------- |
+| **Ticker**    | Stock symbol                                          |
+| **Grade**     | S/A/B/C/D/F quality rating                            |
+| **Contract**  | Option contract symbol                                |
+| **Volume**    | Current day's volume                                  |
+| **OI Change** | % change in open interest                             |
+| **Premium**   | Total premium flow (dollars)                          |
 | **Sentiment** | Directional bias (🟢 Bullish, 🔴 Bearish, ⚪ Neutral) |
 
 ### Grade Meanings
@@ -159,6 +161,7 @@ poetry run unusual-options scan AAPL MSFT GOOGL META NVDA AMD --min-grade B
 ### Use Case 2: Watchlist Monitoring
 
 Create a watchlist file `watchlist.txt`:
+
 ```
 AAPL
 MSFT
@@ -168,6 +171,7 @@ NVDA
 ```
 
 Then run:
+
 ```bash
 # TODO: Watchlist functionality coming soon
 # poetry run unusual-options scan --watchlist watchlist.txt --watch
@@ -220,6 +224,7 @@ cp env.example .env
 ### "Supabase: Not configured"
 
 Check that your `.env` has:
+
 ```bash
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_anon_key
@@ -228,6 +233,7 @@ SUPABASE_KEY=your_anon_key
 ### "No unusual activity detected"
 
 This is normal! Most tickers don't have unusual activity most days. Try:
+
 - Scanning more tickers
 - Lowering detection thresholds
 - Scanning during market hours (9:30 AM - 4:00 PM ET)
@@ -252,6 +258,7 @@ Review [Signal Grading](signal-grading.md) to see how the scoring system works.
 ### 3. Develop a Trading Plan
 
 See [Signal Interpretation](signal-interpretation.md) for guidance on:
+
 - When to act on signals
 - Position sizing based on grade
 - Risk management strategies
@@ -259,6 +266,7 @@ See [Signal Interpretation](signal-interpretation.md) for guidance on:
 ### 4. Track Performance
 
 Use the backtest command to see historical performance:
+
 ```bash
 poetry run unusual-options backtest --start 2024-01-01 --end 2024-12-31
 ```
@@ -282,6 +290,7 @@ echo "Scan complete! Check results/"
 ```
 
 Make it executable and run daily:
+
 ```bash
 chmod +x morning_scan.sh
 ./morning_scan.sh
@@ -342,7 +351,7 @@ unusual-options backtest --start 2024-01-01 --end 2024-12-31
 **You're all set!** Start scanning and remember to combine signals with your own analysis and risk management.
 
 For deeper understanding, continue to:
+
 - [Understanding Unusual Activity](understanding-unusual-activity.md)
 - [System Overview](system-overview.md)
 - [Signal Interpretation](signal-interpretation.md)
-

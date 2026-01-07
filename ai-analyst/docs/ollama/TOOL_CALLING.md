@@ -59,6 +59,7 @@ Also known as "single-shot" tool calling.
       "stream": false
     }'
     ```
+
   </Tab>
 
   <Tab title="Python">
@@ -69,7 +70,7 @@ Also known as "single-shot" tool calling.
     pip install ollama -U
 
     # with uv
-    uv add ollama    
+    uv add ollama
     ```
 
     ```python  theme={"system"}
@@ -77,7 +78,7 @@ Also known as "single-shot" tool calling.
 
     def get_temperature(city: str) -> str:
       """Get the current temperature for a city
-      
+
       Args:
         city: The name of the city
 
@@ -107,6 +108,7 @@ Also known as "single-shot" tool calling.
       final_response = chat(model="qwen3", messages=messages, tools=[get_temperature], think=True)
       print(final_response.message.content)
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -172,6 +174,7 @@ Also known as "single-shot" tool calling.
       console.log(finalResponse.message.content)
     }
     ```
+
   </Tab>
 </Tabs>
 
@@ -271,6 +274,7 @@ Also known as "single-shot" tool calling.
       "stream": false
     }'
     ```
+
   </Tab>
 
   <Tab title="Python">
@@ -279,7 +283,7 @@ Also known as "single-shot" tool calling.
 
     def get_temperature(city: str) -> str:
       """Get the current temperature for a city
-      
+
       Args:
         city: The name of the city
 
@@ -295,7 +299,7 @@ Also known as "single-shot" tool calling.
 
     def get_conditions(city: str) -> str:
       """Get the current weather conditions for a city
-      
+
       Args:
         city: The name of the city
 
@@ -313,13 +317,13 @@ Also known as "single-shot" tool calling.
     messages = [{'role': 'user', 'content': 'What are the current weather conditions and temperature in New York and London?'}]
 
     # The python client automatically parses functions as a tool schema so we can pass them directly
-    # Schemas can be passed directly in the tools list as well 
+    # Schemas can be passed directly in the tools list as well
     response = chat(model='qwen3', messages=messages, tools=[get_temperature, get_conditions], think=True)
 
     # add the assistant message to the messages
     messages.append(response.message)
     if response.message.tool_calls:
-      # process each tool call 
+      # process each tool call
       for call in response.message.tool_calls:
         # execute the appropriate tool
         if call.function.name == 'get_temperature':
@@ -335,6 +339,7 @@ Also known as "single-shot" tool calling.
       final_response = chat(model='qwen3', messages=messages, tools=[get_temperature, get_conditions], think=True)
       print(final_response.message.content)
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -402,7 +407,7 @@ Also known as "single-shot" tool calling.
     // add the assistant message to the messages
     messages.push(response.message)
     if (response.message.tool_calls) {
-      // process each tool call 
+      // process each tool call
       for (const call of response.message.tool_calls) {
         // execute the appropriate tool
         let result: string
@@ -424,6 +429,7 @@ Also known as "single-shot" tool calling.
       console.log(finalResponse.message.content)
     }
     ```
+
   </Tab>
 </Tabs>
 
@@ -437,7 +443,6 @@ It also might help to tell the model that it is in a loop and can make multiple 
   <Tab title="Python">
     ```python  theme={"system"}
     from ollama import chat, ChatResponse
-
 
     def add(a: int, b: int) -> int:
       """Add two numbers"""
@@ -494,6 +499,7 @@ It also might help to tell the model that it is in a loop and can make multiple 
             break
       # continue the loop with the updated messages
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -585,6 +591,7 @@ It also might help to tell the model that it is in a loop and can make multiple 
 
     agentLoop().catch(console.error)
     ```
+
   </Tab>
 </Tabs>
 
@@ -595,12 +602,11 @@ When streaming, gather every chunk of `thinking`, `content`, and `tool_calls`, t
 <Tabs>
   <Tab title="Python">
     ```python  theme={"system"}
-    from ollama import chat 
-
+    from ollama import chat
 
     def get_temperature(city: str) -> str:
       """Get the current temperature for a city
-      
+
       Args:
         city: The name of the city
 
@@ -659,6 +665,7 @@ When streaming, gather every chunk of `thinking`, `content`, and `tool_calls`, t
           result = 'Unknown tool'
         messages.append({'role': 'tool', 'tool_name': call.function.name, 'content': result})
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -746,6 +753,7 @@ When streaming, gather every chunk of `thinking`, `content`, and `tool_calls`, t
 
     agentLoop().catch(console.error)
     ```
+
   </Tab>
 </Tabs>
 
@@ -756,12 +764,12 @@ This loop streams the assistant response, accumulates partial fields, passes the
 The Python SDK automatically parses functions as a tool schema so we can pass them directly.
 Schemas can still be passed if needed.
 
-```python  theme={"system"}
+```python theme={"system"}
 from ollama import chat
 
 def get_temperature(city: str) -> str:
   """Get the current temperature for a city
-  
+
   Args:
     city: The name of the city
 
@@ -780,7 +788,6 @@ available_functions = {
 # directly pass the function as part of the tools list
 response = chat(model='qwen3', messages=messages, tools=available_functions.values(), think=True)
 ```
-
 
 ---
 

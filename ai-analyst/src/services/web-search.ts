@@ -5,7 +5,7 @@
  * Fallback to DuckDuckGo if Ollama API unavailable
  */
 
-import { Ollama } from "ollama";
+import { Ollama } from 'ollama';
 
 // ============================================================================
 // TYPES
@@ -34,47 +34,63 @@ export interface WebSearchResponse {
  * Per docs: client.webSearch({ query: "..." })
  */
 async function ollamaWebSearch(
-  query: string, 
+  query: string,
   maxResults: number = 5
 ): Promise<WebSearchResponse | null> {
   const apiKey = process.env.OLLAMA_API_KEY;
   if (!apiKey) {
-    return null;  // Fallback to DuckDuckGo
+    return null; // Fallback to DuckDuckGo
   }
 
   try {
     // Create Ollama client with cloud credentials
     const client = new Ollama({
-      host: "https://ollama.com",
+      host: 'https://ollama.com',
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
     });
 
     // Use SDK's built-in webSearch method
-    const response = await client.webSearch({ 
+    const response = await client.webSearch({
       query,
-      max_results: maxResults,
+      maxResults,
     });
-    
+
     // Filter out irrelevant results (social media, forums, unrelated)
-    const irrelevantDomains = ['facebook.com', 'reddit.com', 'twitter.com', 'x.com', 'tiktok.com', 'instagram.com'];
-    const irrelevantTerms = ['buy a tesla', 'should i buy', 'my tesla', 'tesla owner'];
-    
+    const irrelevantDomains = [
+      'facebook.com',
+      'reddit.com',
+      'twitter.com',
+      'x.com',
+      'tiktok.com',
+      'instagram.com',
+    ];
+    const irrelevantTerms = [
+      'buy a tesla',
+      'should i buy',
+      'my tesla',
+      'tesla owner',
+    ];
+
+    // Type for web search results
+    type WebResult = { title?: string; url?: string; content?: string };
+
     const results: SearchResult[] = (response.results ?? [])
-      .filter((r: { title: string; url: string; content: string }) => {
+      .filter((r: WebResult) => {
+        if (!r.url || !r.title) return false;
         const urlLower = r.url.toLowerCase();
         const titleLower = r.title.toLowerCase();
         // Filter out social media
-        if (irrelevantDomains.some(d => urlLower.includes(d))) return false;
+        if (irrelevantDomains.some((d) => urlLower.includes(d))) return false;
         // Filter out consumer questions
-        if (irrelevantTerms.some(t => titleLower.includes(t))) return false;
+        if (irrelevantTerms.some((t) => titleLower.includes(t))) return false;
         return true;
       })
-      .map((r: { title: string; url: string; content: string }) => ({
-        title: r.title,
-        snippet: r.content,
-        url: r.url,
+      .map((r: WebResult) => ({
+        title: r.title ?? '',
+        snippet: r.content ?? '',
+        url: r.url ?? '',
         source: 'Ollama',
       }));
 
@@ -96,13 +112,13 @@ async function ollamaWebSearch(
  * Fallback search using DuckDuckGo Instant Answer API
  */
 async function duckDuckGoSearch(
-  query: string, 
+  query: string,
   limit: number = 5
 ): Promise<WebSearchResponse> {
   try {
     const encodedQuery = encodeURIComponent(query);
     const url = `https://api.duckduckgo.com/?q=${encodedQuery}&format=json&no_html=1&skip_disambig=1`;
-    
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'AI-Analyst/1.0',
@@ -113,16 +129,26 @@ async function duckDuckGoSearch(
       throw new Error(`Search failed: ${response.status}`);
     }
 
-    const data = await response.json();
-    
+    // DuckDuckGo API response type
+    interface DDGResponse {
+      AbstractText?: string;
+      RelatedTopics?: Array<{
+        Text?: string;
+        FirstURL?: string;
+        Topics?: Array<{ Text?: string; FirstURL?: string }>;
+      }>;
+    }
+
+    const data = (await response.json()) as DDGResponse;
+
     const results: SearchResult[] = [];
-    
+
     // Extract instant answer if available
     let instantAnswer: string | undefined;
     if (data.AbstractText) {
       instantAnswer = data.AbstractText;
     }
-    
+
     // Extract related topics as results
     if (data.RelatedTopics) {
       for (const topic of data.RelatedTopics.slice(0, limit)) {
@@ -172,7 +198,7 @@ async function duckDuckGoSearch(
  * Search the web - uses Ollama API if available, falls back to DuckDuckGo
  */
 export async function searchWeb(
-  query: string, 
+  query: string,
   limit: number = 5
 ): Promise<WebSearchResponse> {
   // Try Ollama first (better results)
@@ -180,7 +206,7 @@ export async function searchWeb(
   if (ollamaResult && ollamaResult.results.length > 0) {
     return ollamaResult;
   }
-  
+
   // Fallback to DuckDuckGo
   return duckDuckGoSearch(query, limit);
 }
@@ -188,7 +214,9 @@ export async function searchWeb(
 /**
  * Search for stock/market news using a simple approach
  */
-export async function searchStockNews(ticker: string): Promise<WebSearchResponse> {
+export async function searchStockNews(
+  ticker: string
+): Promise<WebSearchResponse> {
   const query = `${ticker} stock news today`;
   return searchWeb(query, 5);
 }
@@ -196,7 +224,9 @@ export async function searchStockNews(ticker: string): Promise<WebSearchResponse
 /**
  * Search for market analysis
  */
-export async function searchMarketAnalysis(topic: string): Promise<WebSearchResponse> {
+export async function searchMarketAnalysis(
+  topic: string
+): Promise<WebSearchResponse> {
   const query = `${topic} market analysis 2024`;
   return searchWeb(query, 5);
 }
@@ -210,29 +240,32 @@ export function formatSearchForAI(response: WebSearchResponse): string {
   }
 
   let output = `\n=== WEB SEARCH: "${response.query}" ===\n`;
-  
+
   if (response.instantAnswer) {
     output += `\nSummary: ${response.instantAnswer}\n`;
   }
-  
+
   if (response.results.length > 0) {
     output += `\nResults:\n`;
     for (const r of response.results.slice(0, 3)) {
       output += `• ${r.title}\n  ${r.snippet.substring(0, 150)}...\n`;
     }
   }
-  
+
   output += `=== END SEARCH ===\n`;
-  
+
   return output;
 }
 
 /**
  * Detect if user message needs web search
  */
-export function needsWebSearch(message: string): { needed: boolean; query?: string } {
+export function needsWebSearch(message: string): {
+  needed: boolean;
+  query?: string;
+} {
   const lowerMessage = message.toLowerCase();
-  
+
   // Keywords that suggest web search is needed
   const searchTriggers = [
     'what is happening',
@@ -242,14 +275,14 @@ export function needsWebSearch(message: string): { needed: boolean; query?: stri
     'search for',
     'look up',
     'find out',
-    'what\'s going on',
+    "what's going on",
     'recent news',
     'current events',
     'market news',
     'why did',
     'what caused',
   ];
-  
+
   for (const trigger of searchTriggers) {
     if (lowerMessage.includes(trigger)) {
       // Extract a search query from the message
@@ -257,11 +290,10 @@ export function needsWebSearch(message: string): { needed: boolean; query?: stri
         .replace(/\?/g, '')
         .replace(/can you |please |could you /gi, '')
         .trim();
-      
+
       return { needed: true, query };
     }
   }
-  
+
   return { needed: false };
 }
-

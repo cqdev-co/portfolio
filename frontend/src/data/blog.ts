@@ -1,14 +1,14 @@
-import fs from "fs";
-import matter from "gray-matter";
-import path from "path";
-import rehypePrettyCode from "rehype-pretty-code";
-import rehypeStringify from "rehype-stringify";
-import remarkGfm from "remark-gfm";
-import remarkParse from "remark-parse";
-import remarkRehype from "remark-rehype";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import { unified } from "unified";
+import fs from 'fs';
+import matter from 'gray-matter';
+import path from 'path';
+import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeStringify from 'rehype-stringify';
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import remarkRehype from 'remark-rehype';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import { unified } from 'unified';
 
 // Node types for rehype plugins
 interface HastElement {
@@ -31,7 +31,7 @@ export type Metadata = {
 };
 
 function getMDXFiles(dir: string) {
-  return fs.readdirSync(dir).filter((file) => path.extname(file) === ".mdx");
+  return fs.readdirSync(dir).filter((file) => path.extname(file) === '.mdx');
 }
 
 export async function markdownToHTML(markdown: string) {
@@ -47,22 +47,22 @@ export async function markdownToHTML(markdown: string) {
       properties: {
         className: ['anchor'],
         ariaHidden: true,
-        tabIndex: -1
+        tabIndex: -1,
       },
       content: {
         type: 'element',
         tagName: 'span',
         properties: {
-          className: ['anchor-icon']
+          className: ['anchor-icon'],
         },
-        children: []
-      }
+        children: [],
+      },
     })
     .use(rehypePrettyCode, {
       // Better code block styling
       theme: {
-        light: "github-light",
-        dark: "github-dark",
+        light: 'github-light',
+        dark: 'github-dark',
       },
       keepBackground: true,
       onVisitLine(node: HastElement) {
@@ -81,7 +81,7 @@ export async function markdownToHTML(markdown: string) {
       onVisitHighlightedWord(node: HastElement) {
         // Add highlighted word class
         node.properties.className = ['word'];
-      }
+      },
     } as unknown as Parameters<typeof rehypePrettyCode>[0]) // Type assertion with more specific type
     .use(rehypeStringify, { allowDangerousHtml: true })
     .process(markdown);
@@ -98,12 +98,12 @@ function calculateReadingTime(content: string): number {
 }
 
 export async function getPost(slug: string) {
-  const filePath = path.join("content", `${slug}.mdx`);
-  const source = fs.readFileSync(filePath, "utf-8");
+  const filePath = path.join('content', `${slug}.mdx`);
+  const source = fs.readFileSync(filePath, 'utf-8');
   const { content: rawContent, data: metadata } = matter(source);
   const content = await markdownToHTML(rawContent);
   const readingTime = calculateReadingTime(rawContent);
-  
+
   return {
     source: content,
     rawContent, // Keep raw markdown for proper component rendering
@@ -126,10 +126,10 @@ async function getAllPosts(dir: string) {
         rawContent,
         readingTime,
       };
-    }),
+    })
   );
 }
 
 export async function getBlogPosts() {
-  return getAllPosts(path.join(process.cwd(), "content"));
+  return getAllPosts(path.join(process.cwd(), 'content'));
 }

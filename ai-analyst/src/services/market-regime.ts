@@ -3,10 +3,10 @@
  * Provides VIX awareness, SPY trend analysis, and sector rotation tracking
  */
 
-import YahooFinance from "yahoo-finance2";
+import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance({
-  suppressNotices: ["yahooSurvey", "rippiReport"],
+  suppressNotices: ['yahooSurvey'],
   validation: {
     logErrors: false,
     logOptionsErrors: false,
@@ -17,18 +17,18 @@ const yahooFinance = new YahooFinance({
 // TYPES
 // ============================================================================
 
-export type MarketRegimeType = 
-  | 'RISK_ON'    // Bullish conditions, low VIX, above MA200
-  | 'RISK_OFF'   // Bearish conditions, high VIX, below MA200
-  | 'NEUTRAL'    // Mixed signals
-  | 'HIGH_VOL';  // Elevated volatility regardless of direction
+export type MarketRegimeType =
+  | 'RISK_ON' // Bullish conditions, low VIX, above MA200
+  | 'RISK_OFF' // Bearish conditions, high VIX, below MA200
+  | 'NEUTRAL' // Mixed signals
+  | 'HIGH_VOL'; // Elevated volatility regardless of direction
 
-export type VIXLevel = 
-  | 'CALM'       // VIX < 15
-  | 'NORMAL'     // VIX 15-20
-  | 'ELEVATED'   // VIX 20-30
-  | 'HIGH'       // VIX 30-40
-  | 'EXTREME';   // VIX > 40
+export type VIXLevel =
+  | 'CALM' // VIX < 15
+  | 'NORMAL' // VIX 15-20
+  | 'ELEVATED' // VIX 20-30
+  | 'HIGH' // VIX 30-40
+  | 'EXTREME'; // VIX > 40
 
 export interface VIXData {
   current: number;
@@ -193,7 +193,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
   try {
     // Fetch all sector ETFs in parallel
     const quotes = await Promise.all(
-      SECTOR_ETFS.map(s => yahooFinance.quote(s.ticker).catch(() => null))
+      SECTOR_ETFS.map((s) => yahooFinance.quote(s.ticker).catch(() => null))
     );
 
     for (let i = 0; i < SECTOR_ETFS.length; i++) {
@@ -202,7 +202,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
 
       if (quote?.regularMarketChangePercent !== undefined) {
         const changePct = quote.regularMarketChangePercent;
-        
+
         // Classify momentum
         let momentum: SectorPerformance['momentum'] = 'NEUTRAL';
         if (changePct > 1) momentum = 'LEADING';
@@ -247,7 +247,10 @@ function determineRegime(
 
   // Check SPY trend
   if (spy) {
-    if (spy.trend === 'BULLISH' && (!vix || vix.level === 'CALM' || vix.level === 'NORMAL')) {
+    if (
+      spy.trend === 'BULLISH' &&
+      (!vix || vix.level === 'CALM' || vix.level === 'NORMAL')
+    ) {
       return 'RISK_ON';
     }
     if (spy.trend === 'BEARISH') {
@@ -381,19 +384,23 @@ export async function getMarketRegime(): Promise<MarketRegime> {
  */
 export function formatRegimeForAI(regime: MarketRegime): string {
   const lines: string[] = [];
-  
+
   lines.push(`REGIME: ${regime.regime}`);
   lines.push(`VIX: ${regime.vix.current} (${regime.vix.level})`);
-  lines.push(`SPY: $${regime.spy.price} ${regime.spy.trend} ${regime.spy.aboveMA200 ? '↑MA200' : '↓MA200'}`);
-  
+  lines.push(
+    `SPY: $${regime.spy.price} ${regime.spy.trend} ${regime.spy.aboveMA200 ? '↑MA200' : '↓MA200'}`
+  );
+
   if (regime.sectors.length > 0) {
     const top3 = regime.sectors.slice(0, 3);
-    const leaders = top3.map(s => `${s.name}:${s.changePct > 0 ? '+' : ''}${s.changePct}%`);
+    const leaders = top3.map(
+      (s) => `${s.name}:${s.changePct > 0 ? '+' : ''}${s.changePct}%`
+    );
     lines.push(`SECTORS: ${leaders.join(' | ')}`);
   }
-  
+
   lines.push(`→ ${regime.tradingRecommendation}`);
-  
+
   return lines.join('\n');
 }
 
@@ -401,15 +408,21 @@ export function formatRegimeForAI(regime: MarketRegime): string {
  * Get regime badge for display (very compact)
  */
 export function getRegimeBadge(regime: MarketRegime): string {
-  const vixEmoji = regime.vix.level === 'CALM' ? '🟢' 
-    : regime.vix.level === 'NORMAL' ? '🟡'
-    : regime.vix.level === 'ELEVATED' ? '🟠'
-    : '🔴';
-  
-  const trendEmoji = regime.spy.trend === 'BULLISH' ? '📈'
-    : regime.spy.trend === 'BEARISH' ? '📉'
-    : '➡️';
-  
+  const vixEmoji =
+    regime.vix.level === 'CALM'
+      ? '🟢'
+      : regime.vix.level === 'NORMAL'
+        ? '🟡'
+        : regime.vix.level === 'ELEVATED'
+          ? '🟠'
+          : '🔴';
+
+  const trendEmoji =
+    regime.spy.trend === 'BULLISH'
+      ? '📈'
+      : regime.spy.trend === 'BEARISH'
+        ? '📉'
+        : '➡️';
+
   return `${vixEmoji} VIX ${regime.vix.current} ${trendEmoji} ${regime.regime}`;
 }
-

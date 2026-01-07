@@ -1,15 +1,11 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // Signal categories
-export const SignalCategory = z.enum([
-  "technical",
-  "fundamental",
-  "analyst",
-]);
+export const SignalCategory = z.enum(['technical', 'fundamental', 'analyst']);
 export type SignalCategory = z.infer<typeof SignalCategory>;
 
 // Stock investment style
-export const StockStyle = z.enum(["growth", "value", "blend"]);
+export const StockStyle = z.enum(['growth', 'value', 'blend']);
 export type StockStyle = z.infer<typeof StockStyle>;
 
 // Individual signal schema
@@ -29,7 +25,8 @@ export const WeekContext = z.object({
   pctFromLow: z.number().optional(),
   pctFromHigh: z.number().optional(),
   positionInRange: z.number().optional(),
-  ma200: z.number().optional(),
+  ma50: z.number().optional(), // v2.5: Short-term trend
+  ma200: z.number().optional(), // Long-term trend
   marketCap: z.number().optional(),
   nextEarningsDate: z.date().optional(),
   sector: z.string().optional(),
@@ -44,7 +41,7 @@ export const WeekContext = z.object({
   beta: z.number().optional(),
   shortPercentOfFloat: z.number().optional(),
   sharesShort: z.number().optional(),
-  shortRatio: z.number().optional(),  // days to cover
+  shortRatio: z.number().optional(), // days to cover
   // Balance sheet health
   debtToEquity: z.number().optional(),
   currentRatio: z.number().optional(),
@@ -52,8 +49,8 @@ export const WeekContext = z.object({
   totalCash: z.number().optional(),
   totalDebt: z.number().optional(),
   // Volatility context
-  atr14: z.number().optional(),  // 14-day ATR
-  atrPercent: z.number().optional(),  // ATR as % of price
+  atr14: z.number().optional(), // 14-day ATR
+  atrPercent: z.number().optional(), // ATR as % of price
 });
 export type WeekContext = z.infer<typeof WeekContext>;
 
@@ -69,7 +66,7 @@ export const StockScore = z.object({
   upsidePotential: z.number(),
   signals: z.array(Signal),
   warnings: z.array(Signal).optional(),
-  dataQuality: z.enum(["good", "partial", "poor"]).optional(),
+  dataQuality: z.enum(['good', 'partial', 'poor']).optional(),
   scanDate: z.date(),
   context: WeekContext.optional(),
   stockStyle: StockStyle.optional(),
@@ -89,7 +86,7 @@ export const ThresholdsConfig = z.object({
     pegRatioGood: z.number().default(2.0),
     fcfYieldMin: z.number().default(0.03),
     fcfYieldHigh: z.number().default(0.05),
-    forwardPEDiscountPercent: z.number().default(0.10),
+    forwardPEDiscountPercent: z.number().default(0.1),
     evEbitdaMax: z.number().default(15),
     evEbitdaGood: z.number().default(20),
   }),
@@ -135,30 +132,33 @@ export type ScoreWeights = z.infer<typeof ScoreWeights>;
 
 // Quarterly Performance types (v1.4.0)
 export interface QuarterlyResult {
-  quarter: string;       // e.g., "3Q2024"
+  quarter: string; // e.g., "3Q2024"
   revenue: number | null;
   earnings: number | null;
   epsActual: number | null;
   epsEstimate: number | null;
-  epsSurprise: number | null;  // surprise percentage
+  epsSurprise: number | null; // surprise percentage
   beat: boolean | null;
 }
 
 export interface QuarterlyPerformance {
   quarters: QuarterlyResult[];
-  revenueTrend: "growing" | "declining" | "mixed" | "insufficient_data";
-  earningsTrend: "improving" | "declining" | "mixed" | "insufficient_data";
+  revenueTrend: 'growing' | 'declining' | 'mixed' | 'insufficient_data';
+  earningsTrend: 'improving' | 'declining' | 'mixed' | 'insufficient_data';
   beatMissRecord: {
     beats: number;
     misses: number;
     total: number;
-    summary: string;  // e.g., "Beat 3 of last 4 quarters"
+    summary: string; // e.g., "Beat 3 of last 4 quarters"
   };
   profitableQuarters: number;
   totalQuarters: number;
-  sequentialImprovement: boolean;  // margins improving QoQ
-  surpriseTrend: "consistently_beating" | "consistently_missing" | 
-                "mixed" | "insufficient_data";
+  sequentialImprovement: boolean; // margins improving QoQ
+  surpriseTrend:
+    | 'consistently_beating'
+    | 'consistently_missing'
+    | 'mixed'
+    | 'insufficient_data';
 }
 
 // Yahoo Finance data types
@@ -191,7 +191,7 @@ export interface QuoteSummary {
     pegRatio?: { raw?: number };
     shortPercentOfFloat?: { raw?: number };
     sharesShort?: { raw?: number };
-    shortRatio?: { raw?: number };  // days to cover
+    shortRatio?: { raw?: number }; // days to cover
     beta?: { raw?: number };
     fiftyTwoWeekChange?: { raw?: number };
     floatShares?: { raw?: number };
@@ -332,6 +332,7 @@ export type StockOpportunityRecord = z.infer<typeof StockOpportunityRecord>;
 export interface ScanOptions {
   list?: string;
   tickers?: string;
+  top?: number; // Limit to top N tickers (for quick scans)
   minScore: number;
   dryRun: boolean;
   verbose: boolean;
@@ -341,4 +342,3 @@ export interface TrendsOptions {
   days: number;
   minDelta: number;
 }
-

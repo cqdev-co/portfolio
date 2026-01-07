@@ -7,7 +7,18 @@
 // TYPES
 // ============================================================================
 
-export type TradeGrade = 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F';
+export type TradeGrade =
+  | 'A+'
+  | 'A'
+  | 'A-'
+  | 'B+'
+  | 'B'
+  | 'B-'
+  | 'C+'
+  | 'C'
+  | 'C-'
+  | 'D'
+  | 'F';
 
 export interface GradingCriteria {
   name: string;
@@ -25,6 +36,10 @@ export interface TradeGradeResult {
   criteria: GradingCriteria[];
   summary: string;
   recommendation: 'STRONG BUY' | 'BUY' | 'WAIT' | 'AVOID';
+  // Additional data for analysis
+  rsi?: number;
+  aboveMA200?: boolean;
+  earningsDays?: number;
 }
 
 export interface ScenarioResult {
@@ -38,7 +53,7 @@ export interface ScenarioResult {
 }
 
 export interface RiskScore {
-  score: number;  // 1-10 (1 = low risk, 10 = high risk)
+  score: number; // 1-10 (1 = low risk, 10 = high risk)
   level: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
   factors: RiskFactor[];
   summary: string;
@@ -46,7 +61,7 @@ export interface RiskScore {
 
 export interface RiskFactor {
   name: string;
-  impact: number;  // 1-3
+  impact: number; // 1-3
   description: string;
 }
 
@@ -62,25 +77,49 @@ export interface AdvancedAnalysis {
 
 export const GRADE_RUBRIC = {
   criteria: [
-    { name: 'Above MA200', maxPoints: 25, desc: 'Price above 200-day MA = bullish trend' },
-    { name: 'RSI Zone', maxPoints: 20, desc: 'RSI 35-55 = ideal entry, 55-65 = partial, >65 = overbought' },
-    { name: 'Cushion', maxPoints: 20, desc: '>10% = full, 7-10% = partial, <7% = risky' },
-    { name: 'IV Level', maxPoints: 15, desc: 'Normal/Low = full, Elevated = partial, High = risky' },
-    { name: 'Earnings', maxPoints: 10, desc: '>14 days = safe, 7-14 = partial, <7 = avoid' },
-    { name: 'Risk/Reward', maxPoints: 10, desc: '>20% return = full, 15-20% = partial, <15% = poor' },
+    {
+      name: 'Above MA200',
+      maxPoints: 25,
+      desc: 'Price above 200-day MA = bullish trend',
+    },
+    {
+      name: 'RSI Zone',
+      maxPoints: 20,
+      desc: 'RSI 35-55 = ideal entry, 55-65 = partial, >65 = overbought',
+    },
+    {
+      name: 'Cushion',
+      maxPoints: 20,
+      desc: '>10% = full, 7-10% = partial, <7% = risky',
+    },
+    {
+      name: 'IV Level',
+      maxPoints: 15,
+      desc: 'Normal/Low = full, Elevated = partial, High = risky',
+    },
+    {
+      name: 'Earnings',
+      maxPoints: 10,
+      desc: '>14 days = safe, 7-14 = partial, <7 = avoid',
+    },
+    {
+      name: 'Risk/Reward',
+      maxPoints: 10,
+      desc: '>20% return = full, 15-20% = partial, <15% = poor',
+    },
   ],
   grades: {
     'A+': { min: 95, recommendation: 'STRONG BUY' },
-    'A': { min: 90, recommendation: 'STRONG BUY' },
+    A: { min: 90, recommendation: 'STRONG BUY' },
     'A-': { min: 85, recommendation: 'BUY' },
     'B+': { min: 80, recommendation: 'BUY' },
-    'B': { min: 75, recommendation: 'BUY' },
+    B: { min: 75, recommendation: 'BUY' },
     'B-': { min: 70, recommendation: 'WAIT' },
     'C+': { min: 65, recommendation: 'WAIT' },
-    'C': { min: 60, recommendation: 'WAIT' },
+    C: { min: 60, recommendation: 'WAIT' },
     'C-': { min: 55, recommendation: 'AVOID' },
-    'D': { min: 50, recommendation: 'AVOID' },
-    'F': { min: 0, recommendation: 'AVOID' },
+    D: { min: 50, recommendation: 'AVOID' },
+    F: { min: 0, recommendation: 'AVOID' },
   },
   riskLevels: {
     '1-3': 'LOW - Favorable conditions, standard position size',
@@ -98,26 +137,28 @@ export function explainGradeRubric(
   risk: RiskScore
 ): string {
   const lines: string[] = [];
-  
+
   lines.push(`GRADE: ${grade.grade} (${grade.score}/${grade.maxScore} points)`);
   lines.push('');
   lines.push('Scoring Breakdown:');
-  
+
   for (const c of grade.criteria) {
     const status = c.passed ? '✓' : '✗';
-    lines.push(`  ${status} ${c.name}: ${c.points}/${c.maxPoints} - ${c.reason}`);
+    lines.push(
+      `  ${status} ${c.name}: ${c.points}/${c.maxPoints} - ${c.reason}`
+    );
   }
-  
+
   lines.push('');
   lines.push(`RISK: ${risk.score}/10 (${risk.level})`);
   lines.push('');
   lines.push('Risk Factors:');
-  
+
   for (const f of risk.factors) {
     const impact = '!'.repeat(f.impact);
     lines.push(`  ${impact} ${f.name}: ${f.description}`);
   }
-  
+
   return lines.join('\n');
 }
 
@@ -153,7 +194,7 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
       points,
       maxPoints: 25,
       passed,
-      reason: passed 
+      reason: passed
         ? `Price above MA200 - bullish trend confirmed`
         : `Price below MA200 - trend not favorable`,
     });
@@ -251,7 +292,7 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
       passed = false;
       reason = `Earnings ${input.earningsDays} days out - too close`;
     } else {
-      points = -10;  // Penalty
+      points = -10; // Penalty
       passed = false;
       reason = `Earnings in ${input.earningsDays} days - AVOID`;
     }
@@ -304,7 +345,7 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
   if (input.spreadWidth !== undefined && input.debit !== undefined) {
     const maxProfit = input.spreadWidth - input.debit;
     const returnOnRisk = (maxProfit / input.debit) * 100;
-    
+
     let points = 0;
     let passed = false;
     let reason = '';
@@ -343,12 +384,12 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
   const recommendation = gradeToRecommendation(grade);
 
   // Generate summary
-  const passedCount = criteria.filter(c => c.passed).length;
-  const failedCriteria = criteria.filter(c => !c.passed);
-  
+  const passedCount = criteria.filter((c) => c.passed).length;
+  const failedCriteria = criteria.filter((c) => !c.passed);
+
   let summary = `Score: ${totalScore}/${maxScore} (${percentage.toFixed(0)}%)`;
   if (failedCriteria.length > 0) {
-    summary += ` | Issues: ${failedCriteria.map(c => c.name).join(', ')}`;
+    summary += ` | Issues: ${failedCriteria.map((c) => c.name).join(', ')}`;
   }
 
   return {
@@ -376,7 +417,9 @@ function scoreToGrade(percentage: number): TradeGrade {
   return 'F';
 }
 
-function gradeToRecommendation(grade: TradeGrade): TradeGradeResult['recommendation'] {
+function gradeToRecommendation(
+  grade: TradeGrade
+): TradeGradeResult['recommendation'] {
   if (grade === 'A+' || grade === 'A') return 'STRONG BUY';
   if (grade === 'A-' || grade === 'B+' || grade === 'B') return 'BUY';
   if (grade === 'B-' || grade === 'C+' || grade === 'C') return 'WAIT';
@@ -405,19 +448,25 @@ export function analyzeScenarios(input: ScenarioInput): ScenarioResult[] {
 
   // Define price change scenarios
   const priceChanges = [
-    { label: 'Up 10%', change: 0.10 },
+    { label: 'Up 10%', change: 0.1 },
     { label: 'Up 5%', change: 0.05 },
     { label: 'Flat', change: 0 },
     { label: 'Down 5%', change: -0.05 },
-    { label: 'Down 10%', change: -0.10 },
+    { label: 'Down 10%', change: -0.1 },
     { label: 'Down 15%', change: -0.15 },
-    { label: 'To Breakeven', change: (breakeven - currentPrice) / currentPrice },
-    { label: 'To Long Strike', change: (longStrike - currentPrice) / currentPrice },
+    {
+      label: 'To Breakeven',
+      change: (breakeven - currentPrice) / currentPrice,
+    },
+    {
+      label: 'To Long Strike',
+      change: (longStrike - currentPrice) / currentPrice,
+    },
   ];
 
   for (const { label, change } of priceChanges) {
     const newPrice = currentPrice * (1 + change);
-    
+
     // Calculate spread value at expiration
     let spreadValue: number;
     if (newPrice >= shortStrike) {
@@ -470,7 +519,7 @@ interface RiskInput {
   cushionPercent?: number;
   earningsDays?: number | null;
   dte?: number;
-  positionSizePercent?: number;  // % of account
+  positionSizePercent?: number; // % of account
   aboveMA200?: boolean;
   volatilityHigh?: boolean;
 }
@@ -586,9 +635,10 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
   else if (score <= 7) level = 'HIGH';
   else level = 'EXTREME';
 
-  const summary = factors.length === 0
-    ? 'No significant risk factors identified'
-    : `${factors.length} risk factor${factors.length > 1 ? 's' : ''}: ${factors.map(f => f.name).join(', ')}`;
+  const summary =
+    factors.length === 0
+      ? 'No significant risk factors identified'
+      : `${factors.length} risk factor${factors.length > 1 ? 's' : ''}: ${factors.map((f) => f.name).join(', ')}`;
 
   return {
     score,
@@ -618,7 +668,9 @@ export interface FullAnalysisInput {
   accountSize?: number;
 }
 
-export function performFullAnalysis(input: FullAnalysisInput): AdvancedAnalysis | null {
+export function performFullAnalysis(
+  input: FullAnalysisInput
+): AdvancedAnalysis | null {
   const { price, longStrike, shortStrike, debit } = input;
 
   // Need spread details for full analysis
@@ -630,8 +682,8 @@ export function performFullAnalysis(input: FullAnalysisInput): AdvancedAnalysis 
   const breakeven = longStrike + debit;
   const cushionPercent = ((price - breakeven) / price) * 100;
   const positionCost = debit * 100;
-  const positionSizePercent = input.accountSize 
-    ? (positionCost / input.accountSize) * 100 
+  const positionSizePercent = input.accountSize
+    ? (positionCost / input.accountSize) * 100
     : undefined;
 
   // Grade the trade
@@ -683,7 +735,7 @@ export function formatAnalysisForAI(analysis: AdvancedAnalysis): string {
   output += `\n=== TRADE GRADE: ${analysis.grade.grade} ===\n`;
   output += `Score: ${analysis.grade.score}/${analysis.grade.maxScore} (${analysis.grade.percentage.toFixed(0)}%)\n`;
   output += `Recommendation: ${analysis.grade.recommendation}\n\n`;
-  
+
   output += `Criteria breakdown:\n`;
   for (const c of analysis.grade.criteria) {
     const icon = c.passed ? '✓' : '✗';
@@ -709,4 +761,3 @@ export function formatAnalysisForAI(analysis: AdvancedAnalysis): string {
 
   return output;
 }
-

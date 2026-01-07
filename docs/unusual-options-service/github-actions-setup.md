@@ -18,21 +18,21 @@ The workflow runs **every 30 minutes** during US EDT market hours:
 ### Schedule Details
 
 | Time (EDT) | Time (UTC) | Cron Expression |
-|------------|-----------|-----------------|
-| 9:30 AM | 13:30 | `30 13 * * 1-5` |
-| 10:00 AM | 14:00 | `0 14 * * 1-5` |
-| 10:30 AM | 14:30 | `30 14 * * 1-5` |
-| 11:00 AM | 15:00 | `0 15 * * 1-5` |
-| 11:30 AM | 15:30 | `30 15 * * 1-5` |
-| 12:00 PM | 16:00 | `0 16 * * 1-5` |
-| 12:30 PM | 16:30 | `30 16 * * 1-5` |
-| 1:00 PM | 17:00 | `0 17 * * 1-5` |
-| 1:30 PM | 17:30 | `30 17 * * 1-5` |
-| 2:00 PM | 18:00 | `0 18 * * 1-5` |
-| 2:30 PM | 18:30 | `30 18 * * 1-5` |
-| 3:00 PM | 19:00 | `0 19 * * 1-5` |
-| 3:30 PM | 19:30 | `30 19 * * 1-5` |
-| 4:00 PM | 20:00 | `0 20 * * 1-5` |
+| ---------- | ---------- | --------------- |
+| 9:30 AM    | 13:30      | `30 13 * * 1-5` |
+| 10:00 AM   | 14:00      | `0 14 * * 1-5`  |
+| 10:30 AM   | 14:30      | `30 14 * * 1-5` |
+| 11:00 AM   | 15:00      | `0 15 * * 1-5`  |
+| 11:30 AM   | 15:30      | `30 15 * * 1-5` |
+| 12:00 PM   | 16:00      | `0 16 * * 1-5`  |
+| 12:30 PM   | 16:30      | `30 16 * * 1-5` |
+| 1:00 PM    | 17:00      | `0 17 * * 1-5`  |
+| 1:30 PM    | 17:30      | `30 17 * * 1-5` |
+| 2:00 PM    | 18:00      | `0 18 * * 1-5`  |
+| 2:30 PM    | 18:30      | `30 18 * * 1-5` |
+| 3:00 PM    | 19:00      | `0 19 * * 1-5`  |
+| 3:30 PM    | 19:30      | `30 19 * * 1-5` |
+| 4:00 PM    | 20:00      | `0 20 * * 1-5`  |
 
 ## Manual Trigger
 
@@ -43,7 +43,6 @@ You can also trigger the workflow manually from the GitHub Actions UI with custo
 - **`min_grade`** (optional): Minimum signal grade to display
   - Options: `S`, `A`, `B`, `C`, `D`, `F`
   - Default: `B`
-  
 - **`limit`** (optional): Maximum number of tickers to scan
   - Type: Number
   - Default: Unlimited (scans all tickers)
@@ -115,6 +114,7 @@ poetry run python -m unusual_options.cli scan-all \
 ### Signal Storage
 
 All detected signals are automatically stored in the Supabase database with:
+
 - Signal metadata (ticker, contract, grade, score)
 - Detection timestamp
 - Premium flow, volume, open interest data
@@ -125,6 +125,7 @@ All detected signals are automatically stored in the Supabase database with:
 ### Continuity Tracking
 
 The scanner includes continuity tracking to:
+
 - **Detect new signals:** First-time detection of unusual activity
 - **Track signal evolution:** Monitor how signals change over time
 - **Prevent duplicates:** Avoid storing the same signal multiple times
@@ -149,11 +150,13 @@ The scanner includes continuity tracking to:
 ### Success Indicators
 
 ✅ **Workflow completes successfully**
+
 - Exit code: 0
 - "Scanning all tickers..." completes
 - Signals displayed in output (if any found)
 
 ✅ **Signals stored in database**
+
 - Check Supabase dashboard → `unusual_options_signals` table
 - Verify `detection_timestamp` is recent
 - Confirm `is_active = true` for new signals
@@ -161,6 +164,7 @@ The scanner includes continuity tracking to:
 ### Log Output
 
 The workflow logs include:
+
 - Configuration status
 - Scan progress
 - Detected signals (formatted table)
@@ -188,6 +192,7 @@ The workflow logs include:
 **Problem:** Workflow exceeds 60-minute timeout.
 
 **Solutions:**
+
 - Reduce the `limit` parameter to scan fewer tickers
 - Check for API rate limiting issues
 - Review logs for specific bottlenecks
@@ -197,11 +202,13 @@ The workflow logs include:
 **Status:** This is normal.
 
 **Explanation:** Most scans don't find unusual activity. This indicates:
+
 - Market conditions are normal
 - Detection thresholds are working correctly
 - No insider-type activity detected
 
 **To find more signals:**
+
 - Lower the `min_grade` parameter (try `C` or `D`)
 - Scan during high-volatility periods
 - Check during earnings season
@@ -211,6 +218,7 @@ The workflow logs include:
 **Problem:** Cannot connect to Supabase.
 
 **Solutions:**
+
 1. Verify GitHub Secrets are set correctly
 2. Check Supabase project is active
 3. Verify service role key has write permissions
@@ -221,6 +229,7 @@ The workflow logs include:
 **Problem:** Poetry dependencies fail to install.
 
 **Solutions:**
+
 - Check `poetry.lock` file is committed
 - Verify Python version compatibility
 - Clear GitHub Actions cache and retry
@@ -233,6 +242,7 @@ The workflow logs include:
    - Check environment variable values (masked)
 
 2. **Test Locally:**
+
    ```bash
    cd unusual-options-service
    poetry run python -m unusual_options.cli scan-all \
@@ -276,6 +286,7 @@ The workflow logs include:
 ### 1. Start with Limited Scans
 
 When testing, use a small limit:
+
 ```
 limit: 100
 ```
@@ -283,6 +294,7 @@ limit: 100
 ### 2. Monitor Signal Quality
 
 Review detected signals regularly:
+
 - Check signal grades match expectations
 - Verify premium flow amounts are reasonable
 - Confirm tickers are relevant to your strategy
@@ -296,6 +308,7 @@ Review detected signals regularly:
 ### 4. Review Workflow History
 
 Regularly check:
+
 - Workflow success rate
 - Execution times
 - Error patterns
@@ -319,12 +332,14 @@ Regularly check:
 ## Changelog
 
 ### November 13, 2025
+
 - **Fixed:** `--limit` flag handling for empty values
   - Workflow now conditionally includes `--limit` only when a value is provided
   - Prevents "Invalid value for '--limit'" errors during scheduled runs
   - Manual triggers with empty limit now work correctly
 
 ### Previous Updates
+
 - Initial workflow setup with scheduled scans
 - Manual trigger support with custom parameters
 - Continuity tracking integration
@@ -333,4 +348,3 @@ Regularly check:
 ---
 
 **Need Help?** Check the [FAQ](faq.md) or review workflow logs for specific error messages.
-

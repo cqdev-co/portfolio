@@ -48,6 +48,7 @@ penny-stock-scanner/
 ### 1. Models (Pydantic)
 
 **ExplosionSignal**: Core signal model with penny-specific metrics
+
 ```python
 class ExplosionSignal(BaseModel):
     # Volume metrics (50% weight)
@@ -58,7 +59,7 @@ class ExplosionSignal(BaseModel):
     volume_acceleration_5d: float
     volume_consistency_score: float
     dollar_volume: float
-    
+
     # Momentum metrics (30% weight)
     is_consolidating: bool
     consolidation_days: Optional[int]
@@ -67,13 +68,14 @@ class ExplosionSignal(BaseModel):
     price_change_10d: float
     price_change_20d: float
     higher_lows_detected: bool
-    
+
     # ... (see models/analysis.py for full definition)
 ```
 
 ### 2. Technical Indicators
 
 **TechnicalIndicatorCalculator**: Calculates all indicators
+
 ```python
 class TechnicalIndicatorCalculator:
     def calculate_all_indicators(self, market_data):
@@ -83,7 +85,7 @@ class TechnicalIndicatorCalculator:
         # RSI (14-period)
         # MACD (12,26,9)
         # 52-week high/low
-        
+
     # Penny-specific calculations
     def detect_consolidation(self, ohlcv_data) -> Tuple[bool, int, float]
     def detect_higher_lows(self, ohlcv_data) -> bool
@@ -94,6 +96,7 @@ class TechnicalIndicatorCalculator:
 ### 3. Analysis Service
 
 **AnalysisService**: Core signal detection
+
 ```python
 class AnalysisService:
     async def analyze_symbol(self, market_data) -> Optional[AnalysisResult]:
@@ -103,13 +106,13 @@ class AnalysisService:
         # 4. Generate overall score
         # 5. Rank opportunity
         # 6. Calculate risk management
-        
+
     def _score_volume_analysis(self, metrics) -> float:
         # Volume surge: 20%
         # Volume acceleration: 15%
         # Volume consistency: 10%
         # Liquidity depth: 5%
-        
+
     def _score_momentum(self, metrics) -> float:
         # Consolidation detection: 12%
         # Price acceleration: 10%
@@ -120,6 +123,7 @@ class AnalysisService:
 ### 4. Database Integration
 
 **DatabaseService**: Signal storage and retrieval
+
 ```python
 class DatabaseService:
     async def store_signal(self, result, scan_date) -> bool
@@ -147,7 +151,7 @@ overall_score = (
 ```python
 def _score_volume_analysis(self, metrics):
     score = 0.0
-    
+
     # Volume surge (20%)
     if volume_ratio >= 5.0:
         surge_score = 1.0
@@ -157,17 +161,17 @@ def _score_volume_analysis(self, metrics):
         surge_score = 0.65
     # ...
     score += surge_score * 0.20
-    
+
     # Volume acceleration (15%)
     accel_score = normalize_score(accel_5d, 0, 200)
     score += accel_score * 0.15
-    
+
     # Volume consistency (10%)
     score += consistency * 0.10
-    
+
     # Liquidity depth (5%)
     score += liquidity_score * 0.05
-    
+
     return score
 ```
 
@@ -181,33 +185,33 @@ CREATE TABLE penny_stock_signals (
     symbol VARCHAR(10) NOT NULL,
     scan_date DATE NOT NULL,
     close_price DECIMAL(10,4),
-    
+
     -- Scores
     overall_score DECIMAL(5,4),
     volume_score DECIMAL(5,4),
     momentum_score DECIMAL(5,4),
     relative_strength_score DECIMAL(5,4),
     risk_score DECIMAL(5,4),
-    
+
     -- Volume metrics
     volume BIGINT,
     volume_ratio DECIMAL(8,2),
     volume_spike_factor DECIMAL(8,2),
     dollar_volume DECIMAL(15,2),
-    
+
     -- Momentum metrics
     is_consolidating BOOLEAN,
     is_breakout BOOLEAN,
     price_change_20d DECIMAL(8,2),
-    
+
     -- Indexes
     CONSTRAINT unique_signal_per_day UNIQUE (symbol, scan_date)
 );
 
 -- Performance indexes
-CREATE INDEX idx_penny_signals_overall_score 
+CREATE INDEX idx_penny_signals_overall_score
     ON penny_stock_signals(overall_score DESC);
-CREATE INDEX idx_penny_signals_symbol_date 
+CREATE INDEX idx_penny_signals_symbol_date
     ON penny_stock_signals(symbol, scan_date DESC);
 ```
 
@@ -222,14 +226,14 @@ class Settings(BaseSettings):
     penny_max_price: float = 5.00
     penny_min_volume: int = 200000
     penny_min_dollar_volume: float = 100000.0
-    
+
     # Scoring weights (must sum to 1.0)
     weight_volume_surge: float = 0.20
     weight_volume_acceleration: float = 0.15
     weight_volume_consistency: float = 0.10
     weight_liquidity_depth: float = 0.05
     # ... (30% momentum, 15% strength, 5% risk)
-    
+
     def validate_weights(self) -> bool:
         total = sum([all_weights])
         return abs(total - 1.0) < 0.001
@@ -243,7 +247,7 @@ class Settings(BaseSettings):
 async def get_market_data(self, symbol: str, period: str = "6mo"):
     ticker = yf.Ticker(symbol)
     hist = ticker.history(period=period)
-    
+
     # Convert to OHLCVData objects
     ohlcv_data = [
         OHLCVData(
@@ -256,7 +260,7 @@ async def get_market_data(self, symbol: str, period: str = "6mo"):
         )
         for index, row in hist.iterrows()
     ]
-    
+
     return MarketData(symbol=symbol, ohlcv_data=ohlcv_data)
 ```
 
@@ -266,15 +270,15 @@ async def get_market_data(self, symbol: str, period: str = "6mo"):
 async def get_multiple_symbols(self, symbols, period="6mo"):
     results = {}
     batch_size = self.settings.max_concurrent_requests
-    
+
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i+batch_size]
         tasks = [self.get_market_data(sym, period) for sym in batch]
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Brief delay between batches
         await asyncio.sleep(0.5)
-    
+
     return results
 ```
 
@@ -303,10 +307,10 @@ def test_volume_score():
 async def test_full_analysis_workflow():
     # Fetch data
     market_data = await data_service.get_market_data("AEMD", "6mo")
-    
+
     # Analyze
     result = await analysis_service.analyze_symbol(market_data)
-    
+
     # Verify
     assert result is not None
     assert result.overall_score >= 0.0
@@ -366,6 +370,7 @@ except AnalysisError as e:
 ### Production Checklist
 
 1. **Environment Setup**:
+
    ```bash
    # .env file with production credentials
    NEXT_PUBLIC_SUPABASE_URL=prod_url
@@ -373,12 +378,14 @@ except AnalysisError as e:
    ```
 
 2. **Database Setup**:
+
    ```bash
    # Run SQL schema
    psql -h your-supabase-host -f db/penny_stock_signals.sql
    ```
 
 3. **Dependencies**:
+
    ```bash
    poetry install --no-dev  # Production only
    ```
@@ -395,7 +402,7 @@ except AnalysisError as e:
 name: Daily Penny Stock Scan
 on:
   schedule:
-    - cron: '0 13 * * 1-5'  # Weekdays at 1pm UTC
+    - cron: '0 13 * * 1-5' # Weekdays at 1pm UTC
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -461,17 +468,20 @@ class AIService:
 ## Best Practices
 
 ### Code Style
+
 - Follow PEP 8
 - Use type hints
 - Document public APIs
 - Keep functions focused
 
 ### Testing
+
 - Unit test all scoring functions
 - Integration test full workflows
 - Validate against historical data
 
 ### Logging
+
 ```python
 logger.info(f"Analyzing {len(symbols)} symbols")
 logger.warning(f"Symbol {symbol} has insufficient data")
@@ -480,6 +490,7 @@ logger.debug(f"Score breakdown: vol={vol_score}, mom={mom_score}")
 ```
 
 ### Error Handling
+
 - Catch specific exceptions
 - Log errors with context
 - Fail gracefully
@@ -488,6 +499,7 @@ logger.debug(f"Score breakdown: vol={vol_score}, mom={mom_score}")
 ## Maintenance
 
 ### Regular Tasks
+
 - Update penny ticker database (weekly)
 - Monitor scan performance
 - Review and adjust thresholds
@@ -495,6 +507,7 @@ logger.debug(f"Score breakdown: vol={vol_score}, mom={mom_score}")
 - Update dependencies
 
 ### Monitoring
+
 - Track signal generation rate
 - Monitor API rate limits
 - Check database size growth
@@ -504,8 +517,8 @@ logger.debug(f"Score breakdown: vol={vol_score}, mom={mom_score}")
 ## Support
 
 For questions or issues:
+
 - Review documentation in `docs/`
 - Check error logs
 - Verify configuration in `.env`
 - Ensure database schema is current
-

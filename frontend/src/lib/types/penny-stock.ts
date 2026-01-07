@@ -2,10 +2,10 @@
  * Type definitions for Penny Stock Scanner signals and analysis
  */
 
-export type TrendDirection = "bullish" | "bearish" | "neutral";
-export type SignalStatus = "NEW" | "CONTINUING" | "ENDED";
-export type OpportunityRank = "S" | "A" | "B" | "C" | "D";
-export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "EXTREME";
+export type TrendDirection = 'bullish' | 'bearish' | 'neutral';
+export type SignalStatus = 'NEW' | 'CONTINUING' | 'ENDED';
+export type OpportunityRank = 'S' | 'A' | 'B' | 'C' | 'D';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
 
 /**
  * Penny Stock Signal with explosion setup detection
@@ -15,21 +15,21 @@ export interface PennyStockSignal {
   id: string;
   symbol: string;
   scan_date: string;
-  
+
   // Price data
   close_price: number;
-  
+
   // Overall assessment
   overall_score: number;
   opportunity_rank: OpportunityRank;
   recommendation: string;
-  
+
   // Component scores
   volume_score: number;
   momentum_score: number;
   relative_strength_score: number;
   risk_score: number;
-  
+
   // Volume metrics (50% weight)
   volume: number;
   avg_volume_20d: number | null;
@@ -39,7 +39,7 @@ export interface PennyStockSignal {
   volume_acceleration_5d: number | null;
   volume_consistency_score: number | null;
   dollar_volume: number | null;
-  
+
   // Price momentum & consolidation (30% weight)
   is_consolidating: boolean | null;
   consolidation_days: number | null;
@@ -50,21 +50,21 @@ export interface PennyStockSignal {
   price_change_20d: number | null;
   higher_lows_detected: boolean | null;
   consecutive_green_days: number | null;
-  
+
   // Moving averages
   ema_20: number | null;
   ema_50: number | null;
   price_vs_ema20: number | null;
   price_vs_ema50: number | null;
   ema_crossover_signal: boolean | null;
-  
+
   // Relative strength (15% weight)
   market_outperformance: number | null;
   sector_outperformance: number | null;
   distance_from_52w_low: number | null;
   distance_from_52w_high: number | null;
   breaking_resistance: boolean | null;
-  
+
   // Risk & liquidity (5% weight)
   bid_ask_spread_pct: number | null;
   avg_spread_5d: number | null;
@@ -73,26 +73,26 @@ export interface PennyStockSignal {
   daily_volatility: number | null;
   atr_20: number | null;
   pump_dump_risk: RiskLevel | null;
-  
+
   // Country risk (added Dec 2024)
   country: string | null;
   is_high_risk_country: boolean | null;
   pump_dump_warning: boolean | null;
-  
+
   // Trend context
   trend_direction: TrendDirection | null;
-  
+
   // Signal metadata
   signal_status: SignalStatus;
   days_active: number;
-  
+
   // Risk management
   stop_loss_level: number | null;
   position_size_pct: number | null;
-  
+
   // Data quality
   data_quality_score: number | null;
-  
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -120,7 +120,7 @@ export interface PennyStockFilters {
  */
 export interface PennyStockSortConfig {
   field: keyof PennyStockSignal;
-  direction: "asc" | "desc";
+  direction: 'asc' | 'desc';
 }
 
 /**
@@ -146,4 +146,3 @@ export interface PennyStockResponse {
   error: string | null;
   count?: number;
 }
-

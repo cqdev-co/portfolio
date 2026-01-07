@@ -55,15 +55,15 @@ After the fetch completes, check your data:
 ### Query 1: Count Total Tickers
 
 ```sql
-SELECT COUNT(*) as total_penny_tickers 
-FROM penny_tickers 
+SELECT COUNT(*) as total_penny_tickers
+FROM penny_tickers
 WHERE is_active = true;
 ```
 
 ### Query 2: View High-Quality Stocks
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     current_price,
@@ -80,7 +80,7 @@ LIMIT 20;
 ### Query 3: Risk Distribution
 
 ```sql
-SELECT 
+SELECT
     risk_level,
     COUNT(*) as count,
     AVG(current_price) as avg_price,
@@ -109,7 +109,7 @@ SELECT refresh_active_quality_penny_tickers();
 ### Find Low-Risk Penny Stocks Under $2
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     current_price,
@@ -128,7 +128,7 @@ LIMIT 25;
 ### Find SEC-Reporting OTC Stocks
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     exchange,
@@ -147,7 +147,7 @@ LIMIT 20;
 ### Find Recently Active Stocks
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     current_price,
@@ -168,7 +168,7 @@ LIMIT 20;
 ### Find Volatile Penny Stocks
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     current_price,
@@ -196,10 +196,11 @@ Edit `.github/workflows/fetch-penny-tickers.yml`:
 on:
   schedule:
     # Change the cron schedule here
-    - cron: '0 7 * * 1'  # Default: Mondays at 7 AM UTC
+    - cron: '0 7 * * 1' # Default: Mondays at 7 AM UTC
 ```
 
 Cron schedule examples:
+
 - `'0 7 * * 1'` - Every Monday at 7 AM UTC
 - `'0 12 * * 1,4'` - Mondays and Thursdays at 12 PM UTC
 - `'0 6 * * *'` - Every day at 6 AM UTC
@@ -250,7 +251,7 @@ SELECT cron.schedule(
 Weekly quality check:
 
 ```sql
-SELECT 
+SELECT
     COUNT(*) as total_tickers,
     AVG(data_quality_score) as avg_quality,
     COUNT(CASE WHEN data_quality_score >= 70 THEN 1 END) as high_quality_count,
@@ -281,7 +282,7 @@ async function fetchQualityPennyStocks() {
     .from('active_quality_penny_tickers')
     .select('*')
     .limit(50);
-  
+
   if (error) throw error;
   return data;
 }
@@ -294,7 +295,7 @@ async function searchPennyStock(symbol: string) {
     .eq('symbol', symbol.toUpperCase())
     .eq('is_active', true)
     .single();
-  
+
   if (error) throw error;
   return data;
 }
@@ -303,7 +304,7 @@ async function searchPennyStock(symbol: string) {
 async function filterPennyStocks({
   maxPrice = 5.0,
   riskLevel = 'low',
-  minVolume = 100000
+  minVolume = 100000,
 }) {
   const { data, error } = await supabase
     .from('penny_tickers')
@@ -314,7 +315,7 @@ async function filterPennyStocks({
     .gte('average_volume', minVolume)
     .order('data_quality_score', { ascending: false })
     .limit(100);
-  
+
   if (error) throw error;
   return data;
 }
@@ -370,6 +371,7 @@ print(sector_analysis)
 ### Quality scores too low?
 
 Lower the volume requirement:
+
 ```bash
 python fetch_penny_tickers.py --min-volume 5000
 ```
@@ -377,6 +379,7 @@ python fetch_penny_tickers.py --min-volume 5000
 ### Fetch taking too long?
 
 Reduce the ticker limit:
+
 ```bash
 python fetch_penny_tickers.py --max-tickers 1000
 ```
@@ -407,12 +410,12 @@ Now that your penny tickers system is running:
 
 Common issues and solutions:
 
-| Issue | Solution |
-|-------|----------|
-| "No API key found" | Add keys to `.env` or GitHub Secrets |
-| "No tickers fetched" | Check API limits, try dry-run with verbose |
-| "Permission denied" | Verify service role key, check RLS policies |
-| "Timeout" | Reduce `--max-tickers` or increase workflow timeout |
+| Issue                | Solution                                            |
+| -------------------- | --------------------------------------------------- |
+| "No API key found"   | Add keys to `.env` or GitHub Secrets                |
+| "No tickers fetched" | Check API limits, try dry-run with verbose          |
+| "Permission denied"  | Verify service role key, check RLS policies         |
+| "Timeout"            | Reduce `--max-tickers` or increase workflow timeout |
 
 ---
 
@@ -430,4 +433,3 @@ psql -c "SELECT refresh_active_quality_penny_tickers();"
 ```
 
 **You're all set! 🚀**
-

@@ -4,13 +4,13 @@
  * account size, and historical performance
  */
 
-import type { 
-  StrategyType, 
-  StrategyRecommendation, 
+import type {
+  StrategyType,
+  StrategyRecommendation,
   MarketRegime,
   TickerHistory,
-  FairValueResult 
-} from "../types/index.ts";
+  FairValueResult,
+} from '../types/index.ts';
 
 // ============================================================================
 // STRATEGY DEFINITIONS
@@ -21,57 +21,60 @@ interface StrategyProfile {
   name: string;
   description: string;
   minAccountSize: number;
-  minPrice: number;       // Minimum stock price for this strategy
-  maxPrice: number;       // Maximum practical stock price
+  minPrice: number; // Minimum stock price for this strategy
+  maxPrice: number; // Maximum practical stock price
   idealRegimes: MarketRegime[];
   winRateExpected: number; // Expected win rate (0-100)
-  riskLevel: "low" | "medium" | "high";
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
 const STRATEGIES: StrategyProfile[] = [
   {
-    type: "deep_itm_cds",
-    name: "Deep ITM Call Debit Spread",
-    description: "Buy deep ITM call, sell ATM call. High probability, defined risk.",
+    type: 'deep_itm_cds',
+    name: 'Deep ITM Call Debit Spread',
+    description:
+      'Buy deep ITM call, sell ATM call. High probability, defined risk.',
     minAccountSize: 300,
     minPrice: 20,
     maxPrice: 500,
-    idealRegimes: ["bull", "neutral"],
+    idealRegimes: ['bull', 'neutral'],
     winRateExpected: 70,
-    riskLevel: "low",
+    riskLevel: 'low',
   },
   {
-    type: "put_credit_spread",
-    name: "Put Credit Spread",
-    description: "Sell OTM put, buy further OTM put. Collect premium, bullish bet.",
+    type: 'put_credit_spread',
+    name: 'Put Credit Spread',
+    description:
+      'Sell OTM put, buy further OTM put. Collect premium, bullish bet.',
     minAccountSize: 500,
     minPrice: 30,
     maxPrice: 300,
-    idealRegimes: ["bull"],
+    idealRegimes: ['bull'],
     winRateExpected: 65,
-    riskLevel: "medium",
+    riskLevel: 'medium',
   },
   {
-    type: "cash_secured_put",
-    name: "Cash Secured Put",
-    description: "Sell put with cash to buy shares. Income + potential ownership.",
+    type: 'cash_secured_put',
+    name: 'Cash Secured Put',
+    description:
+      'Sell put with cash to buy shares. Income + potential ownership.',
     minAccountSize: 1000,
     minPrice: 10,
     maxPrice: 50,
-    idealRegimes: ["bull", "neutral"],
+    idealRegimes: ['bull', 'neutral'],
     winRateExpected: 75,
-    riskLevel: "medium",
+    riskLevel: 'medium',
   },
   {
-    type: "stock_purchase",
-    name: "Stock Purchase",
-    description: "Direct stock ownership. Simple, no expiration risk.",
+    type: 'stock_purchase',
+    name: 'Stock Purchase',
+    description: 'Direct stock ownership. Simple, no expiration risk.',
     minAccountSize: 100,
     minPrice: 1,
     maxPrice: 100,
-    idealRegimes: ["bull", "neutral", "bear"],
+    idealRegimes: ['bull', 'neutral', 'bear'],
     winRateExpected: 55,
-    riskLevel: "medium",
+    riskLevel: 'medium',
   },
 ];
 
@@ -84,18 +87,18 @@ export interface StrategySelectionInput {
   currentPrice: number;
   accountSize: number;
   marketRegime: MarketRegime;
-  
+
   // Technical context
   score?: number;
   rsiValue?: number;
   aboveMA200?: boolean;
-  
+
   // Valuation context
   fairValue?: FairValueResult;
-  
+
   // History context
   history?: TickerHistory;
-  
+
   // Options context (if available)
   hasOptions?: boolean;
   nearestExpiration?: Date;
@@ -172,17 +175,19 @@ function scoreStrategy(
   // 5. Historical performance with this strategy
   if (input.history && input.history.totalTrades >= 3) {
     const typeWins = input.history.recentTrades.filter(
-      t => t.outcome === "win" || t.outcome === "max_profit"
+      (t) => t.outcome === 'win' || t.outcome === 'max_profit'
     );
     const typeTrades = input.history.recentTrades.filter(
-      t => getStrategyTypeFromTradeType(t.tradeType) === profile.type
+      (t) => getStrategyTypeFromTradeType(t.tradeType) === profile.type
     );
-    
+
     if (typeTrades.length >= 2) {
       const typeWinRate = typeWins.length / typeTrades.length;
       if (typeWinRate >= 0.7) {
         score += 15;
-        reasoning.push(`You have ${Math.round(typeWinRate * 100)}% win rate with this strategy`);
+        reasoning.push(
+          `You have ${Math.round(typeWinRate * 100)}% win rate with this strategy`
+        );
       } else if (typeWinRate < 0.4) {
         score -= 10;
         reasoning.push(`Lower win rate with this strategy historically`);
@@ -192,41 +197,49 @@ function scoreStrategy(
 
   // 6. Valuation bonus for certain strategies
   if (input.fairValue) {
-    if (profile.type === "stock_purchase" && input.fairValue.verdict === "undervalued") {
+    if (
+      profile.type === 'stock_purchase' &&
+      input.fairValue.verdict === 'undervalued'
+    ) {
       score += 15;
-      reasoning.push("Stock appears undervalued - good for ownership");
+      reasoning.push('Stock appears undervalued - good for ownership');
     }
-    if (profile.type === "cash_secured_put" && input.fairValue.verdict === "undervalued") {
+    if (
+      profile.type === 'cash_secured_put' &&
+      input.fairValue.verdict === 'undervalued'
+    ) {
       score += 10;
-      reasoning.push("Would be happy to own at lower price");
+      reasoning.push('Would be happy to own at lower price');
     }
   }
 
   // 7. RSI context
   if (input.rsiValue !== undefined) {
-    if (profile.type === "deep_itm_cds" && input.rsiValue < 50) {
+    if (profile.type === 'deep_itm_cds' && input.rsiValue < 50) {
       score += 10;
-      reasoning.push("RSI favorable for bullish spread");
+      reasoning.push('RSI favorable for bullish spread');
     }
-    if (profile.type === "put_credit_spread" && input.rsiValue > 60) {
+    if (profile.type === 'put_credit_spread' && input.rsiValue > 60) {
       score -= 10;
-      reasoning.push("RSI elevated - wait for pullback");
+      reasoning.push('RSI elevated - wait for pullback');
     }
   }
 
   // 8. Options availability
-  if (!input.hasOptions && profile.type !== "stock_purchase") {
+  if (!input.hasOptions && profile.type !== 'stock_purchase') {
     score -= 50;
-    reasoning.push("Options not available");
+    reasoning.push('Options not available');
   }
 
   // 9. Spread candidates bonus
   if (input.spreadCandidates && input.spreadCandidates.length > 0) {
-    if (profile.type === "deep_itm_cds") {
+    if (profile.type === 'deep_itm_cds') {
       const bestSpread = input.spreadCandidates[0];
       if (bestSpread.cushionPct >= 5) {
         score += 10;
-        reasoning.push(`Good spread available (${bestSpread.cushionPct.toFixed(1)}% cushion)`);
+        reasoning.push(
+          `Good spread available (${bestSpread.cushionPct.toFixed(1)}% cushion)`
+        );
       }
     }
   }
@@ -244,16 +257,16 @@ function scoreStrategy(
 
 function getStrategyTypeFromTradeType(tradeType: string): StrategyType {
   switch (tradeType) {
-    case "call_debit":
-      return "deep_itm_cds";
-    case "put_credit":
-      return "put_credit_spread";
-    case "put_debit":
-      return "wait"; // Bear strategy
-    case "call_credit":
-      return "wait"; // Bear strategy
+    case 'call_debit':
+      return 'deep_itm_cds';
+    case 'put_credit':
+      return 'put_credit_spread';
+    case 'put_debit':
+      return 'wait'; // Bear strategy
+    case 'call_credit':
+      return 'wait'; // Bear strategy
     default:
-      return "stock_purchase";
+      return 'stock_purchase';
   }
 }
 
@@ -264,29 +277,30 @@ function getStrategyTypeFromTradeType(tradeType: string): StrategyType {
 /**
  * Select the best strategy for current conditions
  */
-export function selectStrategy(
-  input: StrategySelectionInput
-): { primary: StrategyRecommendation; alternatives: StrategyRecommendation[] } {
+export function selectStrategy(input: StrategySelectionInput): {
+  primary: StrategyRecommendation;
+  alternatives: StrategyRecommendation[];
+} {
   // Score all strategies
-  const scored = STRATEGIES.map(profile => scoreStrategy(profile, input));
-  
+  const scored = STRATEGIES.map((profile) => scoreStrategy(profile, input));
+
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
-  
+
   // Convert to recommendations
-  const recommendations = scored.map(s => buildRecommendation(s, input));
-  
+  const recommendations = scored.map((s) => buildRecommendation(s, input));
+
   // Primary = highest scoring that's viable (score > 0)
-  const viable = recommendations.filter(r => r.confidence > 30);
-  
+  const viable = recommendations.filter((r) => r.confidence > 30);
+
   if (viable.length === 0) {
     // No good strategies - recommend waiting
     return {
       primary: {
-        type: "wait",
-        name: "Wait for Better Setup",
+        type: 'wait',
+        name: 'Wait for Better Setup',
         description: "Current conditions don't favor any strategy",
-        reasoning: ["Account size or market conditions not favorable"],
+        reasoning: ['Account size or market conditions not favorable'],
         confidence: 0,
         riskAmount: 0,
         positionSize: 0,
@@ -294,7 +308,7 @@ export function selectStrategy(
       alternatives: [],
     };
   }
-  
+
   return {
     primary: viable[0],
     alternatives: viable.slice(1, 3), // Top 2 alternatives
@@ -309,15 +323,15 @@ function buildRecommendation(
   input: StrategySelectionInput
 ): StrategyRecommendation {
   const { profile, reasoning, confidence } = scored;
-  
+
   // Calculate position sizing (max 20% of account per position)
-  const maxRisk = input.accountSize * 0.20;
-  
+  const maxRisk = input.accountSize * 0.2;
+
   // Calculate actual risk based on strategy
   let riskAmount: number;
-  let spread: StrategyRecommendation["spread"];
-  
-  if (profile.type === "deep_itm_cds" && input.spreadCandidates?.[0]) {
+  let spread: StrategyRecommendation['spread'];
+
+  if (profile.type === 'deep_itm_cds' && input.spreadCandidates?.[0]) {
     const candidate = input.spreadCandidates[0];
     riskAmount = Math.min(candidate.netDebit * 100, maxRisk);
     spread = {
@@ -329,16 +343,16 @@ function buildRecommendation(
       breakeven: candidate.breakeven,
       cushionPct: candidate.cushionPct,
     };
-  } else if (profile.type === "stock_purchase") {
+  } else if (profile.type === 'stock_purchase') {
     // Buy shares worth up to maxRisk
     riskAmount = Math.min(input.currentPrice, maxRisk);
   } else {
     // Default spread risk estimation
     riskAmount = Math.min(input.currentPrice * 0.05 * 100, maxRisk);
   }
-  
+
   const positionSize = (riskAmount / input.accountSize) * 100;
-  
+
   return {
     type: profile.type,
     name: profile.name,
@@ -362,33 +376,33 @@ export function formatStrategyForDisplay(
   rec: StrategyRecommendation
 ): string[] {
   const lines: string[] = [];
-  
+
   // Strategy name and type
-  const confidence = rec.confidence >= 70 ? "✅" : 
-                     rec.confidence >= 50 ? "⚠️" : "❌";
+  const confidence =
+    rec.confidence >= 70 ? '✅' : rec.confidence >= 50 ? '⚠️' : '❌';
   lines.push(`${confidence} ${rec.name}`);
-  
+
   // Spread details if available
   if (rec.spread) {
-    const expDate = rec.spread.expiration.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
+    const expDate = rec.spread.expiration.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
     });
     lines.push(
       `   Buy $${rec.spread.longStrike}C / Sell $${rec.spread.shortStrike}C (${expDate})`
     );
     lines.push(
       `   Cost: $${(rec.spread.netDebit * 100).toFixed(0)} | ` +
-      `Max Profit: $${(rec.spread.maxProfit * 100).toFixed(0)} | ` +
-      `Cushion: ${rec.spread.cushionPct.toFixed(1)}%`
+        `Max Profit: $${(rec.spread.maxProfit * 100).toFixed(0)} | ` +
+        `Cushion: ${rec.spread.cushionPct.toFixed(1)}%`
     );
   }
-  
+
   // Key reasoning (first 2)
   for (const reason of rec.reasoning.slice(0, 2)) {
     lines.push(`   ${reason}`);
   }
-  
+
   return lines;
 }
 
@@ -397,16 +411,15 @@ export function formatStrategyForDisplay(
  */
 export function getStrategyEmoji(type: StrategyType): string {
   switch (type) {
-    case "deep_itm_cds":
-      return "📈";
-    case "put_credit_spread":
-      return "💰";
-    case "cash_secured_put":
-      return "🏦";
-    case "stock_purchase":
-      return "📊";
-    case "wait":
-      return "⏳";
+    case 'deep_itm_cds':
+      return '📈';
+    case 'put_credit_spread':
+      return '💰';
+    case 'cash_secured_put':
+      return '🏦';
+    case 'stock_purchase':
+      return '📊';
+    case 'wait':
+      return '⏳';
   }
 }
-

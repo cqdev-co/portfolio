@@ -3,10 +3,10 @@
 ## Overview
 
 A trading-focused AI chat assistant powered by **Ollama Cloud**, integrated as
-a floating chat panel. Uses the **Victor Chen** persona - a 67-year-old Wall 
+a floating chat panel. Uses the **Victor Chen** persona - a 67-year-old Wall
 Street veteran specializing in Deep ITM Call Debit Spreads.
 
-**Shared Logic**: The chat uses the same Victor persona as the CLI 
+**Shared Logic**: The chat uses the same Victor persona as the CLI
 (ai-analyst). See [AI Agent Integration](../ai-agent/INTEGRATION_PLAN.md).
 
 ## Architecture
@@ -49,12 +49,12 @@ frontend/src/
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OLLAMA_API_KEY` | - | **Required.** Your Ollama Cloud API key |
-| `OLLAMA_BASE_URL` | `https://ollama.com/api` | Ollama Cloud API endpoint |
-| `OLLAMA_MODEL` | `llama3.3:70b-cloud` | Default model for API route |
-| `NEXT_PUBLIC_OLLAMA_MODEL` | `llama3.3:70b-cloud` | Default model for frontend |
+| Variable                   | Default                  | Description                             |
+| -------------------------- | ------------------------ | --------------------------------------- |
+| `OLLAMA_API_KEY`           | -                        | **Required.** Your Ollama Cloud API key |
+| `OLLAMA_BASE_URL`          | `https://ollama.com/api` | Ollama Cloud API endpoint               |
+| `OLLAMA_MODEL`             | `llama3.3:70b-cloud`     | Default model for API route             |
+| `NEXT_PUBLIC_OLLAMA_MODEL` | `llama3.3:70b-cloud`     | Default model for frontend              |
 
 ### Setup
 
@@ -74,22 +74,23 @@ NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
 Models are fetched dynamically from the Ollama Cloud API (`/api/tags`).
 
 ### Model Selector
-The chat panel includes a dropdown to switch models on-the-fly. Models are 
+
+The chat panel includes a dropdown to switch models on-the-fly. Models are
 fetched from `/api/chat/models` which proxies the Ollama API.
 
 ### Popular Cloud Models
 
-| Model ID | Description |
-|----------|-------------|
-| `llama3.3:70b-cloud` | Fast and capable Meta model (default) |
-| `gpt-oss:120b` | Most capable open-source model |
-| `qwen3:235b-cloud` | Large reasoning model |
-| `deepseek-r1:671b-cloud` | Advanced reasoning model |
-| `llama3.1:405b-cloud` | Largest Llama model |
+| Model ID                 | Description                           |
+| ------------------------ | ------------------------------------- |
+| `llama3.3:70b-cloud`     | Fast and capable Meta model (default) |
+| `gpt-oss:120b`           | Most capable open-source model        |
+| `qwen3:235b-cloud`       | Large reasoning model                 |
+| `deepseek-r1:671b-cloud` | Advanced reasoning model              |
+| `llama3.1:405b-cloud`    | Largest Llama model                   |
 
 See all available models: https://ollama.com/search?c=cloud
 
-The model list updates automatically - just open the dropdown to see 
+The model list updates automatically - just open the dropdown to see
 all currently available Ollama Cloud models.
 
 ## Components
@@ -100,6 +101,7 @@ The AI Chat button is integrated directly into the main floating navbar alongsid
 other navigation items. This provides a unified experience with consistent styling.
 
 Features:
+
 - Part of the main `Dock` component in `navbar.tsx`
 - Magnification effect on hover (same as other navbar icons)
 - Tooltip on hover showing "AI Chat"
@@ -131,6 +133,7 @@ const [isChatOpen, setIsChatOpen] = useState(false);
 ### ChatPanel
 
 Full chat interface with:
+
 - Header with title, model selector, and action buttons
 - "New Chat" button to clear conversation and start fresh
 - Message history with auto-scroll
@@ -139,6 +142,7 @@ Full chat interface with:
 - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
 
 Uses the `useChat` hook from `@ai-sdk/react` (v6.0 stable API):
+
 - `sendMessage({ text: "..." })` for sending messages
 - `messages` - array of `UIMessage` objects with `parts` array
 - `status` for loading states (`ready`, `submitted`, `streaming`)
@@ -148,6 +152,7 @@ Uses the `useChat` hook from `@ai-sdk/react` (v6.0 stable API):
 ### ChatModelSelector
 
 Dropdown to select from available Ollama Cloud models:
+
 - Fetches models from `/api/chat/models` on mount
 - Shows model name and size
 - Falls back to defaults if API fails
@@ -156,6 +161,7 @@ Dropdown to select from available Ollama Cloud models:
 ### ChatMessage
 
 Renders individual messages matching the Vercel AI Chatbot template:
+
 - **User messages**: Primary color bubble, right-aligned
 - **Assistant messages**: No background, left-aligned with sparkles avatar
 - Full GitHub Flavored Markdown (GFM) via `react-markdown` + `remark-gfm`
@@ -163,6 +169,7 @@ Renders individual messages matching the Vercel AI Chatbot template:
 - Streaming cursor animation while loading
 
 **Supported markdown elements:**
+
 - Tables (with proper borders, headers, and responsive scrolling)
 - Code blocks with syntax highlighting container
 - Inline code with background
@@ -175,6 +182,7 @@ Renders individual messages matching the Vercel AI Chatbot template:
 ### ChatGreeting
 
 Empty state component with:
+
 - Welcome message with emoji
 - Grid of 4 suggested prompts
 - Animated entrance with staggered delays
@@ -224,9 +232,9 @@ The AI SDK sends messages in `UIMessage` format with `parts` array:
 {
   messages: Array<{
     id: string;
-    role: "user" | "assistant";
+    role: 'user' | 'assistant';
     parts: Array<{
-      type: "text";
+      type: 'text';
       text: string;
     }>;
   }>;
@@ -237,7 +245,7 @@ The API route extracts content from parts or falls back to direct content.
 
 ### Response
 
-The API uses AI SDK 6.0's `createUIMessageStream` and `createUIMessageStreamResponse` 
+The API uses AI SDK 6.0's `createUIMessageStream` and `createUIMessageStreamResponse`
 for proper streaming. The stream format uses `UIMessageChunk` types:
 
 - `text-start` - Begins a new text part
@@ -247,6 +255,7 @@ for proper streaming. The stream format uses `UIMessageChunk` types:
 ### Error Handling
 
 Returns JSON error response with details:
+
 ```json
 {
   "error": "Failed to process chat request",
@@ -264,13 +273,14 @@ Direct imports work via dual Turbopack/Webpack configuration.
 **Source of truth**: `lib/ai-agent/prompts/victor.ts`
 
 To update Victor's behavior:
+
 1. Edit `lib/ai-agent/prompts/victor.ts`
 2. Test with CLI: `cd ai-analyst && bun run chat`
 3. Changes automatically available in frontend! (direct import)
 
 ```typescript
 // src/app/api/chat/route.ts
-import { buildVictorLitePrompt } from "@lib/ai-agent";
+import { buildVictorLitePrompt } from '@lib/ai-agent';
 
 const systemPrompt = buildVictorLitePrompt({ accountSize: 1750 });
 ```
@@ -287,8 +297,8 @@ NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
 Or update the fallback in `lib/ai/models.ts`:
 
 ```typescript
-export const DEFAULT_CHAT_MODEL = 
-  process.env.NEXT_PUBLIC_OLLAMA_MODEL || "llama3.3:70b-cloud";
+export const DEFAULT_CHAT_MODEL =
+  process.env.NEXT_PUBLIC_OLLAMA_MODEL || 'llama3.3:70b-cloud';
 ```
 
 ### Suggested Actions
@@ -297,7 +307,7 @@ Edit in `src/components/chat/chat-greeting.tsx`:
 
 ```typescript
 const suggestedActions: SuggestedAction[] = [
-  { label: "Your prompt label", prompt: "The actual prompt" },
+  { label: 'Your prompt label', prompt: 'The actual prompt' },
   // ...
 ];
 ```
@@ -305,6 +315,7 @@ const suggestedActions: SuggestedAction[] = [
 ### Styling
 
 All components use Tailwind CSS and respect the app's theme variables:
+
 - `primary` / `primary-foreground` for user messages
 - `muted` / `muted-foreground` for accents
 - `background` / `foreground` for base colors
@@ -315,15 +326,16 @@ The chat supports tool calling via shared handlers from `lib/ai-agent`:
 
 ### Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `get_ticker_data` | Fetches stock data from Yahoo Finance |
-| `web_search` | Web search (requires search function injection) |
-| `analyze_position` | Analyzes existing spread positions |
+| Tool               | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| `get_ticker_data`  | Fetches stock data from Yahoo Finance           |
+| `web_search`       | Web search (requires search function injection) |
+| `analyze_position` | Analyzes existing spread positions              |
 
 ### Data Cards
 
 When Victor uses the `get_ticker_data` tool, a data card is displayed showing:
+
 - Price, change, RSI, ADX
 - Moving averages (MA20, MA50, MA200)
 - Market cap, P/E ratio, sector comparison
@@ -348,6 +360,7 @@ The API streams data events for tool calls:
 ```
 
 The frontend parses these events and renders:
+
 - `ToolStatusIndicator` during tool execution
 - `TickerDataCard` when data is received
 

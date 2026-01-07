@@ -50,19 +50,22 @@ class YFinanceValidator:
     - OHLC violations
     - Missing price/volume data
     - Insufficient history
+    
+    Default thresholds are calibrated for institutional-grade tickers
+    with sufficient liquidity and data quality.
     """
     
     def __init__(
         self,
-        min_history_days: int = 90,
-        min_volume: float = 10_000,
-        min_price: float = 0.50,
+        min_history_days: int = 180,         # 6 months history (was 90)
+        min_volume: float = 100_000,         # 100K shares/day (was 10K)
+        min_price: float = 2.00,             # $2 minimum (was $0.50)
         max_price: float = 10_000,
-        min_data_completeness: float = 0.85,  # 85% data completeness
-        max_gap_ratio: float = 0.10,  # Max 10% gaps allowed
-        recency_days: int = 5,  # Must have data within last 5 days
-        max_workers: int = 3,  # Reduced to avoid rate limiting
-        request_delay: float = 0.5  # Delay between requests
+        min_data_completeness: float = 0.90, # 90% completeness (was 85%)
+        max_gap_ratio: float = 0.05,         # Max 5% gaps (was 10%)
+        recency_days: int = 5,               # Must have data within 5 days
+        max_workers: int = 3,                # Reduced to avoid rate limiting
+        request_delay: float = 0.5           # Delay between requests
     ):
         self.min_history_days = min_history_days
         self.min_volume = min_volume

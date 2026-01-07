@@ -16,17 +16,17 @@ Performs a web search for a single query and returns relevant results.
 
 `POST https://ollama.com/api/web_search`
 
-* `query` (string, required): the search query string
-* `max_results` (integer, optional): maximum results to return (default 5, max 10)
+- `query` (string, required): the search query string
+- `max_results` (integer, optional): maximum results to return (default 5, max 10)
 
 ### Response
 
 Returns an object containing:
 
-* `results` (array): array of search result objects, each containing:
-  * `title` (string): the title of the web page
-  * `url` (string): the URL of the web page
-  * `content` (string): relevant content snippet from the web page
+- `results` (array): array of search result objects, each containing:
+  - `title` (string): the title of the web page
+  - `url` (string): the URL of the web page
+  - `content` (string): relevant content snippet from the web page
 
 ### Examples
 
@@ -36,7 +36,7 @@ Returns an object containing:
 
 #### cURL Request
 
-```bash  theme={"system"}
+```bash theme={"system"}
 curl https://ollama.com/api/web_search \
   --header "Authorization: Bearer $OLLAMA_API_KEY" \
 	-d '{
@@ -46,7 +46,7 @@ curl https://ollama.com/api/web_search \
 
 **Response**
 
-```json  theme={"system"}
+```json theme={"system"}
 {
   "results": [
     {
@@ -70,7 +70,7 @@ curl https://ollama.com/api/web_search \
 
 #### Python library
 
-```python  theme={"system"}
+```python theme={"system"}
 import ollama
 response = ollama.web_search("What is Ollama?")
 print(response)
@@ -78,7 +78,7 @@ print(response)
 
 **Example output**
 
-```python  theme={"system"}
+```python theme={"system"}
 
 results = [
     {
@@ -104,17 +104,17 @@ More Ollama [Python example](https://github.com/ollama/ollama-python/blob/main/e
 
 #### JavaScript Library
 
-```tsx  theme={"system"}
-import { Ollama } from "ollama";
+```tsx theme={"system"}
+import { Ollama } from 'ollama';
 
 const client = new Ollama();
-const results = await client.webSearch({ query: "what is ollama?" });
+const results = await client.webSearch({ query: 'what is ollama?' });
 console.log(JSON.stringify(results, null, 2));
 ```
 
 **Example output**
 
-```json  theme={"system"}
+```json theme={"system"}
 {
   "results": [
     {
@@ -146,21 +146,21 @@ Fetches a single web page by URL and returns its content.
 
 `POST https://ollama.com/api/web_fetch`
 
-* `url` (string, required): the URL to fetch
+- `url` (string, required): the URL to fetch
 
 ### Response
 
 Returns an object containing:
 
-* `title` (string): the title of the web page
-* `content` (string): the main content of the web page
-* `links` (array): array of links found on the page
+- `title` (string): the title of the web page
+- `content` (string): the main content of the web page
+- `links` (array): array of links found on the page
 
 ### Examples
 
 #### cURL Request
 
-```python  theme={"system"}
+```python theme={"system"}
 curl --request POST \
   --url https://ollama.com/api/web_fetch \
   --header "Authorization: Bearer $OLLAMA_API_KEY" \
@@ -172,7 +172,7 @@ curl --request POST \
 
 **Response**
 
-```json  theme={"system"}
+```json theme={"system"}
 {
   "title": "Ollama",
   "content": "[Cloud models](https://ollama.com/blog/cloud-models) are now available in Ollama...",
@@ -186,7 +186,7 @@ curl --request POST \
 
 #### Python SDK
 
-```python  theme={"system"}
+```python theme={"system"}
 from ollama import web_fetch
 
 result = web_fetch('https://ollama.com')
@@ -195,7 +195,7 @@ print(result)
 
 **Result**
 
-```python  theme={"system"}
+```python theme={"system"}
 WebFetchResponse(
     title='Ollama',
     content='[Cloud models](https://ollama.com/blog/cloud-models) are now available in Ollama\n\n**Chat & build
@@ -207,17 +207,17 @@ models](https://ollama.com/models)\n\nAvailable for macOS, Windows, and Linux',
 
 #### JavaScript SDK
 
-```tsx  theme={"system"}
-import { Ollama } from "ollama";
+```tsx theme={"system"}
+import { Ollama } from 'ollama';
 
 const client = new Ollama();
-const fetchResult = await client.webFetch({ url: "https://ollama.com" });
+const fetchResult = await client.webFetch({ url: 'https://ollama.com' });
 console.log(JSON.stringify(fetchResult, null, 2));
 ```
 
 **Result**
 
-```json  theme={"system"}
+```json theme={"system"}
 {
   "title": "Ollama",
   "content": "[Cloud models](https://ollama.com/blog/cloud-models) are now available in Ollama...",
@@ -235,11 +235,11 @@ Use Ollama’s web search API as a tool to build a mini search agent.
 
 This example uses Alibaba’s Qwen 3 model with 4B parameters.
 
-```bash  theme={"system"}
+```bash theme={"system"}
 ollama pull qwen3:4b
 ```
 
-```python  theme={"system"}
+```python theme={"system"}
 from ollama import chat, web_fetch, web_search
 
 available_tools = {'web_search': web_search, 'web_fetch': web_fetch}
@@ -315,7 +315,7 @@ Ollama's web search can be integrated with Cline easily using the MCP server con
 
 `Manage MCP Servers` > `Configure MCP Servers` > Add the following configuration:
 
-```json  theme={"system"}
+```json theme={"system"}
 {
   "mcpServers": {
     "web_search_and_fetch": {
@@ -336,7 +336,7 @@ Ollama works well with OpenAI's Codex tool.
 
 Add the following configuration to `~/.codex/config.toml`
 
-```python  theme={"system"}
+```python theme={"system"}
 [mcp_servers.web_search]
 command = "uv"
 args = ["run", "path/to/web-search-mcp.py"]
@@ -356,7 +356,6 @@ Ollama can integrate with Goose via its MCP feature.
 ### Other integrations
 
 Ollama can be integrated into most of the tools available either through direct integration of Ollama's API, Python / JavaScript libraries, OpenAI compatible API, and MCP server integration.
-
 
 ---
 

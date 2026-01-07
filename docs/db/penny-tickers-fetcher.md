@@ -131,13 +131,13 @@ python fetch_penny_tickers.py \
 
 ### Command-Line Arguments
 
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--dry-run` | flag | false | Run without storing data (testing mode) |
-| `--verbose` | flag | false | Enable detailed debug logging |
-| `--max-price` | float | 5.0 | Maximum price for penny stocks |
-| `--min-volume` | int | 10,000 | Minimum average daily volume |
-| `--max-tickers` | int | 2,000 | Maximum number of tickers to store |
+| Argument        | Type  | Default | Description                             |
+| --------------- | ----- | ------- | --------------------------------------- |
+| `--dry-run`     | flag  | false   | Run without storing data (testing mode) |
+| `--verbose`     | flag  | false   | Enable detailed debug logging           |
+| `--max-price`   | float | 5.0     | Maximum price for penny stocks          |
+| `--min-volume`  | int   | 10,000  | Minimum average daily volume            |
+| `--max-tickers` | int   | 2,000   | Maximum number of tickers to store      |
 
 ### Environment Variables
 
@@ -186,6 +186,7 @@ You can manually trigger the workflow from GitHub Actions with custom parameters
 ### High Risk (Score ≥ 60)
 
 Characteristics:
+
 - OTC or Pink Sheet listing
 - Low volume (< 100k)
 - High volatility (> 50%)
@@ -197,6 +198,7 @@ Characteristics:
 ### Medium Risk (Score 30-59)
 
 Characteristics:
+
 - Exchange-listed but under $2
 - Moderate volume (100k-500k)
 - Moderate volatility (20-50%)
@@ -208,6 +210,7 @@ Characteristics:
 ### Low Risk (Score < 30)
 
 Characteristics:
+
 - Exchange-listed (NASDAQ/NYSE)
 - Good volume (> 1M)
 - Low volatility (< 20%)
@@ -222,6 +225,7 @@ Characteristics:
 ### Data Completeness (30 points)
 
 Points awarded for populated fields:
+
 - Basic info (name, exchange, price)
 - Volume data
 - Company info (sector, industry)
@@ -238,12 +242,14 @@ Points awarded for populated fields:
 ### Trading Activity (40 points)
 
 Volume-based scoring:
+
 - ≥ 1M volume: **20 points**
 - ≥ 500k volume: **15 points**
 - ≥ 100k volume: **10 points**
 - ≥ 50k volume: **5 points**
 
 Bonus points:
+
 - Not OTC: **+10 points**
 - Low volatility (< 30%): **+10 points**
 - Medium volatility (30-50%): **+5 points**
@@ -257,6 +263,7 @@ Bonus points:
 **Endpoint**: `/api/v3/stock/list`
 
 **Provides**:
+
 - Comprehensive stock listings
 - Basic price data
 - Exchange information
@@ -269,6 +276,7 @@ Bonus points:
 **Library**: `yfinance`
 
 **Provides**:
+
 - Real-time pricing
 - Volume metrics (average, daily)
 - Company information
@@ -284,6 +292,7 @@ Bonus points:
 **Endpoint**: `LISTING_STATUS`
 
 **Provides**:
+
 - US stock listings
 - Exchange data
 - Basic company info
@@ -308,9 +317,9 @@ Bonus points:
 
 ### Expected Runtime
 
-| Ticker Count | Expected Time |
-|--------------|---------------|
-| 500 tickers  | ~5-8 minutes  |
+| Ticker Count | Expected Time  |
+| ------------ | -------------- |
+| 500 tickers  | ~5-8 minutes   |
 | 1000 tickers | ~10-15 minutes |
 | 2000 tickers | ~20-30 minutes |
 
@@ -342,12 +351,14 @@ Bonus points:
 ### No Tickers Found
 
 **Possible causes**:
+
 - Invalid API keys
 - API rate limits exceeded
 - Network issues
 - Price threshold too restrictive
 
 **Solutions**:
+
 - Verify API keys in `.env`
 - Wait for rate limit reset
 - Increase `--max-price`
@@ -356,11 +367,13 @@ Bonus points:
 ### Low Enrichment Success Rate
 
 **Possible causes**:
+
 - YFinance rate limiting
 - Invalid ticker symbols
 - Network timeouts
 
 **Solutions**:
+
 - Reduce batch size
 - Add delay between requests
 - Check ticker symbol format
@@ -369,12 +382,14 @@ Bonus points:
 ### Database Errors
 
 **Possible causes**:
+
 - Invalid Supabase credentials
 - RLS policy restrictions
 - Schema mismatch
 - Network issues
 
 **Solutions**:
+
 - Verify service role key
 - Check RLS policies
 - Confirm schema matches
@@ -383,11 +398,13 @@ Bonus points:
 ### Quality Scores Too Low
 
 **Possible causes**:
+
 - Missing data from APIs
 - Volume requirements too high
 - Incomplete ticker information
 
 **Solutions**:
+
 - Lower `--min-volume`
 - Check API response data
 - Verify enrichment logic
@@ -463,4 +480,3 @@ Bonus points:
 **Last Updated**: November 2024  
 **Version**: 1.0.0  
 **Maintained by**: Portfolio Project Team
-

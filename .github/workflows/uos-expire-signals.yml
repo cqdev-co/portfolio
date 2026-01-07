@@ -3,9 +3,9 @@ name: Expire Unusual Options Signals
 on:
   schedule:
     # Run daily at 4:30 PM EDT (8:30 PM UTC / 20:30 UTC during EDT)
-    - cron: '30 20 * * 1-5'  # Mon-Fri at 8:30 PM UTC (4:30 PM EDT)
-  
-  workflow_dispatch:  # Allow manual triggering
+    - cron: '30 20 * * 1-5' # Mon-Fri at 8:30 PM UTC (4:30 PM EDT)
+
+  workflow_dispatch: # Allow manual triggering
     inputs:
       dry_run:
         description: 'Dry run mode (report only, no changes)'
@@ -17,23 +17,23 @@ jobs:
   expire-signals:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
           version: 1.7.1
           virtualenvs-create: true
           virtualenvs-in-project: true
-      
+
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
         with:
@@ -41,11 +41,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
-      
+
       - name: Install dependencies
         working-directory: unusual-options-service
         run: poetry install --no-interaction
-      
+
       - name: Expire signals
         working-directory: unusual-options-service
         env:
@@ -56,7 +56,7 @@ jobs:
         run: |
           # Check for dry run mode 
           DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          
+
           if [ "$DRY_RUN" = "true" ]; then
             poetry run python scripts/expire_signals.py --dry-run
           else

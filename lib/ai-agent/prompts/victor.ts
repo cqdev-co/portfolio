@@ -1,26 +1,26 @@
 /**
  * Victor Chen - AI Trading Analyst Persona
- * 
+ *
  * Shared system prompt for the AI trading analyst.
  * Used by both CLI (ai-analyst) and Frontend (portfolio).
- * 
+ *
  * Victor is a 67-year-old Wall Street veteran with 45 years of
  * experience. He survived Black Monday, dot-com, 2008, COVID.
  * He speaks conversationally and makes decisive calls.
- * 
+ *
  * @example
  * ```typescript
- * import { 
+ * import {
  *   buildVictorSystemPrompt,
- *   buildVictorLitePrompt 
+ *   buildVictorLitePrompt
  * } from '@lib/ai-agent/prompts/victor';
- * 
+ *
  * // Full context (CLI)
  * const prompt = buildVictorSystemPrompt({
  *   accountSize: 1750,
  *   context: toonEncodedData,
  * });
- * 
+ *
  * // Lite version (Frontend)
  * const prompt = buildVictorLitePrompt({ accountSize: 1750 });
  * ```
@@ -119,7 +119,7 @@ Max Loss = Debit. Breakeven = Long Strike + Debit.`;
  */
 export function buildKeyRules(accountSize: number): string {
   const maxPosition = Math.round(accountSize * 0.2);
-  
+
   return `## Key Rules
 • Max position: $${maxPosition} (20% of account) | WHOLE CONTRACTS ONLY
 • RSI > 60 = wait for pullback | FOMC/CPI within 3d = WAIT or reduce size
@@ -199,7 +199,7 @@ deeper on that"`;
 
 /**
  * Build the full Victor system prompt with all context
- * 
+ *
  * Used by: CLI (ai-analyst)
  * Includes: Full persona, strategy, tools, TOON spec, live data
  */
@@ -219,24 +219,24 @@ export function buildVictorSystemPrompt(config: VictorPromptConfig): string {
     '',
     RESPONSE_STYLE,
   ];
-  
+
   // Add TOON decoder spec if requested
   if (config.includeToonSpec !== false) {
     parts.push('', TOON_DECODER_SPEC);
   }
-  
+
   // Add live data context
   parts.push('', '## LIVE DATA', config.context);
-  
+
   // Add closing reminder
   parts.push('', 'Capital protection first, profits second.');
-  
+
   return parts.join('\n');
 }
 
 /**
  * Build a lightweight Victor prompt for frontend chat
- * 
+ *
  * Used by: Frontend (portfolio website chat)
  * Includes: Core persona, basic strategy, response style
  * Optional: Tool instructions (when withTools: true)
@@ -245,8 +245,9 @@ export function buildVictorLitePrompt(config?: VictorLiteConfig): string {
   const accountSize = config?.accountSize ?? 1750;
   const maxPosition = Math.round(accountSize * 0.2);
   const withTools = config?.withTools ?? false;
-  
-  const toolSection = withTools ? `
+
+  const toolSection = withTools
+    ? `
 ## Tools Available
 You have access to get_ticker_data (fetch live market data) and \
 web_search (search for news/info). Use them when asked about \
@@ -262,7 +263,8 @@ recommendations, earnings, grades
 When using web_search:
 - Search for recent news, earnings reports, market sentiment
 - Cite sources when referencing search results
-` : '';
+`
+    : '';
 
   return `${VICTOR_PERSONA}
 
@@ -289,7 +291,7 @@ Capital protection first, profits second.`;
 
 /**
  * Build a minimal prompt for simple queries
- * 
+ *
  * Used by: Quick responses, general questions
  */
 export function buildVictorMinimalPrompt(): string {
@@ -314,4 +316,3 @@ export default {
   DATA_RULES,
   RESPONSE_STYLE,
 };
-

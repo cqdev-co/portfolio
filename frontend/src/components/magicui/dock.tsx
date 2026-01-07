@@ -1,9 +1,15 @@
-"use client";
+'use client';
 
-import { cn } from "@/lib/utils";
-import { cva, type VariantProps } from "class-variance-authority";
-import { motion, useMotionValue, useSpring, useTransform, MotionValue } from "framer-motion";
-import React, { PropsWithChildren, useRef } from "react";
+import { cn } from '@/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  MotionValue,
+} from 'framer-motion';
+import React, { PropsWithChildren, useRef } from 'react';
 
 export interface DockProps extends VariantProps<typeof dockVariants> {
   className?: string;
@@ -15,9 +21,7 @@ export interface DockProps extends VariantProps<typeof dockVariants> {
 const DEFAULT_MAGNIFICATION = 60;
 const DEFAULT_DISTANCE = 140;
 
-const dockVariants = cva(
-  "w-max h-full p-2 flex items-end rounded-full border"
-);
+const dockVariants = cva('w-max h-full p-2 flex items-end rounded-full border');
 
 const Dock = React.forwardRef<HTMLDivElement, DockProps>(
   (
@@ -59,7 +63,7 @@ const Dock = React.forwardRef<HTMLDivElement, DockProps>(
   }
 );
 
-Dock.displayName = "Dock";
+Dock.displayName = 'Dock';
 
 export interface DockIconProps {
   size?: number;
@@ -81,7 +85,7 @@ const DockIcon = ({
 }: DockIconProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const defaultMouseX = useMotionValue(Infinity);
-  
+
   const distanceCalc = useTransform(mousex || defaultMouseX, (val: number) => {
     const bounds = ref.current?.getBoundingClientRect() ?? { x: 0, width: 0 };
     return val - bounds.x - bounds.width / 2;
@@ -104,7 +108,7 @@ const DockIcon = ({
       ref={ref}
       style={{ width }}
       className={cn(
-        "flex aspect-square cursor-pointer items-center justify-center rounded-full",
+        'flex aspect-square cursor-pointer items-center justify-center rounded-full',
         className
       )}
       {...props}
@@ -114,6 +118,6 @@ const DockIcon = ({
   );
 };
 
-DockIcon.displayName = "DockIcon";
+DockIcon.displayName = 'DockIcon';
 
 export { Dock, DockIcon, dockVariants };

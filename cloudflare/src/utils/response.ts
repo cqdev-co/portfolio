@@ -20,11 +20,11 @@ export function jsonResponse(
     'Content-Type': 'application/json',
     ...CORS_HEADERS,
   };
-  
+
   if (cacheControl) {
     headers['Cache-Control'] = cacheControl;
   }
-  
+
   return new Response(JSON.stringify(data), { status, headers });
 }
 
@@ -38,10 +38,6 @@ export function corsPreflightResponse(): Response {
 /**
  * Create an error response
  */
-export function errorResponse(
-  message: string,
-  status: number = 500
-): Response {
+export function errorResponse(message: string, status: number = 500): Response {
   return jsonResponse({ error: message }, status);
 }
-

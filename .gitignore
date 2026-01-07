@@ -71,3 +71,10 @@ ai-analyst/logs/
 
 # lib/ai-agent generated files
 lib/ai-agent/bun.lock
+
+# turbo
+.turbo
+
+# Keep only root lockfile (consolidate bun.lock files)
+**/bun.lock
+!bun.lock

@@ -8,77 +8,78 @@ The `penny_tickers` table stores penny stock data with enhanced risk metrics, qu
 
 ### Core Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | SERIAL | Primary key |
-| `symbol` | VARCHAR(20) | Unique stock ticker symbol |
-| `name` | VARCHAR(255) | Company/security name |
-| `exchange` | VARCHAR(50) | Trading exchange (NYSE, NASDAQ, OTC, etc.) |
-| `country` | VARCHAR(50) | Country of origin |
-| `currency` | VARCHAR(10) | Trading currency |
-| `sector` | VARCHAR(100) | Business sector |
-| `industry` | VARCHAR(100) | Industry classification |
-| `market_cap` | BIGINT | Market capitalization in dollars |
+| Field        | Type         | Description                                |
+| ------------ | ------------ | ------------------------------------------ |
+| `id`         | SERIAL       | Primary key                                |
+| `symbol`     | VARCHAR(20)  | Unique stock ticker symbol                 |
+| `name`       | VARCHAR(255) | Company/security name                      |
+| `exchange`   | VARCHAR(50)  | Trading exchange (NYSE, NASDAQ, OTC, etc.) |
+| `country`    | VARCHAR(50)  | Country of origin                          |
+| `currency`   | VARCHAR(10)  | Trading currency                           |
+| `sector`     | VARCHAR(100) | Business sector                            |
+| `industry`   | VARCHAR(100) | Industry classification                    |
+| `market_cap` | BIGINT       | Market capitalization in dollars           |
 
 ### Penny Stock Specific Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `current_price` | DECIMAL(10, 4) | Current trading price (4 decimal precision for low prices) |
-| `average_volume` | BIGINT | Average daily trading volume (liquidity indicator) |
-| `daily_volume` | BIGINT | Current day's trading volume |
-| `float_shares` | BIGINT | Outstanding shares available for trading |
-| `short_interest` | DECIMAL(10, 2) | Percentage of float that is shorted |
+| Field            | Type           | Description                                                |
+| ---------------- | -------------- | ---------------------------------------------------------- |
+| `current_price`  | DECIMAL(10, 4) | Current trading price (4 decimal precision for low prices) |
+| `average_volume` | BIGINT         | Average daily trading volume (liquidity indicator)         |
+| `daily_volume`   | BIGINT         | Current day's trading volume                               |
+| `float_shares`   | BIGINT         | Outstanding shares available for trading                   |
+| `short_interest` | DECIMAL(10, 2) | Percentage of float that is shorted                        |
 
 ### Risk and Quality Indicators
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `is_otc` | BOOLEAN | Over-the-counter stock (not on major exchange) |
-| `is_pink_sheet` | BOOLEAN | Pink sheet listing (minimal reporting requirements) |
-| `risk_level` | VARCHAR(20) | Risk classification: 'high', 'medium', or 'low' |
-| `volatility_score` | DECIMAL(5, 2) | 30-day volatility percentage |
+| Field              | Type          | Description                                         |
+| ------------------ | ------------- | --------------------------------------------------- |
+| `is_otc`           | BOOLEAN       | Over-the-counter stock (not on major exchange)      |
+| `is_pink_sheet`    | BOOLEAN       | Pink sheet listing (minimal reporting requirements) |
+| `risk_level`       | VARCHAR(20)   | Risk classification: 'high', 'medium', or 'low'     |
+| `volatility_score` | DECIMAL(5, 2) | 30-day volatility percentage                        |
 
 ### Compliance and Reporting
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `is_sec_reporting` | BOOLEAN | Files regular reports with SEC |
+| Field                      | Type    | Description                        |
+| -------------------------- | ------- | ---------------------------------- |
+| `is_sec_reporting`         | BOOLEAN | Files regular reports with SEC     |
 | `has_financial_statements` | BOOLEAN | Has available financial statements |
-| `last_earnings_date` | DATE | Most recent earnings report date |
+| `last_earnings_date`       | DATE    | Most recent earnings report date   |
 
 ### Trading Status
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `is_active` | BOOLEAN | Currently trading |
-| `is_halted` | BOOLEAN | Trading currently halted |
-| `halt_reason` | VARCHAR(255) | Reason for trading halt |
+| Field         | Type         | Description              |
+| ------------- | ------------ | ------------------------ |
+| `is_active`   | BOOLEAN      | Currently trading        |
+| `is_halted`   | BOOLEAN      | Trading currently halted |
+| `halt_reason` | VARCHAR(255) | Reason for trading halt  |
 
 ### Price Tracking
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `day_high` | DECIMAL(10, 4) | Today's high price |
-| `day_low` | DECIMAL(10, 4) | Today's low price |
+| Field          | Type           | Description        |
+| -------------- | -------------- | ------------------ |
+| `day_high`     | DECIMAL(10, 4) | Today's high price |
+| `day_low`      | DECIMAL(10, 4) | Today's low price  |
 | `week_52_high` | DECIMAL(10, 4) | 52-week high price |
-| `week_52_low` | DECIMAL(10, 4) | 52-week low price |
+| `week_52_low`  | DECIMAL(10, 4) | 52-week low price  |
 
 ### Metadata
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `ticker_type` | VARCHAR(20) | Always 'penny_stock' |
-| `data_source` | VARCHAR(50) | Source of data (yfinance, fmp, otcmarkets, etc.) |
-| `data_quality_score` | DECIMAL(5, 2) | Quality rating 0-100 based on data completeness |
-| `created_at` | TIMESTAMP | Record creation timestamp |
-| `updated_at` | TIMESTAMP | Last update timestamp (auto-updated) |
-| `last_fetched` | TIMESTAMP | Last time data was fetched from source |
-| `last_price_update` | TIMESTAMP | Last time price was updated |
+| Field                | Type          | Description                                      |
+| -------------------- | ------------- | ------------------------------------------------ |
+| `ticker_type`        | VARCHAR(20)   | Always 'penny_stock'                             |
+| `data_source`        | VARCHAR(50)   | Source of data (yfinance, fmp, otcmarkets, etc.) |
+| `data_quality_score` | DECIMAL(5, 2) | Quality rating 0-100 based on data completeness  |
+| `created_at`         | TIMESTAMP     | Record creation timestamp                        |
+| `updated_at`         | TIMESTAMP     | Last update timestamp (auto-updated)             |
+| `last_fetched`       | TIMESTAMP     | Last time data was fetched from source           |
+| `last_price_update`  | TIMESTAMP     | Last time price was updated                      |
 
 ## Indexes
 
 ### Single Column Indexes
+
 - `symbol` - Primary lookup
 - `exchange` - Filter by exchange
 - `country` - Geographic filtering
@@ -92,6 +93,7 @@ The `penny_tickers` table stores penny stock data with enhanced risk metrics, qu
 - `data_quality_score` - Quality-based filtering
 
 ### Composite Indexes
+
 - `(is_active, current_price)` - Active stocks by price
 - `(is_active, average_volume)` - Active stocks by liquidity
 - `(is_otc, is_active)` - Active OTC stocks
@@ -101,7 +103,7 @@ The `penny_tickers` table stores penny stock data with enhanced risk metrics, qu
 A materialized view providing quick access to high-quality, actively traded penny stocks:
 
 ```sql
-SELECT 
+SELECT
     symbol,
     name,
     exchange,
@@ -115,7 +117,7 @@ SELECT
     is_sec_reporting,
     last_fetched
 FROM penny_tickers
-WHERE is_active = true 
+WHERE is_active = true
     AND is_halted = false
     AND data_quality_score >= 50.0
     AND average_volume >= 100000
@@ -150,6 +152,7 @@ The `data_quality_score` (0-100) is computed based on:
 ## Risk Level Classification
 
 ### High Risk
+
 - OTC/Pink Sheet stocks
 - No SEC reporting
 - Low average volume (<100k)
@@ -157,12 +160,14 @@ The `data_quality_score` (0-100) is computed based on:
 - Frequent trading halts
 
 ### Medium Risk
+
 - Exchange-listed but under $2
 - SEC reporting but limited volume
 - Moderate volatility (20-50%)
 - Some financial reporting
 
 ### Low Risk
+
 - Exchange-listed (NASDAQ/NYSE)
 - SEC reporting
 - Average volume >1M
@@ -177,6 +182,7 @@ The `data_quality_score` (0-100) is computed based on:
 The table has RLS enabled with two policies:
 
 1. **Read Access**: All users can read data
+
    ```sql
    FOR SELECT USING (true)
    ```
@@ -272,6 +278,7 @@ The `penny_tickers` table is automatically populated by the Penny Tickers Fetche
 - **Script**: `.github/scripts/fetch_penny_tickers.py`
 
 For detailed information about the fetcher system, see:
+
 - **[Penny Tickers Fetcher Guide](penny-tickers-fetcher.md)** - Complete documentation on the automated fetcher system
 
 ## Future Enhancements
@@ -284,4 +291,3 @@ Potential additions to the schema:
 - **Price Targets**: Analyst price targets where available
 - **News Events**: Significant news and PR releases
 - **Pump-and-Dump Detection**: Pattern analysis for manipulation
-

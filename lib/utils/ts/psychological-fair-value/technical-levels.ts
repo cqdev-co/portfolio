@@ -1,11 +1,11 @@
 /**
  * Technical Levels Analysis
- * 
+ *
  * Identifies key support/resistance levels from technical analysis
  * that traders psychologically anchor to.
  */
 
-import type { 
+import type {
   TechnicalData,
   TechnicalLevel,
   TechnicalLevelsResult,
@@ -26,97 +26,64 @@ export function analyzeTechnicalLevels(
 
   // Moving Averages
   if (data.ma20) {
-    levels.push(createLevel(
-      data.ma20, 
-      'MA20', 
-      'WEAK', 
-      currentPrice
-    ));
+    levels.push(createLevel(data.ma20, 'MA20', 'WEAK', currentPrice));
   }
 
   if (data.ma50) {
-    levels.push(createLevel(
-      data.ma50, 
-      'MA50', 
-      'MODERATE', 
-      currentPrice
-    ));
+    levels.push(createLevel(data.ma50, 'MA50', 'MODERATE', currentPrice));
   }
 
   if (data.ma200) {
-    levels.push(createLevel(
-      data.ma200, 
-      'MA200', 
-      'STRONG', 
-      currentPrice
-    ));
+    levels.push(createLevel(data.ma200, 'MA200', 'STRONG', currentPrice));
   }
 
   // 52-Week Extremes
-  levels.push(createLevel(
-    data.fiftyTwoWeekHigh, 
-    '52W_HIGH', 
-    'STRONG', 
-    currentPrice
-  ));
+  levels.push(
+    createLevel(data.fiftyTwoWeekHigh, '52W_HIGH', 'STRONG', currentPrice)
+  );
 
-  levels.push(createLevel(
-    data.fiftyTwoWeekLow, 
-    '52W_LOW', 
-    'STRONG', 
-    currentPrice
-  ));
+  levels.push(
+    createLevel(data.fiftyTwoWeekLow, '52W_LOW', 'STRONG', currentPrice)
+  );
 
   // Recent Swing Points
   if (data.recentSwingHigh) {
-    levels.push(createLevel(
-      data.recentSwingHigh, 
-      'SWING_HIGH', 
-      'MODERATE', 
-      currentPrice
-    ));
+    levels.push(
+      createLevel(data.recentSwingHigh, 'SWING_HIGH', 'MODERATE', currentPrice)
+    );
   }
 
   if (data.recentSwingLow) {
-    levels.push(createLevel(
-      data.recentSwingLow, 
-      'SWING_LOW', 
-      'MODERATE', 
-      currentPrice
-    ));
+    levels.push(
+      createLevel(data.recentSwingLow, 'SWING_LOW', 'MODERATE', currentPrice)
+    );
   }
 
   // VWAP
   if (data.vwap) {
-    levels.push(createLevel(
-      data.vwap, 
-      'VWAP', 
-      'MODERATE', 
-      currentPrice
-    ));
+    levels.push(createLevel(data.vwap, 'VWAP', 'MODERATE', currentPrice));
   }
 
   // Previous Close
   if (data.previousClose) {
-    levels.push(createLevel(
-      data.previousClose, 
-      'PREV_CLOSE', 
-      'WEAK', 
-      currentPrice
-    ));
+    levels.push(
+      createLevel(data.previousClose, 'PREV_CLOSE', 'WEAK', currentPrice)
+    );
   }
 
   // Sort by distance from current price
   levels.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
 
   // Find nearest support and resistance
-  const nearestSupport = levels
-    .filter(l => l.isSupport)
-    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
+  const nearestSupport =
+    levels
+      .filter((l) => l.isSupport)
+      .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
 
-  const nearestResistance = levels
-    .filter(l => l.isResistance)
-    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
+  const nearestResistance =
+    levels
+      .filter((l) => l.isResistance)
+      .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0] || null;
 
   // Calculate weighted center
   const weightedCenter = calculateWeightedCenter(levels, currentPrice);
@@ -139,7 +106,7 @@ function createLevel(
   currentPrice: number
 ): TechnicalLevel {
   const distance = ((price - currentPrice) / currentPrice) * 100;
-  
+
   return {
     price,
     type,
@@ -152,7 +119,7 @@ function createLevel(
 
 /**
  * Calculate weighted center of technical levels
- * 
+ *
  * Stronger levels have more influence
  * Closer levels have more immediate relevance
  */
@@ -174,10 +141,10 @@ function calculateWeightedCenter(
   for (const level of levels) {
     // Base weight from strength
     const baseWeight = strengthWeights[level.strength];
-    
+
     // Distance decay (closer = more relevant)
     const distanceWeight = 1 / (1 + Math.abs(level.distance) / 10);
-    
+
     const weight = baseWeight * distanceWeight;
     weightedSum += level.price * weight;
     totalWeight += weight;
@@ -204,15 +171,15 @@ export function isNearKeyLevel(
 
 /**
  * Find confluence zones where multiple levels cluster
- * 
+ *
  * Confluence = stronger support/resistance
  */
 export function findConfluenceZones(
   levels: TechnicalLevel[],
   currentPrice: number,
   clusterThresholdPercent: number = 2.0
-): { 
-  zone: { low: number; high: number }; 
+): {
+  zone: { low: number; high: number };
   levels: TechnicalLevel[];
   isSupport: boolean;
   strength: number;
@@ -222,17 +189,18 @@ export function findConfluenceZones(
   // Sort levels by price
   const sortedLevels = [...levels].sort((a, b) => a.price - b.price);
   const zones: ReturnType<typeof findConfluenceZones> = [];
-  
+
   let currentZone: TechnicalLevel[] = [sortedLevels[0]];
   let zoneLow = sortedLevels[0].price;
 
   for (let i = 1; i < sortedLevels.length; i++) {
     const level = sortedLevels[i];
     const lastInZone = currentZone[currentZone.length - 1];
-    
+
     // Check if this level is within cluster threshold of the zone
-    const gapPercent = ((level.price - lastInZone.price) / lastInZone.price) * 100;
-    
+    const gapPercent =
+      ((level.price - lastInZone.price) / lastInZone.price) * 100;
+
     if (gapPercent <= clusterThresholdPercent) {
       // Add to current zone
       currentZone.push(level);
@@ -242,13 +210,14 @@ export function findConfluenceZones(
         const zoneHigh = currentZone[currentZone.length - 1].price;
         const zoneMid = (zoneLow + zoneHigh) / 2;
         const isSupport = zoneMid < currentPrice;
-        
+
         // Calculate zone strength
-        const strength = currentZone.reduce((sum, l) => {
-          const strengthVal = l.strength === 'STRONG' ? 3 : 
-                             l.strength === 'MODERATE' ? 2 : 1;
-          return sum + strengthVal;
-        }, 0) / currentZone.length;
+        const strength =
+          currentZone.reduce((sum, l) => {
+            const strengthVal =
+              l.strength === 'STRONG' ? 3 : l.strength === 'MODERATE' ? 2 : 1;
+            return sum + strengthVal;
+          }, 0) / currentZone.length;
 
         zones.push({
           zone: { low: zoneLow, high: zoneHigh },
@@ -257,7 +226,7 @@ export function findConfluenceZones(
           strength,
         });
       }
-      
+
       // Start new zone
       currentZone = [level];
       zoneLow = level.price;
@@ -269,12 +238,13 @@ export function findConfluenceZones(
     const zoneHigh = currentZone[currentZone.length - 1].price;
     const zoneMid = (zoneLow + zoneHigh) / 2;
     const isSupport = zoneMid < currentPrice;
-    
-    const strength = currentZone.reduce((sum, l) => {
-      const strengthVal = l.strength === 'STRONG' ? 3 : 
-                         l.strength === 'MODERATE' ? 2 : 1;
-      return sum + strengthVal;
-    }, 0) / currentZone.length;
+
+    const strength =
+      currentZone.reduce((sum, l) => {
+        const strengthVal =
+          l.strength === 'STRONG' ? 3 : l.strength === 'MODERATE' ? 2 : 1;
+        return sum + strengthVal;
+      }, 0) / currentZone.length;
 
     zones.push({
       zone: { low: zoneLow, high: zoneHigh },
@@ -294,7 +264,7 @@ export function determineTrendBias(
   data: TechnicalData
 ): 'BULLISH' | 'NEUTRAL' | 'BEARISH' {
   const { currentPrice, ma20, ma50, ma200 } = data;
-  
+
   let bullishSignals = 0;
   let bearishSignals = 0;
   let totalSignals = 0;
@@ -331,7 +301,7 @@ export function determineTrendBias(
   if (totalSignals === 0) return 'NEUTRAL';
 
   const bullishRatio = bullishSignals / totalSignals;
-  
+
   if (bullishRatio >= 0.7) return 'BULLISH';
   if (bullishRatio <= 0.3) return 'BEARISH';
   return 'NEUTRAL';
@@ -392,7 +362,7 @@ export function formatTechnicalLevels(result: TechnicalLevelsResult): string {
     const r = result.nearestResistance;
     lines.push(
       `🔴 Nearest Resistance: $${r.price.toFixed(2)} ` +
-      `(${r.type}, ${r.distance.toFixed(1)}% away)`
+        `(${r.type}, ${r.distance.toFixed(1)}% away)`
     );
   }
 
@@ -400,22 +370,22 @@ export function formatTechnicalLevels(result: TechnicalLevelsResult): string {
     const s = result.nearestSupport;
     lines.push(
       `🟢 Nearest Support: $${s.price.toFixed(2)} ` +
-      `(${s.type}, ${Math.abs(s.distance).toFixed(1)}% away)`
+        `(${s.type}, ${Math.abs(s.distance).toFixed(1)}% away)`
     );
   }
 
   lines.push('', 'All Levels:');
   for (const level of result.levels) {
     const icon = level.isResistance ? '↑' : '↓';
-    const distStr = level.distance > 0 
-      ? `+${level.distance.toFixed(1)}%` 
-      : `${level.distance.toFixed(1)}%`;
+    const distStr =
+      level.distance > 0
+        ? `+${level.distance.toFixed(1)}%`
+        : `${level.distance.toFixed(1)}%`;
     lines.push(
       `  ${icon} $${level.price.toFixed(2)} - ${level.type} ` +
-      `(${level.strength}, ${distStr})`
+        `(${level.strength}, ${distStr})`
     );
   }
 
   return lines.join('\n');
 }
-

@@ -3,18 +3,73 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "lib/ai-agent"
+    "lib/*",
+    "screen-ticker",
+    "ai-analyst",
+    "cloudflare"
   ],
   "scripts": {
-    "dev": "cd frontend && bun run dev",
-    "build": "cd frontend && bun run build",
-    "start": "cd frontend && bun run start"
-  },
-  "dependencies": {
-    "next": "16.1.0"
+    "dev": "bun run --cwd frontend dev",
+    "build": "turbo run build",
+    "build:frontend": "bun run --cwd frontend build",
+    "build:cloudflare": "bun run --cwd cloudflare deploy --dry-run",
+    "start": "bun run --cwd frontend start",
+    "dev:analyst": "bun run --cwd ai-analyst analyst",
+    "dev:scanner": "bun run --cwd screen-ticker scan",
+    "dev:cloudflare": "bun run --cwd cloudflare dev",
+    "test": "turbo run test",
+    "test:frontend": "bun run --cwd frontend test",
+    "test:analyst": "bun run --cwd ai-analyst test",
+    "test:scanner": "bun run --cwd screen-ticker test",
+    "typecheck": "turbo run typecheck",
+    "typecheck:frontend": "bun run --cwd frontend tsc --noEmit",
+    "typecheck:analyst": "bun run --cwd ai-analyst typecheck",
+    "typecheck:scanner": "bun run --cwd screen-ticker typecheck",
+    "lint": "turbo run lint",
+    "lint:py": "ruff check unusual-options-service penny-stock-scanner wp-service",
+    "lint:py:fix": "ruff check --fix unusual-options-service penny-stock-scanner wp-service",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:py": "ruff format unusual-options-service penny-stock-scanner wp-service",
+    "format:py:check": "ruff format --check unusual-options-service penny-stock-scanner wp-service",
+    "clean": "rm -rf node_modules frontend/node_modules ai-analyst/node_modules screen-ticker/node_modules cloudflare/node_modules lib/*/node_modules",
+    "clean:turbo": "rm -rf .turbo */.turbo",
+    "prepare": "husky",
+    "py:unusual-options": "cd unusual-options-service && poetry run unusual-options",
+    "py:penny-scanner": "cd penny-stock-scanner && poetry run penny-scanner",
+    "py:wp-service": "cd wp-service && poetry run wp-service",
+    "py:install": "cd unusual-options-service && poetry install && cd ../penny-stock-scanner && poetry install && cd ../wp-service && poetry install"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@eslint/js": "^9.18.0",
+    "@types/bun": "latest",
+    "@types/node": "^25.0.0",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.5.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.21.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,mjs,cjs}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.0"
+  },
+  "packageManager": "bun@1.2.5",
+  "dependencies": {
+    "yaml": "^2.8.2"
   }
 }
-

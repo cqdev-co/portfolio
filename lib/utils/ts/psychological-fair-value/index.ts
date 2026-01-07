@@ -1,16 +1,16 @@
 /**
  * Psychological Fair Value (PFV) Utility
- * 
+ *
  * Calculates where stock price gravitates based on behavioral
  * biases and market mechanics rather than fundamentals.
- * 
+ *
  * @example
  * ```typescript
- * import { 
+ * import {
  *   calculatePsychologicalFairValue,
  *   formatPFVResult,
  * } from '@lib/utils/ts/psychological-fair-value';
- * 
+ *
  * const result = calculatePsychologicalFairValue({
  *   ticker: 'AAPL',
  *   technicalData: {
@@ -21,15 +21,15 @@
  *   },
  *   expirations: [...optionsData],
  * });
- * 
+ *
  * console.log(formatPFVResult(result));
  * ```
- * 
+ *
  * @packageDocumentation
  */
 
 // Main calculator
-export { 
+export {
   calculatePsychologicalFairValue,
   quickPFV,
   formatPFVResult,
@@ -43,7 +43,7 @@ export type {
   OptionContract,
   OptionsExpiration,
   TechnicalData,
-  
+
   // Output types
   PsychologicalFairValue,
   MagneticLevel,
@@ -51,12 +51,12 @@ export type {
   ConfidenceLevel,
   BiasSentiment,
   ExpirationAnalysis,
-  
+
   // Profile types
   TickerProfile,
   TickerProfileType,
   ProfileWeights,
-  
+
   // Component result types
   MaxPainResult,
   GammaWall,
@@ -65,7 +65,7 @@ export type {
   TechnicalLevelsResult,
   RoundNumberLevel,
   RoundNumbersResult,
-  
+
   // Utility types
   ValidationMetrics,
 } from './types';
@@ -128,4 +128,3 @@ export {
   calculateTimeGravity,
   formatMultiExpirationAnalysis,
 } from './multi-expiry';
-

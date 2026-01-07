@@ -3,19 +3,20 @@
  * Generate and view morning briefings
  */
 
-import chalk from "chalk";
+import chalk from 'chalk';
 import {
   generateMorningBriefing,
   formatBriefingForCLI,
   type Briefing,
-} from "../agent/briefing.ts";
+} from '../agent/briefing.ts';
 import {
   getRecentBriefings,
   getBriefing,
   isConfigured,
   type Briefing as DBBriefing,
-} from "../services/supabase.ts";
-import type { OllamaMode } from "../services/ollama.ts";
+} from '../services/supabase.ts';
+import type { OllamaMode } from '../services/ollama.ts';
+import type { EventType } from '../services/calendar.ts';
 
 // ============================================================================
 // GENERATE BRIEFING COMMAND
@@ -34,21 +35,29 @@ export async function generateBriefingCommand(
   options: BriefingOptions = {}
 ): Promise<void> {
   console.log();
-  console.log(chalk.bold.white("  ☀️  GENERATING MORNING BRIEFING..."));
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+  console.log(chalk.bold.white('  ☀️  GENERATING MORNING BRIEFING...'));
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
   console.log();
 
   if (!isConfigured()) {
-    console.log(chalk.yellow("  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY"));
+    console.log(
+      chalk.yellow(
+        '  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY'
+      )
+    );
     console.log();
     return;
   }
 
   try {
-    console.log(chalk.gray("  Fetching market data..."));
-    
+    console.log(chalk.gray('  Fetching market data...'));
+
     const briefing = await generateMorningBriefing({
-      aiMode: options.aiMode ?? "cloud",
+      aiMode: options.aiMode ?? 'cloud',
       aiModel: options.aiModel,
       skipDiscord: options.skipDiscord,
     });
@@ -58,11 +67,11 @@ export async function generateBriefingCommand(
     console.log(chalk.white(formatted));
 
     if (!options.skipDiscord) {
-      console.log(chalk.green("  ✓ Briefing sent to Discord"));
+      console.log(chalk.green('  ✓ Briefing sent to Discord'));
     }
     console.log();
   } catch (error) {
-    console.error(chalk.red("  ✗ Error generating briefing:"), error);
+    console.error(chalk.red('  ✗ Error generating briefing:'), error);
     console.log();
   }
 }
@@ -76,12 +85,20 @@ export async function generateBriefingCommand(
  */
 export async function viewBriefingHistory(limit: number = 7): Promise<void> {
   console.log();
-  console.log(chalk.bold.white("  📚 BRIEFING HISTORY"));
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+  console.log(chalk.bold.white('  📚 BRIEFING HISTORY'));
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
   console.log();
 
   if (!isConfigured()) {
-    console.log(chalk.yellow("  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY"));
+    console.log(
+      chalk.yellow(
+        '  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY'
+      )
+    );
     console.log();
     return;
   }
@@ -90,48 +107,53 @@ export async function viewBriefingHistory(limit: number = 7): Promise<void> {
     const briefings = await getRecentBriefings(limit);
 
     if (briefings.length === 0) {
-      console.log(chalk.gray("  No briefings found."));
+      console.log(chalk.gray('  No briefings found.'));
       console.log();
-      console.log(chalk.gray("  Generate a briefing with: bun run analyst briefing"));
+      console.log(
+        chalk.gray('  Generate a briefing with: bun run analyst briefing')
+      );
       console.log();
       return;
     }
 
     // Header
     console.log(
-      chalk.gray("  ") +
-      chalk.bold.white("Date".padEnd(14)) +
-      chalk.bold.white("Regime".padEnd(12)) +
-      chalk.bold.white("Discord".padEnd(10)) +
-      chalk.bold.white("Alerts")
+      chalk.gray('  ') +
+        chalk.bold.white('Date'.padEnd(14)) +
+        chalk.bold.white('Regime'.padEnd(12)) +
+        chalk.bold.white('Discord'.padEnd(10)) +
+        chalk.bold.white('Alerts')
     );
-    console.log(chalk.gray("  " + "─".repeat(50)));
+    console.log(chalk.gray('  ' + '─'.repeat(50)));
 
     for (const briefing of briefings) {
-      const dateStr = briefing.date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      const dateStr = briefing.date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
 
-      const regime = (briefing.marketData as { regime?: string })?.regime ?? "—";
-      const discordStatus = briefing.deliveredDiscord ? "✓" : "—";
+      const regime =
+        (briefing.marketData as { regime?: string })?.regime ?? '—';
+      const discordStatus = briefing.deliveredDiscord ? '✓' : '—';
       const alertCount = (briefing.watchlistAlerts as unknown[])?.length ?? 0;
 
       console.log(
-        chalk.gray("  ") +
-        chalk.cyan(dateStr.padEnd(14)) +
-        chalk.white(regime.padEnd(12)) +
-        chalk.green(discordStatus.padEnd(10)) +
-        chalk.white(alertCount.toString())
+        chalk.gray('  ') +
+          chalk.cyan(dateStr.padEnd(14)) +
+          chalk.white(regime.padEnd(12)) +
+          chalk.green(discordStatus.padEnd(10)) +
+          chalk.white(alertCount.toString())
       );
     }
 
     console.log();
-    console.log(chalk.gray(`  Showing ${briefings.length} most recent briefings`));
+    console.log(
+      chalk.gray(`  Showing ${briefings.length} most recent briefings`)
+    );
     console.log();
   } catch (error) {
-    console.error(chalk.red("  ✗ Error fetching briefings:"), error);
+    console.error(chalk.red('  ✗ Error fetching briefings:'), error);
     console.log();
   }
 }
@@ -147,7 +169,11 @@ export async function viewBriefing(dateStr: string): Promise<void> {
   console.log();
 
   if (!isConfigured()) {
-    console.log(chalk.yellow("  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY"));
+    console.log(
+      chalk.yellow(
+        '  ⚠️  Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY'
+      )
+    );
     console.log();
     return;
   }
@@ -155,7 +181,7 @@ export async function viewBriefing(dateStr: string): Promise<void> {
   try {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) {
-      console.log(chalk.red("  ✗ Invalid date format. Use YYYY-MM-DD"));
+      console.log(chalk.red('  ✗ Invalid date format. Use YYYY-MM-DD'));
       console.log();
       return;
     }
@@ -173,7 +199,7 @@ export async function viewBriefing(dateStr: string): Promise<void> {
     const formatted = formatBriefingForCLI(displayBriefing);
     console.log(chalk.white(formatted));
   } catch (error) {
-    console.error(chalk.red("  ✗ Error fetching briefing:"), error);
+    console.error(chalk.red('  ✗ Error fetching briefing:'), error);
     console.log();
   }
 }
@@ -191,17 +217,33 @@ function dbBriefingToDisplay(db: DBBriefing): Briefing {
   return {
     date: db.date,
     marketPulse: {
-      spy: marketData.spy ?? { price: 0, changePct: 0, trend: "UNKNOWN" },
-      vix: marketData.vix ?? { current: 0, level: "UNKNOWN" },
-      regime: marketData.regime ?? "UNKNOWN",
-      summary: db.marketSummary ?? "",
+      spy: marketData.spy ?? { price: 0, changePct: 0, trend: 'UNKNOWN' },
+      vix: marketData.vix ?? { current: 0, level: 'UNKNOWN' },
+      regime: marketData.regime ?? 'UNKNOWN',
+      summary: db.marketSummary ?? '',
     },
     calendar: {
-      events: (db.calendarEvents as { date: Date; name: string; type: string; impact: "HIGH" | "MEDIUM" | "LOW" }[]) ?? [],
+      events: (db.calendarEvents ?? []) as unknown as {
+        date: Date;
+        name: string;
+        type: EventType;
+        impact: 'HIGH' | 'MEDIUM' | 'LOW';
+      }[],
       warnings: [],
     },
-    watchlistAlerts: (db.watchlistAlerts as { ticker: string; reason: string; priority: "HIGH" | "MEDIUM" | "LOW" }[]) ?? [],
-    positionUpdates: (db.positionUpdates as { ticker: string; status: string; dte?: number; action?: string }[]) ?? [],
-    aiCommentary: db.aiCommentary ?? "No commentary available.",
+    watchlistAlerts:
+      (db.watchlistAlerts as {
+        ticker: string;
+        reason: string;
+        priority: 'HIGH' | 'MEDIUM' | 'LOW';
+      }[]) ?? [],
+    positionUpdates:
+      (db.positionUpdates as {
+        ticker: string;
+        status: string;
+        dte?: number;
+        action?: string;
+      }[]) ?? [],
+    aiCommentary: db.aiCommentary ?? 'No commentary available.',
   };
 }

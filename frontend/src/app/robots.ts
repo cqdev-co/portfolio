@@ -3,7 +3,7 @@ import { DATA } from '@/data/resume';
 
 export default function robots(): MetadataRoute.Robots {
   const url = DATA.url || 'https://conorq.com';
-  
+
   return {
     rules: [
       {
@@ -22,9 +22,9 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: ['/private/', '/api/', '/_next/'],
         crawlDelay: 1,
-      }
+      },
     ],
     sitemap: `${url}/sitemap.xml`,
     host: url,
   };
-} 
+}

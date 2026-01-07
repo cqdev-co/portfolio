@@ -1,6 +1,6 @@
 /**
  * Type definitions for Yahoo Finance Proxy
- * 
+ *
  * These types match lib/ai-agent expected format
  */
 
@@ -98,6 +98,78 @@ export interface SummaryData {
   shortInterest: ShortInterestData | null;
   beta: number | null;
   eps: number | null;
+  // v4.1: Expanded fundamental data
+  fundamentals: FundamentalsData | null;
+  epsTrend: EPSTrendData | null;
+  earningsHistory: EarningsHistoryData | null;
+  insiderActivity: InsiderActivityData | null;
+  profile: ProfileData | null;
+}
+
+// v4.1: Fundamental metrics for scoring
+export interface FundamentalsData {
+  pegRatio: number | null;
+  priceToBook: number | null;
+  evToEbitda: number | null;
+  freeCashFlow: number | null;
+  fcfYield: number | null;
+  revenueGrowth: number | null;
+  earningsGrowth: number | null;
+  profitMargins: number | null;
+  operatingMargins: number | null;
+  returnOnEquity: number | null;
+  debtToEquity: number | null;
+  currentRatio: number | null;
+  totalCash: number | null;
+  totalDebt: number | null;
+  targetMeanPrice: number | null;
+  recommendationMean: number | null;
+  numberOfAnalystOpinions: number | null;
+}
+
+// v4.1: EPS estimates and revisions
+export interface EPSTrendData {
+  current: number | null;
+  sevenDaysAgo: number | null;
+  thirtyDaysAgo: number | null;
+  sixtyDaysAgo: number | null;
+  ninetyDaysAgo: number | null;
+  // Revisions
+  upLast7days: number;
+  upLast30days: number;
+  downLast7days: number;
+  downLast30days: number;
+}
+
+// v4.1: Earnings beat/miss history
+export interface EarningsHistoryData {
+  quarters: Array<{
+    quarter: string;
+    epsActual: number | null;
+    epsEstimate: number | null;
+    surprise: number | null;
+    beat: boolean | null;
+  }>;
+  beatCount: number;
+  missCount: number;
+}
+
+// v4.1: Insider buying/selling
+export interface InsiderActivityData {
+  buyCount: number;
+  buyShares: number;
+  sellCount: number;
+  sellShares: number;
+  netShares: number;
+  period: string;
+}
+
+// v4.1: Company profile
+export interface ProfileData {
+  sector: string | null;
+  industry: string | null;
+  country: string | null;
+  employees: number | null;
 }
 
 // =============================================================================
@@ -224,6 +296,67 @@ export interface YahooSummaryResponse {
         shortPercentOfFloat?: { raw?: number };
         beta?: { raw?: number };
         trailingEps?: { raw?: number };
+        pegRatio?: { raw?: number };
+        priceToBook?: { raw?: number };
+        enterpriseToEbitda?: { raw?: number };
+      };
+      // v4.1: Added modules
+      financialData?: {
+        freeCashflow?: { raw?: number };
+        operatingCashflow?: { raw?: number };
+        totalRevenue?: { raw?: number };
+        revenueGrowth?: { raw?: number };
+        earningsGrowth?: { raw?: number };
+        profitMargins?: { raw?: number };
+        operatingMargins?: { raw?: number };
+        returnOnEquity?: { raw?: number };
+        debtToEquity?: { raw?: number };
+        currentRatio?: { raw?: number };
+        totalCash?: { raw?: number };
+        totalDebt?: { raw?: number };
+        targetMeanPrice?: { raw?: number };
+        recommendationMean?: { raw?: number };
+        numberOfAnalystOpinions?: { raw?: number };
+      };
+      earningsTrend?: {
+        trend?: Array<{
+          period?: string;
+          epsTrend?: {
+            current?: { raw?: number };
+            '7daysAgo'?: { raw?: number };
+            '30daysAgo'?: { raw?: number };
+            '60daysAgo'?: { raw?: number };
+            '90daysAgo'?: { raw?: number };
+          };
+          epsRevisions?: {
+            upLast7days?: { raw?: number };
+            upLast30days?: { raw?: number };
+            downLast7days?: { raw?: number };
+            downLast30days?: { raw?: number };
+          };
+        }>;
+      };
+      earningsHistory?: {
+        history?: Array<{
+          quarter?: { raw?: number };
+          epsActual?: { raw?: number };
+          epsEstimate?: { raw?: number };
+          surprisePercent?: { raw?: number };
+        }>;
+      };
+      netSharePurchaseActivity?: {
+        period?: string;
+        buyInfoCount?: { raw?: number };
+        buyInfoShares?: { raw?: number };
+        sellInfoCount?: { raw?: number };
+        sellInfoShares?: { raw?: number };
+        netInfoShares?: { raw?: number };
+      };
+      assetProfile?: {
+        sector?: string;
+        industry?: string;
+        country?: string;
+        fullTimeEmployees?: number;
       };
     }>;
   };
@@ -327,4 +460,3 @@ export interface YahooHoldingsResponse {
     }>;
   };
 }
-

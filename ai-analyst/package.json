@@ -1,5 +1,5 @@
 {
-  "name": "ai-analyst",
+  "name": "@portfolio/ai-analyst",
   "version": "1.0.0",
   "description": "AI-powered ticker analysis CLI for entry decisions and strategy recommendations",
   "module": "src/index.ts",
@@ -22,6 +22,7 @@
     "briefing": "bun run src/index.ts briefing",
     "alerts": "bun run src/index.ts alerts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
     "test": "bun test",
     "eval": "bun test eval/",
     "eval:verbose": "bun test eval/ --verbose"

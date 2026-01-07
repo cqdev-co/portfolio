@@ -24,6 +24,7 @@ A GitHub Actions workflow runs daily at **4:30 PM ET** (30 minutes after market 
 ## Script Details
 
 ### Location
+
 ```
 unusual-options-service/scripts/expire_signals.py
 ```
@@ -33,7 +34,7 @@ unusual-options-service/scripts/expire_signals.py
 - **Batch Processing:** Updates signals in batches of 500 for efficiency
 - **Detailed Reporting:** Provides statistics grouped by:
   - Expiry date
-  - Ticker symbol  
+  - Ticker symbol
   - Signal grade
 - **Dry Run Mode:** Test the script without making changes
 - **Comprehensive Logging:** Uses loguru for structured, colorized output
@@ -41,18 +42,21 @@ unusual-options-service/scripts/expire_signals.py
 ### Usage
 
 #### Run Normally (Mark Signals Inactive)
+
 ```bash
 cd unusual-options-service
 poetry run python scripts/expire_signals.py
 ```
 
 #### Dry Run (Report Only, No Changes)
+
 ```bash
 cd unusual-options-service
 poetry run python scripts/expire_signals.py --dry-run
 ```
 
 #### Manual Trigger via GitHub Actions
+
 1. Go to GitHub Actions tab
 2. Select "Expire Unusual Options Signals" workflow
 3. Click "Run workflow"
@@ -145,7 +149,7 @@ The workflow uses these GitHub secrets:
 The expiration runs **30 minutes after market close** to ensure:
 
 1. **Complete data capture:** All end-of-day signals are recorded
-2. **After-hours activity:** Captures any unusual activity during the 
+2. **After-hours activity:** Captures any unusual activity during the
    4:00-4:30 PM window
 3. **Safe buffer:** Prevents race conditions with the hourly scanner
 4. **Time zone safety:** Works correctly during both EDT and EST
@@ -162,16 +166,19 @@ The expiration runs **30 minutes after market close** to ensure:
 ### Troubleshooting
 
 **No signals found when some should expire:**
+
 - Check that signals have `is_active = true`
 - Verify expiry dates are in correct format (YYYY-MM-DD)
 - Confirm today's date is >= expiry date
 
 **Batch update fails:**
+
 - Check Supabase service key permissions
 - Verify RLS policies allow updates
 - Ensure database is not under heavy load
 
 **Workflow times out:**
+
 - Increase timeout in workflow file
 - Check batch size (default 500)
 - Verify database connection is stable
@@ -206,4 +213,3 @@ Potential improvements to consider:
 - [Database Schema](./database-schema.md)
 - [Continuity Tracking](./README.md#continuity-tracking)
 - [GitHub Actions Workflows](../README.md#automation)
-

@@ -1,9 +1,9 @@
-import type { HistoricalData } from "../types/index.ts";
+import type { HistoricalData } from '../types/index.ts';
 
 interface PriceLevel {
   price: number;
   strength: number; // Number of touches
-  type: "support" | "resistance";
+  type: 'support' | 'resistance';
 }
 
 /**
@@ -18,7 +18,7 @@ export function detectSupportResistance(
   if (data.length < 20) return [];
 
   const levels: Map<number, PriceLevel> = new Map();
-  
+
   // Find local minima (support) and maxima (resistance)
   for (let i = 2; i < data.length - 2; i++) {
     const current = data[i];
@@ -36,7 +36,7 @@ export function detectSupportResistance(
       current.low < next1.low &&
       current.low < next2.low
     ) {
-      addLevel(levels, current.low, "support", tolerance);
+      addLevel(levels, current.low, 'support', tolerance);
     }
 
     // Local maximum (resistance)
@@ -46,7 +46,7 @@ export function detectSupportResistance(
       current.high > next1.high &&
       current.high > next2.high
     ) {
-      addLevel(levels, current.high, "resistance", tolerance);
+      addLevel(levels, current.high, 'resistance', tolerance);
     }
   }
 
@@ -59,7 +59,7 @@ export function detectSupportResistance(
 function addLevel(
   levels: Map<number, PriceLevel>,
   price: number,
-  type: "support" | "resistance",
+  type: 'support' | 'resistance',
   tolerance: number
 ): void {
   // Check if this price is within tolerance of an existing level
@@ -89,16 +89,16 @@ export function findNearestSupport(
   data: HistoricalData[]
 ): { level: number; distance: number } | null {
   const levels = detectSupportResistance(data);
-  
+
   const supports = levels
-    .filter((l) => l.type === "support" && l.price < currentPrice)
+    .filter((l) => l.type === 'support' && l.price < currentPrice)
     .sort((a, b) => b.price - a.price); // Closest first
 
   if (supports.length === 0) return null;
-  
+
   const nearest = supports[0];
   if (!nearest) return null;
-  
+
   return {
     level: nearest.price,
     distance: (currentPrice - nearest.price) / currentPrice,
@@ -117,4 +117,3 @@ export function isNearSupport(
   if (!nearest) return false;
   return nearest.distance <= threshold;
 }
-

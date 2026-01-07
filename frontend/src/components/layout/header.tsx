@@ -1,9 +1,8 @@
-import { DATA } from "@/data/resume";
-import Image from "next/image";
-import { LoginButton } from "@/components/auth/login-button";
+import { DATA } from '@/data/resume';
+import Image from 'next/image';
+import { LoginButton } from '@/components/auth/login-button';
 
 export function Header() {
-
   return (
     <header className="w-full py-6 mt-3">
       <div className="container max-w-4xl mx-auto px-4 md:px-6">
@@ -13,8 +12,8 @@ export function Header() {
             {/* Profile Image */}
             <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full border-3 border-background bg-card overflow-hidden flex-shrink-0">
               <div className="relative w-full h-full">
-                <Image 
-                  src="/images/headshot.jpg" 
+                <Image
+                  src="/images/headshot.jpg"
                   alt="Profile Photo"
                   fill
                   sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 112px"
@@ -23,7 +22,7 @@ export function Header() {
                 />
               </div>
             </div>
-            
+
             {/* Profile Info */}
             <div>
               <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground tracking-tight">
@@ -46,4 +45,4 @@ export function Header() {
       </div>
     </header>
   );
-} 
+}

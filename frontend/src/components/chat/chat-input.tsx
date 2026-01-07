@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useRef,
@@ -6,10 +6,10 @@ import {
   useCallback,
   type KeyboardEvent,
   type ChangeEvent,
-} from "react";
-import type { ChatStatus } from "@ai-sdk/react";
-import { cn } from "@/lib/utils";
-import { ArrowUpIcon, StopIcon } from "./chat-icons";
+} from 'react';
+import type { ChatStatus } from '@ai-sdk/react';
+import { cn } from '@/lib/utils';
+import { ArrowUpIcon, StopIcon } from './chat-icons';
 
 type ChatInputProps = {
   input?: string;
@@ -21,21 +21,21 @@ type ChatInputProps = {
 };
 
 export function ChatInput({
-  input = "",
+  input = '',
   setInput,
   onSubmit,
   onStop,
   status,
-  placeholder = "Send a message...",
+  placeholder = 'Send a message...',
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isLoading = status === "streaming" || status === "submitted";
+  const isLoading = status === 'streaming' || status === 'submitted';
 
   // Auto-resize textarea
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = "24px";
+      textarea.style.height = '24px';
       const newHeight = Math.min(textarea.scrollHeight, 200);
       textarea.style.height = `${newHeight}px`;
     }
@@ -58,8 +58,8 @@ export function ChatInput({
     if (e.nativeEvent.isComposing) {
       return;
     }
-    
-    if (e.key === "Enter" && !e.shiftKey) {
+
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() && !isLoading) {
         onSubmit();
@@ -81,7 +81,7 @@ export function ChatInput({
 
   const resetHeight = useCallback(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "24px";
+      textareaRef.current.style.height = '24px';
     }
   }, []);
 
@@ -100,12 +100,12 @@ export function ChatInput({
           handleSubmit();
         }}
         className={cn(
-          "flex w-full items-center gap-2",
-          "rounded-xl border border-border bg-muted/30",
-          "pl-4 pr-2 py-2",
-          "transition-all duration-200",
-          "focus-within:border-primary/50 focus-within:bg-background",
-          "hover:border-muted-foreground/30"
+          'flex w-full items-center gap-2',
+          'rounded-xl border border-border bg-muted/30',
+          'pl-4 pr-2 py-2',
+          'transition-all duration-200',
+          'focus-within:border-primary/50 focus-within:bg-background',
+          'hover:border-muted-foreground/30'
         )}
       >
         <textarea
@@ -115,29 +115,29 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           rows={1}
-          disabled={isLoading && status !== "streaming"}
+          disabled={isLoading && status !== 'streaming'}
           className={cn(
-            "flex-1 resize-none border-none bg-transparent",
-            "py-1 text-sm outline-none leading-6",
-            "placeholder:text-muted-foreground/70",
-            "focus-visible:outline-none",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            "min-h-[24px] max-h-[200px]",
-            "[scrollbar-width:none] [-ms-overflow-style:none]",
-            "[&::-webkit-scrollbar]:hidden"
+            'flex-1 resize-none border-none bg-transparent',
+            'py-1 text-sm outline-none leading-6',
+            'placeholder:text-muted-foreground/70',
+            'focus-visible:outline-none',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'min-h-[24px] max-h-[200px]',
+            '[scrollbar-width:none] [-ms-overflow-style:none]',
+            '[&::-webkit-scrollbar]:hidden'
           )}
         />
 
-        {status === "submitted" || status === "streaming" ? (
+        {status === 'submitted' || status === 'streaming' ? (
           <button
             type="button"
             onClick={onStop}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center",
-              "rounded-full",
-              "bg-foreground text-background",
-              "transition-colors duration-200",
-              "hover:bg-foreground/90"
+              'flex size-8 shrink-0 items-center justify-center',
+              'rounded-full',
+              'bg-foreground text-background',
+              'transition-colors duration-200',
+              'hover:bg-foreground/90'
             )}
             aria-label="Stop generating"
           >
@@ -148,13 +148,13 @@ export function ChatInput({
             type="submit"
             disabled={!input.trim()}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center",
-              "rounded-full",
-              "bg-primary text-primary-foreground",
-              "transition-all duration-200",
-              "hover:bg-primary/90",
-              "disabled:bg-muted disabled:text-muted-foreground",
-              "disabled:cursor-not-allowed"
+              'flex size-8 shrink-0 items-center justify-center',
+              'rounded-full',
+              'bg-primary text-primary-foreground',
+              'transition-all duration-200',
+              'hover:bg-primary/90',
+              'disabled:bg-muted disabled:text-muted-foreground',
+              'disabled:cursor-not-allowed'
             )}
             aria-label="Send message"
           >

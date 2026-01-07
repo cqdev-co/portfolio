@@ -29,47 +29,47 @@ permissions:
 jobs:
   fetch-penny-tickers:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run penny ticker fetch (dry-run)
-      if: github.event.inputs.dry_run == 'true'
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-      run: |
-        cd .github/scripts
-        python fetch_penny_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}
-        
-    - name: Run penny ticker fetch (production)
-      if: github.event.inputs.dry_run != 'true'
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-      run: |
-        cd .github/scripts
-        python fetch_penny_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run penny ticker fetch (dry-run)
+        if: github.event.inputs.dry_run == 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          cd .github/scripts
+          python fetch_penny_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}
+
+      - name: Run penny ticker fetch (production)
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          cd .github/scripts
+          python fetch_penny_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} --max-tickers ${{ github.event.inputs.max_tickers || '2000' }}

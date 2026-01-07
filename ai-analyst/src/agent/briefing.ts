@@ -3,26 +3,29 @@
  * Creates daily market briefings with watchlist alerts and position updates
  */
 
-import { getMarketRegime, type MarketRegime } from "../services/market-regime.ts";
-import { 
-  getCalendarContext, 
-  type CalendarContext, 
-  type MarketEvent 
-} from "../services/calendar.ts";
-import { 
-  getWatchlist, 
+import {
+  getMarketRegime,
+  type MarketRegime,
+} from '../services/market-regime.ts';
+import {
+  getCalendarContext,
+  type CalendarContext,
+  type MarketEvent,
+} from '../services/calendar.ts';
+import {
+  getWatchlist,
   saveBriefing,
   markBriefingDelivered,
-  type WatchlistItem, 
+  type WatchlistItem,
   type Briefing as DBBriefing,
-} from "../services/supabase.ts";
-import { scanForOpportunities, type ScanResult } from "../services/scanner.ts";
-import { generateCompletion, type OllamaMode } from "../services/ollama.ts";
-import { 
-  sendMorningBriefing, 
+} from '../services/supabase.ts';
+import { scanForOpportunities, type ScanResult } from '../services/scanner.ts';
+import { generateCompletion, type OllamaMode } from '../services/ollama.ts';
+import {
+  sendMorningBriefing,
   isDiscordConfigured,
   type BriefingEmbed,
-} from "../services/discord.ts";
+} from '../services/discord.ts';
 
 // ============================================================================
 // TYPES
@@ -34,7 +37,7 @@ export interface WatchlistAlert {
   grade?: string;
   rsi?: number;
   cushion?: number;
-  priority: "HIGH" | "MEDIUM" | "LOW";
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 export interface Briefing {
@@ -50,6 +53,12 @@ export interface Briefing {
     warnings: string[];
   };
   watchlistAlerts: WatchlistAlert[];
+  positionUpdates?: {
+    ticker: string;
+    status: string;
+    dte?: number;
+    action?: string;
+  }[];
   aiCommentary: string;
 }
 
@@ -66,7 +75,7 @@ export async function generateMorningBriefing(options?: {
   skipDiscord?: boolean;
 }): Promise<Briefing> {
   const now = new Date();
-  
+
   // Fetch all data in parallel
   const [marketRegime, calendarContext, watchlist] = await Promise.all([
     getMarketRegime(),
@@ -76,13 +85,14 @@ export async function generateMorningBriefing(options?: {
 
   // Scan watchlist tickers for opportunities
   const watchlistTickers = watchlist.map((w: WatchlistItem) => w.ticker);
-  const scanResults = watchlistTickers.length > 0
-    ? await scanForOpportunities(watchlistTickers, {
-        minGrade: "C",
-        maxRisk: 10,
-        minCushion: 0,
-      })
-    : [];
+  const scanResults =
+    watchlistTickers.length > 0
+      ? await scanForOpportunities(watchlistTickers, {
+          minGrade: 'C',
+          maxRisk: 10,
+          minCushion: 0,
+        })
+      : [];
 
   // Generate watchlist alerts
   const watchlistAlerts = generateWatchlistAlerts(watchlist, scanResults);
@@ -92,7 +102,7 @@ export async function generateMorningBriefing(options?: {
     marketRegime,
     calendarContext,
     watchlistAlerts,
-    aiMode: options?.aiMode ?? "cloud",
+    aiMode: options?.aiMode ?? 'cloud',
     aiModel: options?.aiModel,
   });
 
@@ -137,7 +147,7 @@ export async function generateMorningBriefing(options?: {
   if (!options?.skipDiscord && isDiscordConfigured()) {
     const discordBriefing = toBriefingEmbed(briefing);
     const success = await sendMorningBriefing(discordBriefing);
-    
+
     if (success) {
       // Mark as delivered
       const dbBriefing = await saveBriefing({ date: now });
@@ -160,33 +170,36 @@ function generateWatchlistAlerts(
   const alerts: WatchlistAlert[] = [];
 
   for (const item of watchlist) {
-    const result = scanResults.find(r => r.ticker === item.ticker);
-    
+    const result = scanResults.find((r) => r.ticker === item.ticker);
+
     if (!result) continue;
 
     // Check if in buy zone based on item's thresholds
-    const rsiInZone = result.grade.rsi !== undefined && 
-      result.grade.rsi >= item.targetRsiLow && 
+    const rsiInZone =
+      result.grade.rsi !== undefined &&
+      result.grade.rsi >= item.targetRsiLow &&
       result.grade.rsi <= item.targetRsiHigh;
 
-    const cushionMet = result.spread?.cushion !== undefined &&
+    const cushionMet =
+      result.spread?.cushion !== undefined &&
       result.spread.cushion >= item.minCushionPct;
 
-    const gradeMet = gradeToValue(result.grade.grade) >= gradeToValue(item.minGrade);
+    const gradeMet =
+      gradeToValue(result.grade.grade) >= gradeToValue(item.minGrade);
 
     // Determine if this is an alert-worthy situation
     let reason: string | null = null;
-    let priority: "HIGH" | "MEDIUM" | "LOW" = "LOW";
+    let priority: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
 
     if (gradeMet && rsiInZone && cushionMet) {
       reason = `Grade ${result.grade.grade} setup - RSI ${result.grade.rsi?.toFixed(0)}, ${result.spread?.cushion.toFixed(1)}% cushion`;
-      priority = result.grade.grade.startsWith("A") ? "HIGH" : "MEDIUM";
+      priority = result.grade.grade.startsWith('A') ? 'HIGH' : 'MEDIUM';
     } else if (gradeMet && rsiInZone) {
       reason = `RSI ${result.grade.rsi?.toFixed(0)} in buy zone - Grade ${result.grade.grade}`;
-      priority = "MEDIUM";
+      priority = 'MEDIUM';
     } else if (result.grade.rsi !== undefined && result.grade.rsi < 35) {
       reason = `RSI oversold at ${result.grade.rsi.toFixed(0)} - watch for bounce`;
-      priority = "LOW";
+      priority = 'LOW';
     }
 
     if (reason) {
@@ -228,14 +241,14 @@ async function generateAICommentary(context: {
         mode: context.aiMode,
         model: context.aiModel,
       },
-      "You are Victor, a trading assistant. Generate brief, actionable market commentary.",
+      'You are Victor, a trading assistant. Generate brief, actionable market commentary.',
       prompt
     );
 
     return response.content.trim();
   } catch (error) {
-    console.error("Error generating AI commentary:", error);
-    return "Unable to generate AI commentary at this time.";
+    console.error('Error generating AI commentary:', error);
+    return 'Unable to generate AI commentary at this time.';
   }
 }
 
@@ -262,7 +275,7 @@ MARKET CONDITIONS:
     for (const warning of context.calendarContext.warnings.slice(0, 3)) {
       prompt += `- ${warning}\n`;
     }
-    prompt += "\n";
+    prompt += '\n';
   }
 
   if (context.watchlistAlerts.length > 0) {
@@ -270,7 +283,7 @@ MARKET CONDITIONS:
     for (const alert of context.watchlistAlerts.slice(0, 3)) {
       prompt += `- ${alert.ticker}: ${alert.reason}\n`;
     }
-    prompt += "\n";
+    prompt += '\n';
   }
 
   prompt += `Write a concise, actionable morning summary. Focus on:
@@ -290,14 +303,22 @@ function toBriefingEmbed(briefing: Briefing): BriefingEmbed {
   return {
     date: briefing.date,
     marketPulse: briefing.marketPulse,
-    calendar: briefing.calendar.events.slice(0, 3).map(e => ({
+    calendar: briefing.calendar.events.slice(0, 3).map((e) => ({
       name: e.name,
-      date: e.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+      date: e.date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      }),
       impact: e.impact,
     })),
-    watchlistAlerts: briefing.watchlistAlerts.slice(0, 5).map(a => ({
+    watchlistAlerts: briefing.watchlistAlerts.slice(0, 5).map((a) => ({
       ticker: a.ticker,
       reason: a.reason,
+    })),
+    positionUpdates: (briefing.positionUpdates ?? []).slice(0, 5).map((p) => ({
+      ticker: p.ticker,
+      status: p.status,
     })),
     aiCommentary: briefing.aiCommentary,
   };
@@ -307,11 +328,11 @@ function toBriefingEmbed(briefing: Briefing): BriefingEmbed {
  * Format briefing for CLI display
  */
 export function formatBriefingForCLI(briefing: Briefing): string {
-  const dateStr = briefing.date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+  const dateStr = briefing.date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   });
 
   let output = `
@@ -320,7 +341,7 @@ export function formatBriefingForCLI(briefing: Briefing): string {
   ────────────────────────────────────────────────────────────────────
 
   📊 MARKET PULSE
-  SPY: $${briefing.marketPulse.spy.price.toFixed(2)} (${briefing.marketPulse.spy.changePct >= 0 ? "+" : ""}${briefing.marketPulse.spy.changePct.toFixed(1)}%) - ${briefing.marketPulse.spy.trend}
+  SPY: $${briefing.marketPulse.spy.price.toFixed(2)} (${briefing.marketPulse.spy.changePct >= 0 ? '+' : ''}${briefing.marketPulse.spy.changePct.toFixed(1)}%) - ${briefing.marketPulse.spy.trend}
   VIX: ${briefing.marketPulse.vix.current.toFixed(1)} (${briefing.marketPulse.vix.level})
   Regime: ${briefing.marketPulse.regime}
   ${briefing.marketPulse.summary}
@@ -332,30 +353,34 @@ export function formatBriefingForCLI(briefing: Briefing): string {
     for (const warning of briefing.calendar.warnings) {
       output += `  ${warning}\n`;
     }
-    output += "\n";
+    output += '\n';
   }
 
   if (briefing.calendar.events.length > 0) {
     output += `  📅 UPCOMING EVENTS\n`;
     for (const event of briefing.calendar.events.slice(0, 5)) {
-      const eventDate = event.date.toLocaleDateString("en-US", { 
-        weekday: "short", 
-        month: "short", 
-        day: "numeric" 
+      const eventDate = event.date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
       });
       output += `  • ${eventDate}: ${event.name} [${event.impact}]\n`;
     }
-    output += "\n";
+    output += '\n';
   }
 
   if (briefing.watchlistAlerts.length > 0) {
     output += `  🎯 WATCHLIST ALERTS\n`;
     for (const alert of briefing.watchlistAlerts) {
-      const priorityIcon = alert.priority === "HIGH" ? "🔴" : 
-                          alert.priority === "MEDIUM" ? "🟡" : "🟢";
+      const priorityIcon =
+        alert.priority === 'HIGH'
+          ? '🔴'
+          : alert.priority === 'MEDIUM'
+            ? '🟡'
+            : '🟢';
       output += `  ${priorityIcon} ${alert.ticker}: ${alert.reason}\n`;
     }
-    output += "\n";
+    output += '\n';
   } else {
     output += `  🎯 WATCHLIST ALERTS\n  No alerts at this time.\n\n`;
   }
@@ -375,10 +400,17 @@ export function formatBriefingForCLI(briefing: Briefing): string {
 
 function gradeToValue(grade: string): number {
   const grades: Record<string, number> = {
-    'A+': 12, 'A': 11, 'A-': 10,
-    'B+': 9, 'B': 8, 'B-': 7,
-    'C+': 6, 'C': 5, 'C-': 4,
-    'D': 3, 'F': 1,
+    'A+': 12,
+    A: 11,
+    'A-': 10,
+    'B+': 9,
+    B: 8,
+    'B-': 7,
+    'C+': 6,
+    C: 5,
+    'C-': 4,
+    D: 3,
+    F: 1,
   };
   return grades[grade] ?? 0;
 }

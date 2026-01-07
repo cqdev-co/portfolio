@@ -1,11 +1,11 @@
 /**
  * Psychological Fair Value Service
- * 
+ *
  * Integrates the PFV utility with AI Analyst's data fetching
  */
 
-import YahooFinance from "yahoo-finance2";
-import type { 
+import YahooFinance from 'yahoo-finance2';
+import type {
   PFVInput,
   TechnicalData,
   OptionsExpiration,
@@ -13,14 +13,14 @@ import type {
   PsychologicalFairValue,
   PFVCalculatorOptions,
   TickerProfileType,
-} from "../../../lib/utils/ts/psychological-fair-value/types.js";
-import { 
+} from '../../../lib/utils/ts/psychological-fair-value/types.js';
+import {
   calculatePsychologicalFairValue,
   formatPFVResult,
-} from "../../../lib/utils/ts/psychological-fair-value/calculator.js";
+} from '../../../lib/utils/ts/psychological-fair-value/calculator.js';
 
 const yahooFinance = new YahooFinance({
-  suppressNotices: ["yahooSurvey", "rippiReport"],
+  suppressNotices: ['yahooSurvey'],
   validation: { logErrors: false, logOptionsErrors: false },
 });
 
@@ -52,12 +52,14 @@ async function fetchOptionsExpirations(
 
     // Define realistic strike range (50% below to 50% above current price)
     // This filters out pre-split strikes and LEAPS with weird ranges
-    const minStrike = underlyingPrice * 0.50;
-    const maxStrike = underlyingPrice * 1.50;
+    const minStrike = underlyingPrice * 0.5;
+    const maxStrike = underlyingPrice * 1.5;
 
     // Get first N expirations
-    const targetExpirations = optionsResult.expirationDates
-      .slice(0, maxExpirations);
+    const targetExpirations = optionsResult.expirationDates.slice(
+      0,
+      maxExpirations
+    );
 
     for (const expDate of targetExpirations) {
       try {
@@ -74,12 +76,13 @@ async function fetchOptionsExpirations(
 
         // Filter calls to realistic strikes with OI
         const calls: OptionContract[] = (opts.calls ?? [])
-          .filter(c => 
-            c.strike >= minStrike && 
-            c.strike <= maxStrike &&
-            (c.openInterest ?? 0) > 0
+          .filter(
+            (c) =>
+              c.strike >= minStrike &&
+              c.strike <= maxStrike &&
+              (c.openInterest ?? 0) > 0
           )
-          .map(c => ({
+          .map((c) => ({
             strike: c.strike,
             openInterest: c.openInterest ?? 0,
             volume: c.volume ?? 0,
@@ -90,12 +93,13 @@ async function fetchOptionsExpirations(
 
         // Filter puts to realistic strikes with OI
         const puts: OptionContract[] = (opts.puts ?? [])
-          .filter(p => 
-            p.strike >= minStrike && 
-            p.strike <= maxStrike &&
-            (p.openInterest ?? 0) > 0
+          .filter(
+            (p) =>
+              p.strike >= minStrike &&
+              p.strike <= maxStrike &&
+              (p.openInterest ?? 0) > 0
           )
-          .map(p => ({
+          .map((p) => ({
             strike: p.strike,
             openInterest: p.openInterest ?? 0,
             volume: p.volume ?? 0,
@@ -108,7 +112,11 @@ async function fetchOptionsExpirations(
         const totalPutOI = puts.reduce((sum, p) => sum + p.openInterest, 0);
 
         // Skip expirations with insufficient data
-        if (calls.length < 5 || puts.length < 5 || totalCallOI + totalPutOI < 1000) {
+        if (
+          calls.length < 5 ||
+          puts.length < 5 ||
+          totalCallOI + totalPutOI < 1000
+        ) {
           continue;
         }
 
@@ -122,7 +130,7 @@ async function fetchOptionsExpirations(
         });
 
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch {
         // Skip failed expirations
         continue;
@@ -159,21 +167,21 @@ async function fetchTechnicalDataForPFV(
       const history = await yahooFinance.chart(ticker, {
         period1: startDate,
         period2: endDate,
-        interval: "1d",
+        interval: '1d',
       });
 
       if (history?.quotes && history.quotes.length > 0) {
         const highs = history.quotes
-          .map(q => q.high)
+          .map((q) => q.high)
           .filter((h): h is number => h !== null && h !== undefined);
         const lows = history.quotes
-          .map(q => q.low)
+          .map((q) => q.low)
           .filter((l): l is number => l !== null && l !== undefined);
         const closes = history.quotes
-          .map(q => q.close)
+          .map((q) => q.close)
           .filter((c): c is number => c !== null && c !== undefined);
         const volumes = history.quotes
-          .map(q => q.volume)
+          .map((q) => q.volume)
           .filter((v): v is number => v !== null && v !== undefined);
 
         if (highs.length > 0) recentSwingHigh = Math.max(...highs);
@@ -201,18 +209,18 @@ async function fetchTechnicalDataForPFV(
     try {
       const ma20Start = new Date();
       ma20Start.setDate(ma20Start.getDate() - 40);
-      
+
       const history20 = await yahooFinance.chart(ticker, {
         period1: ma20Start,
         period2: endDate,
-        interval: "1d",
+        interval: '1d',
       });
 
       if (history20?.quotes && history20.quotes.length >= 20) {
         const closes = history20.quotes
-          .map(q => q.close)
+          .map((q) => q.close)
           .filter((c): c is number => c !== null && c !== undefined);
-        
+
         if (closes.length >= 20) {
           const last20 = closes.slice(-20);
           ma20 = last20.reduce((a, b) => a + b, 0) / 20;
@@ -227,7 +235,8 @@ async function fetchTechnicalDataForPFV(
       ma20,
       ma50: quote.fiftyDayAverage ?? undefined,
       ma200: quote.twoHundredDayAverage ?? undefined,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? quote.regularMarketPrice * 1.2,
+      fiftyTwoWeekHigh:
+        quote.fiftyTwoWeekHigh ?? quote.regularMarketPrice * 1.2,
       fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? quote.regularMarketPrice * 0.8,
       recentSwingHigh,
       recentSwingLow,
@@ -253,7 +262,7 @@ export interface PFVServiceOptions {
 
 /**
  * Calculate Psychological Fair Value for a ticker
- * 
+ *
  * This is the main entry point for the AI Analyst integration.
  * It fetches all required data and calculates PFV.
  */
@@ -261,8 +270,8 @@ export async function getPsychologicalFairValue(
   ticker: string,
   options: PFVServiceOptions = {}
 ): Promise<PsychologicalFairValue | null> {
-  const { 
-    maxExpirations = 4, 
+  const {
+    maxExpirations = 4,
     profileOverride,
     calculatorOptions = {},
   } = options;
@@ -299,10 +308,10 @@ export async function getPsychologicalFairValue(
  * Get PFV summary for quick display
  */
 export function getPFVSummary(pfv: PsychologicalFairValue): string {
-  const direction = pfv.deviationPercent > 0 ? '↑' : 
-                   pfv.deviationPercent < 0 ? '↓' : '→';
+  const direction =
+    pfv.deviationPercent > 0 ? '↑' : pfv.deviationPercent < 0 ? '↓' : '→';
   const absDeviation = Math.abs(pfv.deviationPercent);
-  
+
   return `$${pfv.fairValue.toFixed(2)} (${direction}${absDeviation.toFixed(1)}% ${pfv.bias})`;
 }
 
@@ -327,7 +336,7 @@ export function getKeyMagneticLevels(
   pfv: PsychologicalFairValue,
   limit: number = 5
 ): { price: number; type: string; distance: string }[] {
-  return pfv.magneticLevels.slice(0, limit).map(level => ({
+  return pfv.magneticLevels.slice(0, limit).map((level) => ({
     price: level.price,
     type: level.type.replace(/_/g, ' '),
     distance: `${level.distance > 0 ? '+' : ''}${level.distance.toFixed(1)}%`,
@@ -337,11 +346,13 @@ export function getKeyMagneticLevels(
 /**
  * Check if PFV suggests a mean reversion opportunity
  */
-export function hasMeanReversionSignal(
-  pfv: PsychologicalFairValue
-): { signal: boolean; direction: 'LONG' | 'SHORT' | null; strength: number } {
+export function hasMeanReversionSignal(pfv: PsychologicalFairValue): {
+  signal: boolean;
+  direction: 'LONG' | 'SHORT' | null;
+  strength: number;
+} {
   const absDeviation = Math.abs(pfv.deviationPercent);
-  
+
   // No signal if deviation is small or confidence is low
   if (absDeviation < 2 || pfv.confidence === 'LOW') {
     return { signal: false, direction: null, strength: 0 };
@@ -349,7 +360,7 @@ export function hasMeanReversionSignal(
 
   // Strong signal if price is significantly away from PFV
   const strength = Math.min(100, absDeviation * 10);
-  
+
   if (pfv.deviationPercent > 2) {
     // PFV above current price = potential upside
     return { signal: true, direction: 'LONG', strength };
@@ -362,6 +373,7 @@ export function hasMeanReversionSignal(
 }
 
 // Re-export types for convenience
-export type { PsychologicalFairValue, MagneticLevel } from 
-  "../../../lib/utils/ts/psychological-fair-value/types.js";
-
+export type {
+  PsychologicalFairValue,
+  MagneticLevel,
+} from '../../../lib/utils/ts/psychological-fair-value/types.js';

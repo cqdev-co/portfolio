@@ -1,4 +1,4 @@
-import { ThresholdsConfig, ScoreWeights } from "../types/index.ts";
+import { ThresholdsConfig, ScoreWeights } from '../types/index.ts';
 
 /**
  * Default thresholds for signal detection
@@ -11,13 +11,13 @@ export const defaultThresholds: ThresholdsConfig = {
     nearSupportPercent: 0.03,
   },
   fundamental: {
-    pegRatioMax: 1.5,        // Relaxed from 1.0 - growth stocks often 1-2
-    pegRatioGood: 2.0,       // Partial credit for PEG < 2
-    fcfYieldMin: 0.03,       // Relaxed from 8% to 3% (more realistic)
-    fcfYieldHigh: 0.05,      // Bonus for 5%+ yield
-    forwardPEDiscountPercent: 0.10, // Relaxed from 15% to 10%
-    evEbitdaMax: 15,         // Relaxed from 12 to 15
-    evEbitdaGood: 20,        // Partial credit for < 20
+    pegRatioMax: 1.5, // Relaxed from 1.0 - growth stocks often 1-2
+    pegRatioGood: 2.0, // Partial credit for PEG < 2
+    fcfYieldMin: 0.03, // Relaxed from 8% to 3% (more realistic)
+    fcfYieldHigh: 0.05, // Bonus for 5%+ yield
+    forwardPEDiscountPercent: 0.1, // Relaxed from 15% to 10%
+    evEbitdaMax: 15, // Relaxed from 12 to 15
+    evEbitdaGood: 20, // Partial credit for < 20
   },
   analyst: {
     minUpsidePercent: 0.25,
@@ -68,12 +68,55 @@ export const defaultWeights: ScoreWeights = {
  * Full list would be loaded from Supabase
  */
 export const SP500_SAMPLE = [
-  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B",
-  "UNH", "JNJ", "JPM", "V", "PG", "XOM", "HD", "CVX", "MA", "ABBV",
-  "MRK", "LLY", "PEP", "KO", "COST", "AVGO", "TMO", "MCD", "WMT",
-  "CSCO", "ACN", "ABT", "DHR", "NEE", "VZ", "ADBE", "CRM", "NKE",
-  "CMCSA", "TXN", "PM", "INTC", "AMD", "QCOM", "UPS", "RTX", "HON",
-  "ORCL", "IBM", "LOW", "CAT",
+  'AAPL',
+  'MSFT',
+  'GOOGL',
+  'AMZN',
+  'NVDA',
+  'META',
+  'TSLA',
+  'BRK-B',
+  'UNH',
+  'JNJ',
+  'JPM',
+  'V',
+  'PG',
+  'XOM',
+  'HD',
+  'CVX',
+  'MA',
+  'ABBV',
+  'MRK',
+  'LLY',
+  'PEP',
+  'KO',
+  'COST',
+  'AVGO',
+  'TMO',
+  'MCD',
+  'WMT',
+  'CSCO',
+  'ACN',
+  'ABT',
+  'DHR',
+  'NEE',
+  'VZ',
+  'ADBE',
+  'CRM',
+  'NKE',
+  'CMCSA',
+  'TXN',
+  'PM',
+  'INTC',
+  'AMD',
+  'QCOM',
+  'UPS',
+  'RTX',
+  'HON',
+  'ORCL',
+  'IBM',
+  'LOW',
+  'CAT',
 ];
 
 /**
@@ -81,16 +124,37 @@ export const SP500_SAMPLE = [
  */
 export const SECTOR_MAPPING: Record<string, string[]> = {
   technology: [
-    "AAPL", "MSFT", "GOOGL", "NVDA", "META", "ADBE", 
-    "CRM", "CSCO", "INTC", "AMD", "QCOM", "ORCL", "IBM",
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'NVDA',
+    'META',
+    'ADBE',
+    'CRM',
+    'CSCO',
+    'INTC',
+    'AMD',
+    'QCOM',
+    'ORCL',
+    'IBM',
   ],
-  healthcare: ["UNH", "JNJ", "ABBV", "MRK", "LLY", "TMO", "ABT", "DHR"],
-  financials: ["JPM", "V", "MA", "BRK-B"],
-  consumer: ["AMZN", "TSLA", "HD", "PG", "PEP", "KO", "COST", "MCD", 
-             "WMT", "NKE", "LOW"],
-  energy: ["XOM", "CVX"],
-  industrials: ["UPS", "RTX", "HON", "CAT"],
-  utilities: ["NEE"],
-  telecom: ["VZ", "CMCSA"],
+  healthcare: ['UNH', 'JNJ', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR'],
+  financials: ['JPM', 'V', 'MA', 'BRK-B'],
+  consumer: [
+    'AMZN',
+    'TSLA',
+    'HD',
+    'PG',
+    'PEP',
+    'KO',
+    'COST',
+    'MCD',
+    'WMT',
+    'NKE',
+    'LOW',
+  ],
+  energy: ['XOM', 'CVX'],
+  industrials: ['UPS', 'RTX', 'HON', 'CAT'],
+  utilities: ['NEE'],
+  telecom: ['VZ', 'CMCSA'],
 };
-

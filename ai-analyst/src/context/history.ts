@@ -3,23 +3,23 @@
  * Fetches and analyzes past trades for context
  */
 
-import { 
-  getTradesByTicker, 
+import {
+  getTradesByTicker,
   getAllTrades,
-  getTickerStats 
-} from "../services/supabase.ts";
-import { 
-  buildTickerHistory, 
+  getTickerStats,
+} from '../services/supabase.ts';
+import {
+  buildTickerHistory,
   getPrimaryPattern,
   buildTickerTOONContext,
-  toonToString 
-} from "./toon.ts";
-import type { 
-  Trade, 
-  TickerHistory, 
+  toonToString,
+} from './toon.ts';
+import type {
+  Trade,
+  TickerHistory,
   TOONContext,
-  MarketRegime 
-} from "../types/index.ts";
+  MarketRegime,
+} from '../types/index.ts';
 
 // Default account size - can be overridden
 const DEFAULT_ACCOUNT_SIZE = 1500;
@@ -31,7 +31,7 @@ export async function getTickerHistory(
   ticker: string
 ): Promise<TickerHistory | null> {
   const trades = await getTradesByTicker(ticker);
-  
+
   if (trades.length === 0) {
     return null;
   }
@@ -49,7 +49,7 @@ export async function getTickerContextForAI(
   accountSize: number = DEFAULT_ACCOUNT_SIZE
 ): Promise<string | null> {
   const trades = await getTradesByTicker(ticker);
-  
+
   if (trades.length === 0) {
     return null;
   }
@@ -75,23 +75,30 @@ export function formatHistoryForDisplay(history: TickerHistory): string[] {
   // Summary line
   lines.push(
     `${history.totalTrades} trades | ` +
-    `${history.winRate.toFixed(0)}% win rate | ` +
-    `${history.totalPnl >= 0 ? '+' : ''}$${history.totalPnl.toFixed(0)} total P&L`
+      `${history.winRate.toFixed(0)}% win rate | ` +
+      `${history.totalPnl >= 0 ? '+' : ''}$${history.totalPnl.toFixed(0)} total P&L`
   );
 
   // Last trade
   if (history.lastTrade) {
     const last = history.lastTrade;
     const pnl = last.realizedPnl ?? 0;
-    const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(0)}` : `-$${Math.abs(pnl).toFixed(0)}`;
+    const pnlStr =
+      pnl >= 0 ? `+$${pnl.toFixed(0)}` : `-$${Math.abs(pnl).toFixed(0)}`;
     const typeStr = formatTradeType(last.tradeType);
-    const dateStr = last.closeDate 
-      ? last.closeDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      : last.openDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    
+    const dateStr = last.closeDate
+      ? last.closeDate.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        })
+      : last.openDate.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        });
+
     lines.push(
       `Last: $${last.longStrike}/${last.shortStrike} ${typeStr} ` +
-      `closed ${pnlStr} (${dateStr})`
+        `closed ${pnlStr} (${dateStr})`
     );
   }
 
@@ -126,7 +133,7 @@ function formatTradeType(type: string): string {
  */
 export async function getTradedTickers(): Promise<string[]> {
   const trades = await getAllTrades();
-  const tickers = new Set(trades.map(t => t.ticker));
+  const tickers = new Set(trades.map((t) => t.ticker));
   return Array.from(tickers).sort();
 }
 
@@ -134,11 +141,14 @@ export async function getTradedTickers(): Promise<string[]> {
  * Get trades grouped by ticker with stats
  */
 export async function getTradesByTickerWithStats(): Promise<
-  Map<string, { trades: Trade[]; stats: Awaited<ReturnType<typeof getTickerStats>> }>
+  Map<
+    string,
+    { trades: Trade[]; stats: Awaited<ReturnType<typeof getTickerStats>> }
+  >
 > {
   const trades = await getAllTrades();
   const result = new Map<
-    string, 
+    string,
     { trades: Trade[]; stats: Awaited<ReturnType<typeof getTickerStats>> }
   >();
 
@@ -172,7 +182,7 @@ export async function hasHistoryForTicker(ticker: string): Promise<boolean> {
  */
 export function getWinRateInsight(history: TickerHistory): string {
   if (history.totalTrades < 3) {
-    return "Limited trade history - no clear patterns yet";
+    return 'Limited trade history - no clear patterns yet';
   }
 
   if (history.winRate >= 70) {
@@ -183,4 +193,3 @@ export function getWinRateInsight(history: TickerHistory): string {
     return `Challenging history (${history.winRate.toFixed(0)}% win rate) - review patterns`;
   }
 }
-

@@ -1,9 +1,23 @@
 # Stock Opportunity Scanner
 
-An AI-powered TypeScript CLI tool that identifies high-conviction stock buy 
+An AI-powered TypeScript CLI tool that identifies high-conviction stock buy
 opportunities using confluence of technical, fundamental, and analyst indicators.
 
-**Version 2.0.0** - AI-first architecture using Ollama (cloud by default).
+**Version 2.3.0** - Strategy-aware scanning with No-Trade Regime integration.
+
+## What's New in v2.3.0
+
+- **Trading Regime Command** - Check GO/CAUTION/NO_TRADE before scanning
+- **Strategy Integration** - Tailored for Deep ITM spreads + cash-preserving
+- **Regime-Adjusted Criteria** - Stricter spread requirements in CAUTION
+- **Transition Warnings** - Predicts regime changes before they happen
+
+### Previous (v2.2.0)
+
+- Expanded Proxy (v4.1) - Fundamentals, EPS trends, earnings history, insider
+- Improved Scoring - 31-61 range with full data
+- Insider Activity Signal
+- EPS Momentum tracking
 
 ## Quick Start
 
@@ -11,36 +25,29 @@ opportunities using confluence of technical, fundamental, and analyst indicators
 # Install dependencies
 bun install
 
-# Set up your API key (required)
-export OLLAMA_API_KEY=your-ollama-api-key
+# Set up environment (from repo root .env)
+export OLLAMA_API_KEY=your-ollama-api-key      # Required for AI
+export YAHOO_PROXY_URL=https://yahoo-proxy.conorquinlan.workers.dev
 
-# Analyze a single ticker (AI-powered analysis)
+# 1. Check trading regime FIRST (recommended workflow)
+bun run regime
+
+# 2. If GO/CAUTION, analyze or scan
 bun run analyze NVDA
-
-# Analyze with your position
-bun run analyze HOOD --position "111/112 Call Debit Spread"
-
-# Run a test scan (dry run)
-bun run scan:test
-
-# Scan large-cap stocks
 bun run scan --list sp500 --min-score 50
 
-# Scan specific tickers
-bun run scan --tickers NVDA,AAPL,GOOGL --min-score 70
-
-# Find tickers with viable deep ITM spreads
-bun run scan-spreads --list mega
-
-# Use relaxed criteria to see "almost viable" setups
-bun run scan-spreads --list growth --relaxed
+# Full workflow example:
+bun run regime            # Check if market is favorable
+bun run scan --list sp500 # Scan for opportunities
+bun run scan-spreads      # Find spreads for top tickers
+bun run analyze NVDA      # Deep dive on candidates
 ```
 
 **Note**: Environment variables are loaded from the repository root `.env` file.
 
 ## Analyze Command
 
-Get an AI-powered narrative-driven analysis that tells a coherent story about 
+Get an AI-powered narrative-driven analysis that tells a coherent story about
 any stock:
 
 ```bash
@@ -90,6 +97,7 @@ bun run analyze HOOD --position "111/112 Call Debit Spread"
 ```
 
 Position analysis shows:
+
 - **Risk Level** - Low/Medium/High/Critical based on cushion to critical strike
 - **Probability of Profit** - Rough estimate based on price distance
 - **Support vs Your Strike** - Whether support levels are above or below
@@ -98,12 +106,21 @@ Position analysis shows:
 
 ## Scoring System
 
-| Category     | Max Points | Key Signals |
-|-------------|-----------|-------------|
-| Technical   | 50        | RSI, Golden Cross, Support, Volume |
-| Fundamental | 30        | PEG, FCF Yield, P/E, EV/EBITDA |
-| Analyst     | 20        | Targets, Upgrades, Revisions |
-| **Total**   | **100**   | |
+| Category    | Max Points | Key Signals                                                 |
+| ----------- | ---------- | ----------------------------------------------------------- |
+| Technical   | 50         | RSI, Golden Cross, Support, Volume, **RSI/MACD Divergence** |
+| Fundamental | 30         | PEG, FCF Yield, P/E, EV/EBITDA, **Insider Ownership**       |
+| Analyst     | 20         | Targets, Upgrades, Revisions                                |
+| **Total**   | **100**    |                                                             |
+
+### New Signals (v2.1.0)
+
+| Signal                       | Category    | Points | Description                      |
+| ---------------------------- | ----------- | ------ | -------------------------------- |
+| Bullish RSI Divergence       | Technical   | 8      | Price lower low, RSI higher low  |
+| Bullish MACD Divergence      | Technical   | 6      | Price lower low, MACD higher low |
+| High Insider Ownership       | Fundamental | 3-5    | Insiders own >5% of shares       |
+| Strong Institutional Support | Fundamental | 2-3    | Institutions own >70%            |
 
 ## Spread Scanner
 
@@ -120,6 +137,7 @@ bun run scan-spreads --from-scan --relaxed
 ```
 
 This workflow:
+
 1. First scans for technically sound stocks (score ≥70)
 2. Then finds viable spreads only on those pre-qualified tickers
 
@@ -145,12 +163,14 @@ bun run scan-spreads --relaxed
 ### Criteria
 
 **Strict Criteria** (default):
+
 - Debit: 55-80% of spread width
 - Cushion: ≥5% below current price
 - PoP: ≥70% probability of profit
 - Return: ≥20% return on risk
 
 **Relaxed Criteria** (`--relaxed`):
+
 - Debit: 50-85% of spread width
 - Cushion: ≥3% below current price
 - PoP: ≥60% probability of profit
@@ -159,6 +179,11 @@ bun run scan-spreads --relaxed
 ## CLI Commands
 
 ```bash
+# Regime command — Check market conditions FIRST
+bun run src/index.ts regime [options]
+  -w, --weekly             # Include transition warnings
+  -j, --json               # Output as JSON
+
 # Analyze command (AI-powered)
 bun run src/index.ts analyze <ticker> [options]
   --no-chart            # Skip price chart visualization
@@ -186,7 +211,32 @@ bun run src/index.ts scan-spreads [options]
   -t, --tickers <symbols>  # Comma-separated tickers
   -r, --relaxed            # Use relaxed criteria
   -v, --verbose            # Verbose output
+
+# Debug command - troubleshoot proxy/cache issues
+bun run src/index.ts debug [options]
+  -t, --test <ticker>      # Test fetching a specific ticker
+
+# Add --debug to scan to see stats after completion
+bun run scan -t AAPL,GOOGL --debug
 ```
+
+## Trading Regimes
+
+The scanner integrates with the **No-Trade Regime Detection** system from `lib/ai-agent/market`:
+
+| Regime      | Action             | Spread Criteria      | Position Size |
+| ----------- | ------------------ | -------------------- | ------------- |
+| 🟢 GO       | Normal scan        | 70% PoP, 5% cushion  | 100%          |
+| 🟡 CAUTION  | Grade A only (≥80) | 75% PoP, 7% cushion  | 50%           |
+| 🔴 NO_TRADE | Skip/warn          | 80% PoP, 10% cushion | 0%            |
+
+**Regime Factors:**
+
+- Chop Index (trend vs consolidation)
+- ADX (trend strength)
+- VIX (volatility)
+- Market Breadth (SPY/RSP/IWM divergence)
+- Signal Conflicts (mixed bullish/bearish signals)
 
 ## Configuration
 
@@ -215,12 +265,14 @@ Run the SQL schema in Supabase:
 ## Documentation
 
 See [docs/stock-scanner/README.md](../docs/stock-scanner/README.md) for:
+
 - Complete signal breakdown
 - Architecture overview
 - Frontend integration guide
 - Historical tracking details
 
 See [docs/stock-scanner/roadmap.md](../docs/stock-scanner/roadmap.md) for:
+
 - Feature history
 - Future roadmap
 
@@ -228,8 +280,46 @@ See [docs/stock-scanner/roadmap.md](../docs/stock-scanner/roadmap.md) for:
 
 - **Runtime**: Bun
 - **AI**: Ollama (cloud or local)
-- **Data**: yahoo-finance2
+- **Data**: yahoo-finance2 (via shared proxy from `lib/`)
 - **Indicators**: technicalindicators
 - **CLI**: commander + chalk
 - **Database**: Supabase
 - **Validation**: zod
+
+## Shared Infrastructure
+
+This service leverages shared code from `lib/` to avoid duplication:
+
+| Module         | Location                                 | Purpose                                   |
+| -------------- | ---------------------------------------- | ----------------------------------------- |
+| Yahoo Proxy    | `lib/ai-agent/data/yahoo-proxy.ts`       | Rate-limited data fetching via Cloudflare |
+| Market Regime  | `lib/ai-agent/market/`                   | VIX, SPY trend, chop index                |
+| Options Chain  | `lib/ai-agent/options/`                  | Options data for spreads                  |
+| PFV Calculator | `lib/utils/ts/psychological-fair-value/` | Fair value estimation                     |
+
+### Using the Yahoo Proxy (v4.1)
+
+Set `YAHOO_PROXY_URL` to use the Cloudflare Worker proxy:
+
+```bash
+export YAHOO_PROXY_URL=https://yahoo-proxy.conorquinlan.workers.dev
+```
+
+Benefits:
+
+- Bypasses Yahoo's IP-based rate limiting
+- Combined endpoint: 1 request fetches 8 Yahoo modules (~8x more efficient)
+- Built-in caching (1 min for quotes, 1 hr for historical)
+
+v4.1 Returns:
+| Field | Data |
+|-------|------|
+| `quote` | Price, P/E, beta, averages, 52-week range |
+| `chart` | 3-month OHLCV data |
+| `fundamentals` | FCF, PEG, ROE, margins, debt metrics |
+| `epsTrend` | Current EPS + 7/30/60/90 day revisions |
+| `earningsHistory` | Last 4 quarters beat/miss |
+| `insiderActivity` | Buy/sell counts and net shares |
+| `profile` | Sector, industry, country |
+| `analysts` | Strong buy/buy/hold/sell distribution |
+| `options` | Expiration count, ATM IV, put/call ratios |

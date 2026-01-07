@@ -1,17 +1,17 @@
 /**
  * Question Classification
- * 
+ *
  * Smart classification of user questions to determine what context
  * and data needs to be fetched. This enables efficient context loading
  * by skipping unnecessary API calls.
- * 
+ *
  * @example
  * ```typescript
  * import { classifyQuestion } from '@lib/ai-agent/classification';
- * 
+ *
  * const classification = classifyQuestion("How does NVDA look?");
  * // { type: 'trade_analysis', needsOptions: true, ... }
- * 
+ *
  * if (classification.needsWebSearch) {
  *   // Fetch web search results
  * }
@@ -25,13 +25,13 @@
 /**
  * Types of questions the agent can handle
  */
-export type QuestionType = 
-  | 'price_check'     // Simple price/quote questions
-  | 'trade_analysis'  // Full trade analysis with spreads
-  | 'research'        // News/why questions requiring web search
-  | 'scan'            // Market scanning requests
-  | 'position'        // Questions about existing positions
-  | 'general';        // General conversation
+export type QuestionType =
+  | 'price_check' // Simple price/quote questions
+  | 'trade_analysis' // Full trade analysis with spreads
+  | 'research' // News/why questions requiring web search
+  | 'scan' // Market scanning requests
+  | 'position' // Questions about existing positions
+  | 'general'; // General conversation
 
 /**
  * Classification result with context requirements
@@ -60,20 +60,87 @@ export interface QuestionClassification {
 /** Common words that look like tickers but aren't */
 const COMMON_WORDS = new Set([
   // Articles/prepositions
-  'I', 'A', 'THE', 'AND', 'OR', 'BUT', 'IS', 'IT', 'TO', 'FOR',
-  'IN', 'ON', 'AT', 'BY', 'UP', 'IF', 'SO', 'NO', 'YES', 'OK',
+  'I',
+  'A',
+  'THE',
+  'AND',
+  'OR',
+  'BUT',
+  'IS',
+  'IT',
+  'TO',
+  'FOR',
+  'IN',
+  'ON',
+  'AT',
+  'BY',
+  'UP',
+  'IF',
+  'SO',
+  'NO',
+  'YES',
+  'OK',
   // Trading terms
-  'CDS', 'PCS', 'ITM', 'OTM', 'ATM', 'RSI', 'MA', 'DTE', 'AI',
-  'BUY', 'SELL', 'HOLD', 'WAIT', 'PASS', 'NOT', 'CAN', 'DO',
+  'CDS',
+  'PCS',
+  'ITM',
+  'OTM',
+  'ATM',
+  'RSI',
+  'MA',
+  'DTE',
+  'AI',
+  'BUY',
+  'SELL',
+  'HOLD',
+  'WAIT',
+  'PASS',
+  'NOT',
+  'CAN',
+  'DO',
   // Question words
-  'HOW', 'WHAT', 'WHY', 'WHEN', 'WHO', 'MY', 'PM', 'AM',
+  'HOW',
+  'WHAT',
+  'WHY',
+  'WHEN',
+  'WHO',
+  'MY',
+  'PM',
+  'AM',
   // Common verbs/adjectives
-  'GET', 'SET', 'RUN', 'NEW', 'OLD', 'BIG', 'TOP', 'LOW', 'MAX',
-  'MIN', 'ALL', 'ANY', 'HAS', 'HAD', 'WAS', 'ARE', 'BE', 'BEEN',
+  'GET',
+  'SET',
+  'RUN',
+  'NEW',
+  'OLD',
+  'BIG',
+  'TOP',
+  'LOW',
+  'MAX',
+  'MIN',
+  'ALL',
+  'ANY',
+  'HAS',
+  'HAD',
+  'WAS',
+  'ARE',
+  'BE',
+  'BEEN',
   // Market terms
-  'FOMC', 'CPI', 'GDP', 'FED', 'SPY', 'QQQ', 'VIX',
+  'FOMC',
+  'CPI',
+  'GDP',
+  'FED',
+  'SPY',
+  'QQQ',
+  'VIX',
   // Directions
-  'ENTER', 'EXIT', 'ABOVE', 'BELOW', 'LONG', 'SHORT',
+  'ENTER',
+  'EXIT',
+  'ABOVE',
+  'BELOW',
+  'LONG',
+  'SHORT',
 ]);
 
 /**
@@ -82,12 +149,10 @@ const COMMON_WORDS = new Set([
 export function extractTickers(message: string): string[] {
   // Match uppercase words that look like tickers (1-5 letters)
   const matches = message.match(/\b[A-Z]{1,5}\b/g) ?? [];
-  
+
   // Filter out common words
-  const tickers = matches.filter(t => 
-    !COMMON_WORDS.has(t) && t.length >= 2
-  );
-  
+  const tickers = matches.filter((t) => !COMMON_WORDS.has(t) && t.length >= 2);
+
   // Return unique tickers
   return [...new Set(tickers)];
 }
@@ -111,9 +176,7 @@ const RESEARCH_PATTERNS = [
 ];
 
 /** Patterns for simple price checks */
-const PRICE_PATTERNS = [
-  /\b(price|quote|how\s*much|what.+at|trading\s*at)\b/i,
-];
+const PRICE_PATTERNS = [/\b(price|quote|how\s*much|what.+at|trading\s*at)\b/i];
 
 /** Patterns for trade analysis */
 const TRADE_ANALYSIS_PATTERNS = [
@@ -131,18 +194,13 @@ const POSITION_PATTERNS = [
 ];
 
 /** Patterns that indicate full analysis is NOT needed */
-const SIMPLE_PATTERNS = [
-  /\b(just|only|quick|simply)\b/i,
-];
+const SIMPLE_PATTERNS = [/\b(just|only|quick|simply)\b/i];
 
 /**
  * Test if message matches any pattern in a list
  */
-function matchesAny(
-  message: string, 
-  patterns: RegExp[]
-): boolean {
-  return patterns.some(p => p.test(message));
+function matchesAny(message: string, patterns: RegExp[]): boolean {
+  return patterns.some((p) => p.test(message));
 }
 
 // ============================================================================
@@ -151,7 +209,7 @@ function matchesAny(
 
 /**
  * Classify a user question to determine what context to load
- * 
+ *
  * This enables smart context loading:
  * - Price checks: minimal data, fast response
  * - Trade analysis: full options, PFV, etc.
@@ -161,12 +219,12 @@ function matchesAny(
 export function classifyQuestion(message: string): QuestionClassification {
   const tickers = extractTickers(message);
   const lower = message.toLowerCase();
-  
+
   // Check for position questions first (highest priority)
   if (matchesAny(message, POSITION_PATTERNS)) {
     return {
       type: 'position',
-      needsOptions: false,  // Position tool handles this
+      needsOptions: false, // Position tool handles this
       needsNews: false,
       needsWebSearch: false,
       needsCalendar: false,
@@ -174,7 +232,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       tickers,
     };
   }
-  
+
   // Scan requests - need full data
   if (matchesAny(message, SCAN_PATTERNS) && tickers.length === 0) {
     return {
@@ -187,7 +245,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       tickers,
     };
   }
-  
+
   // Research/news questions - need web search
   if (matchesAny(message, RESEARCH_PATTERNS)) {
     return {
@@ -200,12 +258,12 @@ export function classifyQuestion(message: string): QuestionClassification {
       tickers,
     };
   }
-  
+
   // Simple price check - minimal data needed
   const isPriceCheck = matchesAny(message, PRICE_PATTERNS);
   const isSimple = matchesAny(message, SIMPLE_PATTERNS);
   const isTradeAnalysis = matchesAny(message, TRADE_ANALYSIS_PATTERNS);
-  
+
   if (isPriceCheck && !isTradeAnalysis) {
     return {
       type: 'price_check',
@@ -217,7 +275,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       tickers,
     };
   }
-  
+
   // Trade analysis - full context needed
   if (isTradeAnalysis || tickers.length > 0) {
     return {
@@ -230,7 +288,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       tickers,
     };
   }
-  
+
   // Default: general question with minimal context
   return {
     type: 'general',
@@ -260,12 +318,9 @@ export function needsMarketData(
 /**
  * Check if a question needs AI tools
  */
-export function needsTools(
-  classification: QuestionClassification
-): boolean {
+export function needsTools(classification: QuestionClassification): boolean {
   return (
-    classification.type !== 'general' &&
-    classification.type !== 'price_check'
+    classification.type !== 'general' && classification.type !== 'price_check'
   );
 }
 
@@ -279,4 +334,3 @@ export default {
   needsMarketData,
   needsTools,
 };
-

@@ -9,12 +9,13 @@
 
 ## Executive Summary
 
-This analysis examines 1,025 unusual options signals captured by the 
-unusual-options-service over a 3-day period. The data reveals significant 
-institutional positioning across tech giants (AMD, AAPL, GOOG), with AMD 
+This analysis examines 1,025 unusual options signals captured by the
+unusual-options-service over a 3-day period. The data reveals significant
+institutional positioning across tech giants (AMD, AAPL, GOOG), with AMD
 showing the highest activity (180 signals, $388M premium flow).
 
 **Key Findings:**
+
 - **Dominant Theme:** Tech sector accumulation with bullish bias
 - **Highest Conviction:** AAPL, TSM, and AMD near-term calls
 - **Largest Single Bets:** LVS $48C ($36.7M), LII $640P ($34.7M)
@@ -24,19 +25,20 @@ showing the highest activity (180 signals, $388M premium flow).
 
 ## Top 10 Highest Premium Flow Plays (>$1M)
 
-| Rank | Ticker | Strike | Type | Expiry | Premium | Score | Grade | Underlying | Moneyness |
-|------|--------|--------|------|--------|---------|-------|-------|------------|-----------|
-| 1 | LVS | $48 | CALL | 11/07 | $36.7M | 0.80 | S | $61.21 | ITM |
-| 2 | LII | $640 | PUT | 12/19 | $34.7M | 0.90 | S | $493.88 | ITM |
-| 3 | DEO | $75 | CALL | 01/16/26 | $19.8M | 0.90 | S | $94.11 | ITM |
-| 4 | SPG | $125 | CALL | 12/19 | $16.5M | 0.82 | S | $176.67 | ITM |
-| 5 | AMD | $260 | CALL | 11/14 | $17.6M | 0.79 | S | $258.42 | ATM |
-| 6 | AMD | $240 | PUT | 11/07 | $17.6M | 0.70 | S | $250.05 | OTM |
-| 7 | AAPL | $270 | CALL | 11/07 | $17.3M | 0.70 | S | $270.04 | ATM |
-| 8 | BKNG | $6200 | PUT | 11/21 | $16.5M | 0.90 | S | $4932.26 | ITM |
+| Rank | Ticker | Strike | Type | Expiry   | Premium | Score | Grade | Underlying | Moneyness |
+| ---- | ------ | ------ | ---- | -------- | ------- | ----- | ----- | ---------- | --------- |
+| 1    | LVS    | $48    | CALL | 11/07    | $36.7M  | 0.80  | S     | $61.21     | ITM       |
+| 2    | LII    | $640   | PUT  | 12/19    | $34.7M  | 0.90  | S     | $493.88    | ITM       |
+| 3    | DEO    | $75    | CALL | 01/16/26 | $19.8M  | 0.90  | S     | $94.11     | ITM       |
+| 4    | SPG    | $125   | CALL | 12/19    | $16.5M  | 0.82  | S     | $176.67    | ITM       |
+| 5    | AMD    | $260   | CALL | 11/14    | $17.6M  | 0.79  | S     | $258.42    | ATM       |
+| 6    | AMD    | $240   | PUT  | 11/07    | $17.6M  | 0.70  | S     | $250.05    | OTM       |
+| 7    | AAPL   | $270   | CALL | 11/07    | $17.3M  | 0.70  | S     | $270.04    | ATM       |
+| 8    | BKNG   | $6200  | PUT  | 11/21    | $16.5M  | 0.90  | S     | $4932.26   | ITM       |
 
 ### Analysis
-- **LVS (Las Vegas Sands):** Massive $36.7M ITM call - potential earnings 
+
+- **LVS (Las Vegas Sands):** Massive $36.7M ITM call - potential earnings
   play or M&A speculation
 - **LII (Lennox International):** Deep ITM put hedging on industrial sector
 - **DEO (Diageo):** Long-term bullish LEAPS on consumer staples
@@ -46,37 +48,39 @@ showing the highest activity (180 signals, $388M premium flow).
 
 ## High Conviction Plays (S-Grade, >0.85 Confidence)
 
-| Ticker | Strike | Type | Expiry | Score | Confidence | Premium | Rationale |
-|--------|--------|------|--------|-------|------------|---------|-----------|
-| AAPL | $262.5 | CALL | 11/14 | 0.90 | 0.90 | $263K | Already ITM by $8, low IV |
-| RIO | $72.5 | CALL | 01/16/26 | 0.90 | 0.90 | $259K | Mining LEAPS, 5% OTM |
-| PKG | $200 | PUT | 11/21 | 0.90 | 0.85 | $711K | ATM bearish setup |
-| AVGO | $357.5 | PUT | 11/21 | 0.90 | 0.90 | $308K | ATM protective position |
-| DAVE | $220 | CALL | 11/21 | 0.90 | 0.90 | $4.79M | ITM by $20, strong flow |
-| AMD | $235 | CALL | 11/14 | 0.90 | 0.90 | $576K | ITM semiconductor play |
-| TSM | $310 | CALL | 11/14 | 0.90 | 0.90 | $400K | Near ATM with momentum |
+| Ticker | Strike | Type | Expiry   | Score | Confidence | Premium | Rationale                 |
+| ------ | ------ | ---- | -------- | ----- | ---------- | ------- | ------------------------- |
+| AAPL   | $262.5 | CALL | 11/14    | 0.90  | 0.90       | $263K   | Already ITM by $8, low IV |
+| RIO    | $72.5  | CALL | 01/16/26 | 0.90  | 0.90       | $259K   | Mining LEAPS, 5% OTM      |
+| PKG    | $200   | PUT  | 11/21    | 0.90  | 0.85       | $711K   | ATM bearish setup         |
+| AVGO   | $357.5 | PUT  | 11/21    | 0.90  | 0.90       | $308K   | ATM protective position   |
+| DAVE   | $220   | CALL | 11/21    | 0.90  | 0.90       | $4.79M  | ITM by $20, strong flow   |
+| AMD    | $235   | CALL | 11/14    | 0.90  | 0.90       | $576K   | ITM semiconductor play    |
+| TSM    | $310   | CALL | 11/14    | 0.90  | 0.90       | $400K   | Near ATM with momentum    |
 
 ---
 
 ## Most Active Tickers
 
 ### By Signal Count
+
 | Ticker | Signals | Total Premium | Avg Premium/Signal |
-|--------|---------|---------------|-------------------|
-| AMD | 180 | $387.8M | $2.15M |
-| AAPL | 102 | $174.6M | $1.71M |
-| GOOG | 73 | $45.1M | $618K |
-| COIN | 53 | $124.2M | $2.34M |
-| ORCL | 39 | $76.5M | $1.96M |
-| AVGO | 34 | $32.3M | $949K |
-| TSM | 23 | $24.4M | $1.06M |
-| CRCL | 19 | $36.1M | $1.90M |
-| BE | 18 | $48.7M | $2.70M |
-| AXON | 17 | $40.4M | $2.38M |
+| ------ | ------- | ------------- | ------------------ |
+| AMD    | 180     | $387.8M       | $2.15M             |
+| AAPL   | 102     | $174.6M       | $1.71M             |
+| GOOG   | 73      | $45.1M        | $618K              |
+| COIN   | 53      | $124.2M       | $2.34M             |
+| ORCL   | 39      | $76.5M        | $1.96M             |
+| AVGO   | 34      | $32.3M        | $949K              |
+| TSM    | 23      | $24.4M        | $1.06M             |
+| CRCL   | 19      | $36.1M        | $1.90M             |
+| BE     | 18      | $48.7M        | $2.70M             |
+| AXON   | 17      | $40.4M        | $2.38M             |
 
 ### Analysis by Ticker
 
 #### AMD (Advanced Micro Devices)
+
 - **180 signals** with **$388M total premium**
 - **Split sentiment:** Mix of calls and puts across multiple strikes
 - **Key strikes:** $260C (ATM), $240P (OTM), $265C (OTM)
@@ -84,6 +88,7 @@ showing the highest activity (180 signals, $388M premium flow).
 - **Strategy:** Consider iron condor or straddle rather than directional
 
 #### AAPL (Apple)
+
 - **102 signals** with **$175M total premium**
 - **Bullish bias:** Majority calls, especially ITM
 - **Key strikes:** $262.5C, $270C, $275C (Nov 14-21)
@@ -92,6 +97,7 @@ showing the highest activity (180 signals, $388M premium flow).
 - **Strategy:** Buy ITM calls with Nov 14+ expiration
 
 #### COIN (Coinbase)
+
 - **53 signals** with **$124M total premium**
 - **Crypto correlation:** Heavily tied to Bitcoin price action
 - **Key strikes:** $340C (needs 6.9% move from $318)
@@ -106,6 +112,7 @@ showing the highest activity (180 signals, $388M premium flow).
 ### Strategy 1: Momentum Plays (Follow Smart Money)
 
 #### Best Opportunities:
+
 1. **LVS $48 CALL exp 11/7** - $36.7M premium
    - Already ITM by $13
    - Short-dated but massive conviction
@@ -126,6 +133,7 @@ showing the highest activity (180 signals, $388M premium flow).
 #### Top 3 Picks (Nov 6-14):
 
 **1. AAPL $262.5 CALL exp 11/14** ⭐⭐⭐⭐⭐
+
 - **Current Price:** $270.52 (ITM by $8)
 - **Score:** 0.90 | **Confidence:** 0.90
 - **Premium Flow:** $263K
@@ -135,6 +143,7 @@ showing the highest activity (180 signals, $388M premium flow).
 - **Rationale:** Already profitable, low IV, consistent institutional flow
 
 **2. TSM $297.5 CALL exp 11/14** ⭐⭐⭐⭐⭐
+
 - **Current Price:** $304.86 (ITM by $7.36)
 - **Score:** 0.90 | **Confidence:** 0.90
 - **Premium Flow:** $289K
@@ -144,6 +153,7 @@ showing the highest activity (180 signals, $388M premium flow).
 - **Rationale:** Semiconductor momentum, potential earnings catalyst
 
 **3. AMD $260 CALL exp 11/14** ⭐⭐⭐⭐
+
 - **Current Price:** $258.42 (needs 0.6% move)
 - **Score:** 0.79 | **Confidence:** High
 - **Premium Flow:** $17.6M
@@ -214,22 +224,26 @@ For smaller position sizing (<1% portfolio):
 ## Risk Management Guidelines
 
 ### Position Sizing
+
 - **High Conviction (Score ≥0.85):** 3-5% of portfolio per trade
 - **Medium Conviction (Score 0.70-0.84):** 2-3% of portfolio
 - **Spec Plays:** 1% maximum
 - **Total options exposure:** Max 20% of portfolio
 
 ### Stop Loss Rules
+
 - **Options:** 20-30% loss maximum
 - **ITM options:** Tighter stops (15-20%)
 - **OTM options:** Wider stops (30-40%) or risk total loss
 
 ### Profit Taking
+
 - **First Target:** 50% of position at 50% gain
 - **Second Target:** 25% of position at 100% gain
 - **Final 25%:** Trail with 20% stop
 
 ### Time Decay Management
+
 - **Avoid:** Options expiring in <7 days unless very high conviction
 - **Prefer:** Options with 14-30 days minimum
 - **Roll:** Consider rolling out if thesis intact but needs more time
@@ -241,35 +255,41 @@ For smaller position sizing (<1% portfolio):
 ### ⚠️ Critical Observations
 
 #### 1. AMD Institutional Battle
+
 - **180 signals** with nearly **$400M premium** indicates major positioning
 - **Mixed signals:** Both heavy call and put activity
 - **Interpretation:** Volatility expectations, not clear directional bias
-- **Recommendation:** Consider non-directional strategies (iron condors, 
+- **Recommendation:** Consider non-directional strategies (iron condors,
   straddles)
 
 #### 2. AAPL Consistent Bullish Flow
+
 - **102 signals** with strong call preference
 - **Low IV (0.20-0.25):** Cheaper options with less decay risk
 - **ITM positioning:** Institutions want delta, not leverage
 - **Recommendation:** Follow the flow - buy ITM calls Nov 14+
 
 #### 3. Short-Dated Risk (Nov 7-14 Expiration)
+
 - Many signals expire within 7-14 days
 - **High theta decay** erodes value quickly
 - Need **immediate catalysts** for profitability
 - **Recommendation:** Focus on Nov 21+ unless very high conviction
 
 #### 4. Deep ITM Positioning = Hedging
+
 - Many signals are deep ITM (LII $640P, LVS $48C, etc.)
 - Could be **protective hedging**, not directional bets
 - **Recommendation:** Don't blindly follow - understand the strategy
 
 #### 5. Spread Detection
+
 - Service flags potential spreads (vertical, calendar, etc.)
 - Blindly following one leg could be dangerous
 - **Recommendation:** Check for matching opposite legs before trading
 
 #### 6. Crypto Correlation (COIN, HUT, MARA)
+
 - Heavy options activity in crypto-related stocks
 - **Requires Bitcoin bullish thesis**
 - High beta and volatility
@@ -308,6 +328,7 @@ For smaller position sizing (<1% portfolio):
 ### Example 1: AAPL $262.5 CALL exp 11/14
 
 **Current Setup (as of Nov 5):**
+
 - Stock Price: $270.52
 - Strike: $262.50
 - Days to Expiry: 9
@@ -315,12 +336,11 @@ For smaller position sizing (<1% portfolio):
 - Estimated Premium: ~$10-11 (including time value)
 
 **Scenarios:**
+
 - **Bullish ($275 by 11/14):** $12.50 intrinsic + $0.50 time = $13.00
   - Profit: $2-3 per contract = **20-30% gain**
-  
 - **Neutral ($270 by 11/14):** $7.50 intrinsic + $0.20 time = $7.70
   - Loss: $2.30-3.30 per contract = **20-30% loss**
-  
 - **Bearish ($265 by 11/14):** $2.50 intrinsic + $0.10 time = $2.60
   - Loss: $7.40-8.40 per contract = **70-80% loss**
 
@@ -331,6 +351,7 @@ For smaller position sizing (<1% portfolio):
 ### Example 2: AMD $260 CALL exp 11/14
 
 **Current Setup:**
+
 - Stock Price: $258.42
 - Strike: $260.00
 - Days to Expiry: 9
@@ -338,16 +359,15 @@ For smaller position sizing (<1% portfolio):
 - Estimated Premium: ~$5-6 (all time value)
 
 **Scenarios:**
+
 - **Bullish ($265 by 11/14):** $5.00 intrinsic + $0.50 time = $5.50
   - Profit/Loss: Break-even to small gain
-  
 - **Very Bullish ($270 by 11/14):** $10.00 intrinsic = $10.00
   - Profit: $4-5 per contract = **80-100% gain**
-  
 - **Neutral/Bearish (<$260):** Worth $0
   - Loss: $5-6 per contract = **100% loss**
 
-**Risk/Reward:** Higher risk, needs 4.5% move, but $17.6M institutional 
+**Risk/Reward:** Higher risk, needs 4.5% move, but $17.6M institutional
 backing
 
 ---
@@ -355,6 +375,7 @@ backing
 ### Example 3: TSM $297.5 CALL exp 11/14
 
 **Current Setup:**
+
 - Stock Price: $304.86
 - Strike: $297.50
 - Days to Expiry: 9
@@ -362,9 +383,9 @@ backing
 - Estimated Premium: ~$9-10
 
 **Scenarios:**
+
 - **Bullish ($310 by 11/14):** $12.50 intrinsic + $0.30 time = $12.80
   - Profit: $2.80-3.80 per contract = **30-40% gain**
-  
 - **Neutral ($305 by 11/14):** $7.50 intrinsic + $0.20 time = $7.70
   - Loss: $1.30-2.30 per contract = **13-25% loss**
 
@@ -375,21 +396,25 @@ backing
 ## Action Plan for This Week (Nov 6-8)
 
 ### Monday (Nov 6):
+
 1. Check overnight market action and futures
 2. If SPY/QQQ bullish: Enter AAPL $262.5C and TSM $297.5C
 3. Wait for AMD direction (first hour volatility)
 
 ### Tuesday (Nov 7):
+
 1. Monitor positions - many options expire today
 2. Roll any 11/7 expirations to 11/14 or 11/21 if thesis intact
 3. Check for new signals from service
 
 ### Wednesday (Nov 8):
+
 1. Take partial profits on any position up 50%+
 2. Reassess AMD - if breakout >$262, enter AMD $265C Nov 14
 3. Trail stops to breakeven on profitable positions
 
 ### Thursday-Friday (Nov 9-10):
+
 1. Weekend theta decay begins Friday
 2. Take profits or roll to next week if holding through weekend
 3. Review new unusual flow for following week
@@ -401,6 +426,7 @@ backing
 Given AMD's contested positioning (180 signals, both calls and puts):
 
 ### AMD Iron Condor Setup:
+
 - **Sell:** AMD $250P / Buy: AMD $245P (Put spread)
 - **Sell:** AMD $270C / Buy: AMD $275C (Call spread)
 - **Expiration:** Nov 21 (16 days)
@@ -411,6 +437,7 @@ Given AMD's contested positioning (180 signals, both calls and puts):
 **Profit Zone:** AMD stays between $250-$270 by Nov 21
 
 **Rationale:**
+
 - High premium from elevated IV
 - Directional uncertainty = range-bound potential
 - Defined risk strategy
@@ -421,18 +448,21 @@ Given AMD's contested positioning (180 signals, both calls and puts):
 ## Data Quality Notes
 
 ### High Quality Signals:
+
 - S-Grade with confidence >0.85
 - Premium flow >$1M
 - Multiple detection counts (>3)
 - Consistent with ticker trends
 
 ### Medium Quality:
+
 - A/B Grade
 - Premium flow $100K-$1M
 - Single detection
 - Mixed risk factors
 
 ### Low Quality / Ignore:
+
 - Zero IV (data issue)
 - $0 premium flow
 - Marked as "likely_spread" without context
@@ -442,16 +472,18 @@ Given AMD's contested positioning (180 signals, both calls and puts):
 
 ## Conclusion
 
-The unusual options data reveals significant institutional positioning primarily 
-in tech (AMD, AAPL, TSM, GOOG, COIN) with bullish bias. The highest conviction 
+The unusual options data reveals significant institutional positioning primarily
+in tech (AMD, AAPL, TSM, GOOG, COIN) with bullish bias. The highest conviction
 plays are:
 
 ### Best Risk/Reward (Next 2 Weeks):
+
 1. **AAPL $262.5 CALL exp 11/14** - Already ITM, low risk
 2. **TSM $297.5 CALL exp 11/14** - Semiconductor momentum
 3. **AMD $260 CALL exp 11/14** - Needs catalyst but massive flow
 
 ### Key Takeaways:
+
 - **Follow AAPL flow** - consistent institutional accumulation
 - **Be cautious with AMD** - volatility expected, not clear direction
 - **Watch crypto correlation** for COIN plays
@@ -459,8 +491,10 @@ plays are:
 - **Use proper position sizing** and stop losses
 
 ### Risk Warning:
-Options trading involves significant risk of loss. These signals show 
+
+Options trading involves significant risk of loss. These signals show
 institutional activity but don't guarantee profitable outcomes. Always:
+
 - Size positions appropriately (1-5% max)
 - Use stop losses (20-30% for options)
 - Take profits systematically (50%, 100% targets)
@@ -471,4 +505,3 @@ institutional activity but don't guarantee profitable outcomes. Always:
 **Last Updated:** November 5, 2025  
 **Next Update:** After market close Nov 8, 2025  
 **Data Source:** unusual-options-service (1,025 signals, Nov 3-5)
-

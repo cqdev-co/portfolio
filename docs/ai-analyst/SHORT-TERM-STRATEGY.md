@@ -4,8 +4,8 @@ SPY/QQQ 1-3 day swing trades for capital-conscious traders.
 
 ## Overview
 
-The `short-term` command scans SPY and QQQ for high-probability 
-entry points using mean reversion and technical signals. Designed 
+The `short-term` command scans SPY and QQQ for high-probability
+entry points using mean reversion and technical signals. Designed
 for traders with limited capital who cannot afford big losses.
 
 ## Quick Start
@@ -20,19 +20,19 @@ bun run short-term --account 500
 
 **Core Principle**: Wait for high-probability setups only.
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| Instruments | SPY, QQQ only | Maximum liquidity |
-| Holding Period | 1-3 days | Minimize overnight risk |
-| Position Type | Debit spreads | Defined, limited risk |
-| DTE | 5-10 days | Weeklies with time buffer |
-| Max Risk | 15% of account | Survive losing streaks |
-| Profit Target | 35% | Take profits, don't be greedy |
-| Stop Loss | 40% | Cut losers quickly |
+| Parameter      | Value          | Rationale                     |
+| -------------- | -------------- | ----------------------------- |
+| Instruments    | SPY, QQQ only  | Maximum liquidity             |
+| Holding Period | 1-3 days       | Minimize overnight risk       |
+| Position Type  | Debit spreads  | Defined, limited risk         |
+| DTE            | 5-10 days      | Weeklies with time buffer     |
+| Max Risk       | 15% of account | Survive losing streaks        |
+| Profit Target  | 35%            | Take profits, don't be greedy |
+| Stop Loss      | 40%            | Cut losers quickly            |
 
 ## Entry Signals
 
-The scanner evaluates multiple factors and generates a confidence 
+The scanner evaluates multiple factors and generates a confidence
 score (0-100):
 
 ### Primary Triggers
@@ -58,12 +58,12 @@ score (0-100):
 
 ### Signal Levels
 
-| Score | Signal | Action |
-|-------|--------|--------|
-| 80+ | STRONG_BUY | Enter immediately |
-| 65-79 | BUY | Enter with standard size |
-| 45-64 | WAIT | Hold for better setup |
-| < 45 | AVOID | Do not trade |
+| Score | Signal     | Action                   |
+| ----- | ---------- | ------------------------ |
+| 80+   | STRONG_BUY | Enter immediately        |
+| 65-79 | BUY        | Enter with standard size |
+| 45-64 | WAIT       | Hold for better setup    |
+| < 45  | AVOID      | Do not trade             |
 
 ## Trade Structure
 
@@ -71,12 +71,12 @@ score (0-100):
 
 The spread width adjusts based on your account size:
 
-| Account Size | Max Risk (15%) | Spread Width | Est. Cost |
-|--------------|----------------|--------------|-----------|
-| $2,500+ | $375+ | $5 | ~$350 |
-| $1,400-$2,499 | $210-$374 | $3 | ~$210 |
-| $950-$1,399 | $140-$209 | $2 | ~$140 |
-| < $950 | < $140 | $1 | ~$70 |
+| Account Size  | Max Risk (15%) | Spread Width | Est. Cost |
+| ------------- | -------------- | ------------ | --------- |
+| $2,500+       | $375+          | $5           | ~$350     |
+| $1,400-$2,499 | $210-$374      | $3           | ~$210     |
+| $950-$1,399   | $140-$209      | $2           | ~$140     |
+| < $950        | < $140         | $1           | ~$70      |
 
 ```
 Example for SPY at $689 ($1,500 account):
@@ -110,12 +110,12 @@ Example ($1,500 account):
 
 ### Exit Rules
 
-| Condition | Action |
-|-----------|--------|
-| +35% gain | Close position |
-| -40% loss | Close position |
+| Condition   | Action                 |
+| ----------- | ---------------------- |
+| +35% gain   | Close position         |
+| -40% loss   | Close position         |
 | 3 days held | Reassess, likely close |
-| Major news | Close before event |
+| Major news  | Close before event     |
 
 ### Capital Preservation Tips
 
@@ -126,12 +126,12 @@ Example ($1,500 account):
 
 ## VIX Awareness
 
-| VIX Level | Implication | Action |
-|-----------|-------------|--------|
-| < 15 | Low volatility | Smaller moves expected |
-| 15-18 | Normal | Standard position sizing |
-| 18-25 | Elevated | Better premium, watch size |
-| > 25 | Extreme | Reduce size or skip trades |
+| VIX Level | Implication    | Action                     |
+| --------- | -------------- | -------------------------- |
+| < 15      | Low volatility | Smaller moves expected     |
+| 15-18     | Normal         | Standard position sizing   |
+| 18-25     | Elevated       | Better premium, watch size |
+| > 25      | Extreme        | Reduce size or skip trades |
 
 ## Example Output
 
@@ -190,12 +190,12 @@ Example ($1,500 account):
 
 ## CLI Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--ai-mode <mode>` | Ollama mode (local/cloud) | cloud |
-| `--ai-model <model>` | Override AI model | - |
-| `-a, --account <size>` | Account size in dollars | 1500 |
-| `-v, --verbose` | Show detailed analysis | false |
+| Flag                   | Description               | Default |
+| ---------------------- | ------------------------- | ------- |
+| `--ai-mode <mode>`     | Ollama mode (local/cloud) | cloud   |
+| `--ai-model <model>`   | Override AI model         | -       |
+| `-a, --account <size>` | Account size in dollars   | 1500    |
+| `-v, --verbose`        | Show detailed analysis    | false   |
 
 ## When NOT to Trade
 
@@ -207,20 +207,21 @@ Example ($1,500 account):
 
 ## Integration with 30-45 DTE Strategy
 
-This short-term strategy **complements** your existing 
+This short-term strategy **complements** your existing
 30-45 DTE deep ITM call debit spreads:
 
-| Strategy | Use When |
-|----------|----------|
-| 30-45 DTE | Bullish conviction on individual stocks |
+| Strategy   | Use When                                |
+| ---------- | --------------------------------------- |
+| 30-45 DTE  | Bullish conviction on individual stocks |
 | Short-Term | Quick tactical plays on index pullbacks |
 
-Both use defined-risk debit spreads, but different timeframes 
+Both use defined-risk debit spreads, but different timeframes
 and instruments. Run both scans for a complete picture.
 
 ## Technical Implementation
 
 The scanner uses:
+
 - RSI (14-period) for oversold/overbought
 - VWAP approximation (5-day typical price average)
 - EMA(9) and SMA(20) for trend detection
@@ -237,5 +238,4 @@ The scanner uses:
 
 ---
 
-*Strategy added December 2024*
-
+_Strategy added December 2024_

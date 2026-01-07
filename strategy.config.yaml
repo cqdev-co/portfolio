@@ -1,0 +1,253 @@
+# =============================================================================
+# DEEP ITM CALL DEBIT SPREAD STRATEGY CONFIGURATION
+# =============================================================================
+#
+# This file defines the rules for the Deep ITM Call Debit Spread strategy.
+# All services (ai-analyst, screen-ticker, spread_quant_analysis) should
+# read from this config to ensure consistent entry/exit criteria.
+#
+# RULE: If ANY entry criterion is not met, DO NOT TRADE.
+#
+# Last Updated: 2026-01-06
+# =============================================================================
+
+strategy:
+  name: 'Deep ITM Call Debit Spread'
+  version: '1.0.0'
+  description: |
+    Bullish defined-risk options strategy using deep in-the-money call 
+    debit spreads on quality stocks with strong technicals and fundamentals.
+
+# =============================================================================
+# ENTRY CRITERIA - ALL must be satisfied
+# =============================================================================
+entry:
+  # --- Trend ---
+  trend:
+    above_ma200: true # Price must be above 200-day MA
+    above_ma50: true # Price must be above 50-day MA (preferred)
+    ma50_above_ma200: false # Golden cross (optional, adds conviction)
+
+  # --- Momentum ---
+  momentum:
+    rsi_min: 30 # Not oversold (bouncing knife)
+    rsi_max: 55 # Not overbought (chasing)
+    rsi_ideal_min: 35 # Sweet spot lower bound
+    rsi_ideal_max: 50 # Sweet spot upper bound
+
+  # --- Cushion (distance from breakeven to current price) ---
+  cushion:
+    minimum_pct: 7.0 # Hard floor - never go below
+    preferred_pct: 10.0 # Ideal cushion
+    excellent_pct: 15.0 # Strong conviction level
+
+  # --- Volatility ---
+  volatility:
+    iv_max_pct: 50 # Max implied volatility
+    iv_preferred_max_pct: 40 # Preferred IV ceiling
+    iv_rank_max: 60 # IV percentile (avoid elevated IV)
+    avoid_if_iv_above: 60 # Hard stop - too expensive
+
+  # --- Earnings ---
+  earnings:
+    min_days_until: 14 # Minimum days until earnings
+    preferred_days_until: 21 # Comfortable buffer
+    never_hold_through: true # Exit before earnings event
+
+  # --- Sentiment ---
+  sentiment:
+    analyst_bullish_min_pct: 70 # Minimum bullish analyst %
+    analyst_bullish_preferred: 80 # Preferred bullish %
+    analyst_count_min: 5 # Minimum analysts covering
+
+  # --- Fundamentals (optional filters) ---
+  fundamentals:
+    require_positive_eps: true
+    max_pe_ratio: 100 # Avoid extreme valuations
+    min_market_cap_b: 5 # $5B minimum (liquidity)
+
+  # --- Spread-Specific ---
+  spread:
+    min_return_on_risk_pct: 15 # Minimum R/R ratio
+    preferred_ror_pct: 20 # Preferred return on risk
+    min_open_interest: 50 # Both legs must have OI
+    max_bid_ask_spread_pct: 5 # Avoid illiquid strikes
+
+# =============================================================================
+# EXIT RULES
+# =============================================================================
+exit:
+  # --- Profit Taking ---
+  profit:
+    target_pct: 35 # Take profits at 35%
+    early_exit_pct: 50 # If hits 50%+ quickly, consider exit
+    scale_out: false # Full exit (don't partial)
+
+  # --- Stop Loss ---
+  stop_loss:
+    max_loss_pct: 40 # Hard stop at -40%
+    time_stop_days: null # Optional: exit after N days regardless
+
+  # --- Time-Based ---
+  time:
+    max_hold_days: 30 # Reassess if held this long
+    exit_before_expiry_days: 7 # Don't hold to expiration
+
+  # --- Event-Based ---
+  events:
+    exit_before_earnings: true
+    exit_on_major_news: true # Fed, CPI, etc.
+
+# =============================================================================
+# POSITION SIZING
+# =============================================================================
+position_sizing:
+  # --- Per-Position Limits ---
+  max_single_position_pct: 20 # Max % of account per position
+  preferred_position_pct: 15 # Typical position size
+  min_position_pct: 5 # Don't go smaller than this
+
+  # --- Portfolio Limits ---
+  max_total_deployed_pct: 65 # Max capital in positions
+  preferred_deployed_pct: 50 # Normal deployment
+  max_concurrent_positions: 6 # Diversification limit
+
+  # --- Scaling Rules ---
+  scaling:
+    # As account grows, adjust position sizing
+    - account_min: 0
+      account_max: 5000
+      max_position_pct: 20
+      max_positions: 4
+    - account_min: 5000
+      account_max: 10000
+      max_position_pct: 15
+      max_positions: 6
+    - account_min: 10000
+      account_max: 25000
+      max_position_pct: 12
+      max_positions: 8
+    - account_min: 25000
+      account_max: 100000
+      max_position_pct: 8
+      max_positions: 12
+
+# =============================================================================
+# SPREAD PARAMETERS
+# =============================================================================
+spread_params:
+  # --- Days to Expiration ---
+  dte:
+    target: 30 # Target DTE for new positions
+    min: 21 # Don't go shorter than this
+    max: 45 # Don't go longer than this
+
+  # --- Spread Width ---
+  width:
+    # Width based on account size
+    - account_max: 2500
+      width: 5
+      typical_debit: 350
+    - account_max: 5000
+      width: 5
+      typical_debit: 350
+    - account_max: 10000
+      width: 7.5
+      typical_debit: 525
+    - account_max: 50000
+      width: 10
+      typical_debit: 700
+
+  # --- Strike Selection ---
+  strikes:
+    long_strike_delta_min: 0.70 # Deep ITM (70+ delta)
+    long_strike_delta_max: 0.85 # Not too deep (expensive)
+    short_strike_delta_min: 0.50 # ATM or slightly ITM
+    short_strike_delta_max: 0.60 # Near the money
+
+# =============================================================================
+# RISK MANAGEMENT
+# =============================================================================
+risk_management:
+  # --- Circuit Breakers ---
+  circuit_breakers:
+    consecutive_losses_pause: 3 # Pause after 3 losses
+    pause_duration_hours: 48 # How long to pause
+    monthly_drawdown_reduce_pct: 20 # Reduce size if -20% monthly
+    monthly_drawdown_stop_pct: 30 # Stop trading if -30% monthly
+
+  # --- Correlation Limits ---
+  correlation:
+    max_same_sector: 3 # Max positions in same sector
+    max_correlated_positions: 4 # Max highly correlated trades
+
+  # --- Blacklist ---
+  blacklist:
+    # Tickers to never trade (add your own)
+    tickers: [CRWD]
+    # Sectors to avoid (if any)
+    sectors: []
+
+# =============================================================================
+# TICKER UNIVERSE
+# =============================================================================
+universe:
+  # --- Tier 1: Primary Focus (trade frequently) ---
+  tier1:
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - META
+
+  # --- Tier 2: Secondary (trade selectively) ---
+  tier2:
+    - NVDA
+    - AMD
+    - AVGO
+    - CRM
+    - NFLX
+    - ORCL
+    - ADBE
+
+  # --- Tier 3: Opportunistic (only on strong signals) ---
+  tier3:
+    - TSLA
+    - JPM
+    - V
+    - MA
+    - UNH
+    - JNJ
+    - PG
+
+  # --- Scanner Universe ---
+  scanner:
+    min_price: 20 # Avoid penny stocks
+    max_price: 1000 # Avoid super expensive
+    min_volume: 500000 # Daily volume minimum
+    min_market_cap_b: 10 # $10B minimum for scanner
+
+# =============================================================================
+# ALERTS & NOTIFICATIONS
+# =============================================================================
+alerts:
+  # When to send alerts
+  triggers:
+    scanner_finds_entry: true # New opportunity
+    position_hits_target: true # Profit target reached
+    position_hits_stop: true # Stop loss triggered
+    earnings_approaching: true # 7 days to earnings
+    rule_violation_attempt: true # Tried to break a rule
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+validation:
+  # Minimum score required from AI analyst
+  min_ai_score: 65
+
+  # Minimum confidence for automated entry
+  min_confidence: 70
+
+  # Require human confirmation above this $ amount
+  human_confirm_above: 500

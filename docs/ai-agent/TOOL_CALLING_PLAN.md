@@ -7,12 +7,13 @@
 ## Problem Statement
 
 The CLI shows rich information when Victor analyzes a ticker:
+
 - Yahoo Finance data card with technicals, earnings, IV, etc.
 - Tool call status ("Fetching AMZN data...")
 - PFV analysis
 - Options spread recommendations
 
-The frontend chat currently only shows Victor's text responses with no 
+The frontend chat currently only shows Victor's text responses with no
 visibility into tool calls or data fetching.
 
 ## Desired User Experience
@@ -42,11 +43,13 @@ Victor: Look, let me give you the full picture on AMZN...
 Execute tools in the API route, stream status updates to the frontend.
 
 **Pros**:
+
 - API keys stay on server
 - Reuse CLI's data fetching logic
 - Full control over tool execution
 
 **Cons**:
+
 - More complex streaming protocol
 - Need to extract data fetching into shared lib
 
@@ -58,13 +61,14 @@ Execute tools in the API route, stream status updates to the frontend.
    - Stream tool status + results + AI response
 
 2. **New Stream Events**
+
    ```typescript
-   type ChatEvent = 
-     | { type: 'tool-start', tool: string, args: object }
-     | { type: 'tool-result', tool: string, data: object }
-     | { type: 'text-start', id: string }
-     | { type: 'text-delta', id: string, delta: string }
-     | { type: 'text-end', id: string };
+   type ChatEvent =
+     | { type: 'tool-start'; tool: string; args: object }
+     | { type: 'tool-result'; tool: string; data: object }
+     | { type: 'text-start'; id: string }
+     | { type: 'text-delta'; id: string; delta: string }
+     | { type: 'text-end'; id: string };
    ```
 
 3. **Frontend Chat UI**
@@ -77,10 +81,12 @@ Execute tools in the API route, stream status updates to the frontend.
 Have the frontend execute tools directly using Yahoo Finance API.
 
 **Pros**:
+
 - Simpler streaming (just text)
 - Frontend controls data display
 
 **Cons**:
+
 - API keys exposed to client
 - Duplicate data fetching code
 - CORS issues with Yahoo Finance
@@ -89,14 +95,16 @@ Have the frontend execute tools directly using Yahoo Finance API.
 
 ### Option C: Hybrid with Tool Results API
 
-Create a separate `/api/tools/ticker-data` endpoint that the AI SDK 
+Create a separate `/api/tools/ticker-data` endpoint that the AI SDK
 calls automatically.
 
 **Pros**:
+
 - Clean separation
 - Works with AI SDK's built-in tool support
 
 **Cons**:
+
 - May require AI SDK tool support for Ollama
 - More API routes to maintain
 
@@ -120,24 +128,20 @@ lib/ai-agent/
 Update `/api/chat/route.ts` to:
 
 ```typescript
-import { 
-  AGENT_TOOLS, 
-  classifyQuestion,
-  extractTickers 
-} from "@lib/ai-agent";
-import { fetchTickerData } from "@lib/ai-agent/data";
+import { AGENT_TOOLS, classifyQuestion, extractTickers } from '@lib/ai-agent';
+import { fetchTickerData } from '@lib/ai-agent/data';
 
 // When AI requests get_ticker_data tool:
 if (toolCall.name === 'get_ticker_data') {
   // Stream tool status
   writer.write({ type: 'tool-start', tool: 'get_ticker_data', args });
-  
+
   // Execute tool
   const data = await fetchTickerData(args.ticker);
-  
+
   // Stream result
   writer.write({ type: 'tool-result', tool: 'get_ticker_data', data });
-  
+
   // Continue AI generation with tool result
 }
 ```
@@ -162,12 +166,10 @@ Modify `chat-message.tsx` to render tool results:
 function ChatMessage({ message }) {
   return (
     <div>
-      {message.toolResults?.map(result => (
+      {message.toolResults?.map((result) => (
         <ToolResultCard key={result.id} result={result} />
       ))}
-      <div className="prose">
-        {message.content}
-      </div>
+      <div className="prose">{message.content}</div>
     </div>
   );
 }
@@ -201,13 +203,13 @@ Frontend Chat Panel
 
 ## Timeline
 
-| Phase | Task | Estimate |
-|-------|------|----------|
-| 1 | Extract data fetching to lib | 2-3 hours |
-| 2 | Enhance API route with tool support | 2-3 hours |
-| 3 | Create UI components | 2-3 hours |
-| 4 | Integration and testing | 1-2 hours |
-| **Total** | | **7-11 hours** |
+| Phase     | Task                                | Estimate       |
+| --------- | ----------------------------------- | -------------- |
+| 1         | Extract data fetching to lib        | 2-3 hours      |
+| 2         | Enhance API route with tool support | 2-3 hours      |
+| 3         | Create UI components                | 2-3 hours      |
+| 4         | Integration and testing             | 1-2 hours      |
+| **Total** |                                     | **7-11 hours** |
 
 ## Dependencies
 
@@ -230,4 +232,3 @@ Frontend Chat Panel
 - Market scanning results
 - Position analysis tool
 - Real-time price updates
-

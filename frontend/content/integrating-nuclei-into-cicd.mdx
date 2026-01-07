@@ -114,6 +114,7 @@ requests:
 ```
 
 I created dozens of custom templates covering various vulnerability types:
+
 - Authentication and authorization flaws
 - Injection vulnerabilities
 - Information disclosure
@@ -140,12 +141,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Start API server for testing
         run: |
           docker-compose up -d api-server
           sleep 10  # Wait for server to start
-      
+
       - name: Install Nuclei
         run: |
           # Use the official installation method with error handling
@@ -155,23 +156,23 @@ releases/latest \
             | grep "browser_download_url.*linux_amd64.zip" \
             | cut -d '"' -f 4 \
             | wget -qi -
-          
+
           # Extract and install
           unzip -o -q nuclei_*_linux_amd64.zip
           sudo mv nuclei /usr/local/bin/
           sudo chmod +x /usr/local/bin/nuclei
-          
+
           # Verify installation and update templates
           nuclei -version
           nuclei -update-templates
-      
+
       - name: Start application for scanning
         working-directory: ./frontend
         run: |
           # Start the development server locally for security scanning
           bun run dev &
           echo "APPLICATION_PID=$!" >> $GITHUB_ENV
-          
+
           # Wait for application to start
           echo "Waiting for application to start..."
           for i in {1..30}; do
@@ -182,39 +183,39 @@ releases/latest \
             echo "Waiting for application... (attempt $i/30)"
             sleep 2
           done
-          
+
           # Final check
           curl -f http://localhost:3000 || \
             (echo "Application failed to start" && exit 1)
-      
+
       - name: Run Nuclei scan
         run: |
           TARGET_URL="http://localhost:3000"
           echo "Running Nuclei scan against: $TARGET_URL"
-          
+
           # Run comprehensive security scan
           nuclei -target "$TARGET_URL" \
             -tags cve,exposure,misconfig,vulnerability \
             -severity low,medium,high,critical \
             -jsonl -output nuclei-results.jsonl \
             -stats
-          
+
           # Run web-specific scan
           nuclei -target "$TARGET_URL" \
             -tags tech,default-logins,web \
             -jsonl -output nuclei-web-results.jsonl \
             -stats
-      
+
       - name: Process scan results
         run: |
           python3 .github/scripts/process_nuclei_results.py
-      
+
       - name: Upload scan results
         uses: actions/upload-artifact@v3
         with:
           name: nuclei-results
           path: nuclei-results.json
-      
+
       - name: Fail if high severity issues found
         run: |
           if grep -q '"severity":"high"' nuclei-results.json; then
@@ -224,6 +225,7 @@ releases/latest \
 ```
 
 This workflow:
+
 1. Starts our API server in a test environment
 2. Runs Nuclei with our custom templates
 3. Processes the results
@@ -247,7 +249,7 @@ def process_results(input_file, output_file):
         for line in f:
             if line.strip():  # Skip empty lines
                 results.append(json.loads(line))
-    
+
     # Group by severity
     grouped = {
         "critical": [],
@@ -256,11 +258,11 @@ def process_results(input_file, output_file):
         "low": [],
         "info": []
     }
-    
+
     for result in results:
         severity = result.get("info", {}).get("severity", "info").lower()
         grouped[severity].append(result)
-    
+
     # Generate summary
     summary = {
         "scan_date": datetime.now().isoformat(),
@@ -272,10 +274,10 @@ def process_results(input_file, output_file):
         "info_count": len(grouped["info"]),
         "results_by_severity": grouped
     }
-    
+
     with open(output_file, 'w') as f:
         json.dump(summary, f, indent=2)
-    
+
     # Print summary to console
     print(f"Total issues found: {summary['total_issues']}")
     print(f"Critical: {summary['critical_count']}")
@@ -283,7 +285,7 @@ def process_results(input_file, output_file):
     print(f"Medium: {summary['medium_count']}")
     print(f"Low: {summary['low_count']}")
     print(f"Info: {summary['info_count']}")
-    
+
     # Exit with error if critical or high issues found
     if summary['critical_count'] > 0 or summary['high_count'] > 0:
         return 1
@@ -316,6 +318,7 @@ The implementation wasn't without challenges:
 ### False Positives
 
 Initially, we had issues with false positives. I addressed this by:
+
 - Fine-tuning matcher conditions in templates
 - Adding context-specific validation
 - Implementing a feedback loop to improve templates
@@ -323,14 +326,15 @@ Initially, we had issues with false positives. I addressed this by:
 ### Performance Optimization
 
 As our API grew, scan times increased. I optimized by:
+
 - Parallelizing scans
 - Using template filtering to run only relevant tests
 - Implementing incremental scanning for PR changes
 
 ### Installation Issues
 
-Initially, we encountered issues with the Nuclei installation in CI/CD 
-environments. The original approach using hardcoded version URLs was 
+Initially, we encountered issues with the Nuclei installation in CI/CD
+environments. The original approach using hardcoded version URLs was
 brittle and prone to failures. I improved this by:
 
 - Using the GitHub API to dynamically fetch the latest release URL
@@ -340,14 +344,14 @@ brittle and prone to failures. I improved this by:
 - Using non-interactive unzip flags to avoid prompts in CI/CD environments
 - Using correct output format flags (`-jsonl` instead of `-json`)
 
-The improved installation method is more robust and automatically 
-adapts to new Nuclei releases without requiring manual updates to 
+The improved installation method is more robust and automatically
+adapts to new Nuclei releases without requiring manual updates to
 the CI/CD configuration.
 
 ### Local vs Remote Testing
 
-Initially, I attempted to scan Vercel preview deployments directly, 
-but this introduced complexity around URL detection and deployment 
+Initially, I attempted to scan Vercel preview deployments directly,
+but this introduced complexity around URL detection and deployment
 timing. I simplified the approach by:
 
 - Starting the application locally with `bun run dev`
@@ -355,13 +359,14 @@ timing. I simplified the approach by:
 - Eliminating dependency on external deployment URLs
 - Reducing wait times and potential network issues
 
-This local testing approach is more reliable, faster, and tests the 
-same code that will be deployed, making it an ideal solution for 
+This local testing approach is more reliable, faster, and tests the
+same code that will be deployed, making it an ideal solution for
 CI/CD security scanning.
 
 ### Developer Adoption
 
 Getting developers to pay attention to security findings required:
+
 - Creating clear, actionable reports
 - Integrating results into existing developer tools
 - Providing remediation guidance with each finding
@@ -394,14 +399,14 @@ about my approach, feel free to reach out to me on
 [LinkedIn](https://linkedin.com/in/conorgquinlan) or
 [GitHub](https://github.com/cqdev-co).
 
-| Technology | Purpose |
-| ---------- | ------- |
-| Nuclei     | Security scanning engine |
-| Docker     | Containerization for CI/CD |
-| GitHub Actions | CI/CD workflow automation |
-| Python     | Results processing and reporting |
-| YAML       | Custom vulnerability templates |
+| Technology     | Purpose                          |
+| -------------- | -------------------------------- |
+| Nuclei         | Security scanning engine         |
+| Docker         | Containerization for CI/CD       |
+| GitHub Actions | CI/CD workflow automation        |
+| Python         | Results processing and reporting |
+| YAML           | Custom vulnerability templates   |
 
 ```jsx
-console.log("Hello World");
+console.log('Hello World');
 ```

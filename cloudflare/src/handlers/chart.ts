@@ -1,6 +1,6 @@
 /**
  * Chart Handler
- * 
+ *
  * Endpoint for historical OHLCV data
  */
 
@@ -17,16 +17,15 @@ export async function handleChart(
   try {
     const range = searchParams.get('range') || '3mo';
     const interval = searchParams.get('interval') || '1d';
-    
+
     const chart = await fetchChart(ticker, range, interval);
-    
+
     if (!chart) {
       return jsonResponse({ error: 'Chart not found' }, 404);
     }
-    
+
     return jsonResponse(chart);
   } catch (error) {
     return jsonResponse({ error: String(error) }, 500);
   }
 }
-

@@ -250,7 +250,7 @@ const { data: lowPriceStocks } = await supabase
   .from('penny_tickers')
   .select('*')
   .eq('is_active', true)
-  .gte('market_cap', 10000000)  // $10M+
+  .gte('market_cap', 10000000) // $10M+
   .lte('market_cap', 100000000); // $100M-
 ```
 
@@ -280,11 +280,13 @@ const { data: lowPriceStocks } = await supabase
 **Symptoms**: Zero tickers after running script
 
 **Causes**:
+
 - API keys invalid or expired
 - Rate limiting from data sources
 - Network connectivity issues
 
 **Solutions**:
+
 - Verify API keys in GitHub secrets
 - Wait and retry (rate limits reset)
 - Check GitHub Actions logs
@@ -294,11 +296,13 @@ const { data: lowPriceStocks } = await supabase
 **Symptoms**: < 20% tickers pass validation
 
 **Causes**:
+
 - Overly strict filters
 - Market conditions (low volatility)
 - Data source issues
 
 **Solutions**:
+
 - Review filter thresholds
 - Adjust min_quality_score parameter
 - Check data source status
@@ -308,11 +312,13 @@ const { data: lowPriceStocks } = await supabase
 **Symptoms**: last_fetched dates > 7 days old
 
 **Causes**:
+
 - Workflow disabled or failing
 - API quota exhausted
 - Database connection issues
 
 **Solutions**:
+
 - Enable workflow if disabled
 - Check API usage limits
 - Verify Supabase connectivity
@@ -375,6 +381,7 @@ Penny stocks are scored 0-100 based on:
 ### Validation Criteria
 
 ✅ **Passes Validation**:
+
 - 60+ days of trading history
 - Data within last 7 days
 - 75%+ data completeness
@@ -383,6 +390,7 @@ Penny stocks are scored 0-100 based on:
 - Volume: 10,000+ shares/day
 
 ❌ **Fails Validation**:
+
 - Insufficient history (< 60 days)
 - Stale data (> 7 days old)
 - Too many data gaps (> 15%)
@@ -424,4 +432,3 @@ For issues or questions:
    - [FMP API Docs](https://site.financialmodelingprep.com/developer/docs)
    - [Alpha Vantage Docs](https://www.alphavantage.co/documentation/)
    - [YFinance Docs](https://github.com/ranaroussi/yfinance)
-

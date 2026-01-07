@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useScrollToBottom() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,18 +20,15 @@ export function useScrollToBottom() {
     return scrollTop + clientHeight >= scrollHeight - 100;
   }, []);
 
-  const scrollToBottom = useCallback(
-    (behavior: ScrollBehavior = "smooth") => {
-      if (!containerRef.current) {
-        return;
-      }
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior,
-      });
-    }, 
-    []
-  );
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (!containerRef.current) {
+      return;
+    }
+    containerRef.current.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior,
+    });
+  }, []);
 
   // Handle user scroll events
   useEffect(() => {
@@ -55,9 +52,9 @@ export function useScrollToBottom() {
       }, 150);
     };
 
-    container.addEventListener("scroll", handleScroll, { passive: true });
+    container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener('scroll', handleScroll);
       clearTimeout(scrollTimeout);
     };
   }, [checkIfAtBottom]);
@@ -74,7 +71,7 @@ export function useScrollToBottom() {
         requestAnimationFrame(() => {
           container.scrollTo({
             top: container.scrollHeight,
-            behavior: "instant",
+            behavior: 'instant',
           });
           setIsAtBottom(true);
           isAtBottomRef.current = true;
@@ -109,4 +106,3 @@ export function useScrollToBottom() {
     scrollToBottom,
   };
 }
-

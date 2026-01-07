@@ -1,50 +1,103 @@
 /**
  * Spread Scanner Command
- * 
+ *
  * Scans tickers to find those with viable deep ITM call spreads
  * meeting our conservative criteria:
  * - Debit: 55-80% of width
  * - Cushion: ≥5%
  * - PoP: ≥70%
  * - Return: ≥20%
- * 
+ *
  * Two-stage workflow:
  * 1. Run `bun run scan` to find technically sound stocks (ENTER decisions)
  * 2. Run `bun run scan-spreads --from-scan` to find viable spreads
  */
 
-import chalk from "chalk";
-import Table from "cli-table3";
-import { logger } from "../utils/logger.ts";
-import { fetchSP500Tickers, isTickerDBConfigured } from "../providers/tickers.ts";
-import { createClient } from "@supabase/supabase-js";
+import chalk from 'chalk';
+import Table from 'cli-table3';
+import { logger } from '../utils/logger.ts';
+import {
+  fetchSP500Tickers,
+  isTickerDBConfigured,
+} from '../providers/tickers.ts';
+import { createClient } from '@supabase/supabase-js';
 
 // Dynamic import for yahoo-finance2 (ES module)
 async function getYahooFinance() {
-  const YahooFinance = (await import("yahoo-finance2")).default;
-  return new YahooFinance({ suppressNotices: ["yahooSurvey", "rippiReport"] });
+  const YahooFinance = (await import('yahoo-finance2')).default;
+  return new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 }
 
 // Ticker lists
 const TICKER_LISTS: Record<string, string[]> = {
   // Most liquid, best for spreads
-  mega: ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "NFLX", "AVGO"],
-  
+  mega: [
+    'AAPL',
+    'MSFT',
+    'NVDA',
+    'GOOGL',
+    'AMZN',
+    'META',
+    'TSLA',
+    'AMD',
+    'NFLX',
+    'AVGO',
+  ],
+
   // Broader tech + growth
   growth: [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "NFLX", "AVGO",
-    "CRM", "ADBE", "ORCL", "NOW", "SNOW", "PLTR", "UBER", "ABNB", "DDOG", "MDB",
-    "SHOP", "SQ", "COIN", "HOOD", "SOFI", "NET", "CRWD", "ZS", "PANW", "OKTA"
+    'AAPL',
+    'MSFT',
+    'NVDA',
+    'GOOGL',
+    'AMZN',
+    'META',
+    'TSLA',
+    'AMD',
+    'NFLX',
+    'AVGO',
+    'CRM',
+    'ADBE',
+    'ORCL',
+    'NOW',
+    'SNOW',
+    'PLTR',
+    'UBER',
+    'ABNB',
+    'DDOG',
+    'MDB',
+    'SHOP',
+    'SQ',
+    'COIN',
+    'HOOD',
+    'SOFI',
+    'NET',
+    'CRWD',
+    'ZS',
+    'PANW',
+    'OKTA',
   ],
-  
+
   // ETFs - often best liquidity
-  etf: ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "ARKK", "SMH", "SOXX"],
-  
+  etf: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLE', 'XLK', 'ARKK', 'SMH', 'SOXX'],
+
   // Value/dividend stocks
   value: [
-    "JPM", "BAC", "WFC", "GS", "MS",
-    "XOM", "CVX", "COP", "SLB", "HAL",
-    "UNH", "JNJ", "PFE", "MRK", "ABBV"
+    'JPM',
+    'BAC',
+    'WFC',
+    'GS',
+    'MS',
+    'XOM',
+    'CVX',
+    'COP',
+    'SLB',
+    'HAL',
+    'UNH',
+    'JNJ',
+    'PFE',
+    'MRK',
+    'ABBV',
   ],
 };
 
@@ -54,41 +107,46 @@ const TICKER_LISTS: Record<string, string[]> = {
  */
 async function fetchEnterTickersFromScan(minScore = 70): Promise<string[]> {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
-  
+  const key =
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+
   if (!url || !key) {
-    logger.error("Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.");
+    logger.error(
+      'Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.'
+    );
     return [];
   }
-  
+
   const client = createClient(url, key);
-  const today = new Date().toISOString().split("T")[0];
-  
+  const today = new Date().toISOString().split('T')[0];
+
   try {
     // Fetch today's scan results with high scores
     // ENTER criteria: score ≥75, but we'll use minScore param
     const { data, error } = await client
-      .from("stock_opportunities")
-      .select("ticker, total_score")
-      .eq("scan_date", today)
-      .gte("total_score", minScore)
-      .order("total_score", { ascending: false });
-    
+      .from('stock_opportunities')
+      .select('ticker, total_score')
+      .eq('scan_date', today)
+      .gte('total_score', minScore)
+      .order('total_score', { ascending: false });
+
     if (error) {
       logger.error(`Failed to fetch scan results: ${error.message}`);
       return [];
     }
-    
+
     if (!data || data.length === 0) {
       logger.warn(`No scan results found for ${today} with score ≥${minScore}`);
       logger.info("Run 'bun run scan' first to populate scan results.");
       return [];
     }
-    
+
     const tickers = data.map((d) => d.ticker);
-    logger.success(`Found ${tickers.length} tickers from today's scan with score ≥${minScore}`);
+    logger.success(
+      `Found ${tickers.length} tickers from today's scan with score ≥${minScore}`
+    );
     return tickers;
-    
   } catch (error) {
     logger.error(`Database error: ${error}`);
     return [];
@@ -107,22 +165,22 @@ interface Criteria {
 }
 
 const STRICT_CRITERIA: Criteria = {
-  minDebitRatio: 0.55,  // Minimum debit as % of width
-  maxDebitRatio: 0.80,  // Maximum debit as % of width
-  minCushion: 5,        // Minimum % cushion
-  minPoP: 70,           // Minimum probability of profit
-  minReturn: 0.20,      // Minimum return on risk
-  targetDTE: 30,        // Target days to expiration
-  minOI: 10,            // Minimum open interest
+  minDebitRatio: 0.55, // Minimum debit as % of width
+  maxDebitRatio: 0.8, // Maximum debit as % of width
+  minCushion: 5, // Minimum % cushion
+  minPoP: 70, // Minimum probability of profit
+  minReturn: 0.2, // Minimum return on risk
+  targetDTE: 30, // Target days to expiration
+  minOI: 10, // Minimum open interest
 };
 
 // Relaxed criteria for showing "close" setups
 const RELAXED_CRITERIA: Criteria = {
-  minDebitRatio: 0.50,  // Slightly wider range
+  minDebitRatio: 0.5, // Slightly wider range
   maxDebitRatio: 0.85,
-  minCushion: 3,        // Lower cushion acceptable
-  minPoP: 60,           // Lower PoP acceptable
-  minReturn: 0.15,      // Lower return acceptable
+  minCushion: 3, // Lower cushion acceptable
+  minPoP: 60, // Lower PoP acceptable
+  minReturn: 0.15, // Lower return acceptable
   targetDTE: 30,
   minOI: 5,
 };
@@ -150,14 +208,21 @@ interface SpreadResult {
 function normalCDF(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const a = Math.abs(x) / Math.sqrt(2);
-  const y = Math.sqrt(1 - Math.exp(-a * a * (4 / Math.PI + 0.147 * a * a) / (1 + 0.147 * a * a)));
+  const y = Math.sqrt(
+    1 - Math.exp((-a * a * (4 / Math.PI + 0.147 * a * a)) / (1 + 0.147 * a * a))
+  );
   return 0.5 * (1 + sign * y);
 }
 
 /**
  * Calculate PoP using Black-Scholes-inspired approximation
  */
-function calculatePoP(price: number, breakeven: number, iv: number, dte: number): number {
+function calculatePoP(
+  price: number,
+  breakeven: number,
+  iv: number,
+  dte: number
+): number {
   if (iv <= 0 || dte <= 0) return price > breakeven ? 75 : 25;
   const T = dte / 365;
   const z = Math.log(price / breakeven) / (iv * Math.sqrt(T));
@@ -184,7 +249,7 @@ async function findViableSpread(
     returnPct: null,
     dte: null,
     viable: false,
-    reason: "",
+    reason: '',
   };
 
   try {
@@ -192,7 +257,7 @@ async function findViableSpread(
     const quote = await yahooFinance.quote(ticker);
     const price = quote.regularMarketPrice;
     if (!price) {
-      result.reason = "No price data";
+      result.reason = 'No price data';
       return result;
     }
     result.price = price;
@@ -200,7 +265,7 @@ async function findViableSpread(
     // Get options
     const optionsBase = await yahooFinance.options(ticker);
     if (!optionsBase.expirationDates?.length) {
-      result.reason = "No options";
+      result.reason = 'No options';
       return result;
     }
 
@@ -219,7 +284,9 @@ async function findViableSpread(
       }
     }
 
-    const dte = Math.ceil((closestExp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const dte = Math.ceil(
+      (closestExp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
     result.dte = dte;
 
     // Fetch options for that expiration
@@ -227,7 +294,7 @@ async function findViableSpread(
     const calls = options.options?.[0]?.calls || [];
 
     if (calls.length === 0) {
-      result.reason = "No calls";
+      result.reason = 'No calls';
       return result;
     }
 
@@ -274,10 +341,13 @@ async function findViableSpread(
         let debit: number | null = null;
         if (marketDebit > 0 && isFinite(marketDebit)) {
           if (marketRatio > CRITERIA.maxDebitRatio) continue;
-          if (marketRatio >= CRITERIA.minDebitRatio && marketRatio <= CRITERIA.maxDebitRatio) {
+          if (
+            marketRatio >= CRITERIA.minDebitRatio &&
+            marketRatio <= CRITERIA.maxDebitRatio
+          ) {
             debit = marketDebit;
           } else if (marketRatio < CRITERIA.minDebitRatio && midDebit > 0) {
-            debit = midDebit * 1.10;
+            debit = midDebit * 1.1;
             if (debit / width > CRITERIA.maxDebitRatio) continue;
           }
         }
@@ -295,7 +365,8 @@ async function findViableSpread(
         if (returnOnRisk < CRITERIA.minReturn) continue;
 
         // Calculate PoP
-        const iv = (longCall as { impliedVolatility?: number }).impliedVolatility || 0.3;
+        const iv =
+          (longCall as { impliedVolatility?: number }).impliedVolatility || 0.3;
         const pop = calculatePoP(price, breakeven, iv, dte);
 
         if (pop < CRITERIA.minPoP) continue;
@@ -324,14 +395,14 @@ async function findViableSpread(
       result.pop = bestSpread.pop;
       result.returnPct = bestSpread.returnPct;
       result.viable = true;
-      result.reason = "✅ Viable";
+      result.reason = '✅ Viable';
     } else {
-      result.reason = "No spread meets criteria";
+      result.reason = 'No spread meets criteria';
     }
 
     return result;
   } catch (error) {
-    result.reason = `Error: ${error instanceof Error ? error.message : "Unknown"}`;
+    result.reason = `Error: ${error instanceof Error ? error.message : 'Unknown'}`;
     return result;
   }
 }
@@ -341,8 +412,8 @@ export interface ScanSpreadsOptions {
   tickers?: string;
   verbose?: boolean;
   relaxed?: boolean;
-  fromScan?: boolean;      // Use tickers from today's scan (ENTER decisions)
-  minScore?: number;       // Minimum score for --from-scan (default: 70)
+  fromScan?: boolean; // Use tickers from today's scan (ENTER decisions)
+  minScore?: number; // Minimum score for --from-scan (default: 70)
 }
 
 /**
@@ -357,11 +428,11 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   // Get ticker list based on source
   let tickers: string[];
   let sourceDescription: string;
-  
+
   if (options.tickers) {
     // Explicit ticker list
-    tickers = options.tickers.split(",").map((t) => t.trim().toUpperCase());
-    sourceDescription = "specified tickers";
+    tickers = options.tickers.split(',').map((t) => t.trim().toUpperCase());
+    sourceDescription = 'specified tickers';
   } else if (options.fromScan) {
     // Two-stage workflow: use ENTER tickers from today's scan
     const minScore = options.minScore ?? 70;
@@ -372,17 +443,17 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
     sourceDescription = `today's scan (score ≥${minScore})`;
   } else {
     const listName = options.list.toLowerCase();
-    
-    if (listName === "db" || listName === "sp500") {
+
+    if (listName === 'db' || listName === 'sp500') {
       // Fetch from Supabase
       if (!isTickerDBConfigured()) {
-        logger.error("Supabase not configured for ticker fetching.");
-        logger.info("Set SUPABASE_URL and SUPABASE_SERVICE_KEY.");
+        logger.error('Supabase not configured for ticker fetching.');
+        logger.info('Set SUPABASE_URL and SUPABASE_SERVICE_KEY.');
         return;
       }
       tickers = await fetchSP500Tickers();
       if (tickers.length === 0) {
-        logger.error("No tickers found in database.");
+        logger.error('No tickers found in database.');
         return;
       }
       sourceDescription = `database (${tickers.length} tickers)`;
@@ -391,26 +462,38 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
       sourceDescription = `${listName} list`;
     } else {
       logger.error(`Unknown list: ${listName}`);
-      logger.info(`Available lists: ${Object.keys(TICKER_LISTS).join(", ")}, db, sp500`);
-      logger.info("Or use --from-scan to use tickers from today's scan results");
+      logger.info(
+        `Available lists: ${Object.keys(TICKER_LISTS).join(', ')}, db, sp500`
+      );
+      logger.info(
+        "Or use --from-scan to use tickers from today's scan results"
+      );
       return;
     }
   }
 
   console.log();
-  console.log(chalk.bold.cyan("  🔍 Deep ITM Spread Scanner"));
+  console.log(chalk.bold.cyan('  🔍 Deep ITM Spread Scanner'));
   console.log(chalk.gray(`  Source: ${sourceDescription}`));
   if (options.relaxed) {
-    console.log(chalk.yellow("  Mode: RELAXED (showing close-to-viable setups)"));
+    console.log(
+      chalk.yellow('  Mode: RELAXED (showing close-to-viable setups)')
+    );
   } else {
-    console.log(chalk.gray("  Mode: STRICT (conservative criteria)"));
+    console.log(chalk.gray('  Mode: STRICT (conservative criteria)'));
   }
   console.log();
-  console.log(chalk.gray("  Criteria:"));
-  console.log(chalk.gray(`    • Debit: ${(CRITERIA.minDebitRatio * 100).toFixed(0)}-${(CRITERIA.maxDebitRatio * 100).toFixed(0)}% of width`));
+  console.log(chalk.gray('  Criteria:'));
+  console.log(
+    chalk.gray(
+      `    • Debit: ${(CRITERIA.minDebitRatio * 100).toFixed(0)}-${(CRITERIA.maxDebitRatio * 100).toFixed(0)}% of width`
+    )
+  );
   console.log(chalk.gray(`    • Cushion: ≥${CRITERIA.minCushion}%`));
   console.log(chalk.gray(`    • PoP: ≥${CRITERIA.minPoP}%`));
-  console.log(chalk.gray(`    • Return: ≥${(CRITERIA.minReturn * 100).toFixed(0)}%`));
+  console.log(
+    chalk.gray(`    • Return: ≥${(CRITERIA.minReturn * 100).toFixed(0)}%`)
+  );
   console.log(chalk.gray(`    • Target DTE: ~${CRITERIA.targetDTE} days`));
   console.log();
 
@@ -420,13 +503,19 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   // Scan each ticker
   for (let i = 0; i < tickers.length; i++) {
     const ticker = tickers[i];
-    process.stdout.write(chalk.gray(`  [${i + 1}/${tickers.length}] ${ticker.padEnd(6)}`));
+    process.stdout.write(
+      chalk.gray(`  [${i + 1}/${tickers.length}] ${ticker.padEnd(6)}`)
+    );
 
     const result = await findViableSpread(yahooFinance, ticker);
     results.push(result);
 
     if (result.viable) {
-      console.log(chalk.green(" ✅ ") + chalk.white(result.spread) + chalk.gray(` ($${result.debit?.toFixed(2)})`));
+      console.log(
+        chalk.green(' ✅ ') +
+          chalk.white(result.spread) +
+          chalk.gray(` ($${result.debit?.toFixed(2)})`)
+      );
     } else {
       console.log(chalk.gray(` ❌ ${result.reason}`));
     }
@@ -439,36 +528,44 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   const viable = results.filter((r) => r.viable);
 
   console.log();
-  console.log(chalk.gray("─".repeat(72)));
+  console.log(chalk.gray('─'.repeat(72)));
   console.log();
 
   if (viable.length === 0) {
-    console.log(chalk.yellow("  ⚠️  No tickers found with viable spreads"));
-    console.log(chalk.gray("  Try a different list or check back when market conditions improve"));
+    console.log(chalk.yellow('  ⚠️  No tickers found with viable spreads'));
+    console.log(
+      chalk.gray(
+        '  Try a different list or check back when market conditions improve'
+      )
+    );
   } else {
-    console.log(chalk.bold.green(`  ✅ Found ${viable.length} ticker(s) with viable spreads:\n`));
+    console.log(
+      chalk.bold.green(
+        `  ✅ Found ${viable.length} ticker(s) with viable spreads:\n`
+      )
+    );
 
     const table = new Table({
       head: [
-        chalk.cyan("Ticker"),
-        chalk.cyan("Price"),
-        chalk.cyan("Spread"),
-        chalk.cyan("Debit"),
-        chalk.cyan("Debit%"),
-        chalk.cyan("Cushion"),
-        chalk.cyan("PoP"),
-        chalk.cyan("Return"),
-        chalk.cyan("DTE"),
+        chalk.cyan('Ticker'),
+        chalk.cyan('Price'),
+        chalk.cyan('Spread'),
+        chalk.cyan('Debit'),
+        chalk.cyan('Debit%'),
+        chalk.cyan('Cushion'),
+        chalk.cyan('PoP'),
+        chalk.cyan('Return'),
+        chalk.cyan('DTE'),
       ],
       colWidths: [8, 10, 12, 8, 9, 9, 7, 9, 6],
-      style: { head: [], border: ["gray"] },
+      style: { head: [], border: ['gray'] },
     });
 
     for (const r of viable) {
       table.push([
         chalk.bold(r.ticker),
         chalk.white(`$${r.price.toFixed(2)}`),
-        chalk.white(r.spread ?? "-"),
+        chalk.white(r.spread ?? '-'),
         chalk.yellow(`$${r.debit?.toFixed(2)}`),
         chalk.white(`${r.debitPct?.toFixed(0)}%`),
         chalk.green(`${r.cushion?.toFixed(1)}%`),
@@ -484,22 +581,21 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
     // Best pick
     const best = viable.sort((a, b) => (b.cushion ?? 0) - (a.cushion ?? 0))[0];
     console.log(
-      chalk.bold.white("  🏆 Best Setup: ") +
+      chalk.bold.white('  🏆 Best Setup: ') +
         chalk.cyan(best.ticker) +
-        chalk.gray(" - ") +
+        chalk.gray(' - ') +
         chalk.white(`${best.spread}`) +
         chalk.gray(` @ $${best.debit?.toFixed(2)}`)
     );
     console.log(
-      chalk.gray("     ") +
+      chalk.gray('     ') +
         chalk.green(`${best.cushion?.toFixed(1)}% cushion`) +
-        chalk.gray(" | ") +
+        chalk.gray(' | ') +
         chalk.cyan(`${best.pop}% PoP`) +
-        chalk.gray(" | ") +
+        chalk.gray(' | ') +
         chalk.green(`${best.returnPct?.toFixed(0)}% return`)
     );
   }
 
   console.log();
 }
-

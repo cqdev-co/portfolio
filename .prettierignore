@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+venv/
+
+# Build outputs
+.next/
+dist/
+.turbo/
+
+# Generated
+*.lock
+bun.lockb
+poetry.lock
+
+# Cache
+cache/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+logs/
+*.log
+

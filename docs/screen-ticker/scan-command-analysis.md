@@ -21,15 +21,15 @@
 
 ## Executive Summary
 
-The `scan` command in screen-ticker is a comprehensive stock screening 
-tool that analyzes tickers across technical, fundamental, and analyst 
+The `scan` command in screen-ticker is a comprehensive stock screening
+tool that analyzes tickers across technical, fundamental, and analyst
 dimensions.
 
 ### v1.7.1 Improvements (December 2024)
 
 All identified issues have been fixed:
 
-- **Performance:** 3-5x throughput improvement with batch concurrent 
+- **Performance:** 3-5x throughput improvement with batch concurrent
   processing and parallel API calls
 - **Caching:** Two-tier LRU cache (memory + file) for faster repeated scans
 - **Logic:** Fixed RSI parsing, D/E normalization, short interest signals
@@ -39,16 +39,16 @@ All identified issues have been fixed:
 
 ## Implementation Status
 
-| Fix | Status | File |
-|-----|--------|------|
-| RSI numeric value parsing | ✅ Fixed | `index.ts` |
-| D/E normalization | ✅ Fixed | `fundamental.ts` |
-| Parallel API calls | ✅ Implemented | `yahoo.ts` |
-| Batch concurrent scanning | ✅ Implemented | `screener.ts` |
-| In-memory LRU cache | ✅ Implemented | `yahoo.ts` |
-| Signal group caps | ✅ Implemented | `technical.ts` |
-| Short interest logic | ✅ Fixed | `fundamental.ts` |
-| Analyst threshold | ✅ Fixed | `analyst.ts` |
+| Fix                       | Status         | File             |
+| ------------------------- | -------------- | ---------------- |
+| RSI numeric value parsing | ✅ Fixed       | `index.ts`       |
+| D/E normalization         | ✅ Fixed       | `fundamental.ts` |
+| Parallel API calls        | ✅ Implemented | `yahoo.ts`       |
+| Batch concurrent scanning | ✅ Implemented | `screener.ts`    |
+| In-memory LRU cache       | ✅ Implemented | `yahoo.ts`       |
+| Signal group caps         | ✅ Implemented | `technical.ts`   |
+| Short interest logic      | ✅ Fixed       | `fundamental.ts` |
+| Analyst threshold         | ✅ Fixed       | `analyst.ts`     |
 
 ---
 
@@ -66,7 +66,7 @@ for (let i = 0; i < tickers.length; i++) {
 }
 ```
 
-**Issue:** Scanning 500 tickers takes 4-8 minutes due to sequential 
+**Issue:** Scanning 500 tickers takes 4-8 minutes due to sequential
 processing with rate limiting.
 
 **Solution:** Implement batched concurrent processing:
@@ -76,9 +76,7 @@ processing with rate limiting.
 const BATCH_SIZE = 5;
 for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
   const batch = tickers.slice(i, i + BATCH_SIZE);
-  const results = await Promise.all(
-    batch.map(t => scanTicker(t))
-  );
+  const results = await Promise.all(batch.map((t) => scanTicker(t)));
   // ...
 }
 ```
@@ -101,7 +99,7 @@ async getAllData(symbol: string) {
 }
 ```
 
-**Issue:** Three sequential network requests per ticker add 
+**Issue:** Three sequential network requests per ticker add
 ~1.5 seconds latency.
 
 **Solution:** Parallelize independent calls:
@@ -127,16 +125,17 @@ async getAllData(symbol: string) {
 
 ```typescript
 const RATE_LIMIT = {
-  baseDelay: 500,        // 500ms minimum between requests
-  burstLimit: 5,         // Pause after 5 requests
-  burstPause: 2000,      // 2 second pause
+  baseDelay: 500, // 500ms minimum between requests
+  burstLimit: 5, // Pause after 5 requests
+  burstPause: 2000, // 2 second pause
 };
 ```
 
-**Issue:** With burst control, effective rate is ~1 request/second. 
+**Issue:** With burst control, effective rate is ~1 request/second.
 Yahoo Finance can handle 2-3x this rate for authenticated requests.
 
-**Recommendation:** 
+**Recommendation:**
+
 - Reduce `baseDelay` to 200ms for cached/simple requests
 - Increase `burstLimit` to 10
 - Implement adaptive rate limiting based on response headers
@@ -147,7 +146,7 @@ Yahoo Finance can handle 2-3x this rate for authenticated requests.
 
 **Location:** `yahoo.ts:178-209`
 
-**Issue:** File I/O for each cache read/write adds latency. 
+**Issue:** File I/O for each cache read/write adds latency.
 JSON parsing is synchronous.
 
 **Solution:** Use in-memory LRU cache with periodic persistence:
@@ -157,7 +156,7 @@ import { LRUCache } from 'lru-cache';
 
 const memoryCache = new LRUCache<string, unknown>({
   max: 1000,
-  ttl: 1000 * 60 * 5,  // 5 minutes
+  ttl: 1000 * 60 * 5, // 5 minutes
 });
 ```
 
@@ -172,16 +171,16 @@ const memoryCache = new LRUCache<string, unknown>({
 ```typescript
 // Current: String matching on description
 const rsiDesc = rsiSignal.description.toLowerCase();
-if (rsiDesc.includes("oversold") || rsiDesc.includes("neutral")) {
+if (rsiDesc.includes('oversold') || rsiDesc.includes('neutral')) {
   checks.rsiOK = true;
-} else if (rsiDesc.includes("overbought")) {
-  issues.push("RSI overbought");
+} else if (rsiDesc.includes('overbought')) {
+  issues.push('RSI overbought');
 } else {
-  checks.rsiOK = true;  // PROBLEM: Defaults to OK
+  checks.rsiOK = true; // PROBLEM: Defaults to OK
 }
 ```
 
-**Issue:** If RSI description doesn't contain expected keywords, 
+**Issue:** If RSI description doesn't contain expected keywords,
 it defaults to `true`, potentially approving stocks with RSI > 70.
 
 **Fix:** Use the numeric RSI value instead:
@@ -203,11 +202,11 @@ if (rsiValue < 70) {
 
 ```typescript
 if (debtToEquity !== undefined && debtToEquity > 10) {
-  debtToEquity = debtToEquity / 100;  // Convert % to ratio
+  debtToEquity = debtToEquity / 100; // Convert % to ratio
 }
 ```
 
-**Issue:** A company with actual D/E of 15 (highly leveraged) would 
+**Issue:** A company with actual D/E of 15 (highly leveraged) would
 be incorrectly converted to 0.15 (very conservative).
 
 **Fix:** Check the data source format more reliably:
@@ -215,9 +214,7 @@ be incorrectly converted to 0.15 (very conservative).
 ```typescript
 // Yahoo Finance always returns D/E as percentage
 // But verify against total debt/equity if available
-const calculatedDE = totalDebt && totalEquity 
-  ? totalDebt / totalEquity 
-  : null;
+const calculatedDE = totalDebt && totalEquity ? totalDebt / totalEquity : null;
 
 if (calculatedDE && Math.abs(debtToEquity - calculatedDE * 100) < 5) {
   // Confirmed percentage format
@@ -233,9 +230,9 @@ if (calculatedDE && Math.abs(debtToEquity - calculatedDE * 100) < 5) {
 
 ```typescript
 // Awards 8 points for being near 52-week low
-if (pctFromLow < 0.10) {
+if (pctFromLow < 0.1) {
   return {
-    name: "Near 52-Week Low",
+    name: 'Near 52-Week Low',
     points: 8,
     // ...
   };
@@ -243,6 +240,7 @@ if (pctFromLow < 0.10) {
 ```
 
 **Issue:** Near 52-week low could indicate:
+
 - Value opportunity (good)
 - Fundamental deterioration / value trap (bad)
 
@@ -265,7 +263,7 @@ const basePts = fundamentalScore < 10 ? 3 : 8;
 // - Warning for "High Short Interest"
 ```
 
-**Issue:** Confusing UX - same condition is bullish signal AND 
+**Issue:** Confusing UX - same condition is bullish signal AND
 warning. Users don't know if it's good or bad.
 
 **Fix:** Choose one interpretation based on other factors:
@@ -273,7 +271,7 @@ warning. Users don't know if it's good or bad.
 ```typescript
 // Only award squeeze points if momentum is positive
 if (shortPercent > 15 && shortRatio > 5) {
-  if (momentum.overallTrend !== "deteriorating") {
+  if (momentum.overallTrend !== 'deteriorating') {
     // Award squeeze potential
   } else {
     // Only warning - bears are right
@@ -292,16 +290,14 @@ if (shortPercent > 15 && shortRatio > 5) {
 if (bullish > bearish * 3 && bullish >= 5) {
 ```
 
-**Issue:** A stock with 4 buys and 0 sells wouldn't qualify 
-(bullish >= 5 fails), but one with 5 buys and 2 sells wouldn't 
+**Issue:** A stock with 4 buys and 0 sells wouldn't qualify
+(bullish >= 5 fails), but one with 5 buys and 2 sells wouldn't
 either (not 3x). The thresholds are too strict.
 
 **Fix:** Use ratio-based scoring:
 
 ```typescript
-const bullishRatio = totalAnalysts > 0 
-  ? bullish / totalAnalysts 
-  : 0;
+const bullishRatio = totalAnalysts > 0 ? bullish / totalAnalysts : 0;
 
 if (bullishRatio >= 0.7 && bullish >= 3) {
   // Strong consensus
@@ -316,26 +312,26 @@ if (bullishRatio >= 0.7 && bullish >= 3) {
 
 ### 1. Technical Signal Stacking
 
-A stock can accumulate excessive technical points from overlapping 
+A stock can accumulate excessive technical points from overlapping
 signals:
 
-| Signal | Points |
-|--------|--------|
-| Above MA200 | 5 |
-| Strong MA Position (above 3/3 MAs) | 5 |
-| Golden Cross Active | 5 |
-| Near MA50 Support | 4 |
-| **Potential Total** | **19+ from MA-related signals** |
+| Signal                             | Points                          |
+| ---------------------------------- | ------------------------------- |
+| Above MA200                        | 5                               |
+| Strong MA Position (above 3/3 MAs) | 5                               |
+| Golden Cross Active                | 5                               |
+| Near MA50 Support                  | 4                               |
+| **Potential Total**                | **19+ from MA-related signals** |
 
 **Recommendation:** Implement signal grouping to cap related signals:
 
 ```typescript
-const maSignals = signals.filter(s => 
-  s.name.includes("MA") || s.name.includes("Golden")
+const maSignals = signals.filter(
+  (s) => s.name.includes('MA') || s.name.includes('Golden')
 );
 const maCappedScore = Math.min(
   maSignals.reduce((sum, s) => sum + s.points, 0),
-  12  // Cap MA-related signals at 12 points
+  12 // Cap MA-related signals at 12 points
 );
 ```
 
@@ -343,8 +339,8 @@ const maCappedScore = Math.min(
 
 ### 2. Missing Volatility Adjustment
 
-High-volatility stocks and stable blue chips are scored identically. 
-A 5% pullback on a stock with 3% daily swings is normal; on a 
+High-volatility stocks and stable blue chips are scored identically.
+A 5% pullback on a stock with 3% daily swings is normal; on a
 0.5% daily swing stock, it's significant.
 
 **Recommendation:** Add ATR-relative scoring:
@@ -362,8 +358,8 @@ const volatilityAdjustedProximity = proximityPercent / (atrPercent / 2);
 
 **Location:** `analyst.ts:296`
 
-Analyst signals can exceed 20 points, but the cap discards excess. 
-This means a stock with multiple strong analyst signals gets the 
+Analyst signals can exceed 20 points, but the cap discards excess.
+This means a stock with multiple strong analyst signals gets the
 same score as one with moderate signals.
 
 **Fix:** Implement weighted averaging instead of hard cap:
@@ -378,13 +374,13 @@ const adjustedScore = Math.min(20, 20 * (1 - Math.exp(-rawScore / 25)));
 
 ### 4. No Sector-Relative Comparison
 
-The scan doesn't factor in sector performance. A tech stock down 5% 
+The scan doesn't factor in sector performance. A tech stock down 5%
 in a sector down 10% is actually outperforming.
 
 **Recommendation:** Include sector-relative scoring:
 
 ```typescript
-const sectorChange = await getSectorChange(sector, days=20);
+const sectorChange = await getSectorChange(sector, (days = 20));
 const relativePerformance = stockChange - sectorChange;
 
 if (relativePerformance > 0.05) {
@@ -421,18 +417,18 @@ if (relativePerformance > 0.05) {
 
 ## Priority Matrix
 
-| Improvement | Impact | Effort | Priority |
-|-------------|--------|--------|----------|
-| Parallel processing | High | Medium | P1 |
-| RSI value fix | High | Low | P1 |
-| D/E normalization | Medium | Low | P1 |
-| In-memory cache | Medium | Medium | P2 |
-| Signal grouping | Medium | Medium | P2 |
-| API parallelization | Medium | Low | P2 |
-| Short interest logic | Low | Low | P3 |
-| Analyst threshold | Low | Low | P3 |
-| 52-week trap detection | Medium | High | P3 |
-| Sector-relative | Medium | High | P4 |
+| Improvement            | Impact | Effort | Priority |
+| ---------------------- | ------ | ------ | -------- |
+| Parallel processing    | High   | Medium | P1       |
+| RSI value fix          | High   | Low    | P1       |
+| D/E normalization      | Medium | Low    | P1       |
+| In-memory cache        | Medium | Medium | P2       |
+| Signal grouping        | Medium | Medium | P2       |
+| API parallelization    | Medium | Low    | P2       |
+| Short interest logic   | Low    | Low    | P3       |
+| Analyst threshold      | Low    | Low    | P3       |
+| 52-week trap detection | Medium | High   | P3       |
+| Sector-relative        | Medium | High   | P4       |
 
 ---
 
@@ -470,7 +466,7 @@ if (relativePerformance > 0.05) {
 Now uses numeric RSI value instead of string matching:
 
 ```typescript
-if (rsiSignal && typeof rsiSignal.value === "number") {
+if (rsiSignal && typeof rsiSignal.value === 'number') {
   const rsiValue = rsiSignal.value;
   if (rsiValue < 70) {
     checks.rsiOK = true;
@@ -500,9 +496,7 @@ Processes tickers in batches of 5 concurrently:
 const BATCH_SIZE = 5;
 for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
   const batch = tickers.slice(i, i + BATCH_SIZE);
-  const results = await Promise.all(
-    batch.map(t => scanTicker(t))
-  );
+  const results = await Promise.all(batch.map((t) => scanTicker(t)));
 }
 ```
 
@@ -535,11 +529,11 @@ Added in-memory LRU cache layer with 500 entry limit:
 
 Prevents excessive scoring from related signals:
 
-| Group | Keywords | Max Points |
-|-------|----------|-----------|
-| Moving Average | ma, golden, sma | 15 |
-| Momentum | rsi, macd, obv | 12 |
-| Price Position | 52-week, support, bollinger | 12 |
+| Group          | Keywords                    | Max Points |
+| -------------- | --------------------------- | ---------- |
+| Moving Average | ma, golden, sma             | 15         |
+| Momentum       | rsi, macd, obv              | 12         |
+| Price Position | 52-week, support, bollinger | 12         |
 
 ### 7. Short Interest Logic Fix
 
@@ -562,6 +556,5 @@ Relaxed from `bullish >= 5 AND bullish > bearish * 3` to:
 
 ---
 
-*Document maintained by the stock-scanner development team.*
-*Last Updated: December 2024 (v1.7.1)*
-
+_Document maintained by the stock-scanner development team._
+_Last Updated: December 2024 (v1.7.1)_

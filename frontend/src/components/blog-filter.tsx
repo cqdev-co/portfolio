@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 
 interface BlogFilterProps {
   allTags: string[];
@@ -22,7 +22,7 @@ export function BlogFilter({ allTags, selectedTag }: BlogFilterProps) {
     } else {
       params.set('tag', tag);
     }
-    
+
     const newUrl = params.toString() ? `/blog?${params.toString()}` : '/blog';
     router.push(newUrl);
   };
@@ -38,11 +38,13 @@ export function BlogFilter({ allTags, selectedTag }: BlogFilterProps) {
   return (
     <div className="mb-8 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-muted-foreground">Filter by tags:</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">
+          Filter by tags:
+        </h3>
         {selectedTag && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={clearFilter}
             className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
           >
@@ -51,12 +53,12 @@ export function BlogFilter({ allTags, selectedTag }: BlogFilterProps) {
           </Button>
         )}
       </div>
-      
+
       <div className="flex flex-wrap gap-2">
         {allTags.map((tag) => (
           <Badge
             key={tag}
-            variant={selectedTag === tag ? "default" : "secondary"}
+            variant={selectedTag === tag ? 'default' : 'secondary'}
             className="cursor-pointer hover:bg-primary/80 transition-colors"
             onClick={() => handleTagClick(tag)}
           >

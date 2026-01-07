@@ -2,40 +2,40 @@
  * Integration Tests - End-to-End Validation
  * Tests real API data against expected behavior
  */
-import { describe, test, expect } from "bun:test";
-import { yahooProvider } from "../src/providers/yahoo.ts";
-import { calculateTechnicalSignals } from "../src/signals/technical.ts";
-import { calculateFundamentalSignals } from "../src/signals/fundamental.ts";
-import { calculateAnalystSignals } from "../src/signals/analyst.ts";
-import { detectSupportResistance } from "../src/utils/support-resistance.ts";
+import { describe, test, expect } from 'bun:test';
+import { yahooProvider } from '../src/providers/yahoo.ts';
+import { calculateTechnicalSignals } from '../src/signals/technical.ts';
+import { calculateFundamentalSignals } from '../src/signals/fundamental.ts';
+import { calculateAnalystSignals } from '../src/signals/analyst.ts';
+import { detectSupportResistance } from '../src/utils/support-resistance.ts';
 
 // Skip these tests in CI (require network)
-const SKIP_INTEGRATION = process.env.CI === "true";
+const SKIP_INTEGRATION = process.env.CI === 'true';
 
-describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
-  describe("Yahoo Provider", () => {
-    test("fetches quote data for valid symbol", async () => {
-      const quote = await yahooProvider.getQuote("AAPL");
+describe.skipIf(SKIP_INTEGRATION)('Integration Tests', () => {
+  describe('Yahoo Provider', () => {
+    test('fetches quote data for valid symbol', async () => {
+      const quote = await yahooProvider.getQuote('AAPL');
 
       expect(quote).not.toBeNull();
       expect(quote!.regularMarketPrice).toBeGreaterThan(0);
-      expect(quote!.symbol).toBe("AAPL");
+      expect(quote!.symbol).toBe('AAPL');
     });
 
-    test("fetches historical data with correct range", async () => {
-      const historical = await yahooProvider.getHistorical("AAPL");
+    test('fetches historical data with correct range', async () => {
+      const historical = await yahooProvider.getHistorical('AAPL');
 
       expect(historical.length).toBeGreaterThan(200);
-      expect(historical[0]).toHaveProperty("date");
-      expect(historical[0]).toHaveProperty("open");
-      expect(historical[0]).toHaveProperty("high");
-      expect(historical[0]).toHaveProperty("low");
-      expect(historical[0]).toHaveProperty("close");
-      expect(historical[0]).toHaveProperty("volume");
+      expect(historical[0]).toHaveProperty('date');
+      expect(historical[0]).toHaveProperty('open');
+      expect(historical[0]).toHaveProperty('high');
+      expect(historical[0]).toHaveProperty('low');
+      expect(historical[0]).toHaveProperty('close');
+      expect(historical[0]).toHaveProperty('volume');
     });
 
-    test("fetches quote summary with all required modules", async () => {
-      const summary = await yahooProvider.getQuoteSummary("AAPL");
+    test('fetches quote summary with all required modules', async () => {
+      const summary = await yahooProvider.getQuoteSummary('AAPL');
 
       expect(summary).not.toBeNull();
       expect(summary!.financialData).toBeDefined();
@@ -43,17 +43,17 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
       expect(summary!.recommendationTrend).toBeDefined();
     });
 
-    test("handles invalid symbol gracefully", async () => {
-      const quote = await yahooProvider.getQuote("INVALID_SYMBOL_XYZ123");
+    test('handles invalid symbol gracefully', async () => {
+      const quote = await yahooProvider.getQuote('INVALID_SYMBOL_XYZ123');
 
       expect(quote).toBeNull();
     });
   });
 
-  describe("Technical Signals Calculation", () => {
-    test("calculates signals for real stock data", async () => {
-      const quote = await yahooProvider.getQuote("AAPL");
-      const historical = await yahooProvider.getHistorical("AAPL");
+  describe('Technical Signals Calculation', () => {
+    test('calculates signals for real stock data', async () => {
+      const quote = await yahooProvider.getQuote('AAPL');
+      const historical = await yahooProvider.getHistorical('AAPL');
 
       expect(quote).not.toBeNull();
       expect(historical.length).toBeGreaterThan(0);
@@ -65,27 +65,24 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
       expect(Array.isArray(result.signals)).toBe(true);
     });
 
-    test("technical score matches sum of signal points", async () => {
-      const quote = await yahooProvider.getQuote("MSFT");
-      const historical = await yahooProvider.getHistorical("MSFT");
+    test('technical score matches sum of signal points', async () => {
+      const quote = await yahooProvider.getQuote('MSFT');
+      const historical = await yahooProvider.getHistorical('MSFT');
 
       if (!quote) return;
 
       const result = calculateTechnicalSignals(quote, historical);
 
-      const sumOfPoints = result.signals.reduce(
-        (sum, s) => sum + s.points, 
-        0
-      );
+      const sumOfPoints = result.signals.reduce((sum, s) => sum + s.points, 0);
 
       // Score should equal sum or be capped at 50
       expect(result.score).toBe(Math.min(sumOfPoints, 50));
     });
   });
 
-  describe("Fundamental Signals Calculation", () => {
-    test("calculates signals for real stock data", async () => {
-      const summary = await yahooProvider.getQuoteSummary("AAPL");
+  describe('Fundamental Signals Calculation', () => {
+    test('calculates signals for real stock data', async () => {
+      const summary = await yahooProvider.getQuoteSummary('AAPL');
 
       expect(summary).not.toBeNull();
 
@@ -97,26 +94,23 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
       expect(Array.isArray(result.signals)).toBe(true);
     });
 
-    test("fundamental score matches sum of signal points", async () => {
-      const summary = await yahooProvider.getQuoteSummary("GOOGL");
+    test('fundamental score matches sum of signal points', async () => {
+      const summary = await yahooProvider.getQuoteSummary('GOOGL');
 
       if (!summary) return;
 
       const marketCap = summary.price?.marketCap?.raw ?? 0;
       const result = calculateFundamentalSignals(summary, marketCap);
 
-      const sumOfPoints = result.signals.reduce(
-        (sum, s) => sum + s.points, 
-        0
-      );
+      const sumOfPoints = result.signals.reduce((sum, s) => sum + s.points, 0);
 
       expect(result.score).toBe(Math.min(sumOfPoints, 30));
     });
   });
 
-  describe("Analyst Signals Calculation", () => {
-    test("calculates signals for real stock data", async () => {
-      const summary = await yahooProvider.getQuoteSummary("AAPL");
+  describe('Analyst Signals Calculation', () => {
+    test('calculates signals for real stock data', async () => {
+      const summary = await yahooProvider.getQuoteSummary('AAPL');
 
       expect(summary).not.toBeNull();
 
@@ -124,43 +118,40 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
 
       expect(result.score).toBeGreaterThanOrEqual(0);
       expect(result.score).toBeLessThanOrEqual(20);
-      expect(typeof result.upsidePotential).toBe("number");
+      expect(typeof result.upsidePotential).toBe('number');
     });
 
-    test("analyst score matches sum of signal points", async () => {
-      const summary = await yahooProvider.getQuoteSummary("NVDA");
+    test('analyst score matches sum of signal points', async () => {
+      const summary = await yahooProvider.getQuoteSummary('NVDA');
 
       if (!summary) return;
 
       const result = calculateAnalystSignals(summary);
 
-      const sumOfPoints = result.signals.reduce(
-        (sum, s) => sum + s.points, 
-        0
-      );
+      const sumOfPoints = result.signals.reduce((sum, s) => sum + s.points, 0);
 
       expect(result.score).toBe(Math.min(sumOfPoints, 20));
     });
   });
 
-  describe("Support/Resistance Detection", () => {
-    test("detects levels for real stock data", async () => {
-      const historical = await yahooProvider.getHistorical("HOOD");
+  describe('Support/Resistance Detection', () => {
+    test('detects levels for real stock data', async () => {
+      const historical = await yahooProvider.getHistorical('HOOD');
 
       const levels = detectSupportResistance(historical);
 
       expect(levels.length).toBeGreaterThan(0);
-      expect(levels.every(l => l.price > 0)).toBe(true);
-      expect(levels.every(l => l.strength >= 2)).toBe(true);
+      expect(levels.every((l) => l.price > 0)).toBe(true);
+      expect(levels.every((l) => l.strength >= 2)).toBe(true);
     });
 
-    test("support levels are below current price", async () => {
-      const historical = await yahooProvider.getHistorical("AAPL");
+    test('support levels are below current price', async () => {
+      const historical = await yahooProvider.getHistorical('AAPL');
       const currentPrice = historical[historical.length - 1]?.close ?? 0;
 
       const levels = detectSupportResistance(historical);
       const supports = levels.filter(
-        l => l.type === "support" && l.price < currentPrice
+        (l) => l.type === 'support' && l.price < currentPrice
       );
 
       // Should find at least one support level below price
@@ -168,8 +159,8 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
     });
   });
 
-  describe("Score Bounds Validation", () => {
-    const testSymbols = ["AAPL", "MSFT", "NVDA", "GOOGL", "F"];
+  describe('Score Bounds Validation', () => {
+    const testSymbols = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'F'];
 
     for (const symbol of testSymbols) {
       test(`${symbol} scores are within valid bounds`, async () => {
@@ -183,7 +174,7 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
 
         const technical = calculateTechnicalSignals(quote, historical);
         const fundamental = calculateFundamentalSignals(
-          summary, 
+          summary,
           summary.price?.marketCap?.raw ?? 0
         );
         const analyst = calculateAnalystSignals(summary);
@@ -203,4 +194,3 @@ describe.skipIf(SKIP_INTEGRATION)("Integration Tests", () => {
     }
   });
 });
-

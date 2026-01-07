@@ -17,6 +17,7 @@ This directory contains automation scripts used by GitHub Actions workflows.
 **Purpose**: Fetches high-quality US stock tickers for the main trading systems.
 
 **Target Criteria:**
+
 - US stocks from major exchanges (NASDAQ, NYSE, NYSEARCA, NYSEMKT)
 - Price: $0.50+ (excludes penny stocks)
 - Volume: 25,000+ shares/day
@@ -25,6 +26,7 @@ This directory contains automation scripts used by GitHub Actions workflows.
 - Max tickers: 2,500
 
 **Usage:**
+
 ```bash
 # Production run
 python fetch_tickers.py
@@ -57,10 +59,11 @@ python fetch_tickers.py --disable-yfinance-validation
 
 ### fetch_penny_tickers.py
 
-**Purpose**: Fetches penny stock tickers (stocks under $5) for 
+**Purpose**: Fetches penny stock tickers (stocks under $5) for
 specialized trading strategies.
 
 **Target Criteria:**
+
 - Price: $0.10 - $5.00 (penny stock range)
 - Market Cap: $5M - $300M (micro to small cap)
 - Volume: 10,000+ shares/day
@@ -68,6 +71,7 @@ specialized trading strategies.
 - Max tickers: 2,000
 
 **Usage:**
+
 ```bash
 # Production run
 python fetch_penny_tickers.py
@@ -98,6 +102,7 @@ python fetch_penny_tickers.py --disable-yfinance-validation
 **Purpose**: High-performance ticker filtering with batch processing.
 
 **Features:**
+
 - CFD (Contract for Difference) detection
 - S&P 500 symbol prioritization
 - Exchange filtering (US markets)
@@ -106,6 +111,7 @@ python fetch_penny_tickers.py --disable-yfinance-validation
 - Symbol validation patterns
 
 **Key Classes:**
+
 - `EfficientTickerFilter`: Main filtering logic
 - `EfficientTickerMetrics`: Lightweight ticker metrics
 
@@ -114,6 +120,7 @@ python fetch_penny_tickers.py --disable-yfinance-validation
 **Purpose**: Validates ticker data quality on Yahoo Finance.
 
 **Features:**
+
 - Historical data availability checks
 - OHLC (Open-High-Low-Close) validation
 - Volume data verification
@@ -123,6 +130,7 @@ python fetch_penny_tickers.py --disable-yfinance-validation
 - Parallel batch processing with rate limiting
 
 **Key Classes:**
+
 - `YFinanceValidator`: Main validation logic
 - `YFinanceValidation`: Validation result data class
 
@@ -131,12 +139,14 @@ python fetch_penny_tickers.py --disable-yfinance-validation
 **Purpose**: Test suite for YFinance validator.
 
 **Usage:**
+
 ```bash
 cd .github/scripts
 python test_yfinance_validation.py
 ```
 
 **Tests:**
+
 - Known valid tickers (AAPL, MSFT, GOOGL)
 - Known invalid tickers (fake symbols)
 - Batch validation performance
@@ -255,6 +265,7 @@ Test workflows via GitHub UI:
 #### fetch_tickers.py
 
 **Typical Output:**
+
 ```
 Total Candidates: 10,000 - 15,000 tickers
 After Pre-Filtering: 5,000 - 8,000 tickers
@@ -267,6 +278,7 @@ Execution Time: 15-25 minutes
 #### fetch_penny_tickers.py
 
 **Typical Output:**
+
 ```
 Total Candidates: 5,000 - 10,000 tickers
 After Deduplication: 4,000 - 8,000 tickers
@@ -280,11 +292,13 @@ Execution Time: 10-20 minutes
 ### API Rate Limiting
 
 **Symptoms:**
+
 - 401/429 HTTP errors
 - "Too many requests" messages
 - Incomplete results
 
 **Solutions:**
+
 - Wait and retry (limits reset hourly/daily)
 - Reduce `max_tickers` parameter
 - Use `--verbose` to see detailed errors
@@ -293,11 +307,13 @@ Execution Time: 10-20 minutes
 ### YFinance Validation Failures
 
 **Symptoms:**
+
 - Very low pass rates (< 10%)
 - "No historical data" errors
 - Connection timeouts
 
 **Solutions:**
+
 - Check internet connectivity
 - Reduce batch size (built-in: 100 tickers/batch)
 - Increase timeout (workflow default: 30-45 minutes)
@@ -306,11 +322,13 @@ Execution Time: 10-20 minutes
 ### Supabase Connection Issues
 
 **Symptoms:**
+
 - "Missing Supabase credentials" error
 - Database write failures
 - Timeout during inserts
 
 **Solutions:**
+
 - Verify environment variables
 - Check Supabase project status
 - Verify service role key permissions
@@ -319,6 +337,7 @@ Execution Time: 10-20 minutes
 ## Best Practices
 
 1. **Always test with dry-run first**
+
    ```bash
    python fetch_tickers.py --dry-run --verbose
    ```
@@ -365,14 +384,14 @@ Monitor ticker data quality:
 
 ```sql
 -- Check last update times
-SELECT 
+SELECT
   'tickers' as table_name,
   COUNT(*) as ticker_count,
   MAX(last_fetched) as last_update
 FROM tickers
 WHERE is_active = true
 UNION ALL
-SELECT 
+SELECT
   'penny_tickers' as table_name,
   COUNT(*) as ticker_count,
   MAX(last_fetched) as last_update
@@ -380,9 +399,9 @@ FROM penny_tickers
 WHERE is_active = true;
 
 -- Check data freshness
-SELECT 
-  symbol, 
-  name, 
+SELECT
+  symbol,
+  name,
   last_fetched,
   NOW() - last_fetched as age
 FROM tickers

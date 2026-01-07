@@ -3,17 +3,17 @@
  * Scans multiple tickers to find Grade A opportunities
  */
 
-import YahooFinance from "yahoo-finance2";
-import { findOptimalSpread, getEarningsInfo, getIVAnalysis } from "./yahoo.ts";
-import { 
-  gradeTradeOpportunity, 
+import YahooFinance from 'yahoo-finance2';
+import { findOptimalSpread, getEarningsInfo, getIVAnalysis } from './yahoo.ts';
+import {
+  gradeTradeOpportunity,
   calculateRiskScore,
   type TradeGradeResult,
   type RiskScore,
-} from "../engine/trade-analyzer.ts";
+} from '../engine/trade-analyzer.ts';
 
 const yahooFinance = new YahooFinance({
-  suppressNotices: ["yahooSurvey"],
+  suppressNotices: ['yahooSurvey'],
   validation: { logErrors: false, logOptionsErrors: false },
 });
 
@@ -35,16 +35,16 @@ export interface ScanResult {
     dte: number;
   };
   iv?: {
-    current: number;         // Current IV percentage (e.g., 35.5)
-    percentile: number;      // IV percentile (0-100)
+    current: number; // Current IV percentage (e.g., 35.5)
+    percentile: number; // IV percentile (0-100)
     level: 'LOW' | 'NORMAL' | 'ELEVATED' | 'HIGH';
   };
   reasons: string[];
 }
 
 export interface ScanOptions {
-  minGrade?: string;  // 'A', 'B', 'C'
-  maxRisk?: number;   // 1-10
+  minGrade?: string; // 'A', 'B', 'C'
+  maxRisk?: number; // 1-10
   minCushion?: number; // percentage
   onProgress?: (current: number, total: number, ticker: string) => void;
 }
@@ -57,28 +57,73 @@ export interface ScanOptions {
 export const SCAN_LISTS = {
   // Large cap tech - most liquid options
   megaCap: [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AMD', 
-    'NFLX', 'CRM', 'ORCL', 'ADBE', 'INTC', 'CSCO', 'QCOM',
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'AMZN',
+    'NVDA',
+    'META',
+    'TSLA',
+    'AMD',
+    'NFLX',
+    'CRM',
+    'ORCL',
+    'ADBE',
+    'INTC',
+    'CSCO',
+    'QCOM',
   ],
-  
+
   // Finance & Healthcare
   diversified: [
-    'JPM', 'BAC', 'GS', 'MS', 'V', 'MA', 'AXP',
-    'UNH', 'JNJ', 'PFE', 'MRK', 'ABBV', 'LLY',
+    'JPM',
+    'BAC',
+    'GS',
+    'MS',
+    'V',
+    'MA',
+    'AXP',
+    'UNH',
+    'JNJ',
+    'PFE',
+    'MRK',
+    'ABBV',
+    'LLY',
   ],
-  
+
   // Consumer & Industrial
   consumer: [
-    'WMT', 'COST', 'HD', 'TGT', 'NKE', 'SBUX', 'MCD',
-    'DIS', 'BA', 'CAT', 'DE', 'UPS', 'FDX',
+    'WMT',
+    'COST',
+    'HD',
+    'TGT',
+    'NKE',
+    'SBUX',
+    'MCD',
+    'DIS',
+    'BA',
+    'CAT',
+    'DE',
+    'UPS',
+    'FDX',
   ],
-  
+
   // High volatility (for experienced traders)
   highBeta: [
-    'COIN', 'MSTR', 'RIOT', 'MARA', 'SQ', 'SHOP', 'SNOW',
-    'PLTR', 'ROKU', 'DKNG', 'RBLX', 'U',
+    'COIN',
+    'MSTR',
+    'RIOT',
+    'MARA',
+    'SQ',
+    'SHOP',
+    'SNOW',
+    'PLTR',
+    'ROKU',
+    'DKNG',
+    'RBLX',
+    'U',
   ],
-  
+
   // ETFs
   etfs: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLE', 'XLK'],
 };
@@ -96,7 +141,10 @@ export const DEFAULT_SCAN_LIST = [
 /**
  * Calculate RSI from historical prices
  */
-async function calculateRSI(symbol: string, period: number = 14): Promise<number | undefined> {
+async function calculateRSI(
+  symbol: string,
+  period: number = 14
+): Promise<number | undefined> {
   try {
     const endDate = new Date();
     const startDate = new Date();
@@ -105,7 +153,7 @@ async function calculateRSI(symbol: string, period: number = 14): Promise<number
     const history = await yahooFinance.chart(symbol, {
       period1: startDate,
       period2: endDate,
-      interval: "1d",
+      interval: '1d',
     });
 
     if (!history?.quotes || history.quotes.length < period + 1) {
@@ -113,7 +161,7 @@ async function calculateRSI(symbol: string, period: number = 14): Promise<number
     }
 
     const closes = history.quotes
-      .map(q => q.close)
+      .map((q) => q.close)
       .filter((c): c is number => c !== null && c !== undefined);
 
     if (closes.length < period + 1) return undefined;
@@ -132,7 +180,7 @@ async function calculateRSI(symbol: string, period: number = 14): Promise<number
 
     if (avgLoss === 0) return 100;
     const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
+    return 100 - 100 / (1 + rs);
   } catch {
     return undefined;
   }
@@ -164,7 +212,7 @@ async function scanTicker(symbol: string): Promise<ScanResult | null> {
 
     // Build reasons array
     const reasons: string[] = [];
-    
+
     if (aboveMA200 === true) {
       reasons.push('Above MA200 ✓');
     } else if (aboveMA200 === false) {
@@ -223,18 +271,22 @@ async function scanTicker(symbol: string): Promise<ScanResult | null> {
       changePct: quote.regularMarketChangePercent ?? 0,
       grade,
       risk,
-      spread: spread ? {
-        strikes: `$${spread.longStrike}/$${spread.shortStrike}`,
-        debit: spread.estimatedDebit,
-        cushion: spread.cushion,
-        maxProfit: spread.maxProfit,
-        dte: spread.dte,
-      } : undefined,
-      iv: ivAnalysis ? {
-        current: ivAnalysis.currentIV,
-        percentile: ivAnalysis.ivPercentile,
-        level: ivAnalysis.ivLevel,
-      } : undefined,
+      spread: spread
+        ? {
+            strikes: `$${spread.longStrike}/$${spread.shortStrike}`,
+            debit: spread.estimatedDebit,
+            cushion: spread.cushion,
+            maxProfit: spread.maxProfit,
+            dte: spread.dte,
+          }
+        : undefined,
+      iv: ivAnalysis
+        ? {
+            current: ivAnalysis.currentIV,
+            percentile: ivAnalysis.ivPercentile,
+            level: ivAnalysis.ivLevel,
+          }
+        : undefined,
       reasons,
     };
   } catch {
@@ -249,12 +301,7 @@ export async function scanForOpportunities(
   tickers: string[] = DEFAULT_SCAN_LIST,
   options: ScanOptions = {}
 ): Promise<ScanResult[]> {
-  const {
-    minGrade = 'C',
-    maxRisk = 8,
-    minCushion = 5,
-    onProgress,
-  } = options;
+  const { minGrade = 'C', maxRisk = 8, minCushion = 5, onProgress } = options;
 
   const results: ScanResult[] = [];
   const total = tickers.length;
@@ -266,12 +313,12 @@ export async function scanForOpportunities(
 
     try {
       const result = await scanTicker(ticker);
-      
+
       if (result) {
         // Apply filters
         const gradeValue = gradeToValue(result.grade.grade);
         const minGradeValue = gradeToValue(minGrade as any);
-        
+
         if (
           gradeValue >= minGradeValue &&
           result.risk.score <= maxRisk &&
@@ -286,7 +333,7 @@ export async function scanForOpportunities(
 
     // Rate limit: small delay between requests
     if (i < tickers.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 
@@ -304,10 +351,17 @@ export async function scanForOpportunities(
 
 function gradeToValue(grade: string): number {
   const grades: Record<string, number> = {
-    'A+': 12, 'A': 11, 'A-': 10,
-    'B+': 9, 'B': 8, 'B-': 7,
-    'C+': 6, 'C': 5, 'C-': 4,
-    'D': 3, 'F': 1,
+    'A+': 12,
+    A: 11,
+    'A-': 10,
+    'B+': 9,
+    B: 8,
+    'B-': 7,
+    'C+': 6,
+    C: 5,
+    'C-': 4,
+    D: 3,
+    F: 1,
   };
   return grades[grade] ?? 0;
 }
@@ -337,10 +391,10 @@ export async function fullScan(
     ...SCAN_LISTS.diversified,
     ...SCAN_LISTS.consumer,
   ];
-  
+
   // Remove duplicates
   const uniqueTickers = [...new Set(allTickers)];
-  
+
   return scanForOpportunities(uniqueTickers, {
     minGrade: 'B-',
     maxRisk: 7,
@@ -358,21 +412,20 @@ export function formatScanResults(results: ScanResult[]): string {
   }
 
   let output = `Found ${results.length} opportunities:\n\n`;
-  
+
   for (const r of results.slice(0, 10)) {
     const changeStr = `${r.changePct >= 0 ? '+' : ''}${r.changePct.toFixed(1)}%`;
     output += `${r.ticker} - Grade ${r.grade.grade} | Risk ${r.risk.score}/10\n`;
     output += `  Price: $${r.price.toFixed(2)} (${changeStr})\n`;
-    
+
     if (r.spread) {
       output += `  Spread: ${r.spread.strikes} @ $${r.spread.debit.toFixed(2)} | `;
       output += `${r.spread.cushion.toFixed(1)}% cushion | ${r.spread.dte} DTE\n`;
     }
-    
+
     output += `  ${r.reasons.slice(0, 3).join(' | ')}\n`;
     output += `  → ${r.grade.recommendation}\n\n`;
   }
 
   return output;
 }
-

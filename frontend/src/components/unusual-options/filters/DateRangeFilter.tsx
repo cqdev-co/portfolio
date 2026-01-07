@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
+import { useState } from 'react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Calendar } from 'lucide-react';
 
 interface DateRangeFilterProps {
   value: string | undefined;
@@ -16,12 +16,12 @@ interface DateRangeFilterProps {
  * Reusable date filter component for filtering signals by detection date
  * Supports single date selection with quick preset options
  */
-export function DateRangeFilter({ 
-  value, 
+export function DateRangeFilter({
+  value,
   onChange,
-  label = "Detection Date" 
+  label = 'Detection Date',
 }: DateRangeFilterProps) {
-  const [inputDate, setInputDate] = useState(value || "");
+  const [inputDate, setInputDate] = useState(value || '');
 
   const handleDateChange = (newDate: string) => {
     setInputDate(newDate);
@@ -35,25 +35,23 @@ export function DateRangeFilter({
   };
 
   const quickPresets = [
-    { label: "Today", getValue: () => getPresetDate(0) },
-    { label: "Yesterday", getValue: () => getPresetDate(1) },
-    { label: "Last 3 days", getValue: () => getPresetDate(3) },
-    { label: "Last 7 days", getValue: () => getPresetDate(7) },
+    { label: 'Today', getValue: () => getPresetDate(0) },
+    { label: 'Yesterday', getValue: () => getPresetDate(1) },
+    { label: 'Last 3 days', getValue: () => getPresetDate(3) },
+    { label: 'Last 7 days', getValue: () => getPresetDate(7) },
   ];
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-foreground">
-        {label}
-      </Label>
-      
+      <Label className="text-xs font-medium text-foreground">{label}</Label>
+
       {/* Date Input */}
       <div className="relative">
-        <Calendar 
+        <Calendar
           className={
-            "absolute left-3 top-1/2 transform -translate-y-1/2 " +
-            "h-4 w-4 text-muted-foreground"
-          } 
+            'absolute left-3 top-1/2 transform -translate-y-1/2 ' +
+            'h-4 w-4 text-muted-foreground'
+          }
         />
         <Input
           type="date"
@@ -73,10 +71,10 @@ export function DateRangeFilter({
             size="sm"
             onClick={() => handleDateChange(preset.getValue())}
             className={
-              "text-[10px] h-6 px-2 " +
-              (inputDate === preset.getValue() 
-                ? "bg-primary/10 border-primary" 
-                : "")
+              'text-[10px] h-6 px-2 ' +
+              (inputDate === preset.getValue()
+                ? 'bg-primary/10 border-primary'
+                : '')
             }
           >
             {preset.label}
@@ -89,7 +87,7 @@ export function DateRangeFilter({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleDateChange("")}
+          onClick={() => handleDateChange('')}
           className="text-[10px] h-6 px-2 text-muted-foreground"
         >
           Clear
@@ -98,4 +96,3 @@ export function DateRangeFilter({
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 /**
  * Economic Calendar Service
- * Provides awareness of major market events: 
+ * Provides awareness of major market events:
  * FOMC, CPI, Jobs Report (NFP), GDP, Fed Speeches, holidays
  */
 
@@ -8,14 +8,14 @@
 // TYPES
 // ============================================================================
 
-export type EventType = 
-  | 'FOMC'      // Fed rate decision
-  | 'CPI'       // Consumer Price Index
-  | 'NFP'       // Non-Farm Payrolls (Jobs Report)
-  | 'GDP'       // Gross Domestic Product
-  | 'FED'       // Fed speeches, Beige Book
-  | 'HOLIDAY'   // Market closed
-  | 'WITCHING'  // Options expiration
+export type EventType =
+  | 'FOMC' // Fed rate decision
+  | 'CPI' // Consumer Price Index
+  | 'NFP' // Non-Farm Payrolls (Jobs Report)
+  | 'GDP' // Gross Domestic Product
+  | 'FED' // Fed speeches, Beige Book
+  | 'HOLIDAY' // Market closed
+  | 'WITCHING' // Options expiration
   | 'ECONOMIC'; // Other economic data
 
 export interface MarketEvent {
@@ -59,7 +59,7 @@ const FOMC_DATES_2024_2025 = [
   { date: '2025-07-30', name: 'FOMC Meeting' },
   { date: '2025-09-17', name: 'FOMC Meeting' },
   { date: '2025-11-05', name: 'FOMC Meeting' },
-  { date: '2025-12-10', name: 'FOMC Meeting' },  // Dec 9-10 meeting, announcement Dec 10
+  { date: '2025-12-10', name: 'FOMC Meeting' }, // Dec 9-10 meeting, announcement Dec 10
 ];
 
 // Major US Market Holidays (2024-2025)
@@ -240,7 +240,7 @@ function isMarketHours(date: Date): boolean {
   const hour = date.getHours();
   const minute = date.getMinutes();
   const time = hour * 60 + minute;
-  
+
   // Market hours: 9:30 AM - 4:00 PM ET
   // Note: This assumes the system is in ET timezone
   return time >= 9 * 60 + 30 && time < 16 * 60;
@@ -248,7 +248,7 @@ function isMarketHours(date: Date): boolean {
 
 function isHoliday(date: Date): boolean {
   const dateStr = date.toISOString().split('T')[0];
-  return MARKET_HOLIDAYS_2024_2025.some(h => h.date === dateStr);
+  return MARKET_HOLIDAYS_2024_2025.some((h) => h.date === dateStr);
 }
 
 /**
@@ -366,7 +366,7 @@ export function getUpcomingEvents(withinDays: number = 14): MarketEvent[] {
 
   // Sort by date
   events.sort((a, b) => a.date.getTime() - b.date.getTime());
-  
+
   return events;
 }
 
@@ -381,12 +381,12 @@ export function getCalendarContext(): CalendarContext {
   // Determine market status
   let isMarketOpen = false;
   let marketStatus = '';
-  
+
   if (isWeekend(now)) {
     marketStatus = 'CLOSED (Weekend)';
   } else if (isHoliday(now)) {
     const holiday = MARKET_HOLIDAYS_2024_2025.find(
-      h => h.date === now.toISOString().split('T')[0]
+      (h) => h.date === now.toISOString().split('T')[0]
     );
     marketStatus = `CLOSED (${holiday?.name ?? 'Holiday'})`;
   } else if (isMarketHours(now)) {
@@ -402,53 +402,57 @@ export function getCalendarContext(): CalendarContext {
   }
 
   // Find next major event
-  const nextMajorEvent = upcomingEvents.find(e => e.impact === 'HIGH') ?? null;
-  const daysUntilNextEvent = nextMajorEvent 
-    ? daysBetween(now, nextMajorEvent.date) 
+  const nextMajorEvent =
+    upcomingEvents.find((e) => e.impact === 'HIGH') ?? null;
+  const daysUntilNextEvent = nextMajorEvent
+    ? daysBetween(now, nextMajorEvent.date)
     : null;
 
   // Check for FOMC within 10 days (full lead-up period)
   const fomcSoon = upcomingEvents.find(
-    e => e.type === 'FOMC' && daysBetween(now, e.date) <= 10
+    (e) => e.type === 'FOMC' && daysBetween(now, e.date) <= 10
   );
   if (fomcSoon) {
     const daysToFomc = daysBetween(now, fomcSoon.date);
     const urgency = daysToFomc <= 3 ? '⚠️' : '🏛️';
     warnings.push(
       `${urgency} FOMC Meeting ${formatDate(fomcSoon.date)} (${daysToFomc}d) - ` +
-      `${daysToFomc <= 3 ? 'HIGH volatility risk' : 'Fed rate decision pending'}`
+        `${daysToFomc <= 3 ? 'HIGH volatility risk' : 'Fed rate decision pending'}`
     );
   }
-  
+
   // Check for CPI within 5 days (major market mover)
   const cpiSoon = upcomingEvents.find(
-    e => e.type === 'CPI' && daysBetween(now, e.date) <= 5
+    (e) => e.type === 'CPI' && daysBetween(now, e.date) <= 5
   );
   if (cpiSoon) {
     const daysToCpi = daysBetween(now, cpiSoon.date);
     const urgency = daysToCpi <= 2 ? '⚠️' : '📊';
     warnings.push(
       `${urgency} CPI Report ${formatDate(cpiSoon.date)} (${daysToCpi}d) - ` +
-      `${daysToCpi <= 2 ? 'HIGH volatility expected' : 'Inflation data release'}`
+        `${daysToCpi <= 2 ? 'HIGH volatility expected' : 'Inflation data release'}`
     );
   }
-  
+
   // Check for Jobs Report within 5 days
   const nfpSoon = upcomingEvents.find(
-    e => e.type === 'NFP' && daysBetween(now, e.date) <= 5
+    (e) => e.type === 'NFP' && daysBetween(now, e.date) <= 5
   );
   if (nfpSoon) {
     const daysToNfp = daysBetween(now, nfpSoon.date);
     const urgency = daysToNfp <= 2 ? '⚠️' : '👷';
     warnings.push(
       `${urgency} Jobs Report ${formatDate(nfpSoon.date)} (${daysToNfp}d) - ` +
-      `${daysToNfp <= 2 ? 'Employment data can move markets' : 'NFP release pending'}`
+        `${daysToNfp <= 2 ? 'Employment data can move markets' : 'NFP release pending'}`
     );
   }
-  
+
   // Check for GDP Advance within 3 days (advance estimates most impactful)
   const gdpSoon = upcomingEvents.find(
-    e => e.type === 'GDP' && e.name.includes('Advance') && daysBetween(now, e.date) <= 3
+    (e) =>
+      e.type === 'GDP' &&
+      e.name.includes('Advance') &&
+      daysBetween(now, e.date) <= 3
   );
   if (gdpSoon) {
     const daysToGdp = daysBetween(now, gdpSoon.date);
@@ -459,7 +463,7 @@ export function getCalendarContext(): CalendarContext {
 
   // Check for witching
   const witchingThisWeek = upcomingEvents.find(
-    e => e.type === 'WITCHING' && daysBetween(now, e.date) <= 5
+    (e) => e.type === 'WITCHING' && daysBetween(now, e.date) <= 5
   );
   if (witchingThisWeek) {
     warnings.push(
@@ -478,10 +482,10 @@ export function getCalendarContext(): CalendarContext {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric' 
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -511,7 +515,6 @@ export function formatCalendarForAI(): string {
   }
 
   output += `=== END CALENDAR ===\n`;
-  
+
   return output;
 }
-

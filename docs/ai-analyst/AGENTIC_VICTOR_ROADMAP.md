@@ -1,20 +1,20 @@
 # 🤖 Agentic Victor - Project Roadmap
 
-> **Vision:** Transform Victor from a reactive analyst into a proactive trading 
-> assistant that autonomously monitors markets, identifies opportunities, and 
+> **Vision:** Transform Victor from a reactive analyst into a proactive trading
+> assistant that autonomously monitors markets, identifies opportunities, and
 > alerts you to high-conviction setups.
 
 ---
 
 ## 📋 Project Overview
 
-| Attribute | Value |
-|-----------|-------|
-| **Project Name** | Agentic Victor |
-| **Start Date** | TBD |
-| **Target Completion** | ~4-6 weeks |
-| **Stack** | TypeScript, Bun, Supabase, Discord Webhooks, DeepSeek-v3 |
-| **Priority** | High |
+| Attribute             | Value                                                    |
+| --------------------- | -------------------------------------------------------- |
+| **Project Name**      | Agentic Victor                                           |
+| **Start Date**        | TBD                                                      |
+| **Target Completion** | ~4-6 weeks                                               |
+| **Stack**             | TypeScript, Bun, Supabase, Discord Webhooks, DeepSeek-v3 |
+| **Priority**          | High                                                     |
 
 ---
 
@@ -91,7 +91,7 @@ CREATE TABLE alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticker VARCHAR(10) NOT NULL,
   alert_type VARCHAR(50) NOT NULL,
-  -- Types: ENTRY_SIGNAL, EXIT_SIGNAL, NEWS_EVENT, 
+  -- Types: ENTRY_SIGNAL, EXIT_SIGNAL, NEWS_EVENT,
   --        EARNINGS_WARNING, POSITION_RISK, MACRO_EVENT
   priority VARCHAR(20) NOT NULL,
   -- Priority: HIGH, MEDIUM, LOW
@@ -141,17 +141,19 @@ CREATE TABLE config (
 ## 🚀 Roadmap
 
 ### Phase 1: Foundation (Week 1-2)
+
 > **Goal:** Core infrastructure and basic scanning
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 1.1 | Set up Supabase tables and RLS policies | 🔴 High |
-| 1.2 | Create `src/services/supabase.ts` client | 🔴 High |
-| 1.3 | Implement watchlist CRUD operations | 🔴 High |
-| 1.4 | Build basic market scanner service | 🔴 High |
-| 1.5 | Add CLI commands: `watch add/remove/list` | 🟡 Medium |
+| Task | Description                               | Priority  |
+| ---- | ----------------------------------------- | --------- |
+| 1.1  | Set up Supabase tables and RLS policies   | 🔴 High   |
+| 1.2  | Create `src/services/supabase.ts` client  | 🔴 High   |
+| 1.3  | Implement watchlist CRUD operations       | 🔴 High   |
+| 1.4  | Build basic market scanner service        | 🔴 High   |
+| 1.5  | Add CLI commands: `watch add/remove/list` | 🟡 Medium |
 
 **Deliverables:**
+
 - [ ] Supabase integration working
 - [ ] Can add/remove tickers from watchlist
 - [ ] Basic scanner runs on-demand
@@ -159,17 +161,19 @@ CREATE TABLE config (
 ---
 
 ### Phase 2: Discord Integration (Week 2)
+
 > **Goal:** Real-time notifications via Discord
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 2.1 | Create Discord webhook service | 🔴 High |
-| 2.2 | Design rich embed templates for alerts | 🔴 High |
-| 2.3 | Implement alert priority system | 🟡 Medium |
-| 2.4 | Add rate limiting (avoid spam) | 🟡 Medium |
-| 2.5 | Test webhook reliability | 🟢 Low |
+| Task | Description                            | Priority  |
+| ---- | -------------------------------------- | --------- |
+| 2.1  | Create Discord webhook service         | 🔴 High   |
+| 2.2  | Design rich embed templates for alerts | 🔴 High   |
+| 2.3  | Implement alert priority system        | 🟡 Medium |
+| 2.4  | Add rate limiting (avoid spam)         | 🟡 Medium |
+| 2.5  | Test webhook reliability               | 🟢 Low    |
 
 **Discord Alert Format:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ 🎯 ENTRY SIGNAL: NVDA                   │
@@ -192,6 +196,7 @@ CREATE TABLE config (
 ```
 
 **Deliverables:**
+
 - [ ] Discord webhook sending alerts
 - [ ] Rich embeds with all relevant data
 - [ ] Alert deduplication (no spam)
@@ -199,18 +204,20 @@ CREATE TABLE config (
 ---
 
 ### Phase 3: Morning Briefing (Week 3)
+
 > **Goal:** Daily automated market summary
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 3.1 | Create briefing generation service | 🔴 High |
-| 3.2 | Implement market regime detection | 🔴 High |
-| 3.3 | Add watchlist overnight analysis | 🟡 Medium |
-| 3.4 | Position status checks | 🟡 Medium |
-| 3.5 | Economic calendar integration | 🟡 Medium |
-| 3.6 | Schedule daily briefing (9:00 AM ET) | 🔴 High |
+| Task | Description                          | Priority  |
+| ---- | ------------------------------------ | --------- |
+| 3.1  | Create briefing generation service   | 🔴 High   |
+| 3.2  | Implement market regime detection    | 🔴 High   |
+| 3.3  | Add watchlist overnight analysis     | 🟡 Medium |
+| 3.4  | Position status checks               | 🟡 Medium |
+| 3.5  | Economic calendar integration        | 🟡 Medium |
+| 3.6  | Schedule daily briefing (9:00 AM ET) | 🔴 High   |
 
 **Morning Briefing Format:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ ☀️ VICTOR'S MORNING BRIEFING            │
@@ -241,6 +248,7 @@ CREATE TABLE config (
 ```
 
 **Deliverables:**
+
 - [ ] Automated morning briefing at 9 AM ET
 - [ ] Briefings stored in Supabase
 - [ ] Discord delivery working
@@ -248,32 +256,34 @@ CREATE TABLE config (
 ---
 
 ### Phase 4: Background Agent (Week 4)
+
 > **Goal:** Continuous monitoring during market hours
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 4.1 | Create background worker process | 🔴 High |
-| 4.2 | Implement scan scheduling (every 15-30 min) | 🔴 High |
-| 4.3 | Build opportunity detection logic | 🔴 High |
-| 4.4 | Add AI reasoning for alert decisions | 🔴 High |
-| 4.5 | Implement cooldown system (avoid alert fatigue) | 🟡 Medium |
-| 4.6 | Add health monitoring / error recovery | 🟡 Medium |
+| Task | Description                                     | Priority  |
+| ---- | ----------------------------------------------- | --------- |
+| 4.1  | Create background worker process                | 🔴 High   |
+| 4.2  | Implement scan scheduling (every 15-30 min)     | 🔴 High   |
+| 4.3  | Build opportunity detection logic               | 🔴 High   |
+| 4.4  | Add AI reasoning for alert decisions            | 🔴 High   |
+| 4.5  | Implement cooldown system (avoid alert fatigue) | 🟡 Medium |
+| 4.6  | Add health monitoring / error recovery          | 🟡 Medium |
 
 **Alert Trigger Criteria:**
+
 ```typescript
 interface AlertCriteria {
   // Entry Signals
-  rsiInBuyZone: boolean;      // RSI 35-55
+  rsiInBuyZone: boolean; // RSI 35-55
   ivBelow50thPercentile: boolean;
   aboveMA200: boolean;
   cushionAbove8Percent: boolean;
   gradeAOrBetter: boolean;
-  
+
   // Exit/Risk Signals
   earningsWithin7Days: boolean;
   cushionBelow5Percent: boolean;
   dteBelow5Days: boolean;
-  
+
   // News Events
   materialNewsDetected: boolean;
   analystUpgradeDowngrade: boolean;
@@ -281,6 +291,7 @@ interface AlertCriteria {
 ```
 
 **Deliverables:**
+
 - [ ] Background process running reliably
 - [ ] Scans executing on schedule
 - [ ] Alerts triggering correctly
@@ -288,17 +299,19 @@ interface AlertCriteria {
 ---
 
 ### Phase 5: AI Enhancement (Week 5)
+
 > **Goal:** Victor's judgment in the loop
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 5.1 | Add AI review before sending alerts | 🔴 High |
-| 5.2 | Implement conviction scoring | 🟡 Medium |
-| 5.3 | Add context from recent news | 🟡 Medium |
-| 5.4 | Historical pattern recognition | 🟢 Low |
-| 5.5 | Sector rotation detection | 🟢 Low |
+| Task | Description                         | Priority  |
+| ---- | ----------------------------------- | --------- |
+| 5.1  | Add AI review before sending alerts | 🔴 High   |
+| 5.2  | Implement conviction scoring        | 🟡 Medium |
+| 5.3  | Add context from recent news        | 🟡 Medium |
+| 5.4  | Historical pattern recognition      | 🟢 Low    |
+| 5.5  | Sector rotation detection           | 🟢 Low    |
 
 **AI Decision Flow:**
+
 ```
 Scanner finds potential setup
         │
@@ -321,6 +334,7 @@ CONVICTION   CONVICTION
 ```
 
 **Deliverables:**
+
 - [ ] AI validates all alerts before sending
 - [ ] Conviction scores included in alerts
 - [ ] False positive rate < 20%
@@ -328,18 +342,20 @@ CONVICTION   CONVICTION
 ---
 
 ### Phase 6: Polish & Optimization (Week 6)
+
 > **Goal:** Production-ready system
 
-| Task | Description | Priority |
-|------|-------------|----------|
-| 6.1 | Performance optimization | 🟡 Medium |
-| 6.2 | Token cost monitoring | 🟡 Medium |
-| 6.3 | Alert analytics dashboard (CLI) | 🟢 Low |
-| 6.4 | Configuration UI | 🟢 Low |
-| 6.5 | Documentation | 🔴 High |
-| 6.6 | Error handling & logging | 🟡 Medium |
+| Task | Description                     | Priority  |
+| ---- | ------------------------------- | --------- |
+| 6.1  | Performance optimization        | 🟡 Medium |
+| 6.2  | Token cost monitoring           | 🟡 Medium |
+| 6.3  | Alert analytics dashboard (CLI) | 🟢 Low    |
+| 6.4  | Configuration UI                | 🟢 Low    |
+| 6.5  | Documentation                   | 🔴 High   |
+| 6.6  | Error handling & logging        | 🟡 Medium |
 
 **Deliverables:**
+
 - [ ] System running reliably 24/5
 - [ ] Cost < $1/day for monitoring
 - [ ] Full documentation
@@ -401,40 +417,40 @@ bun run analyst alerts ack <id>  # Acknowledge an alert
 
 ## 💰 Cost Estimates
 
-| Component | Frequency | Est. Cost |
-|-----------|-----------|-----------|
-| Watchlist Scan (10 tickers) | Every 30 min | ~$0.02/scan |
-| AI Alert Review | Per opportunity | ~$0.01/review |
-| Morning Briefing | Daily | ~$0.05/briefing |
-| News Monitoring | Every 15 min | ~$0.01/check |
-| **Daily Total** | — | **~$0.50-1.00** |
-| **Monthly Total** | — | **~$15-30** |
+| Component                   | Frequency       | Est. Cost       |
+| --------------------------- | --------------- | --------------- |
+| Watchlist Scan (10 tickers) | Every 30 min    | ~$0.02/scan     |
+| AI Alert Review             | Per opportunity | ~$0.01/review   |
+| Morning Briefing            | Daily           | ~$0.05/briefing |
+| News Monitoring             | Every 15 min    | ~$0.01/check    |
+| **Daily Total**             | —               | **~$0.50-1.00** |
+| **Monthly Total**           | —               | **~$15-30**     |
 
-*Assumes TOON encoding and smart caching are used.*
+_Assumes TOON encoding and smart caching are used._
 
 ---
 
 ## ⚠️ Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| Alert fatigue | Cooldown periods, conviction thresholds |
-| API rate limits | Request batching, caching, backoff |
-| False positives | AI review layer, historical validation |
-| Missed opportunities | Multiple scan intervals, redundancy |
-| Cost overrun | Token budgets, TOON encoding, monitoring |
+| Risk                 | Mitigation                               |
+| -------------------- | ---------------------------------------- |
+| Alert fatigue        | Cooldown periods, conviction thresholds  |
+| API rate limits      | Request batching, caching, backoff       |
+| False positives      | AI review layer, historical validation   |
+| Missed opportunities | Multiple scan intervals, redundancy      |
+| Cost overrun         | Token budgets, TOON encoding, monitoring |
 
 ---
 
 ## 🎯 Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Alert accuracy | > 80% actionable |
-| False positive rate | < 20% |
-| Latency (scan to alert) | < 2 minutes |
-| System uptime | > 99% during market hours |
-| User satisfaction | Alerts lead to profitable trades |
+| Metric                  | Target                           |
+| ----------------------- | -------------------------------- |
+| Alert accuracy          | > 80% actionable                 |
+| False positive rate     | < 20%                            |
+| Latency (scan to alert) | < 2 minutes                      |
+| System uptime           | > 99% during market hours        |
+| User satisfaction       | Alerts lead to profitable trades |
 
 ---
 
@@ -458,5 +474,4 @@ bun run analyst alerts ack <id>  # Acknowledge an alert
 
 ---
 
-*Last Updated: December 11, 2024*
-
+_Last Updated: December 11, 2024_

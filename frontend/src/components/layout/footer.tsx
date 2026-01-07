@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { DATA } from "@/data/resume";
+import Link from 'next/link';
+import { DATA } from '@/data/resume';
 
 export function Footer() {
   return (
@@ -11,17 +11,26 @@ export function Footer() {
           </p>
         </div>
         <div className="flex space-x-4">
-          <Link href="/privacy" className="text-caption text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/privacy"
+            className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+          >
             Privacy
           </Link>
-          <Link href="/terms" className="text-caption text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/terms"
+            className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+          >
             Terms
           </Link>
-          <Link href="/sitemap" className="text-caption text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/sitemap"
+            className="text-caption text-muted-foreground hover:text-foreground transition-colors"
+          >
             Sitemap
           </Link>
         </div>
       </div>
     </footer>
   );
-} 
+}

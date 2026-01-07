@@ -82,7 +82,7 @@ on:
     - cron: '50 19 * * 1-5'
     - cron: '55 19 * * 1-5'
     - cron: '0 20 * * 1-5'
-  
+
   workflow_dispatch:
     inputs:
       tickers:
@@ -106,23 +106,23 @@ jobs:
   scan-unusual-options:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
           version: 1.7.1
           virtualenvs-create: true
           virtualenvs-in-project: true
-      
+
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
         with:
@@ -130,11 +130,11 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('unusual-options-service/poetry.lock') }}
           restore-keys: |
             poetry-${{ runner.os }}-
-      
+
       - name: Install dependencies
         working-directory: unusual-options-service
         run: poetry install --no-interaction
-      
+
       - name: Run scanner with continuity tracking
         working-directory: unusual-options-service
         env:
@@ -144,11 +144,11 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           HARDCODED_TICKERS="PLTR TSLA SPY QQQ HIMS HOOD SOFI RKLB"
-          
+
           # Set parameters
           TICKERS="${{ github.event.inputs.tickers }}"
           MIN_GRADE="${{ github.event.inputs.min_grade || 'B' }}"
-          
+
           if [ -n "$TICKERS" ]; then
             # Manual trigger with specific tickers (convert comma-separated to space-separated)
             TICKERS_SPACED=$(echo "$TICKERS" | tr ',' ' ')
@@ -157,4 +157,3 @@ jobs:
             # Scheduled cron or manual trigger without params: use hard-coded tickers
             poetry run python -m unusual_options.cli scan $HARDCODED_TICKERS --min-grade $MIN_GRADE --store
           fi
-

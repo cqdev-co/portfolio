@@ -4,11 +4,12 @@ Your first "employee" at your personal hedge fund.
 
 ## Overview
 
-The AI Analyst is a Financial Analyst AI that works for you. It's not just a tool - 
-it's your analyst who finds trades, makes recommendations, and helps you grow your 
+The AI Analyst is a Financial Analyst AI that works for you. It's not just a tool -
+it's your analyst who finds trades, makes recommendations, and helps you grow your
 $1,500 Robinhood account using Deep ITM Call Debit Spreads.
 
 Think of it like having a real employee you can talk to:
+
 - "What should I buy today?"
 - "Analyze NVDA for me"
 - "Is this a good entry point?"
@@ -74,6 +75,7 @@ bun run log NVDA --type cds --strikes 120/125 --premium 3.80
 ## Documentation
 
 See [docs/ai-analyst/README.md](../docs/ai-analyst/README.md) for:
+
 - Complete CLI reference
 - Architecture overview
 - TOON format specification
@@ -88,6 +90,7 @@ Run the schema in Supabase SQL Editor:
 ```
 
 Tables:
+
 - `analyst_trades` - Trade journal
 - `analyst_observations` - Patterns detected
 - `analyst_performance` - Period summaries

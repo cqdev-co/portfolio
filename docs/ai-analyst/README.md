@@ -1,6 +1,6 @@
 # AI Analyst
 
-Your first "employee" at your personal hedge fund - an AI analyst that finds 
+Your first "employee" at your personal hedge fund - an AI analyst that finds
 trades, makes recommendations, and helps you grow your options account.
 
 **Version 2.8.0**
@@ -8,6 +8,7 @@ trades, makes recommendations, and helps you grow your options account.
 ## What's New (v2.8.0) - Bug Fixes & Probability of Profit
 
 ### Bug Fixes
+
 - **Spread Consistency**: All commands now use `findSpreadWithAlternatives` for consistent spread recommendations
 - **Sector Detection**: Fixed sector always showing "Unknown" - now properly fetches from Yahoo Finance `assetProfile`
 - **R/R Display**: Chat now shows risk/reward calculations for spreads
@@ -27,12 +28,14 @@ riskReward:
 ```
 
 **How PoP is Calculated:**
+
 - Uses Black-Scholes-inspired normal distribution approximation
 - Based on: Current Price, Breakeven, Implied Volatility, and Days to Expiration
 - Formula: `PoP = N(ln(currentPrice/breakeven) / (IV × √(DTE/365)))`
 - Where N() is the cumulative normal distribution function
 
 **Chat Display Enhancement:**
+
 ```
 │   📈 $180/$185 · $335 debit · 2.8% cushion
 │   💰 R/R: $82/$418 (1:0.2) · 19.8% return · 72% PoP
@@ -45,6 +48,7 @@ riskReward:
 All data points now fully integrated across `debug`, `analyze`, and `chat` commands:
 
 ### Complete Volatility Analysis
+
 ```toon
 volatility:
   iv: 34.4%           # Implied volatility from options
@@ -55,6 +59,7 @@ volatility:
 ```
 
 ### Full Spread Recommendation
+
 ```toon
 spread:
   longStrike: $170
@@ -66,6 +71,7 @@ spread:
 ```
 
 ### Calculated Risk/Reward
+
 ```toon
 riskReward:
   maxProfit: $82      # Per contract
@@ -84,29 +90,36 @@ All features now work consistently across all commands.
 The AI Analyst receives **4 high-value data points** for comprehensive analysis:
 
 ### 1. Short Interest
+
 ```toon
 shorts:
   pctFloat: 1.1%      # % of float shorted
   daysTocover: 1.28   # Days to cover at avg volume
 ```
+
 Helps identify squeeze potential and bearish positioning.
 
 ### 2. Relative Strength vs SPY
+
 ```toon
 rsStrength:
   vsSPY: +3.8%        # 30-day outperformance vs SPY
 ```
+
 Identifies true outperformers vs stocks just riding the market.
 
 ### 3. Put/Call Ratio (Options Flow)
+
 ```toon
 optionsFlow:
   pcRatio: 0.89       # Put/Call open interest ratio
   sentiment: neutral  # bullish (<0.7) / neutral / bearish (>1.0)
 ```
+
 Smart money positioning signals from options markets.
 
 ### 4. Risk/Reward Calculation
+
 ```toon
 riskReward:
   maxProfit: $165     # Max profit potential
@@ -115,11 +128,13 @@ riskReward:
   ratio: 1:0.5        # Risk/Reward ratio
   profitPct: 49%      # Max profit as % of risk
 ```
+
 Clear trade economics for smarter position sizing.
 
 ### Enhanced Chat Display
 
 The chat now shows all new data in a single line:
+
 ```
 ┌─ Yahoo Finance ─────────────────────────────────────────────
 │ NVDA $188.61 -0.3% RSI 57 ↑MA200 ↔12
@@ -139,6 +154,7 @@ The chat now shows all new data in a single line:
 The AI now receives **historical volatility (HV20)** to compare against implied volatility (IV):
 
 ### Volatility Analysis
+
 ```toon
 vol:
   iv: 42%         # Current implied volatility
@@ -148,6 +164,7 @@ vol:
 ```
 
 **What This Means:**
+
 - **cheap** (IV < 0.85 × HV): Options are underpriced vs realized vol - good for buying
 - **fair** (IV ≈ HV): Options are fairly priced
 - **expensive** (IV > 1.15 × HV): Options are overpriced - consider selling premium
@@ -159,6 +176,7 @@ vol:
 The AI now receives **significantly more context** for smarter decision making:
 
 ### Earnings History with Beat/Miss Tracking
+
 ```toon
 earnings:
   date: Feb 25
@@ -169,6 +187,7 @@ earnings:
 ```
 
 ### Sector Context
+
 ```toon
 sector:
   name: Technology
@@ -177,6 +196,7 @@ sector:
 ```
 
 ### Volume Analysis
+
 ```toon
 volume:
   today: 36%            # % of average volume
@@ -185,6 +205,7 @@ volume:
 ```
 
 ### Risk Metrics
+
 ```toon
 risk:
   beta: 1.8             # Market sensitivity
@@ -193,6 +214,7 @@ risk:
 ### Enhanced Chat Display
 
 The chat now shows all new data in a clean format:
+
 ```
 ┌─ Yahoo Finance ─────────────────────────────────────────────
 │ NVDA $188.61 -0.3% RSI 57 ↑MA200 ↔12
@@ -224,6 +246,7 @@ Token increase: ~450 → ~500 tokens (+11%), for dramatically better analysis.
 The AI now receives **analyst target prices** and **price performance** for better entry decisions:
 
 ### Target Prices
+
 ```toon
 targets:
   low: $140
@@ -234,6 +257,7 @@ targets:
 ```
 
 ### Price Performance (Momentum Context)
+
 ```toon
 performance:
   d5: +4.2%    # 5-day return
@@ -252,6 +276,7 @@ performance:
 | YTD Return | ❌ Not sent | `+36.4%` |
 
 This helps the AI identify:
+
 - **Momentum stocks** (positive across all timeframes)
 - **Mean reversion opportunities** (recent pullback but strong YTD)
 - **Falling knives** (negative across all timeframes)
@@ -266,6 +291,7 @@ Token increase: ~400 → ~450 tokens (+12%), but significantly better entry timi
 The AI now receives **comprehensive analyst and ownership data** for smarter analysis:
 
 ### Analyst Ratings Breakdown
+
 ```toon
 analysts:
   consensus: 94% bullish
@@ -280,6 +306,7 @@ analysts:
 ```
 
 ### Ownership Structure
+
 ```toon
 ownership:
   insiders: 4.3%
@@ -294,12 +321,12 @@ ownership:
 
 Fixed a data consistency bug where MA200 was being calculated incorrectly:
 
-- **Bug**: MA200 was being computed from only 250 days of historical data, 
-  which only yields ~50 valid MA200 values (an average of the recent 50-day 
+- **Bug**: MA200 was being computed from only 250 days of historical data,
+  which only yields ~50 valid MA200 values (an average of the recent 50-day
   window, not the true 200-day average)
-- **Fix**: Now uses Yahoo Finance's pre-calculated `twoHundredDayAverage`, 
+- **Fix**: Now uses Yahoo Finance's pre-calculated `twoHundredDayAverage`,
   which is the correct 200-day simple moving average
-- **Impact**: For NVDA, MA200 was showing $189 (incorrect) instead of $159 
+- **Impact**: For NVDA, MA200 was showing $189 (incorrect) instead of $159
   (correct), causing wrong `aboveMA200` signals
 
 All commands (`analyze`, `debug`, `chat`) now show consistent MA200 values.
@@ -312,20 +339,20 @@ All commands (`analyze`, `debug`, `chat`) now show consistent MA200 values.
 
 The AI now receives **comprehensive data** instead of sparse summaries:
 
-| Data Point | Before | After |
-|------------|--------|-------|
-| Price | `$188.61` | `$188.61 (-0.3% today)` |
-| Volume | ❌ Not sent | `64.8M (64% below avg)` |
-| 52W Range | ❌ Not sent | `81% of range ($87-$212)` |
-| Market Cap | ❌ Not sent | `$4.6T` |
-| MAs | `Above MA200: No` | `MA20: $181, MA50: $186, MA200: $159 (above ✓)` |
-| Valuation | ❌ Not sent | `P/E: 46.7/25.0, EPS: $4.04/$7.55, Growth: 67%/63%` |
-| Analyst Ratings | ❌ Not sent | `94% bullish (11 Strong Buy, 49 Buy, 3 Hold, 1 Sell)` |
-| Recent Changes | ❌ Not sent | `Truist→Buy $275, Tigress→Strong Buy $350` |
-| Ownership | ❌ Not sent | `4.3% insiders, 69.4% institutions (6,934)` |
-| Insider Activity | ❌ Not sent | `$230M recent insider sales` |
-| PFV Levels | 3 levels | 5 levels + support/resistance zones |
-| Strategy | Name only | `Primary + Alternatives with confidence %` |
+| Data Point       | Before            | After                                                 |
+| ---------------- | ----------------- | ----------------------------------------------------- |
+| Price            | `$188.61`         | `$188.61 (-0.3% today)`                               |
+| Volume           | ❌ Not sent       | `64.8M (64% below avg)`                               |
+| 52W Range        | ❌ Not sent       | `81% of range ($87-$212)`                             |
+| Market Cap       | ❌ Not sent       | `$4.6T`                                               |
+| MAs              | `Above MA200: No` | `MA20: $181, MA50: $186, MA200: $159 (above ✓)`       |
+| Valuation        | ❌ Not sent       | `P/E: 46.7/25.0, EPS: $4.04/$7.55, Growth: 67%/63%`   |
+| Analyst Ratings  | ❌ Not sent       | `94% bullish (11 Strong Buy, 49 Buy, 3 Hold, 1 Sell)` |
+| Recent Changes   | ❌ Not sent       | `Truist→Buy $275, Tigress→Strong Buy $350`            |
+| Ownership        | ❌ Not sent       | `4.3% insiders, 69.4% institutions (6,934)`           |
+| Insider Activity | ❌ Not sent       | `$230M recent insider sales`                          |
+| PFV Levels       | 3 levels          | 5 levels + support/resistance zones                   |
+| Strategy         | Name only         | `Primary + Alternatives with confidence %`            |
 
 Token increase: ~270 → ~400 tokens (+48%), but dramatically better analysis.
 
@@ -340,8 +367,8 @@ bun run debug NVDA --log        # Save full output to logs/ folder
 bun run debug NVDA -c -l        # Compact + log file
 ```
 
-**Log file output:** The `--log` flag saves a clean text file (no ANSI colors) 
-to `ai-analyst/logs/debug-{TICKER}-{timestamp}.log` - useful for reviewing 
+**Log file output:** The `--log` flag saves a clean text file (no ANSI colors)
+to `ai-analyst/logs/debug-{TICKER}-{timestamp}.log` - useful for reviewing
 the full output, comparing runs, or sharing with others.
 
 See exactly what data the AI receives before running analysis.
@@ -356,18 +383,21 @@ Fixed a critical bug where Victor's chat would terminate abruptly after
 making multiple web searches without synthesizing the results.
 
 **The Problem:**
+
 - When Victor made 3 consecutive tool calls (web searches), the agent loop
   would exit after the final tool execution
 - The tool results would remain unsynthesized, leaving the conversation
   hanging without Victor's analysis
 
 **The Fix:**
+
 - Added post-loop synthesis: If the agent loop exits due to hitting max
   iterations with pending tool results, a final synthesis call is now made
 - Added tool call protection: On the final iteration, any tool calls from
   the model are ignored to force synthesis over additional research
 
 **Technical Details:**
+
 - DeepSeek V3 would continue outputting tool-call-like tokens even when
   tools were disabled (because tool definitions existed in conversation
   context from earlier turns)
@@ -513,13 +543,13 @@ bun run chat
 
 ## The Concept
 
-This isn't just a tool - it's your analyst employee **Victor Chen**. He's a 
-67-year-old veteran Wall Street trader with 45 years of experience. Talk to 
+This isn't just a tool - it's your analyst employee **Victor Chen**. He's a
+67-year-old veteran Wall Street trader with 45 years of experience. Talk to
 him like you would a real analyst:
 
 - "What should I buy today?"
 - "Find me a good setup"
-- "Research NVDA for me"  
+- "Research NVDA for me"
 - "Is this a good entry?"
 
 ## Example Conversation
@@ -571,26 +601,26 @@ him like you would a real analyst:
 
 The chat now displays real-time market regime at startup:
 
-| Regime | Description | Trading Recommendation |
-|--------|-------------|----------------------|
-| RISK_ON | VIX low, SPY above MA200 | Normal position sizing |
-| RISK_OFF | SPY below MA200, bearish | Reduce exposure, wait |
-| HIGH_VOL | VIX elevated (>20) | Reduce sizes by 50% |
-| NEUTRAL | Mixed signals | Grade A setups only |
+| Regime   | Description              | Trading Recommendation |
+| -------- | ------------------------ | ---------------------- |
+| RISK_ON  | VIX low, SPY above MA200 | Normal position sizing |
+| RISK_OFF | SPY below MA200, bearish | Reduce exposure, wait  |
+| HIGH_VOL | VIX elevated (>20)       | Reduce sizes by 50%    |
+| NEUTRAL  | Mixed signals            | Grade A setups only    |
 
 ### Enhanced Economic Calendar
 
 Now tracks 7 event types:
 
-| Event | Impact | Typical Market Reaction |
-|-------|--------|------------------------|
-| FOMC | HIGH | ±1-3% on surprises |
-| CPI | HIGH | ±1-2% on inflation data |
-| Jobs (NFP) | HIGH | ±0.5-1% on employment |
-| GDP | MEDIUM-HIGH | Growth signals |
-| Fed Beige Book | MEDIUM | Regional economic data |
-| Quad Witching | MEDIUM | High volume |
-| Holidays | MEDIUM | Market closed |
+| Event          | Impact      | Typical Market Reaction |
+| -------------- | ----------- | ----------------------- |
+| FOMC           | HIGH        | ±1-3% on surprises      |
+| CPI            | HIGH        | ±1-2% on inflation data |
+| Jobs (NFP)     | HIGH        | ±0.5-1% on employment   |
+| GDP            | MEDIUM-HIGH | Growth signals          |
+| Fed Beige Book | MEDIUM      | Regional economic data  |
+| Quad Witching  | MEDIUM      | High volume             |
+| Holidays       | MEDIUM      | Market closed           |
 
 ### TOON Format
 
@@ -602,7 +632,7 @@ LLM comprehension accuracy** (74% vs 70% in benchmarks).
 ticker: NVDA
 name: NVIDIA Corporation
 price: 188.61
-change: "-0.3%"
+change: '-0.3%'
 volume: 36%
 pos52w: 81%
 mcap: 4.6T
@@ -626,22 +656,21 @@ fundamentals:
 pfv:
   value: 180
   bias: bearish
-  deviation: "-4.4%"
+  deviation: '-4.4%'
   support: 186-189
   meanReversion: SHORT 44%
-  levels[5]{price,type,dist}:
-    200,callwall,+6.0%
+  levels[5]{price,type,dist}: 200,callwall,+6.0%
     185,gammawall,"-1.9%"
     195,callwall,+3.4%
 strategy:
   primary: Deep ITM Call Debit Spread
   confidence: 75
-  alternatives[2]{name,conf}:
-    Put Credit Spread,75
+  alternatives[2]{name,conf}: Put Credit Spread,75
     Cash Secured Put,55
 ```
 
 **TOON Features:**
+
 - YAML-like `key: value` syntax for nested objects
 - Tabular arrays with `[N]{fields}:` headers for uniform data
 - Indentation-based structure (no braces/brackets)
@@ -652,26 +681,26 @@ strategy:
 
 Questions are classified to load only relevant data:
 
-| Question Type | Data Loaded |
-|--------------|-------------|
-| Price check | Quote only (fast) |
+| Question Type  | Data Loaded                |
+| -------------- | -------------------------- |
+| Price check    | Quote only (fast)          |
 | Trade analysis | + Options, calendar, grade |
-| Research | + Web search, news |
-| Position check | + Open positions, history |
-| Scan | Full market scan |
+| Research       | + Web search, news         |
+| Position check | + Open positions, history  |
+| Scan           | Full market scan           |
 
 ### Trade Grading Rubric
 
 Transparent scoring system (100 points max):
 
-| Criterion | Max Points | Description |
-|-----------|-----------|-------------|
-| Above MA200 | 25 | Price above 200-day MA = bullish trend |
-| RSI Zone | 20 | 35-55 ideal, 55-65 partial (unless ADX >40) |
-| Cushion | 20 | >10% full, 7-10% partial, <7% risky |
-| IV Level | 15 | Normal/Low = full, Elevated = partial |
-| Earnings | 10 | >14 days safe, 7-14 partial, <7 avoid |
-| Risk/Reward | 10 | >20% return = full, 15-20% partial |
+| Criterion   | Max Points | Description                                 |
+| ----------- | ---------- | ------------------------------------------- |
+| Above MA200 | 25         | Price above 200-day MA = bullish trend      |
+| RSI Zone    | 20         | 35-55 ideal, 55-65 partial (unless ADX >40) |
+| Cushion     | 20         | >10% full, 7-10% partial, <7% risky         |
+| IV Level    | 15         | Normal/Low = full, Elevated = partial       |
+| Earnings    | 10         | >14 days safe, 7-14 partial, <7 avoid       |
+| Risk/Reward | 10         | >20% return = full, 15-20% partial          |
 
 **Grades**: A+ (95+), A (90+), B (75+), C (60+), D (50+), F (<50)
 
@@ -679,22 +708,22 @@ Transparent scoring system (100 points max):
 
 RSI rules are flexible based on trend strength (now included in TOON data):
 
-| ADX Value | Trend | Display | RSI Flexibility |
-|-----------|-------|---------|-----------------|
-| <20 | WEAK | `↔15` | Strict 35-55 RSI only |
-| 20-40 | MODERATE | `→26` | RSI up to 60 acceptable |
-| >40 | STRONG | `📈42` | RSI up to 65 acceptable |
+| ADX Value | Trend    | Display | RSI Flexibility         |
+| --------- | -------- | ------- | ----------------------- |
+| <20       | WEAK     | `↔15`   | Strict 35-55 RSI only   |
+| 20-40     | MODERATE | `→26`   | RSI up to 60 acceptable |
+| >40       | STRONG   | `📈42`  | RSI up to 65 acceptable |
 
 ### Earnings Data
 
 Always displayed in Yahoo Finance card:
 
-| Days Out | Display | Status |
-|----------|---------|--------|
-| <14 days | `⚠️ EARNINGS 12d - AVOID` | Red warning |
-| 14-30 days | `📅 Earnings: 25 days` | Yellow caution |
-| >30 days | `📅 Earnings: 45d (safe)` | Green safe |
-| Unknown | `📅 Earnings: Not available` | Gray note |
+| Days Out   | Display                      | Status         |
+| ---------- | ---------------------------- | -------------- |
+| <14 days   | `⚠️ EARNINGS 12d - AVOID`    | Red warning    |
+| 14-30 days | `📅 Earnings: 25 days`       | Yellow caution |
+| >30 days   | `📅 Earnings: 45d (safe)`    | Green safe     |
+| Unknown    | `📅 Earnings: Not available` | Gray note      |
 
 ## CLI Reference
 
@@ -708,11 +737,11 @@ bun run chat --account 3000
 bun run chat --ai-mode local
 ```
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--ai-mode <mode>` | Ollama mode: local or cloud | cloud |
-| `--ai-model <model>` | Override default AI model | - |
-| `-a, --account <size>` | Account size in dollars | 1500 |
+| Option                 | Description                 | Default |
+| ---------------------- | --------------------------- | ------- |
+| `--ai-mode <mode>`     | Ollama mode: local or cloud | cloud   |
+| `--ai-model <model>`   | Override default AI model   | -       |
+| `-a, --account <size>` | Account size in dollars     | 1500    |
 
 ### `debug <ticker>`
 
@@ -727,6 +756,7 @@ bun run debug AAPL --account 3000
 ```
 
 **Shows:**
+
 - Raw Yahoo Finance data (JSON)
 - Raw technical indicators
 - Raw PFV calculations
@@ -734,12 +764,13 @@ bun run debug AAPL --account 3000
 - Token estimation and cost
 - Compression analysis (TOON vs JSON)
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-a, --account <size>` | Account size in dollars | 1500 |
-| `-c, --compact` | Hide full PFV magnetic levels array | false |
+| Option                 | Description                         | Default |
+| ---------------------- | ----------------------------------- | ------- |
+| `-a, --account <size>` | Account size in dollars             | 1500    |
+| `-c, --compact`        | Hide full PFV magnetic levels array | false   |
 
 **Output sections:**
+
 - 📈 Raw Yahoo Finance Data - Full `stockData` object from YFinance
 - 📉 Raw Technical Indicators - RSI, MAs, score calculation
 - 🌐 Market Regime Data - SPY analysis for bull/bear/neutral
@@ -751,6 +782,7 @@ bun run debug AAPL --account 3000
 - 🔬 Context Analysis - Shows all data now included in prompt
 
 **Rich Context (v2.2)** - The AI now receives comprehensive data:
+
 - Price with % change, volume relative to average
 - 52-week range position, market cap
 - All MA values (MA20/50/200) with above/below indicators
@@ -762,43 +794,43 @@ bun run debug AAPL --account 3000
 
 Analyze a ticker for entry decision.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--ai-mode <mode>` | Ollama mode: local or cloud | cloud |
-| `--ai-model <model>` | Override default AI model | - |
-| `-p, --position <spread>` | Your existing position | - |
-| `-a, --account <size>` | Account size in dollars | 1500 |
-| `--no-chart` | Skip price chart | false |
+| Option                    | Description                 | Default |
+| ------------------------- | --------------------------- | ------- |
+| `--ai-mode <mode>`        | Ollama mode: local or cloud | cloud   |
+| `--ai-model <model>`      | Override default AI model   | -       |
+| `-p, --position <spread>` | Your existing position      | -       |
+| `-a, --account <size>`    | Account size in dollars     | 1500    |
+| `--no-chart`              | Skip price chart            | false   |
 
 ### `journal [ticker]`
 
 View trade history.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-s, --stats` | Show performance statistics | false |
-| `-l, --limit <n>` | Limit trades shown | 20 |
+| Option            | Description                 | Default |
+| ----------------- | --------------------------- | ------- |
+| `-s, --stats`     | Show performance statistics | false   |
+| `-l, --limit <n>` | Limit trades shown          | 20      |
 
 ### `import <file>`
 
 Import Robinhood CSV.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-d, --dry-run` | Don't save to database | false |
-| `-v, --verbose` | Verbose output | false |
+| Option          | Description            | Default |
+| --------------- | ---------------------- | ------- |
+| `-d, --dry-run` | Don't save to database | false   |
+| `-v, --verbose` | Verbose output         | false   |
 
 ### `log <ticker>`
 
 Log a trade manually.
 
-| Option | Description | Required |
-|--------|-------------|----------|
-| `-t, --type <type>` | Trade type: cds, pcs, ccs, pds | Yes |
-| `-s, --strikes <strikes>` | Strikes (e.g., 120/125) | Yes |
-| `-p, --premium <premium>` | Premium per share | Yes |
-| `-e, --expiration <date>` | Expiration (YYYY-MM-DD) | No |
-| `--thesis <text>` | Entry thesis | No |
+| Option                    | Description                    | Required |
+| ------------------------- | ------------------------------ | -------- |
+| `-t, --type <type>`       | Trade type: cds, pcs, ccs, pds | Yes      |
+| `-s, --strikes <strikes>` | Strikes (e.g., 120/125)        | Yes      |
+| `-p, --premium <premium>` | Premium per share              | Yes      |
+| `-e, --expiration <date>` | Expiration (YYYY-MM-DD)        | No       |
+| `--thesis <text>`         | Entry thesis                   | No       |
 
 ## Architecture
 
@@ -852,13 +884,13 @@ ai-analyst/
 
 ## Token Optimization Results
 
-| Metric | Before (v1.1) | After (v1.2) | Reduction |
-|--------|---------------|--------------|-----------|
-| Avg Input Tokens | 3,800 | ~1,500 | 60% |
-| System Prompt | 1,500 | ~1,000 | 33% |
-| Ticker Data | 800/ticker | 50/ticker | 94% |
-| Conversation History | 100+/msg | ~20/msg | 80% |
-| Cost per Conv | $0.08 | ~$0.03 | 62% |
+| Metric               | Before (v1.1) | After (v1.2) | Reduction |
+| -------------------- | ------------- | ------------ | --------- |
+| Avg Input Tokens     | 3,800         | ~1,500       | 60%       |
+| System Prompt        | 1,500         | ~1,000       | 33%       |
+| Ticker Data          | 800/ticker    | 50/ticker    | 94%       |
+| Conversation History | 100+/msg      | ~20/msg      | 80%       |
+| Cost per Conv        | $0.08         | ~$0.03       | 62%       |
 
 ## Configuration
 
@@ -905,22 +937,22 @@ bun run watch remove NVDA        # Remove ticker
 bun run watch configure NVDA     # Configure thresholds
 ```
 
-| Subcommand | Description |
-|------------|-------------|
-| `list` | View current watchlist |
-| `add <tickers...>` | Add ticker(s) to watchlist |
-| `remove <ticker>` | Remove ticker from watchlist |
+| Subcommand           | Description                   |
+| -------------------- | ----------------------------- |
+| `list`               | View current watchlist        |
+| `add <tickers...>`   | Add ticker(s) to watchlist    |
+| `remove <ticker>`    | Remove ticker from watchlist  |
 | `configure <ticker>` | Set RSI/IV/cushion thresholds |
 
 **Configure Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--rsi-low <n>` | Minimum RSI threshold | 35 |
-| `--rsi-high <n>` | Maximum RSI threshold | 55 |
-| `--iv <n>` | IV percentile threshold | 50 |
-| `--cushion <n>` | Minimum cushion % | 8 |
-| `--grade <g>` | Minimum grade | B |
+| Option           | Description             | Default |
+| ---------------- | ----------------------- | ------- |
+| `--rsi-low <n>`  | Minimum RSI threshold   | 35      |
+| `--rsi-high <n>` | Maximum RSI threshold   | 55      |
+| `--iv <n>`       | IV percentile threshold | 50      |
+| `--cushion <n>`  | Minimum cushion %       | 8       |
+| `--grade <g>`    | Minimum grade           | B       |
 
 ### `agent`
 
@@ -933,12 +965,12 @@ bun run agent status             # Check agent health
 bun run agent test-discord       # Test Discord webhook
 ```
 
-| Subcommand | Description |
-|------------|-------------|
-| `start` | Start the background monitoring daemon |
-| `stop` | Stop monitoring |
-| `status` | Check agent health and statistics |
-| `test-discord` | Test Discord webhook configuration |
+| Subcommand     | Description                            |
+| -------------- | -------------------------------------- |
+| `start`        | Start the background monitoring daemon |
+| `stop`         | Stop monitoring                        |
+| `status`       | Check agent health and statistics      |
+| `test-discord` | Test Discord webhook configuration     |
 
 ### `briefing`
 
@@ -961,12 +993,12 @@ bun run alerts ack abc123        # Acknowledge an alert
 bun run alerts summary           # View statistics
 ```
 
-| Option | Description |
-|--------|-------------|
-| `-l, --limit <n>` | Number of alerts to show |
-| `-t, --ticker <ticker>` | Filter by ticker |
-| `--type <type>` | Filter by type |
-| `-u, --unack` | Show only unacknowledged |
+| Option                  | Description              |
+| ----------------------- | ------------------------ |
+| `-l, --limit <n>`       | Number of alerts to show |
+| `-t, --ticker <ticker>` | Filter by ticker         |
+| `--type <type>`         | Filter by type           |
+| `-u, --unack`           | Show only unacknowledged |
 
 ### `short-term`
 
@@ -977,14 +1009,15 @@ bun run short-term               # Scan SPY and QQQ
 bun run short-term --account 500 # With custom account size
 ```
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--ai-mode <mode>` | Ollama mode: local or cloud | cloud |
-| `--ai-model <model>` | Override default AI model | - |
-| `-a, --account <size>` | Account size in dollars | 1500 |
-| `-v, --verbose` | Show detailed analysis | false |
+| Option                 | Description                 | Default |
+| ---------------------- | --------------------------- | ------- |
+| `--ai-mode <mode>`     | Ollama mode: local or cloud | cloud   |
+| `--ai-model <model>`   | Override default AI model   | -       |
+| `-a, --account <size>` | Account size in dollars     | 1500    |
+| `-v, --verbose`        | Show detailed analysis      | false   |
 
 **Strategy highlights:**
+
 - RSI oversold bounces (< 35)
 - VWAP mean reversion setups
 - 5-10 DTE debit spreads
@@ -1014,24 +1047,24 @@ The PFV system calculates where price gravitates based on behavioral biases and 
 
 ### Components & Weights
 
-| Component | Weight | Description |
-|-----------|--------|-------------|
-| Max Pain | 30% | Strike where most options expire worthless |
-| Gamma Walls | 10% | High OI strikes with MM hedging pressure |
-| Technical Levels | 25% | MAs, 52-week high/low, swing points |
-| Volume Anchor | 20% | VWAP and volume-weighted center |
-| Round Numbers | 15% | Psychological magnetism ($100, $50, etc.) |
+| Component        | Weight | Description                                |
+| ---------------- | ------ | ------------------------------------------ |
+| Max Pain         | 30%    | Strike where most options expire worthless |
+| Gamma Walls      | 10%    | High OI strikes with MM hedging pressure   |
+| Technical Levels | 25%    | MAs, 52-week high/low, swing points        |
+| Volume Anchor    | 20%    | VWAP and volume-weighted center            |
+| Round Numbers    | 15%    | Psychological magnetism ($100, $50, etc.)  |
 
 ### Ticker Profiles
 
 PFV adjusts weights based on stock type:
 
-| Profile | When Used | Key Adjustment |
-|---------|-----------|----------------|
-| Blue Chip | AAPL, MSFT, etc. | Higher technical weight |
-| Meme/Retail | GME, AMC, PLTR | Higher round number & gamma |
-| ETF | SPY, QQQ | Higher max pain (very reliable) |
-| Low Float | Small caps | Higher gamma (exaggerated effects) |
+| Profile     | When Used        | Key Adjustment                     |
+| ----------- | ---------------- | ---------------------------------- |
+| Blue Chip   | AAPL, MSFT, etc. | Higher technical weight            |
+| Meme/Retail | GME, AMC, PLTR   | Higher round number & gamma        |
+| ETF         | SPY, QQQ         | Higher max pain (very reliable)    |
+| Low Float   | Small caps       | Higher gamma (exaggerated effects) |
 
 ### Using PFV in Analysis
 

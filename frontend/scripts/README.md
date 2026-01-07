@@ -9,6 +9,7 @@ This directory contains utility scripts for maintaining the portfolio project.
 Automatically fixes line length violations in MDX files to comply with the 75-character limit.
 
 **Quick Usage:**
+
 ```bash
 cd frontend
 node ../scripts/fix-line-length.js

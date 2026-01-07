@@ -1,15 +1,15 @@
-import type { 
-  StockScore, 
-  Signal, 
-  QuoteData, 
-  QuoteSummary, 
+import type {
+  StockScore,
+  Signal,
+  QuoteData,
+  QuoteSummary,
   HistoricalData,
   WeekContext,
-  StockStyle
-} from "../types/index.ts";
-import { calculateTechnicalSignals } from "../signals/technical.ts";
-import { calculateFundamentalSignals } from "../signals/fundamental.ts";
-import { calculateAnalystSignals } from "../signals/analyst.ts";
+  StockStyle,
+} from '../types/index.ts';
+import { calculateTechnicalSignals } from '../signals/technical.ts';
+import { calculateFundamentalSignals } from '../signals/fundamental.ts';
+import { calculateAnalystSignals } from '../signals/analyst.ts';
 
 /**
  * Classify stock as growth, value, or blend based on financial metrics
@@ -20,53 +20,56 @@ function classifyStock(summary: QuoteSummary): StockStyle {
   const revenueGrowth = summary.financialData?.revenueGrowth?.raw ?? 0;
   const peg = summary.defaultKeyStatistics?.pegRatio?.raw;
   const pe = summary.summaryDetail?.trailingPE?.raw;
-  
+
   // High growth: >35% earnings or >25% revenue growth (lowered from 50%/30%)
   if (earningsGrowth > 0.35 || revenueGrowth > 0.25) {
-    return "growth";
+    return 'growth';
   }
-  
+
   // Value: PEG < 1 or P/E < 15
   if ((peg && peg > 0 && peg < 1) || (pe && pe > 0 && pe < 15)) {
-    return "value";
+    return 'value';
   }
-  
-  return "blend";
+
+  return 'blend';
 }
 
 /**
  * Calculate ATR (Average True Range) for volatility context
  * Used for position sizing and stop loss calculation
  */
-function calculateATR(historical: HistoricalData[], period: number = 14): { atr: number; atrPercent: number } | null {
+function calculateATR(
+  historical: HistoricalData[],
+  period: number = 14
+): { atr: number; atrPercent: number } | null {
   if (historical.length < period + 1) return null;
-  
+
   const trValues: number[] = [];
-  
+
   // Calculate True Range for each day
   for (let i = 1; i < historical.length; i++) {
     const current = historical[i];
     const previous = historical[i - 1];
     if (!current || !previous) continue;
-    
+
     const highLow = current.high - current.low;
     const highClose = Math.abs(current.high - previous.close);
     const lowClose = Math.abs(current.low - previous.close);
-    
+
     const trueRange = Math.max(highLow, highClose, lowClose);
     trValues.push(trueRange);
   }
-  
+
   if (trValues.length < period) return null;
-  
+
   // Calculate ATR (simple moving average of TR)
   const recentTR = trValues.slice(-period);
   const atr = recentTR.reduce((a, b) => a + b, 0) / period;
-  
+
   // Calculate ATR as percentage of current price
   const currentPrice = historical[historical.length - 1]?.close ?? 0;
   const atrPercent = currentPrice > 0 ? (atr / currentPrice) * 100 : 0;
-  
+
   return { atr, atrPercent };
 }
 
@@ -87,7 +90,7 @@ function calculate52WeekContext(
     context.high52 = quote.fiftyTwoWeekHigh;
   } else if (historical.length >= 252) {
     // Calculate from historical data
-    const prices = historical.slice(-252).map(d => d.close);
+    const prices = historical.slice(-252).map((d) => d.close);
     context.low52 = Math.min(...prices);
     context.high52 = Math.max(...prices);
   }
@@ -102,7 +105,12 @@ function calculate52WeekContext(
     }
   }
 
-  // MA200
+  // MA50 (short-term trend)
+  if (quote.fiftyDayAverage) {
+    context.ma50 = quote.fiftyDayAverage;
+  }
+
+  // MA200 (long-term trend)
   if (quote.twoHundredDayAverage) {
     context.ma200 = quote.twoHundredDayAverage;
   }
@@ -118,9 +126,9 @@ function calculate52WeekContext(
     // Find the next upcoming earnings date
     const now = new Date();
     const nextEarnings = earningsDates
-      .filter(d => d > now)
+      .filter((d) => d > now)
       .sort((a, b) => a.getTime() - b.getTime())[0];
-    
+
     if (nextEarnings) {
       context.nextEarningsDate = nextEarnings;
     }
@@ -159,7 +167,8 @@ function calculate52WeekContext(
 
   // v1.7.0: Short Interest data
   if (summary.defaultKeyStatistics?.shortPercentOfFloat?.raw) {
-    context.shortPercentOfFloat = summary.defaultKeyStatistics.shortPercentOfFloat.raw;
+    context.shortPercentOfFloat =
+      summary.defaultKeyStatistics.shortPercentOfFloat.raw;
   }
   if (summary.defaultKeyStatistics?.sharesShort?.raw) {
     context.sharesShort = summary.defaultKeyStatistics.sharesShort.raw;
@@ -173,7 +182,7 @@ function calculate52WeekContext(
   if (summary.financialData?.debtToEquity?.raw) {
     let debtToEquity = summary.financialData.debtToEquity.raw;
     if (debtToEquity > 10) {
-      debtToEquity = debtToEquity / 100;  // Convert percentage to ratio
+      debtToEquity = debtToEquity / 100; // Convert percentage to ratio
     }
     context.debtToEquity = debtToEquity;
   }
@@ -228,16 +237,11 @@ export function calculateStockScore(
   );
 
   // Get current price
-  const price = 
-    quote.regularMarketPrice ?? 
-    summary.financialData?.currentPrice?.raw ?? 
-    0;
+  const price =
+    quote.regularMarketPrice ?? summary.financialData?.currentPrice?.raw ?? 0;
 
   // Get company name
-  const name = 
-    quote.shortName ?? 
-    summary.price?.shortName ?? 
-    symbol;
+  const name = quote.shortName ?? summary.price?.shortName ?? symbol;
 
   // Calculate 52-week context (with earnings and sector)
   const context = calculate52WeekContext(quote, historical, price, summary);
@@ -272,16 +276,13 @@ export function getScoreBreakdown(score: StockScore): string {
     `Fundamental: ${score.fundamentalScore}/30`,
     `Analyst: ${score.analystScore}/20`,
     `Total: ${score.totalScore}/100`,
-  ].join(" | ");
+  ].join(' | ');
 }
 
 /**
  * Get the top signals by points
  */
-export function getTopSignals(
-  score: StockScore, 
-  limit = 3
-): string[] {
+export function getTopSignals(score: StockScore, limit = 3): string[] {
   return score.signals
     .sort((a, b) => b.points - a.points)
     .slice(0, limit)
@@ -291,10 +292,7 @@ export function getTopSignals(
 /**
  * Determine if a stock meets the minimum score threshold
  */
-export function meetsThreshold(
-  score: StockScore, 
-  minScore: number
-): boolean {
+export function meetsThreshold(score: StockScore, minScore: number): boolean {
   return score.totalScore >= minScore;
 }
 
@@ -312,8 +310,5 @@ export function filterTopOpportunities(
   scores: StockScore[],
   minScore: number
 ): StockScore[] {
-  return sortByScore(
-    scores.filter((s) => meetsThreshold(s, minScore))
-  );
+  return sortByScore(scores.filter((s) => meetsThreshold(s, minScore)));
 }
-

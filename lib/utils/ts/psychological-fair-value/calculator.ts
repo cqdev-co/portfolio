@@ -1,6 +1,6 @@
 /**
  * Psychological Fair Value Calculator
- * 
+ *
  * Main entry point that combines all components to calculate
  * where price gravitates based on behavioral biases and market mechanics.
  */
@@ -20,8 +20,8 @@ import type {
 import { detectProfile, normalizeWeights } from './profiles';
 import { calculateMaxPain } from './max-pain';
 import { detectGammaWalls } from './gamma-walls';
-import { 
-  analyzeTechnicalLevels, 
+import {
+  analyzeTechnicalLevels,
   findConfluenceZones,
   determineTrendBias,
 } from './technical-levels';
@@ -40,7 +40,7 @@ import {
 
 /**
  * Calculate Psychological Fair Value for a ticker
- * 
+ *
  * This is the main entry point for the PFV calculation.
  */
 export function calculatePsychologicalFairValue(
@@ -77,13 +77,15 @@ export function calculatePsychologicalFairValue(
   );
 
   // 3. Calculate component values
-  const weightedMaxPain = expirationAnalysis.length > 0
-    ? getWeightedMaxPain(expirationAnalysis)
-    : currentPrice;
+  const weightedMaxPain =
+    expirationAnalysis.length > 0
+      ? getWeightedMaxPain(expirationAnalysis)
+      : currentPrice;
 
-  const weightedGammaCenter = expirationAnalysis.length > 0
-    ? getWeightedGammaCenter(expirationAnalysis)
-    : currentPrice;
+  const weightedGammaCenter =
+    expirationAnalysis.length > 0
+      ? getWeightedGammaCenter(expirationAnalysis)
+      : currentPrice;
 
   const technicalResult = analyzeTechnicalLevels(technicalData);
   const roundNumberResult = analyzeRoundNumbers(currentPrice);
@@ -133,7 +135,11 @@ export function calculatePsychologicalFairValue(
   const bias = determineBias(deviationPercent, technicalData);
 
   // 6. Calculate confidence
-  const confidence = calculateConfidence(components, currentPrice, expirationAnalysis);
+  const confidence = calculateConfidence(
+    components,
+    currentPrice,
+    expirationAnalysis
+  );
 
   // 7. Collect magnetic levels
   const magneticLevels = collectMagneticLevels(
@@ -150,14 +156,16 @@ export function calculatePsychologicalFairValue(
     technicalResult.levels,
     currentPrice
   );
-  
-  const supportZone = confluenceZones
-    .filter(z => z.isSupport)
-    .sort((a, b) => b.strength - a.strength)[0]?.zone || null;
-    
-  const resistanceZone = confluenceZones
-    .filter(z => !z.isSupport)
-    .sort((a, b) => b.strength - a.strength)[0]?.zone || null;
+
+  const supportZone =
+    confluenceZones
+      .filter((z) => z.isSupport)
+      .sort((a, b) => b.strength - a.strength)[0]?.zone || null;
+
+  const resistanceZone =
+    confluenceZones
+      .filter((z) => !z.isSupport)
+      .sort((a, b) => b.strength - a.strength)[0]?.zone || null;
 
   // 9. Generate AI context and interpretation
   const aiContext = generateAIContext(
@@ -198,14 +206,18 @@ export function calculatePsychologicalFairValue(
     expirationAnalysis,
     primaryExpiration: getPrimaryExpiration(expirationAnalysis),
     magneticLevels,
-    supportZone: supportZone ? {
-      low: roundPrice(supportZone.low),
-      high: roundPrice(supportZone.high),
-    } : null,
-    resistanceZone: resistanceZone ? {
-      low: roundPrice(resistanceZone.low),
-      high: roundPrice(resistanceZone.high),
-    } : null,
+    supportZone: supportZone
+      ? {
+          low: roundPrice(supportZone.low),
+          high: roundPrice(supportZone.high),
+        }
+      : null,
+    resistanceZone: resistanceZone
+      ? {
+          low: roundPrice(resistanceZone.low),
+          high: roundPrice(resistanceZone.high),
+        }
+      : null,
     calculatedAt: new Date(),
     dataFreshness,
     aiContext,
@@ -250,20 +262,23 @@ function calculateConfidence(
 ): ConfidenceLevel {
   // Factor 1: Component convergence
   // If all components point to similar prices, high confidence
-  const values = components.map(c => c.value);
+  const values = components.map((c) => c.value);
   const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance = values.reduce((sum, v) => 
-    sum + Math.pow((v - avgValue) / avgValue, 2), 0
-  ) / values.length;
+  const variance =
+    values.reduce((sum, v) => sum + Math.pow((v - avgValue) / avgValue, 2), 0) /
+    values.length;
   const convergenceFactor = Math.max(0, 1 - variance * 10);
 
   // Factor 2: Options data quality
   // More expirations with good OI = higher confidence
-  const optionsQuality = expirationAnalysis.length > 0
-    ? Math.min(1, expirationAnalysis.reduce((sum, e) => 
-        sum + e.maxPain.confidence, 0
-      ) / Math.max(1, expirationAnalysis.length))
-    : 0.3;
+  const optionsQuality =
+    expirationAnalysis.length > 0
+      ? Math.min(
+          1,
+          expirationAnalysis.reduce((sum, e) => sum + e.maxPain.confidence, 0) /
+            Math.max(1, expirationAnalysis.length)
+        )
+      : 0.3;
 
   // Factor 3: Distance from current price
   // Very far PFV = less confident
@@ -272,10 +287,8 @@ function calculateConfidence(
   const distanceFactor = Math.max(0.3, 1 - distancePercent * 3);
 
   // Combined confidence
-  const confidence = 
-    convergenceFactor * 0.4 + 
-    optionsQuality * 0.4 + 
-    distanceFactor * 0.2;
+  const confidence =
+    convergenceFactor * 0.4 + optionsQuality * 0.4 + distanceFactor * 0.2;
 
   if (confidence >= 0.7) return 'HIGH';
   if (confidence >= 0.4) return 'MEDIUM';
@@ -287,15 +300,15 @@ function calculateConfidence(
  */
 function collectMagneticLevels(
   expirationAnalysis: ExpirationAnalysis[],
-  technicalLevels: { 
-    price: number; 
-    type: string; 
+  technicalLevels: {
+    price: number;
+    type: string;
     strength: string;
     distance: number;
   }[],
-  roundLevels: { 
-    price: number; 
-    significance: string; 
+  roundLevels: {
+    price: number;
+    significance: string;
     magneticPull: number;
     distance: number;
   }[],
@@ -317,10 +330,13 @@ function collectMagneticLevels(
 
     // Add gamma walls
     for (const wall of exp.gammaWalls.walls.slice(0, 3)) {
-      const type: MagneticLevel['type'] = 
-        wall.type === 'CALL_WALL' ? 'CALL_WALL' :
-        wall.type === 'PUT_WALL' ? 'PUT_WALL' : 'GAMMA_WALL';
-      
+      const type: MagneticLevel['type'] =
+        wall.type === 'CALL_WALL'
+          ? 'CALL_WALL'
+          : wall.type === 'PUT_WALL'
+            ? 'PUT_WALL'
+            : 'GAMMA_WALL';
+
       levels.push({
         price: wall.strike,
         type,
@@ -352,7 +368,7 @@ function collectMagneticLevels(
 
   // Add round number levels
   for (const level of roundLevels.slice(0, 5)) {
-    const type: MagneticLevel['type'] = 
+    const type: MagneticLevel['type'] =
       level.significance === 'MAJOR' ? 'ROUND_MAJOR' : 'ROUND_MODERATE';
 
     levels.push({
@@ -375,10 +391,10 @@ function collectMagneticLevels(
 
   // Filter and sort
   let result = Array.from(priceMap.values());
-  
+
   if (!includeAll) {
     // Filter to only significant levels
-    result = result.filter(l => l.strength >= 0.3);
+    result = result.filter((l) => l.strength >= 0.3);
   }
 
   // Sort by strength (strongest first)
@@ -453,18 +469,17 @@ function generateAIContext(
   for (const c of components) {
     lines.push(
       `  ${c.name}: $${c.value.toFixed(2)} ` +
-      `(${(c.weight * 100).toFixed(0)}% weight)`
+        `(${(c.weight * 100).toFixed(0)}% weight)`
     );
   }
 
   lines.push('', 'KEY MAGNETIC LEVELS:');
   for (const level of magneticLevels.slice(0, 8)) {
-    const distStr = level.distance > 0 
-      ? `+${level.distance.toFixed(1)}%` 
-      : `${level.distance.toFixed(1)}%`;
-    lines.push(
-      `  $${level.price.toFixed(2)} - ${level.type} (${distStr})`
-    );
+    const distStr =
+      level.distance > 0
+        ? `+${level.distance.toFixed(1)}%`
+        : `${level.distance.toFixed(1)}%`;
+    lines.push(`  $${level.price.toFixed(2)} - ${level.type} (${distStr})`);
   }
 
   if (expirationAnalysis.length > 0) {
@@ -474,7 +489,7 @@ function generateAIContext(
       const opexNote = exp.isMonthlyOpex ? ' [MONTHLY OPEX]' : '';
       lines.push(
         `  ${dateStr} (${exp.dte} DTE)${opexNote}: ` +
-        `Max Pain $${exp.maxPain.price.toFixed(2)}`
+          `Max Pain $${exp.maxPain.price.toFixed(2)}`
       );
     }
   }
@@ -503,36 +518,34 @@ function generateInterpretation(
 
   // Main interpretation
   if (absDeviation < 1) {
-    interpretation = 
+    interpretation =
       `Price is trading very close to psychological fair value. ` +
       `The market appears efficiently priced at current levels.`;
   } else if (absDeviation < 3) {
-    interpretation = 
+    interpretation =
       `Price is trading ${absDeviation.toFixed(1)}% ${direction} fair value ` +
       `($${fairValue.toFixed(2)}). `;
-    
+
     if (bias === 'BULLISH') {
-      interpretation += 
+      interpretation +=
         `Options mechanics and technical levels suggest ` +
         `gravitational pull upward.`;
     } else if (bias === 'BEARISH') {
-      interpretation += 
+      interpretation +=
         `Options mechanics and technical levels suggest ` +
         `gravitational pull downward.`;
     } else {
       interpretation += `The bias is neutral with no strong directional pull.`;
     }
   } else {
-    interpretation = 
+    interpretation =
       `Price is trading significantly ${direction} fair value ` +
       `(${absDeviation.toFixed(1)}% deviation). `;
-    
+
     if (direction === 'below') {
-      interpretation += 
-        `Mean reversion suggests potential upside toward $${fairValue.toFixed(2)}.`;
+      interpretation += `Mean reversion suggests potential upside toward $${fairValue.toFixed(2)}.`;
     } else {
-      interpretation += 
-        `Price may be extended; watch for pullback toward $${fairValue.toFixed(2)}.`;
+      interpretation += `Price may be extended; watch for pullback toward $${fairValue.toFixed(2)}.`;
     }
   }
 
@@ -548,8 +561,7 @@ function generateInterpretation(
   if (expirationAnalysis.length > 0) {
     const primary = expirationAnalysis[0];
     if (primary.isMonthlyOpex && primary.dte <= 7) {
-      interpretation += 
-        ` Monthly OPEX in ${primary.dte} days - max pain magnetism strongest.`;
+      interpretation += ` Monthly OPEX in ${primary.dte} days - max pain magnetism strongest.`;
     }
   }
 
@@ -583,9 +595,9 @@ export function quickPFV(
   ticker: string,
   currentPrice: number,
   ma200?: number,
-  expirations?: { 
-    dte: number; 
-    maxPain: number; 
+  expirations?: {
+    dte: number;
+    maxPain: number;
     totalOI: number;
   }[]
 ): { fairValue: number; bias: BiasSentiment } {
@@ -606,10 +618,9 @@ export function quickPFV(
 
   const fairValue = sum / weights;
   const deviation = (fairValue - currentPrice) / currentPrice;
-  
-  const bias: BiasSentiment = 
-    deviation > 0.02 ? 'BULLISH' :
-    deviation < -0.02 ? 'BEARISH' : 'NEUTRAL';
+
+  const bias: BiasSentiment =
+    deviation > 0.02 ? 'BULLISH' : deviation < -0.02 ? 'BEARISH' : 'NEUTRAL';
 
   return { fairValue, bias };
 }
@@ -636,8 +647,10 @@ export function formatPFVResult(result: PsychologicalFairValue): string {
   ];
 
   for (const c of result.components) {
-    const line = `│ ${c.name.padEnd(20)} $${c.value.toFixed(2).padStart(8)} ` +
-      `(${(c.weight * 100).toFixed(0)}%)`.padStart(6) + ' │';
+    const line =
+      `│ ${c.name.padEnd(20)} $${c.value.toFixed(2).padStart(8)} ` +
+      `(${(c.weight * 100).toFixed(0)}%)`.padStart(6) +
+      ' │';
     lines.push(line);
   }
 
@@ -647,12 +660,13 @@ export function formatPFVResult(result: PsychologicalFairValue): string {
 
   for (const level of result.magneticLevels.slice(0, 8)) {
     const icon = level.distance < 0 ? '🟢' : '🔴';
-    const distStr = level.distance > 0 
-      ? `+${level.distance.toFixed(1)}%` 
-      : `${level.distance.toFixed(1)}%`;
+    const distStr =
+      level.distance > 0
+        ? `+${level.distance.toFixed(1)}%`
+        : `${level.distance.toFixed(1)}%`;
     lines.push(
       `  ${icon} $${level.price.toFixed(2).padStart(8)} - ` +
-      `${level.type.padEnd(12)} (${distStr})`
+        `${level.type.padEnd(12)} (${distStr})`
     );
   }
 
@@ -660,14 +674,14 @@ export function formatPFVResult(result: PsychologicalFairValue): string {
     lines.push('');
     lines.push(
       `Support Zone: $${result.supportZone.low.toFixed(2)} - ` +
-      `$${result.supportZone.high.toFixed(2)}`
+        `$${result.supportZone.high.toFixed(2)}`
     );
   }
 
   if (result.resistanceZone) {
     lines.push(
       `Resistance Zone: $${result.resistanceZone.low.toFixed(2)} - ` +
-      `$${result.resistanceZone.high.toFixed(2)}`
+        `$${result.resistanceZone.high.toFixed(2)}`
     );
   }
 
@@ -679,4 +693,3 @@ export function formatPFVResult(result: PsychologicalFairValue): string {
 
   return lines.join('\n');
 }
-

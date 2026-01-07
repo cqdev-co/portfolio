@@ -7,13 +7,13 @@
  * - Cloud: Uses ollama.com API with OLLAMA_API_KEY
  */
 
-import { Ollama } from "ollama";
+import { Ollama } from 'ollama';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type OllamaMode = "local" | "cloud";
+export type OllamaMode = 'local' | 'cloud';
 
 export interface OllamaConfig {
   mode: OllamaMode;
@@ -32,8 +32,8 @@ export interface OllamaResponse {
 // ============================================================================
 
 const DEFAULT_MODELS: Record<OllamaMode, string> = {
-  local: "llama3.2",
-  cloud: "deepseek-v3.1:671b",
+  local: 'llama3.2',
+  cloud: 'deepseek-v3.1:671b',
 };
 
 // ============================================================================
@@ -44,16 +44,16 @@ const DEFAULT_MODELS: Record<OllamaMode, string> = {
  * Create Ollama client based on mode
  */
 function createClient(mode: OllamaMode): Ollama {
-  if (mode === "cloud") {
+  if (mode === 'cloud') {
     const apiKey = process.env.OLLAMA_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "OLLAMA_API_KEY environment variable required for cloud mode"
+        'OLLAMA_API_KEY environment variable required for cloud mode'
       );
     }
 
     return new Ollama({
-      host: "https://ollama.com",
+      host: 'https://ollama.com',
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
@@ -62,7 +62,7 @@ function createClient(mode: OllamaMode): Ollama {
 
   // Local mode - default localhost
   return new Ollama({
-    host: "http://localhost:11434",
+    host: 'http://localhost:11434',
   });
 }
 
@@ -95,8 +95,8 @@ export async function generateCompletion(
   const response = await client.chat({
     model,
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
     stream: false,
   });
@@ -124,13 +124,13 @@ export async function* generateStreamingCompletion(
   const stream = await client.chat({
     model,
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
     stream: true,
   });
 
-  let fullContent = "";
+  let fullContent = '';
   let tokensUsed = 0;
 
   for await (const part of stream) {
@@ -151,9 +151,7 @@ export async function* generateStreamingCompletion(
 /**
  * Get available models for a given mode
  */
-export async function getAvailableModels(
-  mode: OllamaMode
-): Promise<string[]> {
+export async function getAvailableModels(mode: OllamaMode): Promise<string[]> {
   try {
     const client = createClient(mode);
     const response = await client.list();
@@ -199,15 +197,16 @@ export async function validateAIRequirement(
   mode: OllamaMode
 ): Promise<AIValidationResult> {
   // Check API key for cloud mode
-  if (mode === "cloud") {
+  if (mode === 'cloud') {
     const apiKey = process.env.OLLAMA_API_KEY;
     if (!apiKey) {
       return {
         available: false,
-        error: "OLLAMA_API_KEY environment variable not set",
-        suggestion: "Add OLLAMA_API_KEY to your .env file or export it:\n" +
-          "  export OLLAMA_API_KEY=your-api-key\n" +
-          "  Or use local mode: --ai-mode local",
+        error: 'OLLAMA_API_KEY environment variable not set',
+        suggestion:
+          'Add OLLAMA_API_KEY to your .env file or export it:\n' +
+          '  export OLLAMA_API_KEY=your-api-key\n' +
+          '  Or use local mode: --ai-mode local',
       };
     }
   }
@@ -216,20 +215,22 @@ export async function validateAIRequirement(
   try {
     const isAvailable = await checkOllamaAvailability(mode);
     if (!isAvailable) {
-      if (mode === "local") {
+      if (mode === 'local') {
         return {
           available: false,
-          error: "Cannot connect to local Ollama instance",
-          suggestion: "Start Ollama locally:\n" +
-            "  ollama serve\n" +
-            "  Or use cloud mode: --ai-mode cloud",
+          error: 'Cannot connect to local Ollama instance',
+          suggestion:
+            'Start Ollama locally:\n' +
+            '  ollama serve\n' +
+            '  Or use cloud mode: --ai-mode cloud',
         };
       } else {
         return {
           available: false,
-          error: "Cannot connect to Ollama cloud API",
-          suggestion: "Check your OLLAMA_API_KEY is valid\n" +
-            "  Or use local mode: --ai-mode local",
+          error: 'Cannot connect to Ollama cloud API',
+          suggestion:
+            'Check your OLLAMA_API_KEY is valid\n' +
+            '  Or use local mode: --ai-mode local',
         };
       }
     }
@@ -239,10 +240,10 @@ export async function validateAIRequirement(
     return {
       available: false,
       error: `AI service error: ${errorMessage}`,
-      suggestion: mode === "cloud" 
-        ? "Check your API key and network connection"
-        : "Ensure Ollama is running: ollama serve",
+      suggestion:
+        mode === 'cloud'
+          ? 'Check your API key and network connection'
+          : 'Ensure Ollama is running: ollama serve',
     };
   }
 }
-

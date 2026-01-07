@@ -26,20 +26,23 @@ aiohttp = "^3.13.2"
 pytest = "^7.4.0"
 pytest-asyncio = "^0.21.0"
 pytest-cov = "^4.1.0"
-black = "^23.12.0"
-ruff = "^0.1.0"
+ruff = "^0.8.0"
 mypy = "^1.7.0"
 
 [tool.poetry.scripts]
 unusual-options = "unusual_options.cli:cli"
 
-[tool.black]
-line-length = 100
-target-version = ['py311']
-
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
 python_version = "3.11"

@@ -1,10 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
 // Simple in-memory cache
-const cache = new Map<
-  string,
-  { data: MarketDataPoint[]; timestamp: number }
->();
+const cache = new Map<string, { data: MarketDataPoint[]; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface MarketDataPoint {
@@ -16,7 +13,7 @@ interface MarketDataPoint {
 }
 
 export async function GET() {
-  const cacheKey = "market-data";
+  const cacheKey = 'market-data';
   const cached = cache.get(cacheKey);
 
   // Return cached data if still valid
@@ -26,29 +23,26 @@ export async function GET() {
 
   try {
     // Import dynamically to use v3 API
-    const { default: yahooFinance } = await import("yahoo-finance2");
+    const { default: yahooFinance } = await import('yahoo-finance2');
 
     // Fetch data for major indices
-    const symbols = ["SPY", "QQQ", "DIA", "IWM", "^VIX"];
+    const symbols = ['SPY', 'QQQ', 'DIA', 'IWM', '^VIX'];
     const data: MarketDataPoint[] = [];
 
     // Fetch all quotes in a single call for efficiency
     try {
       const quotes = await yahooFinance.quote(symbols);
-      
+
       for (const quote of quotes) {
         if (quote) {
           const price = quote.regularMarketPrice || 0;
-          const previousClose = 
-            quote.regularMarketPreviousClose || price;
+          const previousClose = quote.regularMarketPreviousClose || price;
           const change = price - previousClose;
-          const changePercent = 
-            previousClose !== 0 
-              ? (change / previousClose) * 100 
-              : 0;
-          
+          const changePercent =
+            previousClose !== 0 ? (change / previousClose) * 100 : 0;
+
           data.push({
-            symbol: quote.symbol || "",
+            symbol: quote.symbol || '',
             price: Number(price.toFixed(2)),
             change: Number(change.toFixed(2)),
             changePercent: Number(changePercent.toFixed(2)),
@@ -57,22 +51,19 @@ export async function GET() {
         }
       }
     } catch (err) {
-      console.error("Error fetching quotes:", err);
+      console.error('Error fetching quotes:', err);
       // Fallback: try individual requests
       for (const symbol of symbols) {
         try {
           const quote = await yahooFinance.quote(symbol);
-          
+
           if (quote) {
             const price = quote.regularMarketPrice || 0;
-            const previousClose = 
-              quote.regularMarketPreviousClose || price;
+            const previousClose = quote.regularMarketPreviousClose || price;
             const change = price - previousClose;
-            const changePercent = 
-              previousClose !== 0 
-                ? (change / previousClose) * 100 
-                : 0;
-            
+            const changePercent =
+              previousClose !== 0 ? (change / previousClose) * 100 : 0;
+
             data.push({
               symbol: quote.symbol || symbol,
               price: Number(price.toFixed(2)),
@@ -82,10 +73,7 @@ export async function GET() {
             });
           }
         } catch (err) {
-          console.error(
-            `Error fetching data for ${symbol}:`, 
-            err
-          );
+          console.error(`Error fetching data for ${symbol}:`, err);
           // Skip this symbol if fetch fails
         }
       }
@@ -96,11 +84,10 @@ export async function GET() {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Error fetching market data:", error);
+    console.error('Error fetching market data:', error);
     return NextResponse.json(
-      { error: "Failed to fetch market data" },
+      { error: 'Failed to fetch market data' },
       { status: 500 }
     );
   }
 }
-

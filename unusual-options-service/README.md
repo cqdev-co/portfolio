@@ -5,6 +5,7 @@ Enterprise-grade unusual options activity detection system for identifying poten
 ## 🚀 Features
 
 ### Core Capabilities
+
 - **🕵️ Insider-Focused Detection**: Built to find suspicious plays that might indicate insider information
 - **🚫 0DTE Noise Filter**: Automatically excludes 0-2 DTE gambling noise from TSLA/NVDA/META/AMZN
 - **📊 Earnings Calendar Integration**: Shows earnings proximity and boosts pre-earnings positioning scores
@@ -18,6 +19,7 @@ Enterprise-grade unusual options activity detection system for identifying poten
 - **Multi-timeframe Scoring**: Analyzes activity across intraday, daily, and weekly windows
 
 ### Technical Excellence
+
 - **CLI-First Design**: Fast, scriptable command-line interface for automation
 - **Supabase Integration**: Cloud-native storage for signals and historical performance
 - **Async Architecture**: High-performance concurrent data processing
@@ -61,12 +63,14 @@ Enterprise-grade unusual options activity detection system for identifying poten
 ## 🛠 Installation
 
 ### Prerequisites
+
 - Python 3.11+
 - Poetry for dependency management
 - Supabase account for data storage
 - Market data API access (see Data Sources below)
 
 ### Setup
+
 ```bash
 # Clone the repository
 cd unusual-options-service
@@ -112,12 +116,13 @@ The service includes a comprehensive suite of analysis tools designed for quants
    - Creates feedback loop for filter tuning
 
 4. **Signal Analysis** (`scripts/analyze_results.py`) - Statistical overview with AI insights
-5. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation  
+5. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation
 6. **Correlation Analysis** (`scripts/signal_correlation.py`) - Cross-ticker correlations and market regime detection
 7. **Flow Divergence** (`scripts/flow_divergence.py`) - Identify unusual patterns in positioning
 8. **Momentum Tracker** (`scripts/momentum_tracker.py`) - Track acceleration, exhaustion, and reversals
 
 ### Quick Analysis
+
 ```bash
 # PRIMARY: Find suspicious insider-type plays with STRICT filters
 # (Requires: $2M+ premium, 7-45 DTE, >65% aggressive, excludes ETFs)
@@ -140,6 +145,7 @@ poetry run python scripts/analyze_results.py --days 7 --min-grade A
 ```
 
 ### Analysis Features
+
 - **📈 Statistical Analysis**: Volume, premium flow, score distributions
 - **🎯 Grade-Based Breakdown**: Performance by signal quality (S/A/B/C/D/F)
 - **🏆 Top Performers**: Best tickers, signals, and opportunities
@@ -148,6 +154,7 @@ poetry run python scripts/analyze_results.py --days 7 --min-grade A
 - **💰 Premium Flow Tracking**: Institutional money movement analysis
 
 ### Sample Output
+
 ```
 📊 Signal Overview
 ┌──────────────────────┬────────────────┐
@@ -167,6 +174,7 @@ poetry run python scripts/analyze_results.py --days 7 --min-grade A
 See [Signal Analysis Tool Documentation](docs/signal-analysis-tool.md) for complete details.
 
 ### Environment Variables
+
 ```bash
 # Supabase Configuration
 SUPABASE_URL=your_supabase_project_url
@@ -229,6 +237,7 @@ poetry run python scripts/cron_scanner.py --scan-all --min-grade B
 ```
 
 **Key Features:**
+
 - ✅ Automatic deduplication (no duplicate signals)
 - ✅ Continuity tracking (NEW/CONTINUING badges)
 - ✅ Smart signal lifecycle management (active until expiry)
@@ -236,6 +245,7 @@ poetry run python scripts/cron_scanner.py --scan-all --min-grade B
 - ✅ Complete audit trail
 
 **Signal Lifecycle:**
+
 - **ACTIVE**: Option contract hasn't expired yet (`expiry >= today`)
 - **INACTIVE**: Option contract has expired (`expiry < today`)
 - Signals stay active until expiration, regardless of detection frequency
@@ -243,13 +253,15 @@ poetry run python scripts/cron_scanner.py --scan-all --min-grade B
 - Inactive signals remain in database for historical analysis
 
 **Automated Signal Expiration:**
+
 - ✅ Runs daily at 4:30 PM ET (30 min after market close)
 - ✅ Marks expired options as inactive automatically
 - ✅ Detailed statistics by expiry date, ticker, and grade
 - ✅ Manual trigger available via GitHub Actions
 - ✅ Dry-run mode for safe testing
 
-**See:** 
+**See:**
+
 - [Hourly Cron Setup Guide](../docs/unusual-options-service/hourly-cron-setup.md)
 - [Signal Expiration System](../docs/unusual-options-service/signal-expiration.md)
 
@@ -306,6 +318,7 @@ unusual-options report --month 2025-09
 ### Grade Classifications
 
 **S Tier (≥0.90)** - Exceptional Opportunity
+
 - Multiple strong anomaly indicators
 - Historical win rate > 70%
 - Large premium flow (> $1M)
@@ -313,6 +326,7 @@ unusual-options report --month 2025-09
 - Low implied volatility suggesting mispricing
 
 **A Tier (0.80-0.89)** - High Conviction
+
 - Strong volume and OI anomalies
 - Premium flow > $500k
 - Historical win rate > 60%
@@ -320,23 +334,27 @@ unusual-options report --month 2025-09
 - Clear directional bias
 
 **B Tier (0.70-0.79)** - Good Signal
+
 - Significant volume anomaly (> 3x average)
 - Moderate premium flow (> $200k)
 - Historical win rate > 50%
 - Worth monitoring closely
 
 **C Tier (0.60-0.69)** - Watch List
+
 - Moderate unusual activity
 - May be early positioning
 - Requires confirmation
 - Consider waiting for stronger signals
 
 **D Tier (0.50-0.59)** - Low Conviction
+
 - Weak or mixed signals
 - May be noise or retail activity
 - High risk, low probability
 
 **F Tier (<0.50)** - Avoid
+
 - Likely false positive
 - No clear directional bias
 - Poor historical performance
@@ -355,6 +373,7 @@ unusual-options report --month 2025-09
 ### Recommended Providers
 
 **Polygon.io** (Best Overall)
+
 - ✅ Real-time options quotes
 - ✅ Historical options data
 - ✅ Time & sales data
@@ -362,18 +381,21 @@ unusual-options report --month 2025-09
 - Cost: $199-$399/month
 
 **Tradier** (Good Alternative)
+
 - ✅ Real-time options chains
 - ✅ Market data API
 - ✅ Sandbox environment
 - Cost: $10-$25/month (after free tier)
 
 **CBOE DataShop** (Premium)
+
 - ✅ Exchange-level data
 - ✅ Most accurate volume/OI
 - ✅ Historical depth
 - Cost: $$$ (enterprise pricing)
 
 **YFinance** (Free Tier Option)
+
 - ⚠️ Limited real-time data
 - ⚠️ No sweep detection
 - ⚠️ Delayed unusual activity
@@ -432,6 +454,7 @@ unusual_options/
 ### Tables
 
 **unusual_options_signals**
+
 - Signal metadata and detection details
 - Ticker, expiry, strike, option type
 - Volume, OI, premium flow metrics
@@ -439,18 +462,21 @@ unusual_options/
 - Detection timestamp
 
 **signal_performance**
+
 - Forward returns tracking (1d, 5d, 30d)
 - Win/loss classification
 - Entry and exit prices
 - Actual vs expected outcomes
 
 **options_flow_history**
+
 - Raw options flow data
 - Time & sales records
 - Block trades and sweeps
 - Premium calculations
 
 **scanner_config**
+
 - Detection thresholds
 - Watchlist management
 - Alert preferences
@@ -458,6 +484,7 @@ unusual_options/
 ## 🎯 Use Cases
 
 ### 1. Day Trading Setup
+
 ```bash
 # Morning scan for unusual premarket activity
 unusual-options market-scan --premarket --min-grade B
@@ -467,6 +494,7 @@ unusual-options scan TSLA NVDA --watch --interval 60
 ```
 
 ### 2. Swing Trading
+
 ```bash
 # Find medium-term positioning (30-60 DTE)
 unusual-options scan --dte-min 30 --dte-max 60 --min-premium 500000
@@ -476,6 +504,7 @@ unusual-options signals track <signal_id> --days 30
 ```
 
 ### 3. Event-Driven Trading
+
 ```bash
 # Pre-earnings unusual activity
 unusual-options scan --earnings-soon --days-before 7
@@ -485,6 +514,7 @@ unusual-options scan AAPL --hours 2
 ```
 
 ### 4. Research & Backtesting
+
 ```bash
 # Historical analysis
 unusual-options backtest --start 2024-01-01 --end 2024-12-31
@@ -543,7 +573,7 @@ unusual-options watchlist list
 - **B Tier Signals**: 50-55% win rate
 - **C Tier Signals**: 45-50% win rate
 
-*Win defined as: Underlying moves > 2% in signal direction within 5 trading days*
+_Win defined as: Underlying moves > 2% in signal direction within 5 trading days_
 
 ### Processing Speed
 
@@ -584,6 +614,7 @@ unusual-options watchlist list
 ### Planned Features
 
 **Phase 1** (Current)
+
 - ✅ Basic unusual volume detection
 - ✅ CLI interface
 - ✅ Supabase integration
@@ -591,6 +622,7 @@ unusual-options watchlist list
 - 🔄 Historical performance tracking
 
 **Phase 2** (Next 3 months)
+
 - 📋 Real-time streaming data
 - 📋 Advanced sweep detection
 - 📋 Dark pool correlation
@@ -598,6 +630,7 @@ unusual-options watchlist list
 - 📋 Discord/Telegram alerts
 
 **Phase 3** (6+ months)
+
 - 📋 Multi-asset support (futures options, index options)
 - 📋 Portfolio-level risk management
 - 📋 Signal correlation analysis
@@ -607,18 +640,21 @@ unusual-options watchlist list
 ## 📚 Additional Resources
 
 ### Recent Updates
+
 - [October 10, 2025 - Core Scanner Improvements](../docs/unusual-options-service/oct-10-2025-core-scanner-improvements.md) - 0DTE filter + earnings calendar
 - [October 9, 2025 - Insider Plays Updates v2](../docs/unusual-options-service/oct-9-2025-updates-v2.md) - Deduplication, mega-cap filter, surprise factor
 - [Insider Plays Improvements](../docs/unusual-options-service/insider-plays-improvements.md) - Detection algorithm details
 - [Project Refocus](../docs/unusual-options-service/project-refocus.md) - Core mission and goals
 
 ### Learning Resources
+
 - [Options Volume & Open Interest Guide](docs/volume-oi-guide.md)
 - [Understanding Unusual Activity](docs/unusual-activity-patterns.md)
 - [Signal Interpretation Guide](docs/signal-interpretation.md)
 - [Risk Management Best Practices](docs/risk-management.md)
 
 ### API Documentation
+
 - [CLI Command Reference](docs/cli-reference.md)
 - [Python API Usage](docs/python-api.md)
 - [Supabase Schema](docs/database-schema.md)

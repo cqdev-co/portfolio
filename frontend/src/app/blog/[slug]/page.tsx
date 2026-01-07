@@ -1,17 +1,17 @@
-import { getBlogPosts, getPost } from "@/data/blog";
-import { formatDate, createMetadata, sortPostsByDate } from "@/lib/utils";
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { Suspense } from "react";
-import Link from "next/link";
-import BlurFade from "@/components/magicui/blur-fade";
-import { Clock } from "lucide-react";
-import TableOfContents from "@/components/toc";
-import CodeBlockEnhancer from "@/components/code-block";
-import { BlogPostSchema } from "@/components/schema";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { globalComponents } from "@/components/mdx";
+import { getBlogPosts, getPost } from '@/data/blog';
+import { formatDate, createMetadata, sortPostsByDate } from '@/lib/utils';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
+import Link from 'next/link';
+import BlurFade from '@/components/magicui/blur-fade';
+import { Clock } from 'lucide-react';
+import TableOfContents from '@/components/toc';
+import CodeBlockEnhancer from '@/components/code-block';
+import { BlogPostSchema } from '@/components/schema';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { globalComponents } from '@/components/mdx';
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts();
@@ -27,25 +27,21 @@ export async function generateMetadata({
 }): Promise<Metadata | undefined> {
   const resolvedParams = await params;
   const post = await getPost(resolvedParams.slug);
-  
+
   if (!post) {
     return {
       title: 'Post Not Found',
-      description: 'The requested blog post could not be found'
+      description: 'The requested blog post could not be found',
     };
   }
-  
-  const {
-    title,
-    summary: description,
-    image,
-  } = post.metadata;
-  
+
+  const { title, summary: description, image } = post.metadata;
+
   return createMetadata({
     title,
     description,
     pageUrl: `/blog/${post.slug}`,
-    type: "article",
+    type: 'article',
     imagePath: image ? `${image}` : undefined,
   });
 }
@@ -66,13 +62,17 @@ export default async function Blog({
 
   // Get all posts for adjacent post navigation
   const allPosts = await getBlogPosts();
-  
+
   // Sort all posts by date
   const sortedPosts = sortPostsByDate(allPosts);
 
-  const currentPostIndex = sortedPosts.findIndex(p => p.slug === post.slug);
-  const previousPost = currentPostIndex < sortedPosts.length - 1 ? sortedPosts[currentPostIndex + 1] : null;
-  const nextPost = currentPostIndex > 0 ? sortedPosts[currentPostIndex - 1] : null;
+  const currentPostIndex = sortedPosts.findIndex((p) => p.slug === post.slug);
+  const previousPost =
+    currentPostIndex < sortedPosts.length - 1
+      ? sortedPosts[currentPostIndex + 1]
+      : null;
+  const nextPost =
+    currentPostIndex > 0 ? sortedPosts[currentPostIndex - 1] : null;
 
   return (
     <>
@@ -84,12 +84,15 @@ export default async function Blog({
         publishedAt={post.metadata.publishedAt as string}
         updatedAt={post.metadata.updatedAt as string | undefined}
       />
-      
+
       <CodeBlockEnhancer />
 
       <BlurFade>
         <div className="mb-8">
-          <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
+          <Link
+            href="/blog"
+            className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -157,15 +160,15 @@ export default async function Blog({
         <div className="grid grid-cols-1 lg:grid-cols-[auto_240px] gap-10">
           <BlurFade delay={0.2}>
             <div className="prose dark:prose-invert">
-              <Markdown 
-                remarkPlugins={[remarkGfm]} 
+              <Markdown
+                remarkPlugins={[remarkGfm]}
                 components={globalComponents}
               >
                 {post.rawContent}
               </Markdown>
             </div>
           </BlurFade>
-          
+
           <BlurFade delay={0.2}>
             <div className="hidden lg:block lg:sticky lg:top-24 lg:self-start">
               <TableOfContents html={post.source} />
@@ -176,7 +179,10 @@ export default async function Blog({
         <BlurFade delay={0.3}>
           <div className="mt-16 grid gap-4 md:grid-cols-2 border-t pt-6">
             {previousPost && (
-              <Link href={`/blog/${previousPost.slug}`} className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors">
+              <Link
+                href={`/blog/${previousPost.slug}`}
+                className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+              >
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -201,7 +207,10 @@ export default async function Blog({
               </Link>
             )}
             {nextPost && (
-              <Link href={`/blog/${nextPost.slug}`} className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors text-right">
+              <Link
+                href={`/blog/${nextPost.slug}`}
+                className="group p-4 border rounded-lg hover:bg-secondary/50 transition-colors text-right"
+              >
                 <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground mb-2">
                   <span>Next post</span>
                   <svg

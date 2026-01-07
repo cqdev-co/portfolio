@@ -3,20 +3,20 @@ name: Market Hours Penny Stock Scanner
 on:
   schedule:
     # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
-    - cron: '30 13 * * 1-5'  # 9:30 AM EDT (13:30 UTC)
-    - cron: '0 14 * * 1-5'   # 10:00 AM EDT (14:00 UTC)
-    - cron: '30 14 * * 1-5'  # 10:30 AM EDT (14:30 UTC)
-    - cron: '0 15 * * 1-5'   # 11:00 AM EDT (15:00 UTC)
-    - cron: '30 15 * * 1-5'  # 11:30 AM EDT (15:30 UTC)
-    - cron: '0 16 * * 1-5'   # 12:00 PM EDT (16:00 UTC)
-    - cron: '30 16 * * 1-5'  # 12:30 PM EDT (16:30 UTC)
-    - cron: '0 17 * * 1-5'   # 1:00 PM EDT (17:00 UTC)
-    - cron: '30 17 * * 1-5'  # 1:30 PM EDT (17:30 UTC)
-    - cron: '0 18 * * 1-5'   # 2:00 PM EDT (18:00 UTC)
-    - cron: '30 18 * * 1-5'  # 2:30 PM EDT (18:30 UTC)
-    - cron: '0 19 * * 1-5'   # 3:00 PM EDT (19:00 UTC)
-    - cron: '30 19 * * 1-5'  # 3:30 PM EDT (19:30 UTC)
-    - cron: '0 20 * * 1-5'   # 4:00 PM EDT (20:00 UTC) - Market close
+    - cron: '30 13 * * 1-5' # 9:30 AM EDT (13:30 UTC)
+    - cron: '0 14 * * 1-5' # 10:00 AM EDT (14:00 UTC)
+    - cron: '30 14 * * 1-5' # 10:30 AM EDT (14:30 UTC)
+    - cron: '0 15 * * 1-5' # 11:00 AM EDT (15:00 UTC)
+    - cron: '30 15 * * 1-5' # 11:30 AM EDT (15:30 UTC)
+    - cron: '0 16 * * 1-5' # 12:00 PM EDT (16:00 UTC)
+    - cron: '30 16 * * 1-5' # 12:30 PM EDT (16:30 UTC)
+    - cron: '0 17 * * 1-5' # 1:00 PM EDT (17:00 UTC)
+    - cron: '30 17 * * 1-5' # 1:30 PM EDT (17:30 UTC)
+    - cron: '0 18 * * 1-5' # 2:00 PM EDT (18:00 UTC)
+    - cron: '30 18 * * 1-5' # 2:30 PM EDT (18:30 UTC)
+    - cron: '0 19 * * 1-5' # 3:00 PM EDT (19:00 UTC)
+    - cron: '30 19 * * 1-5' # 3:30 PM EDT (19:30 UTC)
+    - cron: '0 20 * * 1-5' # 4:00 PM EDT (20:00 UTC) - Market close
   workflow_dispatch:
     inputs:
       min_score:
@@ -32,44 +32,44 @@ jobs:
   scan-penny-stocks:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: latest
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-        
-    - name: Cache Poetry dependencies
-      uses: actions/cache@v4
-      with:
-        path: penny-stock-scanner/.venv
-        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('penny-stock-scanner/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-          
-    - name: Install dependencies
-      working-directory: penny-stock-scanner
-      run: poetry install --only=main
-        
-    - name: Run Penny Stock Scanner
-      working-directory: penny-stock-scanner
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        # Discord alerts for S/A-Tier signals
-        DISCORD_PENNY_WEBHOOK_URL: ${{ secrets.DISCORD_PENNY_WEBHOOK_URL }}
-      run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.60' }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: penny-stock-scanner/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('penny-stock-scanner/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Install dependencies
+        working-directory: penny-stock-scanner
+        run: poetry install --only=main
+
+      - name: Run Penny Stock Scanner
+        working-directory: penny-stock-scanner
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          # Discord alerts for S/A-Tier signals
+          DISCORD_PENNY_WEBHOOK_URL: ${{ secrets.DISCORD_PENNY_WEBHOOK_URL }}
+        run: poetry run penny-scanner scan-all --min-score ${{ github.event.inputs.min_score || '0.60' }}

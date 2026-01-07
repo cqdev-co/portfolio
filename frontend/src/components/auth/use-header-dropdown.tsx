@@ -1,34 +1,37 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react';
 
 export function useHeaderDropdown() {
-  const [isOpen, setIsOpen] = useState(false)
-  const triggerRef = useRef<HTMLDivElement>(null)
-  
-  const toggle = () => setIsOpen(!isOpen)
-  const close = () => setIsOpen(false)
-  
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const toggle = () => setIsOpen(!isOpen);
+  const close = () => setIsOpen(false);
+
   // Close dropdown when clicking outside
   useEffect(() => {
-    if (!isOpen) return
-    
+    if (!isOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-        close()
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node)
+      ) {
+        close();
       }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside)
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
-  
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   return {
     isOpen,
     toggle,
     close,
-    triggerRef
-  }
+    triggerRef,
+  };
 }

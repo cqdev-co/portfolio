@@ -153,19 +153,19 @@ def scan(
     """Scan tickers for unusual options activity"""
     config = load_config()
     orchestrator = ScanOrchestrator(config)
-    
+
     if watch:
         console.print(f"[yellow]Monitoring {', '.join(tickers)} every {interval}s[/yellow]")
         console.print("[dim]Press Ctrl+C to stop[/dim]\n")
-        
+
         import time
         try:
             while True:
                 _run_scan(
-                    orchestrator, 
-                    list(tickers), 
-                    min_grade, 
-                    output, 
+                    orchestrator,
+                    list(tickers),
+                    min_grade,
+                    output,
                     include_backtest
                 )
                 time.sleep(interval)
@@ -184,10 +184,10 @@ def _run_scan(
     """Execute a single scan"""
     with Progress() as progress:
         task = progress.add_task(
-            "[cyan]Scanning tickers...", 
+            "[cyan]Scanning tickers...",
             total=len(tickers)
         )
-        
+
         results = []
         for ticker in tickers:
             try:
@@ -195,20 +195,20 @@ def _run_scan(
                     ticker,
                     include_backtest=include_backtest
                 )
-                
+
                 # Filter by minimum grade
                 filtered = [s for s in signals if s.grade >= min_grade]
                 results.extend(filtered)
-                
+
             except Exception as e:
                 console.print(f"[red]Error scanning {ticker}: {e}[/red]")
-            
+
             progress.advance(task)
-    
+
     # Display results
     if results:
         _display_results_table(results)
-        
+
         if output:
             _export_results(results, output)
             console.print(f"\n[green]Results exported to {output}[/green]")
@@ -218,7 +218,7 @@ def _run_scan(
 def _display_results_table(signals):
     """Display signals in formatted table"""
     table = Table(title="Unusual Options Activity")
-    
+
     table.add_column("Ticker", style="cyan", no_wrap=True)
     table.add_column("Grade", justify="center")
     table.add_column("Contract", style="magenta")
@@ -226,7 +226,7 @@ def _display_results_table(signals):
     table.add_column("OI Change", justify="right")
     table.add_column("Premium", justify="right")
     table.add_column("Sentiment", justify="center")
-    
+
     for signal in sorted(signals, key=lambda s: s.overall_score, reverse=True):
         grade_color = {
             'S': 'bold bright_magenta',
@@ -236,13 +236,13 @@ def _display_results_table(signals):
             'D': 'red',
             'F': 'dim red'
         }.get(signal.grade, 'white')
-        
+
         sentiment_emoji = {
             'BULLISH': '🟢',
             'BEARISH': '🔴',
             'NEUTRAL': '⚪'
         }.get(signal.sentiment, '')
-        
+
         table.add_row(
             signal.ticker,
             f"[{grade_color}]{signal.grade}[/{grade_color}]",
@@ -252,7 +252,7 @@ def _display_results_table(signals):
             f"${signal.premium_flow:,.0f}",
             f"{sentiment_emoji} {signal.sentiment}"
         )
-    
+
     console.print(table)
 
 @cli.command()
@@ -261,10 +261,10 @@ def _display_results_table(signals):
 def signals_list(days: int, min_grade: str):
     """List recent signals"""
     from .storage.supabase import SupabaseClient
-    
+
     client = SupabaseClient()
     signals = client.get_recent_signals(days=days, min_grade=min_grade)
-    
+
     if signals:
         _display_results_table(signals)
     else:
@@ -277,12 +277,12 @@ def track(signal_id: str, days: int):
     """Track signal performance over time"""
     from .storage.supabase import SupabaseClient
     from .scoring.performance import PerformanceTracker
-    
+
     client = SupabaseClient()
     tracker = PerformanceTracker(client)
-    
+
     performance = tracker.track_signal(signal_id, days=days)
-    
+
     # Display performance metrics
     console.print(f"\n[bold]Signal Performance: {signal_id}[/bold]\n")
     console.print(f"Ticker: {performance.ticker}")
@@ -296,9 +296,9 @@ def status():
     """Check system status and connectivity"""
     from .storage.supabase import SupabaseClient
     from .data.providers import get_provider
-    
+
     console.print("[bold]System Status Check[/bold]\n")
-    
+
     # Check Supabase
     try:
         client = SupabaseClient()
@@ -306,7 +306,7 @@ def status():
         console.print("✓ Supabase: [green]Connected[/green]")
     except Exception as e:
         console.print(f"✗ Supabase: [red]Error - {e}[/red]")
-    
+
     # Check data provider
     try:
         provider = get_provider()
@@ -314,7 +314,7 @@ def status():
         console.print(f"✓ Data Provider ({provider.name}): [green]Connected[/green]")
     except Exception as e:
         console.print(f"✗ Data Provider: [red]Error - {e}[/red]")
-    
+
     console.print("\n[green]System operational[/green]")
 
 @cli.command()
@@ -324,14 +324,14 @@ def status():
 def backtest(start: str, end: str, tickers: Optional[str]):
     """Run historical backtest of detection algorithm"""
     from .scoring.performance import BacktestEngine
-    
+
     ticker_list = tickers.split(',') if tickers else None
-    
+
     console.print(f"[yellow]Running backtest from {start} to {end}...[/yellow]\n")
-    
+
     engine = BacktestEngine()
     results = engine.run(start_date=start, end_date=end, tickers=ticker_list)
-    
+
     # Display backtest results
     console.print("[bold]Backtest Results[/bold]\n")
     console.print(f"Total Signals: {results.total_signals}")
@@ -339,7 +339,7 @@ def backtest(start: str, end: str, tickers: Optional[str]):
     console.print(f"Average Winner: {results.avg_winner:+.2%}")
     console.print(f"Average Loser: {results.avg_loser:+.2%}")
     console.print(f"Sharpe Ratio: {results.sharpe_ratio:.2f}")
-    
+
     # Grade breakdown
     console.print("\n[bold]Performance by Grade:[/bold]")
     for grade, metrics in results.grade_breakdown.items():
@@ -370,7 +370,7 @@ class ScanOrchestrator:
     Main coordinator for scanning operations.
     Manages data fetching, detection, scoring, and storage.
     """
-    
+
     def __init__(self, config: dict):
         self.config = config
         self.provider = get_provider(config)
@@ -379,76 +379,76 @@ class ScanOrchestrator:
         self.grader = SignalGrader(config)
         self.risk_assessor = RiskAssessor(config)
         self.storage = SupabaseClient(config)
-    
+
     def scan_ticker(
-        self, 
-        ticker: str, 
+        self,
+        ticker: str,
         include_backtest: bool = False
     ) -> List[UnusualOptionsSignal]:
         """
         Scan a single ticker for unusual options activity.
-        
+
         Args:
             ticker: Stock ticker symbol
             include_backtest: Include historical performance data
-            
+
         Returns:
             List of detected signals with grades
         """
         logger.info(f"Scanning {ticker}")
-        
+
         try:
             # 1. Fetch current options chain
             options_chain = self.provider.get_options_chain(ticker)
-            
+
             if not options_chain or not options_chain.contracts:
                 logger.warning(f"No options data available for {ticker}")
                 return []
-            
+
             # 2. Fetch historical context (20-day lookback)
             historical_data = self.provider.get_historical_options(
-                ticker, 
+                ticker,
                 days=20
             )
-            
+
             # 3. Run detection algorithms
             detections = self.detector.detect_anomalies(
-                options_chain, 
+                options_chain,
                 historical_data
             )
-            
+
             if not detections:
                 logger.info(f"No anomalies detected for {ticker}")
                 return []
-            
+
             # 4. Analyze and score each detection
             signals = []
             for detection in detections:
                 # Create signal object
                 signal = self.analyzer.analyze_detection(
-                    detection, 
+                    detection,
                     options_chain,
                     historical_data
                 )
-                
+
                 # Calculate score and grade
                 signal.overall_score = self.grader.calculate_score(signal)
                 signal.grade = self.grader.assign_grade(signal.overall_score)
                 signal.confidence = self.grader.calculate_confidence(signal)
-                
+
                 # Assess risks
                 risk_assessment = self.risk_assessor.assess(signal, options_chain)
                 signal.risk_level = risk_assessment.risk_level
                 signal.risk_factors = risk_assessment.risk_factors
-                
+
                 # Add historical performance if requested
                 if include_backtest:
                     signal.historical_performance = (
                         self.storage.get_similar_signal_performance(signal)
                     )
-                
+
                 signals.append(signal)
-            
+
             # 5. Store signals in database
             for signal in signals:
                 self.storage.insert_signal(signal)
@@ -456,83 +456,83 @@ class ScanOrchestrator:
                     f"Signal created: {signal.ticker} {signal.option_symbol} "
                     f"Grade: {signal.grade}"
                 )
-            
+
             return signals
-            
+
         except Exception as e:
             logger.error(f"Error scanning {ticker}: {e}")
             raise
-    
+
     def scan_multiple(
-        self, 
+        self,
         tickers: List[str],
         max_concurrent: int = 5
     ) -> List[UnusualOptionsSignal]:
         """
         Scan multiple tickers with rate limiting.
-        
+
         Args:
             tickers: List of ticker symbols
             max_concurrent: Maximum concurrent requests
-            
+
         Returns:
             Combined list of all signals
         """
         import asyncio
         from concurrent.futures import ThreadPoolExecutor
-        
+
         all_signals = []
-        
+
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
             futures = [
-                executor.submit(self.scan_ticker, ticker) 
+                executor.submit(self.scan_ticker, ticker)
                 for ticker in tickers
             ]
-            
+
             for future in futures:
                 try:
                     signals = future.result(timeout=30)
                     all_signals.extend(signals)
                 except Exception as e:
                     logger.error(f"Error in concurrent scan: {e}")
-        
+
         return all_signals
-    
+
     def market_scan(
-        self, 
+        self,
         min_market_cap: float = 1_000_000_000,
         min_avg_volume: int = 1_000_000,
         limit: int = 500
     ) -> List[UnusualOptionsSignal]:
         """
         Scan broad market for unusual activity.
-        
+
         Args:
             min_market_cap: Minimum market cap filter
             min_avg_volume: Minimum average volume filter
             limit: Maximum number of tickers to scan
-            
+
         Returns:
             All detected signals across market
         """
         logger.info(f"Running market-wide scan (limit: {limit})")
-        
+
         # Get list of liquid, optionable tickers
         tickers = self._get_liquid_tickers(
             min_market_cap=min_market_cap,
             min_avg_volume=min_avg_volume,
             limit=limit
         )
-        
+
         logger.info(f"Scanning {len(tickers)} tickers")
-        
+
         # Scan in batches
         all_signals = self.scan_multiple(tickers)
-        
+
         logger.info(f"Market scan complete. Found {len(all_signals)} signals")
-        
+
         return all_signals
-    
+
     def _get_liquid_tickers(
         self,
         min_market_cap: float,
@@ -573,13 +573,13 @@ class AnomalyDetector:
     """
     Detects unusual options activity across multiple dimensions.
     """
-    
+
     def __init__(self, config: dict):
         self.config = config
         self.volume_threshold = config.get('VOLUME_MULTIPLIER_THRESHOLD', 3.0)
         self.oi_change_threshold = config.get('OI_CHANGE_THRESHOLD', 0.20)
         self.min_premium_flow = config.get('MIN_PREMIUM_FLOW', 100000)
-    
+
     def detect_anomalies(
         self,
         options_chain: OptionsChain,
@@ -587,20 +587,20 @@ class AnomalyDetector:
     ) -> List[Detection]:
         """
         Run all detection algorithms on options chain.
-        
+
         Returns list of detected anomalies.
         """
         detections = []
-        
+
         for contract in options_chain.contracts:
             # 1. Check volume anomalies
             volume_detection = self._detect_volume_anomaly(
-                contract, 
+                contract,
                 historical_data
             )
             if volume_detection:
                 detections.append(volume_detection)
-            
+
             # 2. Check open interest spikes
             oi_detection = self._detect_oi_spike(
                 contract,
@@ -608,7 +608,7 @@ class AnomalyDetector:
             )
             if oi_detection:
                 detections.append(oi_detection)
-            
+
             # 3. Check premium flow
             premium_detection = self._detect_premium_flow(
                 contract,
@@ -616,7 +616,7 @@ class AnomalyDetector:
             )
             if premium_detection:
                 detections.append(premium_detection)
-            
+
             # 4. Check for sweep orders
             sweep_detection = self._detect_sweep_order(
                 contract,
@@ -624,35 +624,35 @@ class AnomalyDetector:
             )
             if sweep_detection:
                 detections.append(sweep_detection)
-        
+
         logger.info(f"Found {len(detections)} anomalies")
         return detections
-    
+
     def _detect_volume_anomaly(
         self,
         contract: OptionsContract,
         historical: HistoricalData
     ) -> Optional[Detection]:
         """Detect unusual volume vs historical average"""
-        
+
         current_volume = contract.volume
         if current_volume == 0:
             return None
-        
+
         # Get average volume from historical data
         avg_volume = historical.get_avg_volume(
             contract.symbol,
             days=20
         )
-        
+
         if avg_volume < 100:  # Filter low liquidity
             return None
-        
+
         volume_ratio = current_volume / avg_volume
-        
+
         if volume_ratio >= self.volume_threshold:
             confidence = min(volume_ratio / 10.0, 1.0)
-            
+
             return Detection(
                 detection_type='VOLUME_ANOMALY',
                 contract=contract,
@@ -664,30 +664,30 @@ class AnomalyDetector:
                 confidence=confidence,
                 timestamp=datetime.now()
             )
-        
+
         return None
-    
+
     def _detect_oi_spike(
         self,
         contract: OptionsContract,
         historical: HistoricalData
     ) -> Optional[Detection]:
         """Detect significant open interest changes"""
-        
+
         current_oi = contract.open_interest
         previous_oi = historical.get_previous_oi(
             contract.symbol,
             days_ago=1
         )
-        
+
         if previous_oi == 0:
             return None  # New contract
-        
+
         oi_change_pct = (current_oi - previous_oi) / previous_oi
-        
+
         if oi_change_pct >= self.oi_change_threshold:
             confidence = min(oi_change_pct / 0.5, 1.0)
-            
+
             return Detection(
                 detection_type='OI_SPIKE',
                 contract=contract,
@@ -700,37 +700,37 @@ class AnomalyDetector:
                 confidence=confidence,
                 timestamp=datetime.now()
             )
-        
+
         return None
-    
+
     def _detect_premium_flow(
         self,
         contract: OptionsContract,
         historical: HistoricalData
     ) -> Optional[Detection]:
         """Detect large premium expenditures"""
-        
+
         # Calculate total premium flow
         premium = contract.last_price * contract.volume * 100
-        
+
         if premium < self.min_premium_flow:
             return None
-        
+
         # Check if orders were aggressive (at ask or above)
         time_sales = historical.get_time_and_sales(contract.symbol)
         if not time_sales:
             return None
-        
+
         aggressive_orders = sum(
-            1 for trade in time_sales 
+            1 for trade in time_sales
             if trade.price >= trade.ask
         )
         aggressive_pct = aggressive_orders / len(time_sales)
-        
+
         if aggressive_pct >= 0.7:  # 70% aggressive
             confidence = (premium / 1_000_000) * aggressive_pct
             confidence = min(confidence, 1.0)
-            
+
             return Detection(
                 detection_type='PREMIUM_FLOW',
                 contract=contract,
@@ -743,41 +743,41 @@ class AnomalyDetector:
                 confidence=confidence,
                 timestamp=datetime.now()
             )
-        
+
         return None
-    
+
     def _detect_sweep_order(
         self,
         contract: OptionsContract,
         historical: HistoricalData
     ) -> Optional[Detection]:
         """Detect sweep orders across exchanges"""
-        
+
         time_sales = historical.get_time_and_sales_with_exchanges(
             contract.symbol,
             window_seconds=5
         )
-        
+
         if not time_sales:
             return None
-        
+
         # Group trades by timestamp
         trade_groups = self._group_trades_by_time(
             time_sales,
             tolerance_seconds=1.0
         )
-        
+
         for group in trade_groups:
             unique_exchanges = set(t.exchange for t in group)
             total_volume = sum(t.size for t in group)
-            
+
             # Sweep criteria: 3+ exchanges, 100+ contracts
             if len(unique_exchanges) >= 3 and total_volume >= 100:
                 total_premium = sum(
-                    t.price * t.size * 100 
+                    t.price * t.size * 100
                     for t in group
                 )
-                
+
                 return Detection(
                     detection_type='SWEEP_ORDER',
                     contract=contract,
@@ -790,9 +790,9 @@ class AnomalyDetector:
                     confidence=0.9,  # Sweeps are high conviction
                     timestamp=group[0].timestamp
                 )
-        
+
         return None
-    
+
     def _group_trades_by_time(
         self,
         trades: List,
@@ -801,22 +801,22 @@ class AnomalyDetector:
         """Group trades that occurred within time tolerance"""
         if not trades:
             return []
-        
+
         sorted_trades = sorted(trades, key=lambda t: t.timestamp)
         groups = []
         current_group = [sorted_trades[0]]
-        
+
         for trade in sorted_trades[1:]:
             time_diff = (
                 trade.timestamp - current_group[-1].timestamp
             ).total_seconds()
-            
+
             if time_diff <= tolerance_seconds:
                 current_group.append(trade)
             else:
                 groups.append(current_group)
                 current_group = [trade]
-        
+
         groups.append(current_group)
         return groups
 ```
@@ -833,7 +833,7 @@ class SignalGrader:
     """
     Multi-factor scoring system for signal quality.
     """
-    
+
     # Weight allocations
     WEIGHTS = {
         'volume': 0.30,
@@ -842,14 +842,14 @@ class SignalGrader:
         'historical': 0.15,
         'technical': 0.10
     }
-    
+
     def __init__(self, config: dict):
         self.config = config
-    
+
     def calculate_score(self, signal: UnusualOptionsSignal) -> float:
         """
         Calculate overall signal score (0.0 - 1.0).
-        
+
         Combines multiple factors with weighted average.
         """
         scores = {
@@ -859,19 +859,19 @@ class SignalGrader:
             'historical': self._calculate_historical_score(signal),
             'technical': self._calculate_technical_score(signal)
         }
-        
+
         # Weighted sum
         overall = sum(
-            scores[factor] * weight 
+            scores[factor] * weight
             for factor, weight in self.WEIGHTS.items()
         )
-        
+
         # Bonus for sweep detection
         if signal.has_sweep:
             overall = min(overall + 0.15, 1.0)
-        
+
         return overall
-    
+
     def assign_grade(self, score: float) -> str:
         """Convert numerical score to letter grade"""
         if score >= 0.90:
@@ -886,11 +886,11 @@ class SignalGrader:
             return 'D'
         else:
             return 'F'
-    
+
     def calculate_confidence(self, signal: UnusualOptionsSignal) -> float:
         """Calculate confidence level (0.0 - 1.0)"""
         factors = []
-        
+
         # Volume confidence
         if signal.volume_ratio >= 10:
             factors.append(1.0)
@@ -898,7 +898,7 @@ class SignalGrader:
             factors.append(0.8)
         elif signal.volume_ratio >= 3:
             factors.append(0.6)
-        
+
         # Premium confidence
         if signal.premium_flow >= 1_000_000:
             factors.append(1.0)
@@ -906,23 +906,23 @@ class SignalGrader:
             factors.append(0.8)
         elif signal.premium_flow >= 100_000:
             factors.append(0.6)
-        
+
         # Sweep confidence
         if signal.has_sweep:
             factors.append(0.9)
-        
+
         # OI confidence
         if signal.oi_change_pct >= 0.50:
             factors.append(0.9)
         elif signal.oi_change_pct >= 0.20:
             factors.append(0.7)
-        
+
         return sum(factors) / len(factors) if factors else 0.5
-    
+
     def _calculate_volume_score(self, signal: UnusualOptionsSignal) -> float:
         """Score based on volume anomaly"""
         ratio = signal.volume_ratio
-        
+
         if ratio >= 10:
             return 1.0
         elif ratio >= 5:
@@ -933,12 +933,12 @@ class SignalGrader:
             return 0.4
         else:
             return 0.2
-    
+
     def _calculate_premium_score(self, signal: UnusualOptionsSignal) -> float:
         """Score based on premium flow"""
         premium = signal.premium_flow
         aggressive_pct = signal.aggressive_order_pct
-        
+
         # Base score from premium size
         if premium >= 1_000_000:
             base = 1.0
@@ -950,14 +950,14 @@ class SignalGrader:
             base = 0.4
         else:
             base = 0.2
-        
+
         # Adjust for aggressiveness
         return base * (0.5 + 0.5 * aggressive_pct)
-    
+
     def _calculate_oi_score(self, signal: UnusualOptionsSignal) -> float:
         """Score based on OI changes"""
         change_pct = signal.oi_change_pct
-        
+
         if change_pct >= 0.50:
             return 1.0
         elif change_pct >= 0.35:
@@ -966,14 +966,14 @@ class SignalGrader:
             return 0.6
         else:
             return 0.3
-    
+
     def _calculate_historical_score(self, signal: UnusualOptionsSignal) -> float:
         """Score based on historical performance of similar signals"""
         # This would query the database for similar past signals
         # and their win rates
         # Placeholder for now
         return 0.6
-    
+
     def _calculate_technical_score(self, signal: UnusualOptionsSignal) -> float:
         """Score based on technical alignment"""
         # Check if option direction aligns with technical indicators
@@ -1001,20 +1001,20 @@ from unusual_options.data.models import OptionsContract, HistoricalData
 def test_volume_anomaly_detection():
     """Test volume anomaly detection logic"""
     detector = AnomalyDetector(config={})
-    
+
     contract = OptionsContract(
         symbol='AAPL250117C00180000',
         volume=5000,
         open_interest=1000,
         last_price=5.50
     )
-    
+
     historical = HistoricalData(
         avg_volumes={'AAPL250117C00180000': 1000}
     )
-    
+
     detection = detector._detect_volume_anomaly(contract, historical)
-    
+
     assert detection is not None
     assert detection.detection_type == 'VOLUME_ANOMALY'
     assert detection.metrics['volume_ratio'] == 5.0
@@ -1022,20 +1022,20 @@ def test_volume_anomaly_detection():
 def test_no_detection_on_low_liquidity():
     """Should not detect on low liquidity contracts"""
     detector = AnomalyDetector(config={})
-    
+
     contract = OptionsContract(
         symbol='LOWVOL250117C00100000',
         volume=300,
         open_interest=50,
         last_price=2.00
     )
-    
+
     historical = HistoricalData(
         avg_volumes={'LOWVOL250117C00100000': 50}
     )
-    
+
     detection = detector._detect_volume_anomaly(contract, historical)
-    
+
     assert detection is None  # Below 100 volume threshold
 ```
 
@@ -1050,9 +1050,9 @@ from unusual_options.scanner.orchestrator import ScanOrchestrator
 def test_full_scan_workflow(mock_config):
     """Test end-to-end scan workflow"""
     orchestrator = ScanOrchestrator(mock_config)
-    
+
     signals = orchestrator.scan_ticker('AAPL')
-    
+
     assert isinstance(signals, list)
     for signal in signals:
         assert signal.ticker == 'AAPL'
@@ -1074,4 +1074,3 @@ def test_full_scan_workflow(mock_config):
 ---
 
 **Next Document**: [Database Schema](database-schema.md)
-

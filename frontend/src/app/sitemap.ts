@@ -3,7 +3,7 @@ import { getBlogPosts } from '@/data/blog';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.conorq.com';
-  
+
   try {
     // Get all blog posts for dynamic routes
     const posts = await getBlogPosts();
@@ -73,4 +73,4 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
     ];
   }
-} 
+}

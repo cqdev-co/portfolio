@@ -1,6 +1,6 @@
 /**
  * TypeScript type definitions for ticker data
- * 
+ *
  * These types match the database schema and can be used across
  * the entire monorepo for type safety.
  */
@@ -75,7 +75,7 @@ export const TICKER_TYPES = {
   COMMODITY: 'commodity',
 } as const;
 
-export type TickerType = typeof TICKER_TYPES[keyof typeof TICKER_TYPES];
+export type TickerType = (typeof TICKER_TYPES)[keyof typeof TICKER_TYPES];
 
 export const MAJOR_EXCHANGES = {
   NASDAQ: 'NASDAQ',
@@ -85,4 +85,5 @@ export const MAJOR_EXCHANGES = {
   TSE: 'TSE',
 } as const;
 
-export type MajorExchange = typeof MAJOR_EXCHANGES[keyof typeof MAJOR_EXCHANGES];
+export type MajorExchange =
+  (typeof MAJOR_EXCHANGES)[keyof typeof MAJOR_EXCHANGES];

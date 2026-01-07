@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import Image from "next/image";
-import Link from "next/link";
-import Markdown from "react-markdown";
-import { motion } from "framer-motion";
-import React from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import Image from 'next/image';
+import Link from 'next/link';
+import Markdown from 'react-markdown';
+import { motion } from 'framer-motion';
+import React from 'react';
+import { ExternalLinkIcon } from 'lucide-react';
 
 interface Props {
   title: string;
@@ -43,11 +43,11 @@ export function ProjectCard({
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
-    <motion.div 
+    <motion.div
       className={cn(
-        "group flex flex-col overflow-hidden h-full rounded-md border border-border bg-card",
-        "transition-all duration-200 shadow-sm",
-        isHovered ? "shadow-md scale-[1.01]" : "",
+        'group flex flex-col overflow-hidden h-full rounded-md border border-border bg-card',
+        'transition-all duration-200 shadow-sm',
+        isHovered ? 'shadow-md scale-[1.01]' : '',
         className
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -58,7 +58,7 @@ export function ProjectCard({
     >
       {/* Media Section - Video or Image */}
       <div className="relative w-full h-48 overflow-hidden bg-muted">
-        <Link href={href || "#"} className="block w-full h-full">
+        <Link href={href || '#'} className="block w-full h-full">
           {video && (
             <video
               src={video}
@@ -80,11 +80,13 @@ export function ProjectCard({
           )}
           {!image && !video && (
             <div className="w-full h-full flex items-center justify-center bg-muted">
-              <span className="text-lg font-semibold text-muted-foreground">{title.substring(0, 1)}</span>
+              <span className="text-lg font-semibold text-muted-foreground">
+                {title.substring(0, 1)}
+              </span>
             </div>
           )}
         </Link>
-        
+
         {/* Active Badge */}
         {active && (
           <div className="absolute top-3 right-3">
@@ -102,27 +104,36 @@ export function ProjectCard({
           <div className="flex items-start justify-between">
             <h3 className="font-medium text-foreground text-sm">{title}</h3>
             {href && (
-              <Link href={href} target="_blank" rel="noopener noreferrer" className="ml-2 text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <ExternalLinkIcon className="size-3.5" />
               </Link>
             )}
           </div>
-          
+
           {/* Date */}
           <time className="text-caption text-muted-foreground">{dates}</time>
-          
+
           {/* Description */}
           <div className="mt-2 prose-sm max-w-full text-compact text-muted-foreground dark:prose-invert">
             <Markdown>{description}</Markdown>
           </div>
-          
+
           {/* Security Features Section */}
           {securityFeatures && securityFeatures.length > 0 && (
             <div className="mt-2.5 pt-2.5 border-t border-border">
-              <h4 className="text-caption font-medium text-foreground mb-1.5">Security Features</h4>
+              <h4 className="text-caption font-medium text-foreground mb-1.5">
+                Security Features
+              </h4>
               <ul className="list-disc pl-4 text-caption text-muted-foreground space-y-1">
                 {securityFeatures.map((feature, idx) => (
-                  <li key={idx} className="leading-tight">{feature}</li>
+                  <li key={idx} className="leading-tight">
+                    {feature}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -144,7 +155,7 @@ export function ProjectCard({
               ))}
             </div>
           )}
-          
+
           {/* Links Section */}
           {links && links.length > 0 && (
             <div className="flex flex-wrap gap-1">

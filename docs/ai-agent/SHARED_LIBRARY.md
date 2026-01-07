@@ -6,9 +6,9 @@
 
 ## Overview
 
-The AI Agent shared library provides common components for building AI 
-trading assistants that work across different runtime environments. Both 
-the CLI (ai-analyst) and Frontend (portfolio website) use this library 
+The AI Agent shared library provides common components for building AI
+trading assistants that work across different runtime environments. Both
+the CLI (ai-analyst) and Frontend (portfolio website) use this library
 to ensure consistent behavior and reduce code duplication.
 
 ## Directory Structure
@@ -39,13 +39,13 @@ lib/ai-agent/
 
 ### 1. Victor Prompts (`prompts/`)
 
-Victor Chen is our AI trading analyst persona - a 67-year-old Wall 
-Street veteran with 45 years of experience. The prompts module provides 
+Victor Chen is our AI trading analyst persona - a 67-year-old Wall
+Street veteran with 45 years of experience. The prompts module provides
 different versions for different use cases:
 
 #### `buildVictorSystemPrompt(config)`
 
-Full system prompt with all context. Used by CLI for comprehensive 
+Full system prompt with all context. Used by CLI for comprehensive
 analysis.
 
 ```typescript
@@ -53,14 +53,14 @@ import { buildVictorSystemPrompt } from 'lib/ai-agent';
 
 const prompt = buildVictorSystemPrompt({
   accountSize: 1750,
-  context: "... TOON data and calendar ...",
+  context: '... TOON data and calendar ...',
   includeToonSpec: true,
 });
 ```
 
 #### `buildVictorLitePrompt(config?)`
 
-Lightweight prompt for frontend chat. Same persona, less context 
+Lightweight prompt for frontend chat. Same persona, less context
 overhead.
 
 ```typescript
@@ -89,13 +89,13 @@ SDK-agnostic tool schemas that can be converted to different formats.
 import { AGENT_TOOLS, RESEARCH_TOOLS, BASIC_TOOLS } from 'lib/ai-agent';
 
 // All tools
-AGENT_TOOLS // web_search, get_ticker_data, scan, analyze_position
+AGENT_TOOLS; // web_search, get_ticker_data, scan, analyze_position
 
 // For research queries
-RESEARCH_TOOLS // web_search, get_ticker_data, analyze_position
+RESEARCH_TOOLS; // web_search, get_ticker_data, analyze_position
 
 // For basic queries
-BASIC_TOOLS // web_search, get_ticker_data
+BASIC_TOOLS; // web_search, get_ticker_data
 ```
 
 #### Ollama Conversion
@@ -110,17 +110,17 @@ const ollamaTools = toOllamaTools(AGENT_TOOLS);
 #### Individual Tools
 
 ```typescript
-import { 
+import {
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
   SCAN_OPPORTUNITIES_TOOL,
-  ANALYZE_POSITION_TOOL 
+  ANALYZE_POSITION_TOOL,
 } from 'lib/ai-agent';
 ```
 
 ### 3. Data Fetching (`data/`)
 
-Shared data fetching and formatting for ticker analysis. Works in both 
+Shared data fetching and formatting for ticker analysis. Works in both
 CLI and Frontend environments.
 
 #### Fetch Ticker Data
@@ -135,10 +135,10 @@ const data = await fetchTickerData('AAPL');
 #### Format for AI
 
 ```typescript
-import { 
-  formatTickerDataForAI, 
+import {
+  formatTickerDataForAI,
   formatSearchResultsForAI,
-  formatTickerSummary 
+  formatTickerSummary,
 } from 'lib/ai-agent';
 
 // Full format for AI context
@@ -200,20 +200,20 @@ const positionResult = await handleAnalyzePosition({
   ticker: 'AMD',
   longStrike: 120,
   shortStrike: 130,
-  costBasis: 2.50,
+  costBasis: 2.5,
   dte: 14,
 });
 ```
 
 ### 5. Question Classification (`classification.ts`)
 
-Smart classification to optimize context loading and reduce 
+Smart classification to optimize context loading and reduce
 unnecessary API calls.
 
 ```typescript
 import { classifyQuestion, extractTickers } from 'lib/ai-agent';
 
-const result = classifyQuestion("How does NVDA look for a trade?");
+const result = classifyQuestion('How does NVDA look for a trade?');
 // {
 //   type: 'trade_analysis',
 //   needsOptions: true,
@@ -224,20 +224,20 @@ const result = classifyQuestion("How does NVDA look for a trade?");
 //   tickers: ['NVDA']
 // }
 
-const tickers = extractTickers("Looking at AAPL and MSFT today");
+const tickers = extractTickers('Looking at AAPL and MSFT today');
 // ['AAPL', 'MSFT']
 ```
 
 #### Question Types
 
-| Type | Description | Context Needed |
-|------|-------------|----------------|
-| `price_check` | Simple price queries | Minimal |
-| `trade_analysis` | Full trade evaluation | Options, News, Calendar |
-| `research` | News/why questions | Web Search |
-| `scan` | Market scanning | Full scanner |
-| `position` | Existing position queries | Position tool |
-| `general` | Conversation | Calendar only |
+| Type             | Description               | Context Needed          |
+| ---------------- | ------------------------- | ----------------------- |
+| `price_check`    | Simple price queries      | Minimal                 |
+| `trade_analysis` | Full trade evaluation     | Options, News, Calendar |
+| `research`       | News/why questions        | Web Search              |
+| `scan`           | Market scanning           | Full scanner            |
+| `position`       | Existing position queries | Position tool           |
+| `general`        | Conversation              | Calendar only           |
 
 ## Usage Examples
 
@@ -250,7 +250,7 @@ import {
   AGENT_TOOLS,
   toOllamaTools,
   classifyQuestion,
-} from "../../../lib/ai-agent";
+} from '../../../lib/ai-agent';
 
 // Classify question to optimize data fetching
 const classification = classifyQuestion(userMessage);
@@ -270,8 +270,8 @@ const tools = toOllamaTools(AGENT_TOOLS);
 
 // Use with Ollama
 const response = await ollama.chat({
-  model: "deepseek-r1:32b",
-  messages: [{ role: "system", content: systemPrompt }, ...messages],
+  model: 'deepseek-r1:32b',
+  messages: [{ role: 'system', content: systemPrompt }, ...messages],
   tools,
 });
 ```
@@ -282,12 +282,12 @@ Direct imports work thanks to `turbopack.root` configuration in Next.js 16.
 
 ```typescript
 // frontend/src/app/api/chat/route.ts
-import { 
+import {
   buildVictorLitePrompt,
   BASIC_TOOLS,
   toOllamaTools,
   executeToolCall,
-} from "@lib/ai-agent";
+} from '@lib/ai-agent';
 
 // System prompt
 const systemPrompt = buildVictorLitePrompt({ accountSize: 1500 });
@@ -302,24 +302,25 @@ if (pendingToolCalls.length > 0) {
       name: tc.function.name,
       arguments: tc.function.arguments,
     });
-    
+
     // Add result to conversation
     messages.push({
-      role: "tool",
+      role: 'tool',
       content: result.formatted || result.error,
     });
   }
 }
 ```
 
-**Configuration**: 
+**Configuration**:
+
 - Build uses `turbopack.root` in `next.config.js`
 - Dev uses `--webpack` flag with webpack alias
 - See `frontend/next.config.js` for dual configuration
 
 ## Data Module (`lib/ai-agent/data/`)
 
-**Important**: All formatters use `safeFixed()` helper to prevent `.toFixed()` 
+**Important**: All formatters use `safeFixed()` helper to prevent `.toFixed()`
 errors on undefined values. This ensures robust handling of partial data.
 
 The data module provides comprehensive ticker data fetching with Yahoo Finance:
@@ -328,29 +329,29 @@ The data module provides comprehensive ticker data fetching with Yahoo Finance:
 
 Returns a `TickerData` object with:
 
-| Field | Description |
-|-------|-------------|
-| `price`, `change`, `changePct` | Current price and movement |
-| `rsi`, `adx`, `trendStrength` | Technical indicators |
-| `ma20`, `ma50`, `ma200` | Moving averages |
-| `aboveMA200` | Trend direction |
-| `marketCap`, `peRatio`, `forwardPE` | Fundamentals |
-| `analystRatings` | Bullish %, breakdown by rating |
-| `targetPrices` | Low/mean/high targets, upside % |
-| `earningsDays`, `earningsWarning` | Earnings calendar |
-| `iv` | IV, HV20, premium assessment |
-| `shortInterest` | Short %, days to cover |
-| `support`, `resistance` | S/R from recent lows/highs |
-| `performance` | 1d, 5d, 1m returns |
-| `news` | Recent headlines (3 max) |
-| `spread` | Suggested spread, cushion, PoP |
-| `grade` | Trade grade (A-D), score, recommendation |
-| `dataQuality` | Staleness warning |
+| Field                               | Description                              |
+| ----------------------------------- | ---------------------------------------- |
+| `price`, `change`, `changePct`      | Current price and movement               |
+| `rsi`, `adx`, `trendStrength`       | Technical indicators                     |
+| `ma20`, `ma50`, `ma200`             | Moving averages                          |
+| `aboveMA200`                        | Trend direction                          |
+| `marketCap`, `peRatio`, `forwardPE` | Fundamentals                             |
+| `analystRatings`                    | Bullish %, breakdown by rating           |
+| `targetPrices`                      | Low/mean/high targets, upside %          |
+| `earningsDays`, `earningsWarning`   | Earnings calendar                        |
+| `iv`                                | IV, HV20, premium assessment             |
+| `shortInterest`                     | Short %, days to cover                   |
+| `support`, `resistance`             | S/R from recent lows/highs               |
+| `performance`                       | 1d, 5d, 1m returns                       |
+| `news`                              | Recent headlines (3 max)                 |
+| `spread`                            | Suggested spread, cushion, PoP           |
+| `grade`                             | Trade grade (A-D), score, recommendation |
+| `dataQuality`                       | Staleness warning                        |
 
 ```typescript
-import { fetchTickerData, formatTickerDataForAI } from "@lib/ai-agent";
+import { fetchTickerData, formatTickerDataForAI } from '@lib/ai-agent';
 
-const data = await fetchTickerData("NVDA");
+const data = await fetchTickerData('NVDA');
 const formatted = formatTickerDataForAI(data); // AI-friendly string
 ```
 
@@ -393,7 +394,7 @@ import type {
   // Prompt types
   VictorPromptConfig,
   VictorLiteConfig,
-  
+
   // Tool types
   AgentTool,
   OllamaTool,
@@ -403,7 +404,7 @@ import type {
   ToolResult,
   TickerToolResult,
   SearchToolResult,
-  
+
   // Data types
   TickerData,
   SpreadRecommendation,
@@ -413,7 +414,7 @@ import type {
   AnalystRatings,
   TargetPrices,
   SearchResult,
-  
+
   // Classification types
   QuestionType,
   QuestionClassification,
@@ -427,6 +428,7 @@ import type {
 ### Why TOON?
 
 From benchmarks ([toonformat.dev](https://toonformat.dev)):
+
 - **40% fewer tokens** than JSON
 - **74% LLM accuracy** vs JSON's 70%
 - Perfect for **uniform arrays** (ticker data, scan results)
@@ -437,25 +439,25 @@ Both CLI and Frontend should use TOON for maximum efficiency.
 ### Available Encoders
 
 ```typescript
-import { 
+import {
   // Single ticker (full details)
-  encodeTickerToTOON, 
-  
+  encodeTickerToTOON,
+
   // Multiple tickers (tabular format - most efficient)
   encodeTickerTableToTOON,
-  
+
   // Market regime
   encodeMarketRegimeToTOON,
-  
+
   // Scan results
   encodeScanResultsToTOON,
-  
+
   // Search results
   encodeSearchToTOON,
-  
+
   // Generic encoder
   encodeTOON,
-  
+
   // For system prompts
   getTOONDecoderSpec,
 } from 'lib/ai-agent';
@@ -469,6 +471,7 @@ const toon = encodeTickerToTOON(data);
 ```
 
 Output (compact, token-efficient):
+
 ```yaml
 ticker: NVDA
 price: 130.50
@@ -495,12 +498,13 @@ For scanning multiple tickers, use the tabular format:
 
 ```typescript
 const tickers = await Promise.all(
-  ['NVDA', 'AAPL', 'MSFT'].map(t => fetchTickerData(t))
+  ['NVDA', 'AAPL', 'MSFT'].map((t) => fetchTickerData(t))
 );
 const toon = encodeTickerTableToTOON(tickers);
 ```
 
 Output (TOON's most efficient format):
+
 ```yaml
 tickers[3]{ticker,price,changePct,rsi,grade,flowSentiment}:
   NVDA,130.50,2.1,55,A,bullish
@@ -516,6 +520,7 @@ const toon = encodeMarketRegimeToTOON(regime);
 ```
 
 Output:
+
 ```yaml
 regime: RISK_ON
 vix:
@@ -555,20 +560,24 @@ const result = await executeToolCall({
 });
 
 // Explicit text format (human-readable)
-const result = await executeToolCall({
-  name: 'get_ticker_data',
-  arguments: { ticker: 'NVDA' },
-}, { format: 'text' });
+const result = await executeToolCall(
+  {
+    name: 'get_ticker_data',
+    arguments: { ticker: 'NVDA' },
+  },
+  { format: 'text' }
+);
 ```
 
 ## Web Search Integration
 
-The library uses **Ollama's native web search API** for real-time 
+The library uses **Ollama's native web search API** for real-time
 information retrieval. This requires an `OLLAMA_API_KEY`.
 
 ### Token Optimization
 
 Web search results are **limited to save tokens**:
+
 - **Max 3 results** (not 5+)
 - **Snippets truncated** to 300 chars
 - **Total content capped** at ~2KB
@@ -577,11 +586,11 @@ Web search results are **limited to save tokens**:
 import { handleWebSearch, ollamaWebSearch } from 'lib/ai-agent';
 
 // Direct API usage (max 3 results)
-const results = await ollamaWebSearch("NVDA latest news", apiKey);
+const results = await ollamaWebSearch('NVDA latest news', apiKey);
 
 // Via handler (uses OLLAMA_API_KEY env var)
 const result = await handleWebSearch(
-  { query: "NVDA latest news" },
+  { query: 'NVDA latest news' },
   { apiKey: process.env.OLLAMA_API_KEY }
 );
 ```
@@ -602,33 +611,35 @@ Authorization: Bearer $OLLAMA_API_KEY
 
 ```typescript
 interface SearchResult {
-  title: string;     // Truncated to 100 chars
+  title: string; // Truncated to 100 chars
   url: string;
-  snippet: string;   // Truncated to 300 chars
+  snippet: string; // Truncated to 300 chars
 }
 ```
 
 ## Data Cards UI (Frontend)
 
-Tool results are embedded in streamed responses using markers that the 
+Tool results are embedded in streamed responses using markers that the
 frontend extracts and displays as rich cards.
 
 ### How It Works
 
 1. **API Route** embeds tool data in stream:
+
    ```typescript
    const marker = `<!--TOOL:get_ticker_data:${JSON.stringify(data)}:TOOL-->`;
-   writer.write({ type: "text-delta", delta: marker });
+   writer.write({ type: 'text-delta', delta: marker });
    ```
 
 2. **Chat Message** extracts and renders:
+
    ```typescript
    const TOOL_MARKER_REGEX = /<!--TOOL:(\w+):(.+?):TOOL-->/g;
-   
+
    const { cleanContent, tools } = extractToolData(rawContent);
    const tickerCards = tools
-     .filter(t => t.tool === "get_ticker_data")
-     .map(t => t.data as TickerData);
+     .filter((t) => t.tool === 'get_ticker_data')
+     .map((t) => t.data as TickerData);
    ```
 
 3. **TickerDataCard** displays:
@@ -653,7 +664,7 @@ import type { TickerData } from "@lib/ai-agent";
 
 **NEW - December 28, 2025**
 
-Shared market regime detection providing VIX awareness, SPY trend analysis, 
+Shared market regime detection providing VIX awareness, SPY trend analysis,
 and sector rotation tracking. Same logic as CLI.
 
 ### Get Full Market Regime
@@ -691,12 +702,12 @@ const sectors = await getSectorPerformance();
 
 ### Regime Types
 
-| Regime | Condition | Trading Recommendation |
-|--------|-----------|------------------------|
-| `RISK_ON` | Low VIX + Bullish SPY | Favorable for entries |
-| `RISK_OFF` | Bearish SPY | Reduce exposure |
-| `HIGH_VOL` | VIX > 20 | Smaller positions |
-| `NEUTRAL` | Mixed signals | Grade A setups only |
+| Regime     | Condition             | Trading Recommendation |
+| ---------- | --------------------- | ---------------------- |
+| `RISK_ON`  | Low VIX + Bullish SPY | Favorable for entries  |
+| `RISK_OFF` | Bearish SPY           | Reduce exposure        |
+| `HIGH_VOL` | VIX > 20              | Smaller positions      |
+| `NEUTRAL`  | Mixed signals         | Grade A setups only    |
 
 ## Rich Data Fields
 
@@ -708,8 +719,8 @@ The `TickerData` object now includes additional fields matching CLI:
 
 ```typescript
 data.optionsFlow = {
-  pcRatioOI: 0.65,      // Put/Call by open interest
-  pcRatioVol: 0.58,     // Put/Call by volume
+  pcRatioOI: 0.65, // Put/Call by open interest
+  pcRatioVol: 0.58, // Put/Call by volume
   sentiment: 'bullish', // bullish | neutral | bearish
 };
 ```
@@ -718,8 +729,8 @@ data.optionsFlow = {
 
 ```typescript
 data.relativeStrength = {
-  vsSPY: 5.2,              // % outperformance vs SPY (30d)
-  trend: 'outperforming',  // outperforming | inline | underperforming
+  vsSPY: 5.2, // % outperformance vs SPY (30d)
+  trend: 'outperforming', // outperforming | inline | underperforming
 };
 ```
 
@@ -729,9 +740,9 @@ data.relativeStrength = {
 data.earnings = {
   date: 'Jan 15',
   daysUntil: 18,
-  streak: 4,           // Positive = consecutive beats
-  lastSurprise: 8.5,   // Last EPS surprise %
-  avgSurprise: 6.2,    // Average over 4 quarters
+  streak: 4, // Positive = consecutive beats
+  lastSurprise: 8.5, // Last EPS surprise %
+  avgSurprise: 6.2, // Average over 4 quarters
 };
 ```
 
@@ -740,8 +751,8 @@ data.earnings = {
 ```typescript
 data.sectorContext = {
   name: 'Technology',
-  avgPE: 28,           // Sector average P/E
-  vsAvg: 15,           // Ticker P/E vs sector avg (%)
+  avgPE: 28, // Sector average P/E
+  vsAvg: 15, // Ticker P/E vs sector avg (%)
 };
 ```
 
@@ -762,4 +773,3 @@ data.sectorContext = {
 - [ ] Add conversation summarization
 - [ ] Scanner service (quickScan, fullScan)
 - [ ] Economic calendar warnings
-

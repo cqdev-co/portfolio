@@ -120,15 +120,19 @@ python scripts/rh_portfolio_analysis.py data.csv --verbose
 The Robinhood CSV export has a **critical limitation**: it only contains transaction history, not cost basis for positions opened before the export period.
 
 ### What We CAN Calculate Accurately
+
 - **Spread P&L**: For spreads opened AND closed within the export period
 - **Other Income**: Interest, dividends, stock lending
 
 ### What We CANNOT Calculate Accurately
+
 - **Prior Period Spreads**: Spreads closed in this period but opened earlier (missing entry cost)
 - **Stock Trades**: Sales of stocks bought before this period (missing cost basis)
 
 ### Example
+
 If you opened a CHYM spread in November and closed it in December:
+
 - The CSV only shows the December CLOSE (+$239.95 exit proceeds)
 - We don't know the November OPEN cost (maybe $200?)
 - True P&L might be +$39.95, but we can only show "+$239.95 (proceeds only)"
@@ -140,6 +144,7 @@ If you opened a CHYM spread in November and closed it in December:
 ### 1. CSV Parsing
 
 The script handles Robinhood's CSV format including:
+
 - Multi-line descriptions (CUSIP info)
 - Various transaction codes (BTO, STO, BTC, STC, etc.)
 - Currency parsing (handles `$`, `,`, `()` for negatives)
@@ -147,6 +152,7 @@ The script handles Robinhood's CSV format including:
 ### 2. Spread Matching
 
 Options trades are matched into spreads by:
+
 1. Grouping by ticker + expiration + option type
 2. Finding same-day BTO/STO pairs (entries)
 3. Finding same-day BTC/STC pairs (exits)
@@ -154,33 +160,35 @@ Options trades are matched into spreads by:
 
 ### 3. Metrics Calculation
 
-| Metric | Formula |
-|--------|---------|
-| Win Rate | Winners / Total Closed × 100 |
-| Profit Factor | Total Gains / Abs(Total Losses) |
-| Risk/Reward | Avg Debit / (Spread Width × 100 - Avg Debit) |
-| Required Win Rate | R/R Ratio / (1 + R/R Ratio) × 100 |
+| Metric            | Formula                                      |
+| ----------------- | -------------------------------------------- |
+| Win Rate          | Winners / Total Closed × 100                 |
+| Profit Factor     | Total Gains / Abs(Total Losses)              |
+| Risk/Reward       | Avg Debit / (Spread Width × 100 - Avg Debit) |
+| Required Win Rate | R/R Ratio / (1 + R/R Ratio) × 100            |
 
 ## Transaction Codes
 
-| Code | Description |
-|------|-------------|
-| BTO | Buy to Open (long position) |
-| STO | Sell to Open (short position) |
-| BTC | Buy to Close (close short) |
-| STC | Sell to Close (close long) |
-| INT | Interest payment |
-| CDIV | Cash dividend |
-| GDBP | Gold deposit boost payment |
-| SLIP | Stock lending income payment |
+| Code   | Description                     |
+| ------ | ------------------------------- |
+| BTO    | Buy to Open (long position)     |
+| STO    | Sell to Open (short position)   |
+| BTC    | Buy to Close (close short)      |
+| STC    | Sell to Close (close long)      |
+| INT    | Interest payment                |
+| CDIV   | Cash dividend                   |
+| GDBP   | Gold deposit boost payment      |
+| SLIP   | Stock lending income payment    |
 | FUTSWP | Futures/event contract transfer |
 
 ## Output Formats
 
 ### Text (Default)
+
 Human-readable report with sections for summary, P&L, risk metrics, per-ticker breakdown, and recommendations.
 
 ### JSON (`--output json`)
+
 Structured JSON for integration with other tools:
 
 ```json
@@ -207,6 +215,7 @@ Structured JSON for integration with other tools:
 The script is optimized for analyzing **Deep ITM Call Debit Spreads**:
 
 ### What the Strategy Involves
+
 - Buy a deep in-the-money call (lower strike)
 - Sell a call at a higher strike
 - Creates a debit spread with high delta
@@ -235,23 +244,23 @@ Based on empirical analysis of winning vs losing trades (Jan 2026):
 
 ### Winning Trade Characteristics (AMD, AVGO pattern)
 
-| Signal | What It Means |
-|--------|---------------|
-| RSI 25-45 | Oversold or recovering - good entry zone |
+| Signal                 | What It Means                              |
+| ---------------------- | ------------------------------------------ |
+| RSI 25-45              | Oversold or recovering - good entry zone   |
 | Buffer to support > 7% | Adequate cushion before spread loses value |
-| Bounce confirmed | Price formed higher low after pullback |
-| Analyst bullish > 75% | Strong institutional support |
-| Earnings > 30 days | Clear of binary event risk |
+| Bounce confirmed       | Price formed higher low after pullback     |
+| Analyst bullish > 75%  | Strong institutional support               |
+| Earnings > 30 days     | Clear of binary event risk                 |
 
 ### Losing Trade Red Flags (TSLA pattern)
 
-| Red Flag | Why It's Dangerous |
-|----------|-------------------|
-| RSI neutral (50+) falling | Catching a falling knife |
-| Buffer to support < 5% | No room for price movement |
-| No bounce confirmation | Still in decline phase |
-| Analyst bullish < 50% | Bearish sentiment = headwind |
-| Earnings within window | Binary risk during position |
+| Red Flag                  | Why It's Dangerous           |
+| ------------------------- | ---------------------------- |
+| RSI neutral (50+) falling | Catching a falling knife     |
+| Buffer to support < 5%    | No room for price movement   |
+| No bounce confirmation    | Still in decline phase       |
+| Analyst bullish < 50%     | Bearish sentiment = headwind |
+| Earnings within window    | Binary risk during position  |
 
 ### Entry Checklist
 
@@ -287,13 +296,15 @@ The `lib/utils/ts/entry-grade` module calculates entry signals from proxy data:
 import { analyzeTechnicals } from '@lib/utils/ts/entry-grade';
 
 // Fetch raw data from proxy
-const data = await fetch(`${YAHOO_PROXY_URL}/ticker/NVDA`).then(r => r.json());
+const data = await fetch(`${YAHOO_PROXY_URL}/ticker/NVDA`).then((r) =>
+  r.json()
+);
 
 // Calculate technicals in lib/
 const analysis = analyzeTechnicals(
-  data.chart.quotes.map(q => q.close),
-  data.chart.quotes.map(q => q.high),
-  data.chart.quotes.map(q => q.low),
+  data.chart.quotes.map((q) => q.close),
+  data.chart.quotes.map((q) => q.high),
+  data.chart.quotes.map((q) => q.low),
   {
     price: data.quote.price,
     ma50: data.quote.fiftyDayAverage,
@@ -318,6 +329,7 @@ const analysis = analyzeTechnicals(
 ```
 
 Use `entryGrade.recommendation`:
+
 - `STRONG_BUY` (75+): Ideal entry conditions
 - `BUY` (60-74): Good entry, minor concerns
 - `HOLD` (45-59): Wait for better setup
@@ -326,14 +338,17 @@ Use `entryGrade.recommendation`:
 ## Troubleshooting
 
 ### "No spreads found"
+
 - Ensure CSV contains option trades (BTO/STO pairs)
 - Check that trades are formatted correctly in CSV
 
 ### Parsing errors
+
 - Verify CSV is a Robinhood export (specific format)
 - Check for corrupted rows or special characters
 
 ### Missing trades
+
 - Multi-leg orders on different days won't match
 - Single-leg option trades are ignored
 
@@ -355,8 +370,7 @@ The JSON output can be consumed by the frontend for visualization:
 
 ```typescript
 // Example: Fetch analysis results
-const analysis = await fetch('/api/portfolio-analysis')
-  .then(r => r.json());
+const analysis = await fetch('/api/portfolio-analysis').then((r) => r.json());
 
 // Display win rate, P&L charts, etc.
 ```
@@ -365,12 +379,13 @@ const analysis = await fetch('/api/portfolio-analysis')
 
 ## Spread Quantitative Analysis System
 
-A persistent data system for tracking trades over time and running 
+A persistent data system for tracking trades over time and running
 statistical analysis as sample size grows.
 
 ### Why This Exists
 
 With n=7 trades, no statistical conclusions are valid. This system:
+
 - **Accumulates data** over time as more trades close
 - **Tracks progress** toward n=30 (minimum for significance)
 - **Auto-calculates** correlations, regressions, significance tests
@@ -394,18 +409,18 @@ python scripts/spread_quant_analysis.py export trades.csv
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `import <csv>` | Parse CSV and add trades to database |
-| `show` | Display all tracked trades |
-| `analyze` | Run full statistical analysis |
-| `open` | Analyze open positions with recommendations |
-| `coverage` | Show data coverage for all 45 factors |
-| `fetch [--ticker]` | Pull data from Yahoo proxy |
-| `template <file>` | Export CSV template for manual entry |
-| `export <file>` | Export to CSV for R/Python analysis |
-| `update <ticker> <date>` | Manually set entry conditions |
-| `batch-update <csv>` | Bulk update entry conditions |
+| Command                  | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `import <csv>`           | Parse CSV and add trades to database        |
+| `show`                   | Display all tracked trades                  |
+| `analyze`                | Run full statistical analysis               |
+| `open`                   | Analyze open positions with recommendations |
+| `coverage`               | Show data coverage for all 45 factors       |
+| `fetch [--ticker]`       | Pull data from Yahoo proxy                  |
+| `template <file>`        | Export CSV template for manual entry        |
+| `export <file>`          | Export to CSV for R/Python analysis         |
+| `update <ticker> <date>` | Manually set entry conditions               |
+| `batch-update <csv>`     | Bulk update entry conditions                |
 
 ### Data Storage
 
@@ -419,7 +434,7 @@ Trades are stored in `data/spread_trades.json`:
       "ticker": "NVDA",
       "entry_date": "12/2/2025",
       "exit_date": "12/26/2025",
-      "pnl": 107.90,
+      "pnl": 107.9,
       "return_pct": 29.72,
       "entry_rsi": 38.5,
       "entry_analyst_pct": 94,
@@ -434,15 +449,15 @@ Trades are stored in `data/spread_trades.json`:
 
 The system tracks these factors for correlation analysis:
 
-| Category | Factors |
-|----------|---------|
-| **Position** | Price, 52w High/Low, % from ATH, % from 50DMA, % from 200DMA |
-| **Fundamentals** | P/E, Forward P/E, EPS, Market Cap, Beta, Dividend Yield |
-| **Technicals** | RSI (14 & 5), MACD Histogram, ADX, ATR %, BB Position, Volume Ratio |
-| **Trend** | 5d/10d/20d Returns, Buffer %, Support/Resistance, MA Alignment, Higher Low |
-| **Sentiment** | Analyst %, Analyst Count, Short Ratio, Short % Float, Put/Call Ratio |
-| **Volatility** | IV, IV Rank, HV20, IV/HV Ratio |
-| **Timing** | Day of Week, Days to Earnings, Days to Expiry, Days Held |
+| Category         | Factors                                                                    |
+| ---------------- | -------------------------------------------------------------------------- |
+| **Position**     | Price, 52w High/Low, % from ATH, % from 50DMA, % from 200DMA               |
+| **Fundamentals** | P/E, Forward P/E, EPS, Market Cap, Beta, Dividend Yield                    |
+| **Technicals**   | RSI (14 & 5), MACD Histogram, ADX, ATR %, BB Position, Volume Ratio        |
+| **Trend**        | 5d/10d/20d Returns, Buffer %, Support/Resistance, MA Alignment, Higher Low |
+| **Sentiment**    | Analyst %, Analyst Count, Short Ratio, Short % Float, Put/Call Ratio       |
+| **Volatility**   | IV, IV Rank, HV20, IV/HV Ratio                                             |
+| **Timing**       | Day of Week, Days to Earnings, Days to Expiry, Days Held                   |
 
 ### Data Entry Methods
 
@@ -502,22 +517,24 @@ python spread_quant_analysis.py update NVDA 12/2/2025 \
 
 ### Statistical Methods
 
-| Metric | Method |
-|--------|--------|
-| Correlation | Pearson r with t-test p-values |
-| Significance | α = 0.05 (two-tailed) |
-| Regression | OLS with F-test for model significance |
-| Win Rate CI | Wilson score interval |
-| Sample Size | Power analysis for r = 0.5, β = 0.80 |
+| Metric       | Method                                 |
+| ------------ | -------------------------------------- |
+| Correlation  | Pearson r with t-test p-values         |
+| Significance | α = 0.05 (two-tailed)                  |
+| Regression   | OLS with F-test for model significance |
+| Win Rate CI  | Wilson score interval                  |
+| Sample Size  | Power analysis for r = 0.5, β = 0.80   |
 
 ### Interpretation Guide
 
 **When n < 30:**
-- All findings are *directional*, not conclusive
+
+- All findings are _directional_, not conclusive
 - Wide confidence intervals expected
 - Focus on accumulating data
 
 **When n ≥ 30:**
+
 - Correlations with p < 0.05 are statistically significant
 - Regression coefficients become reliable
 - Entry criteria can be validated/refined
@@ -563,20 +580,20 @@ R² = 0.84 (explains 84% of return variance)
 
 Based on historical performance:
 
-| Ticker | Trades | Win Rate | Total P&L | Status |
-|--------|--------|----------|-----------|--------|
-| CRWD | 2 | 0% | -$105.20 | **BLACKLISTED** |
+| Ticker | Trades | Win Rate | Total P&L | Status          |
+| ------ | ------ | -------- | --------- | --------------- |
+| CRWD   | 2      | 0%       | -$105.20  | **BLACKLISTED** |
 
 ### Roadmap
 
 As data accumulates:
 
-| n | Milestone |
-|---|-----------|
-| 15 | Preliminary decile analysis |
-| 30 | Statistical significance threshold |
-| 50 | Reliable regression model |
-| 100 | ML feature importance analysis |
+| n   | Milestone                          |
+| --- | ---------------------------------- |
+| 15  | Preliminary decile analysis        |
+| 30  | Statistical significance threshold |
+| 50  | Reliable regression model          |
+| 100 | ML feature importance analysis     |
 
 ---
 
@@ -596,4 +613,3 @@ As data accumulates:
 
 **Last Updated**: 2026-01-03
 **Author**: Portfolio Analysis Team
-

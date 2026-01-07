@@ -3,30 +3,30 @@
  * Database operations for trades, observations, and performance
  */
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { 
-  Trade, 
-  TradeType, 
-  TradeDirection, 
-  TradeStatus, 
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type {
+  Trade,
+  TradeType,
+  TradeDirection,
+  TradeStatus,
   TradeOutcome,
   CloseReason,
-  MarketRegime 
-} from "../types/index.ts";
+  MarketRegime,
+} from '../types/index.ts';
 
 let supabase: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
   if (supabase) return supabase;
 
-  const url = process.env.SUPABASE_URL ?? 
-              process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY ?? 
-              process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
-      "Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY"
+      'Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY'
     );
   }
 
@@ -35,10 +35,10 @@ function getClient(): SupabaseClient {
 }
 
 export function isConfigured(): boolean {
-  const url = process.env.SUPABASE_URL ?? 
-              process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY ?? 
-              process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
   return !!(url && key);
 }
 
@@ -115,22 +115,25 @@ function dbToTrade(row: DBTrade): Trade {
  */
 export async function getTradesByTicker(ticker: string): Promise<Trade[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("analyst_trades")
-      .select("*")
-      .eq("ticker", ticker.toUpperCase())
-      .order("open_date", { ascending: false });
+      .from('analyst_trades')
+      .select('*')
+      .eq('ticker', ticker.toUpperCase())
+      .order('open_date', { ascending: false });
 
     if (error) {
       // Silently return empty if table doesn't exist
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching trades:", error);
+      console.error('Error fetching trades:', error);
       return [];
     }
 
@@ -145,21 +148,24 @@ export async function getTradesByTicker(ticker: string): Promise<Trade[]> {
  */
 export async function getAllTrades(): Promise<Trade[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("analyst_trades")
-      .select("*")
-      .order("open_date", { ascending: false });
+      .from('analyst_trades')
+      .select('*')
+      .order('open_date', { ascending: false });
 
     if (error) {
       // Silently return empty if table doesn't exist
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching trades:", error);
+      console.error('Error fetching trades:', error);
       return [];
     }
 
@@ -174,21 +180,24 @@ export async function getAllTrades(): Promise<Trade[]> {
  */
 export async function getRecentTrades(limit: number = 10): Promise<Trade[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("analyst_trades")
-      .select("*")
-      .order("open_date", { ascending: false })
+      .from('analyst_trades')
+      .select('*')
+      .order('open_date', { ascending: false })
       .limit(limit);
 
     if (error) {
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching recent trades:", error);
+      console.error('Error fetching recent trades:', error);
       return [];
     }
 
@@ -201,7 +210,9 @@ export async function getRecentTrades(limit: number = 10): Promise<Trade[]> {
 /**
  * Insert a new trade
  */
-export async function insertTrade(trade: Omit<Trade, "id" | "createdAt" | "updatedAt" | "daysHeld">): Promise<Trade | null> {
+export async function insertTrade(
+  trade: Omit<Trade, 'id' | 'createdAt' | 'updatedAt' | 'daysHeld'>
+): Promise<Trade | null> {
   const client = getClient();
 
   const dbRecord = {
@@ -210,10 +221,10 @@ export async function insertTrade(trade: Omit<Trade, "id" | "createdAt" | "updat
     direction: trade.direction,
     long_strike: trade.longStrike,
     short_strike: trade.shortStrike,
-    expiration: trade.expiration.toISOString().split("T")[0],
+    expiration: trade.expiration.toISOString().split('T')[0],
     quantity: trade.quantity,
-    open_date: trade.openDate.toISOString().split("T")[0],
-    close_date: trade.closeDate?.toISOString().split("T")[0] ?? null,
+    open_date: trade.openDate.toISOString().split('T')[0],
+    close_date: trade.closeDate?.toISOString().split('T')[0] ?? null,
     open_premium: trade.openPremium,
     close_premium: trade.closePremium ?? null,
     max_profit: trade.maxProfit ?? null,
@@ -232,13 +243,13 @@ export async function insertTrade(trade: Omit<Trade, "id" | "createdAt" | "updat
   };
 
   const { data, error } = await client
-    .from("analyst_trades")
+    .from('analyst_trades')
     .insert(dbRecord)
     .select()
     .single();
 
   if (error) {
-    console.error("Error inserting trade:", error);
+    console.error('Error inserting trade:', error);
     return null;
   }
 
@@ -249,15 +260,15 @@ export async function insertTrade(trade: Omit<Trade, "id" | "createdAt" | "updat
  * Update an existing trade
  */
 export async function updateTrade(
-  id: string, 
+  id: string,
   updates: Partial<Trade>
 ): Promise<Trade | null> {
   const client = getClient();
 
   const dbUpdates: Record<string, unknown> = {};
-  
+
   if (updates.closeDate) {
-    dbUpdates.close_date = updates.closeDate.toISOString().split("T")[0];
+    dbUpdates.close_date = updates.closeDate.toISOString().split('T')[0];
   }
   if (updates.closePremium !== undefined) {
     dbUpdates.close_premium = updates.closePremium;
@@ -282,14 +293,14 @@ export async function updateTrade(
   }
 
   const { data, error } = await client
-    .from("analyst_trades")
+    .from('analyst_trades')
     .update(dbUpdates)
-    .eq("id", id)
+    .eq('id', id)
     .select()
     .single();
 
   if (error) {
-    console.error("Error updating trade:", error);
+    console.error('Error updating trade:', error);
     return null;
   }
 
@@ -314,24 +325,34 @@ export interface TickerStats {
 /**
  * Get statistics for a specific ticker
  */
-export async function getTickerStats(ticker: string): Promise<TickerStats | null> {
+export async function getTickerStats(
+  ticker: string
+): Promise<TickerStats | null> {
   const trades = await getTradesByTicker(ticker);
-  
+
   if (trades.length === 0) return null;
 
-  const closedTrades = trades.filter(t => t.status !== "open");
-  const wins = closedTrades.filter(t => t.outcome === "win" || t.outcome === "max_profit").length;
-  const losses = closedTrades.filter(t => t.outcome === "loss" || t.outcome === "max_loss").length;
-  
-  const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl ?? 0), 0);
+  const closedTrades = trades.filter((t) => t.status !== 'open');
+  const wins = closedTrades.filter(
+    (t) => t.outcome === 'win' || t.outcome === 'max_profit'
+  ).length;
+  const losses = closedTrades.filter(
+    (t) => t.outcome === 'loss' || t.outcome === 'max_loss'
+  ).length;
+
+  const totalPnl = closedTrades.reduce(
+    (sum, t) => sum + (t.realizedPnl ?? 0),
+    0
+  );
   const avgPnl = closedTrades.length > 0 ? totalPnl / closedTrades.length : 0;
-  
+
   const daysHeld = closedTrades
-    .filter(t => t.daysHeld !== undefined)
-    .map(t => t.daysHeld!);
-  const avgDaysHeld = daysHeld.length > 0 
-    ? daysHeld.reduce((a, b) => a + b, 0) / daysHeld.length 
-    : 0;
+    .filter((t) => t.daysHeld !== undefined)
+    .map((t) => t.daysHeld!);
+  const avgDaysHeld =
+    daysHeld.length > 0
+      ? daysHeld.reduce((a, b) => a + b, 0) / daysHeld.length
+      : 0;
 
   return {
     ticker: ticker.toUpperCase(),
@@ -359,18 +380,21 @@ export async function getPerformanceSummary(): Promise<{
   avgPnl: number;
 }> {
   const trades = await getAllTrades();
-  
-  const openTrades = trades.filter(t => t.status === "open").length;
-  const closedTrades = trades.filter(t => t.status !== "open");
-  
+
+  const openTrades = trades.filter((t) => t.status === 'open').length;
+  const closedTrades = trades.filter((t) => t.status !== 'open');
+
   const wins = closedTrades.filter(
-    t => t.outcome === "win" || t.outcome === "max_profit"
+    (t) => t.outcome === 'win' || t.outcome === 'max_profit'
   ).length;
   const losses = closedTrades.filter(
-    t => t.outcome === "loss" || t.outcome === "max_loss"
+    (t) => t.outcome === 'loss' || t.outcome === 'max_loss'
   ).length;
-  
-  const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl ?? 0), 0);
+
+  const totalPnl = closedTrades.reduce(
+    (sum, t) => sum + (t.realizedPnl ?? 0),
+    0
+  );
   const avgPnl = closedTrades.length > 0 ? totalPnl / closedTrades.length : 0;
 
   return {
@@ -393,7 +417,7 @@ export interface Observation {
   id: string;
   observation: string;
   context: Record<string, unknown>;
-  confidence: "hypothesis" | "pattern" | "rule";
+  confidence: 'hypothesis' | 'pattern' | 'rule';
   validated: boolean;
   validationNotes?: string;
   tags: string[];
@@ -411,11 +435,11 @@ export async function addObservation(
   const client = getClient();
 
   const { data, error } = await client
-    .from("analyst_observations")
+    .from('analyst_observations')
     .insert({
       observation,
       context,
-      confidence: "hypothesis",
+      confidence: 'hypothesis',
       validated: false,
       tags,
     })
@@ -423,7 +447,7 @@ export async function addObservation(
     .single();
 
   if (error) {
-    console.error("Error adding observation:", error);
+    console.error('Error adding observation:', error);
     return null;
   }
 
@@ -448,35 +472,37 @@ export async function getObservationsForTicker(
   const client = getClient();
 
   const { data, error } = await client
-    .from("analyst_observations")
-    .select("*")
-    .contains("tags", [ticker.toUpperCase()])
-    .order("created_at", { ascending: false });
+    .from('analyst_observations')
+    .select('*')
+    .contains('tags', [ticker.toUpperCase()])
+    .order('created_at', { ascending: false });
 
   if (error) {
-    console.error("Error fetching observations:", error);
+    console.error('Error fetching observations:', error);
     return [];
   }
 
-  return data.map((row: {
-    id: string;
-    observation: string;
-    context: Record<string, unknown>;
-    confidence: "hypothesis" | "pattern" | "rule";
-    validated: boolean;
-    validation_notes?: string;
-    tags: string[];
-    created_at: string;
-  }) => ({
-    id: row.id,
-    observation: row.observation,
-    context: row.context,
-    confidence: row.confidence,
-    validated: row.validated,
-    validationNotes: row.validation_notes,
-    tags: row.tags ?? [],
-    createdAt: new Date(row.created_at),
-  }));
+  return data.map(
+    (row: {
+      id: string;
+      observation: string;
+      context: Record<string, unknown>;
+      confidence: 'hypothesis' | 'pattern' | 'rule';
+      validated: boolean;
+      validation_notes?: string;
+      tags: string[];
+      created_at: string;
+    }) => ({
+      id: row.id,
+      observation: row.observation,
+      context: row.context,
+      confidence: row.confidence,
+      validated: row.validated,
+      validationNotes: row.validation_notes,
+      tags: row.tags ?? [],
+      createdAt: new Date(row.created_at),
+    })
+  );
 }
 
 // ============================================================================
@@ -489,6 +515,7 @@ export interface WatchlistItem {
   targetRsiLow: number;
   targetRsiHigh: number;
   targetIvPercentile: number;
+  ivPercentileMin?: number;
   minCushionPct: number;
   minGrade: string;
   active: boolean;
@@ -530,25 +557,30 @@ function dbToWatchlistItem(row: DBWatchlistItem): WatchlistItem {
 /**
  * Get all watchlist items
  */
-export async function getWatchlist(activeOnly: boolean = true): Promise<WatchlistItem[]> {
+export async function getWatchlist(
+  activeOnly: boolean = true
+): Promise<WatchlistItem[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
-    let query = client.from("agent_watchlist").select("*");
+
+    let query = client.from('agent_watchlist').select('*');
     if (activeOnly) {
-      query = query.eq("active", true);
+      query = query.eq('active', true);
     }
-    query = query.order("ticker", { ascending: true });
+    query = query.order('ticker', { ascending: true });
 
     const { data, error } = await query;
 
     if (error) {
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching watchlist:", error);
+      console.error('Error fetching watchlist:', error);
       return [];
     }
 
@@ -573,13 +605,13 @@ export async function addToWatchlist(
   }
 ): Promise<WatchlistItem[]> {
   if (!isConfigured()) return [];
-  
+
   const tickerList = Array.isArray(tickers) ? tickers : [tickers];
   const results: WatchlistItem[] = [];
-  
+
   try {
     const client = getClient();
-    
+
     for (const ticker of tickerList) {
       const dbRecord = {
         ticker: ticker.toUpperCase(),
@@ -593,8 +625,8 @@ export async function addToWatchlist(
       };
 
       const { data, error } = await client
-        .from("agent_watchlist")
-        .upsert(dbRecord, { onConflict: "ticker" })
+        .from('agent_watchlist')
+        .upsert(dbRecord, { onConflict: 'ticker' })
         .select()
         .single();
 
@@ -608,7 +640,7 @@ export async function addToWatchlist(
 
     return results;
   } catch (err) {
-    console.error("Error adding to watchlist:", err);
+    console.error('Error adding to watchlist:', err);
     return results;
   }
 }
@@ -618,17 +650,17 @@ export async function addToWatchlist(
  */
 export async function removeFromWatchlist(ticker: string): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
+
     const { error } = await client
-      .from("agent_watchlist")
+      .from('agent_watchlist')
       .delete()
-      .eq("ticker", ticker.toUpperCase());
+      .eq('ticker', ticker.toUpperCase());
 
     if (error) {
-      console.error("Error removing from watchlist:", error);
+      console.error('Error removing from watchlist:', error);
       return false;
     }
 
@@ -654,28 +686,32 @@ export async function configureWatchlistItem(
   }
 ): Promise<WatchlistItem | null> {
   if (!isConfigured()) return null;
-  
+
   try {
     const client = getClient();
-    
+
     const dbUpdates: Record<string, unknown> = {};
-    if (config.targetRsiLow !== undefined) dbUpdates.target_rsi_low = config.targetRsiLow;
-    if (config.targetRsiHigh !== undefined) dbUpdates.target_rsi_high = config.targetRsiHigh;
-    if (config.targetIvPercentile !== undefined) dbUpdates.target_iv_percentile = config.targetIvPercentile;
-    if (config.minCushionPct !== undefined) dbUpdates.min_cushion_pct = config.minCushionPct;
+    if (config.targetRsiLow !== undefined)
+      dbUpdates.target_rsi_low = config.targetRsiLow;
+    if (config.targetRsiHigh !== undefined)
+      dbUpdates.target_rsi_high = config.targetRsiHigh;
+    if (config.targetIvPercentile !== undefined)
+      dbUpdates.target_iv_percentile = config.targetIvPercentile;
+    if (config.minCushionPct !== undefined)
+      dbUpdates.min_cushion_pct = config.minCushionPct;
     if (config.minGrade !== undefined) dbUpdates.min_grade = config.minGrade;
     if (config.notes !== undefined) dbUpdates.notes = config.notes;
     if (config.active !== undefined) dbUpdates.active = config.active;
 
     const { data, error } = await client
-      .from("agent_watchlist")
+      .from('agent_watchlist')
       .update(dbUpdates)
-      .eq("ticker", ticker.toUpperCase())
+      .eq('ticker', ticker.toUpperCase())
       .select()
       .single();
 
     if (error) {
-      console.error("Error configuring watchlist item:", error);
+      console.error('Error configuring watchlist item:', error);
       return null;
     }
 
@@ -689,15 +725,15 @@ export async function configureWatchlistItem(
 // AGENT: ALERTS
 // ============================================================================
 
-export type AlertType = 
-  | "ENTRY_SIGNAL"
-  | "EXIT_SIGNAL"
-  | "POSITION_RISK"
-  | "EARNINGS_WARNING"
-  | "NEWS_EVENT"
-  | "MACRO_EVENT";
+export type AlertType =
+  | 'ENTRY_SIGNAL'
+  | 'EXIT_SIGNAL'
+  | 'POSITION_RISK'
+  | 'EARNINGS_WARNING'
+  | 'NEWS_EVENT'
+  | 'MACRO_EVENT';
 
-export type AlertPriority = "HIGH" | "MEDIUM" | "LOW";
+export type AlertPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export interface Alert {
   id: string;
@@ -741,7 +777,9 @@ function dbToAlert(row: DBAlert): Alert {
     aiConviction: row.ai_conviction ?? undefined,
     aiReasoning: row.ai_reasoning ?? undefined,
     acknowledged: row.acknowledged,
-    acknowledgedAt: row.acknowledged_at ? new Date(row.acknowledged_at) : undefined,
+    acknowledgedAt: row.acknowledged_at
+      ? new Date(row.acknowledged_at)
+      : undefined,
     createdAt: new Date(row.created_at),
   };
 }
@@ -760,10 +798,10 @@ export async function createAlert(alert: {
   aiReasoning?: string;
 }): Promise<Alert | null> {
   if (!isConfigured()) return null;
-  
+
   try {
     const client = getClient();
-    
+
     const dbRecord = {
       ticker: alert.ticker.toUpperCase(),
       alert_type: alert.alertType,
@@ -776,19 +814,19 @@ export async function createAlert(alert: {
     };
 
     const { data, error } = await client
-      .from("agent_alerts")
+      .from('agent_alerts')
       .insert(dbRecord)
       .select()
       .single();
 
     if (error) {
-      console.error("Error creating alert:", error);
+      console.error('Error creating alert:', error);
       return null;
     }
 
     return dbToAlert(data as DBAlert);
   } catch (err) {
-    console.error("Error creating alert:", err);
+    console.error('Error creating alert:', err);
     return null;
   }
 }
@@ -803,33 +841,36 @@ export async function getRecentAlerts(options?: {
   unacknowledgedOnly?: boolean;
 }): Promise<Alert[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
-    let query = client.from("agent_alerts").select("*");
-    
+
+    let query = client.from('agent_alerts').select('*');
+
     if (options?.ticker) {
-      query = query.eq("ticker", options.ticker.toUpperCase());
+      query = query.eq('ticker', options.ticker.toUpperCase());
     }
     if (options?.alertType) {
-      query = query.eq("alert_type", options.alertType);
+      query = query.eq('alert_type', options.alertType);
     }
     if (options?.unacknowledgedOnly) {
-      query = query.eq("acknowledged", false);
+      query = query.eq('acknowledged', false);
     }
-    
+
     query = query
-      .order("created_at", { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(options?.limit ?? 50);
 
     const { data, error } = await query;
 
     if (error) {
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching alerts:", error);
+      console.error('Error fetching alerts:', error);
       return [];
     }
 
@@ -844,20 +885,20 @@ export async function getRecentAlerts(options?: {
  */
 export async function acknowledgeAlert(id: string): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
+
     const { error } = await client
-      .from("agent_alerts")
+      .from('agent_alerts')
       .update({
         acknowledged: true,
         acknowledged_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq('id', id);
 
     if (error) {
-      console.error("Error acknowledging alert:", error);
+      console.error('Error acknowledging alert:', error);
       return false;
     }
 
@@ -871,7 +912,11 @@ export async function acknowledgeAlert(id: string): Promise<boolean> {
 // AGENT: SCAN HISTORY
 // ============================================================================
 
-export type ScanType = "WATCHLIST" | "FULL_MARKET" | "POSITION_CHECK" | "BRIEFING";
+export type ScanType =
+  | 'WATCHLIST'
+  | 'FULL_MARKET'
+  | 'POSITION_CHECK'
+  | 'BRIEFING';
 
 export interface ScanRecord {
   id: string;
@@ -896,10 +941,10 @@ export async function logScan(scan: {
   errors?: unknown[];
 }): Promise<ScanRecord | null> {
   if (!isConfigured()) return null;
-  
+
   try {
     const client = getClient();
-    
+
     const dbRecord = {
       scan_type: scan.scanType,
       tickers_scanned: scan.tickersScanned,
@@ -910,13 +955,13 @@ export async function logScan(scan: {
     };
 
     const { data, error } = await client
-      .from("agent_scan_history")
+      .from('agent_scan_history')
       .insert(dbRecord)
       .select()
       .single();
 
     if (error) {
-      console.error("Error logging scan:", error);
+      console.error('Error logging scan:', error);
       return null;
     }
 
@@ -931,7 +976,7 @@ export async function logScan(scan: {
       createdAt: new Date(data.created_at),
     };
   } catch (err) {
-    console.error("Error logging scan:", err);
+    console.error('Error logging scan:', err);
     return null;
   }
 }
@@ -967,12 +1012,12 @@ export async function saveBriefing(briefing: {
   aiCommentary?: string;
 }): Promise<Briefing | null> {
   if (!isConfigured()) return null;
-  
+
   try {
     const client = getClient();
-    
-    const dateStr = briefing.date.toISOString().split("T")[0];
-    
+
+    const dateStr = briefing.date.toISOString().split('T')[0];
+
     const dbRecord = {
       date: dateStr,
       market_summary: briefing.marketSummary ?? null,
@@ -984,13 +1029,13 @@ export async function saveBriefing(briefing: {
     };
 
     const { data, error } = await client
-      .from("agent_briefings")
-      .upsert(dbRecord, { onConflict: "date" })
+      .from('agent_briefings')
+      .upsert(dbRecord, { onConflict: 'date' })
       .select()
       .single();
 
     if (error) {
-      console.error("Error saving briefing:", error);
+      console.error('Error saving briefing:', error);
       return null;
     }
 
@@ -1008,7 +1053,7 @@ export async function saveBriefing(briefing: {
       createdAt: new Date(data.created_at),
     };
   } catch (err) {
-    console.error("Error saving briefing:", err);
+    console.error('Error saving briefing:', err);
     return null;
   }
 }
@@ -1018,23 +1063,23 @@ export async function saveBriefing(briefing: {
  */
 export async function getBriefing(date: Date): Promise<Briefing | null> {
   if (!isConfigured()) return null;
-  
+
   try {
     const client = getClient();
-    const dateStr = date.toISOString().split("T")[0];
-    
+    const dateStr = date.toISOString().split('T')[0];
+
     const { data, error } = await client
-      .from("agent_briefings")
-      .select("*")
-      .eq("date", dateStr)
+      .from('agent_briefings')
+      .select('*')
+      .eq('date', dateStr)
       .single();
 
     if (error) {
-      if (error.code === "PGRST116") {
+      if (error.code === 'PGRST116') {
         // No rows returned
         return null;
       }
-      console.error("Error fetching briefing:", error);
+      console.error('Error fetching briefing:', error);
       return null;
     }
 
@@ -1059,51 +1104,58 @@ export async function getBriefing(date: Date): Promise<Briefing | null> {
 /**
  * Get recent briefings
  */
-export async function getRecentBriefings(limit: number = 7): Promise<Briefing[]> {
+export async function getRecentBriefings(
+  limit: number = 7
+): Promise<Briefing[]> {
   if (!isConfigured()) return [];
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("agent_briefings")
-      .select("*")
-      .order("date", { ascending: false })
+      .from('agent_briefings')
+      .select('*')
+      .order('date', { ascending: false })
       .limit(limit);
 
     if (error) {
-      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('does not exist')
+      ) {
         return [];
       }
-      console.error("Error fetching briefings:", error);
+      console.error('Error fetching briefings:', error);
       return [];
     }
 
-    return data.map((row: {
-      id: string;
-      date: string;
-      market_summary: string | null;
-      market_data: Record<string, unknown>;
-      watchlist_alerts: unknown[];
-      position_updates: unknown[];
-      calendar_events: unknown[];
-      ai_commentary: string | null;
-      delivered_discord: boolean;
-      delivered_at: string | null;
-      created_at: string;
-    }) => ({
-      id: row.id,
-      date: new Date(row.date),
-      marketSummary: row.market_summary ?? undefined,
-      marketData: row.market_data,
-      watchlistAlerts: row.watchlist_alerts,
-      positionUpdates: row.position_updates,
-      calendarEvents: row.calendar_events,
-      aiCommentary: row.ai_commentary ?? undefined,
-      deliveredDiscord: row.delivered_discord,
-      deliveredAt: row.delivered_at ? new Date(row.delivered_at) : undefined,
-      createdAt: new Date(row.created_at),
-    }));
+    return data.map(
+      (row: {
+        id: string;
+        date: string;
+        market_summary: string | null;
+        market_data: Record<string, unknown>;
+        watchlist_alerts: unknown[];
+        position_updates: unknown[];
+        calendar_events: unknown[];
+        ai_commentary: string | null;
+        delivered_discord: boolean;
+        delivered_at: string | null;
+        created_at: string;
+      }) => ({
+        id: row.id,
+        date: new Date(row.date),
+        marketSummary: row.market_summary ?? undefined,
+        marketData: row.market_data,
+        watchlistAlerts: row.watchlist_alerts,
+        positionUpdates: row.position_updates,
+        calendarEvents: row.calendar_events,
+        aiCommentary: row.ai_commentary ?? undefined,
+        deliveredDiscord: row.delivered_discord,
+        deliveredAt: row.delivered_at ? new Date(row.delivered_at) : undefined,
+        createdAt: new Date(row.created_at),
+      })
+    );
   } catch {
     return [];
   }
@@ -1114,20 +1166,20 @@ export async function getRecentBriefings(limit: number = 7): Promise<Briefing[]>
  */
 export async function markBriefingDelivered(id: string): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
+
     const { error } = await client
-      .from("agent_briefings")
+      .from('agent_briefings')
       .update({
         delivered_discord: true,
         delivered_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq('id', id);
 
     if (error) {
-      console.error("Error marking briefing delivered:", error);
+      console.error('Error marking briefing delivered:', error);
       return false;
     }
 
@@ -1146,22 +1198,22 @@ export async function markBriefingDelivered(id: string): Promise<boolean> {
  */
 export async function getConfig<T>(key: string, defaultValue: T): Promise<T> {
   if (!isConfigured()) return defaultValue;
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("agent_config")
-      .select("value")
-      .eq("key", key)
+      .from('agent_config')
+      .select('value')
+      .eq('key', key)
       .single();
 
     if (error) {
-      if (error.code === "PGRST116") {
+      if (error.code === 'PGRST116') {
         // Key doesn't exist
         return defaultValue;
       }
-      console.error("Error fetching config:", error);
+      console.error('Error fetching config:', error);
       return defaultValue;
     }
 
@@ -1175,15 +1227,15 @@ export async function getConfig<T>(key: string, defaultValue: T): Promise<T> {
  * Set configuration value
  */
 export async function setConfig<T>(
-  key: string, 
-  value: T, 
+  key: string,
+  value: T,
   description?: string
 ): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
+
     const dbRecord: Record<string, unknown> = {
       key,
       value,
@@ -1193,11 +1245,11 @@ export async function setConfig<T>(
     }
 
     const { error } = await client
-      .from("agent_config")
-      .upsert(dbRecord, { onConflict: "key" });
+      .from('agent_config')
+      .upsert(dbRecord, { onConflict: 'key' });
 
     if (error) {
-      console.error("Error setting config:", error);
+      console.error('Error setting config:', error);
       return false;
     }
 
@@ -1212,16 +1264,16 @@ export async function setConfig<T>(
  */
 export async function getAllConfig(): Promise<Record<string, unknown>> {
   if (!isConfigured()) return {};
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("agent_config")
-      .select("key, value");
+      .from('agent_config')
+      .select('key, value');
 
     if (error) {
-      console.error("Error fetching all config:", error);
+      console.error('Error fetching all config:', error);
       return {};
     }
 
@@ -1243,26 +1295,26 @@ export async function getAllConfig(): Promise<Record<string, unknown>> {
  * Check if a ticker is in cooldown period
  */
 export async function checkAlertCooldown(
-  ticker: string, 
+  ticker: string,
   cooldownMs: number
 ): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
+
     const { data, error } = await client
-      .from("agent_alert_cooldowns")
-      .select("last_alert_at")
-      .eq("ticker", ticker.toUpperCase())
+      .from('agent_alert_cooldowns')
+      .select('last_alert_at')
+      .eq('ticker', ticker.toUpperCase())
       .single();
 
     if (error) {
-      if (error.code === "PGRST116") {
+      if (error.code === 'PGRST116') {
         // No cooldown record = not in cooldown
         return false;
       }
-      console.error("Error checking cooldown:", error);
+      console.error('Error checking cooldown:', error);
       return false;
     }
 
@@ -1278,24 +1330,25 @@ export async function checkAlertCooldown(
  * Update alert cooldown for a ticker
  */
 export async function updateAlertCooldown(
-  ticker: string, 
+  ticker: string,
   alertType: AlertType
 ): Promise<boolean> {
   if (!isConfigured()) return false;
-  
+
   try {
     const client = getClient();
-    
-    const { error } = await client
-      .from("agent_alert_cooldowns")
-      .upsert({
+
+    const { error } = await client.from('agent_alert_cooldowns').upsert(
+      {
         ticker: ticker.toUpperCase(),
         alert_type: alertType,
         last_alert_at: new Date().toISOString(),
-      }, { onConflict: "ticker" });
+      },
+      { onConflict: 'ticker' }
+    );
 
     if (error) {
-      console.error("Error updating cooldown:", error);
+      console.error('Error updating cooldown:', error);
       return false;
     }
 
@@ -1304,4 +1357,3 @@ export async function updateAlertCooldown(
     return false;
   }
 }
-

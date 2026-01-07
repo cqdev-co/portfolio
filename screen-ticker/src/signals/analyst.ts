@@ -1,5 +1,5 @@
-import type { Signal, QuoteSummary } from "../types/index.ts";
-import { defaultThresholds, defaultWeights } from "../config/thresholds.ts";
+import type { Signal, QuoteSummary } from '../types/index.ts';
+import { defaultThresholds, defaultWeights } from '../config/thresholds.ts';
 
 interface AnalystResult {
   score: number;
@@ -30,40 +30,43 @@ function checkPriceTargetUpside(
   if (upside >= thresholds.minUpsidePercent) {
     return {
       signal: {
-        name: "High Upside Potential",
-        category: "analyst",
+        name: 'High Upside Potential',
+        category: 'analyst',
         points: defaultWeights.analyst.highUpside,
-        description: `Target $${targetPrice.toFixed(0)} ` +
+        description:
+          `Target $${targetPrice.toFixed(0)} ` +
           `(+${(upside * 100).toFixed(0)}% upside)`,
         value: upside,
       },
       upside,
     };
   }
-  
+
   // Moderate upside: >= 15% (partial points)
   if (upside >= 0.15) {
     return {
       signal: {
-        name: "Moderate Upside",
-        category: "analyst",
+        name: 'Moderate Upside',
+        category: 'analyst',
         points: 5,
-        description: `Target $${targetPrice.toFixed(0)} ` +
+        description:
+          `Target $${targetPrice.toFixed(0)} ` +
           `(+${(upside * 100).toFixed(0)}% upside)`,
         value: upside,
       },
       upside,
     };
   }
-  
+
   // Small upside: >= 10% (small points)
-  if (upside >= 0.10) {
+  if (upside >= 0.1) {
     return {
       signal: {
-        name: "Some Upside",
-        category: "analyst",
+        name: 'Some Upside',
+        category: 'analyst',
         points: 3,
-        description: `Target $${targetPrice.toFixed(0)} ` +
+        description:
+          `Target $${targetPrice.toFixed(0)} ` +
           `(+${(upside * 100).toFixed(0)}% upside)`,
         value: upside,
       },
@@ -94,9 +97,12 @@ function checkRecentUpgrades(
   const isRecent = (epochGradeDate: Date | number | undefined): boolean => {
     if (!epochGradeDate) return false;
     // Handle Date object or epoch number (seconds or ms)
-    const dateMs = epochGradeDate instanceof Date 
-      ? epochGradeDate.getTime()
-      : epochGradeDate > 1e12 ? epochGradeDate : epochGradeDate * 1000;
+    const dateMs =
+      epochGradeDate instanceof Date
+        ? epochGradeDate.getTime()
+        : epochGradeDate > 1e12
+          ? epochGradeDate
+          : epochGradeDate * 1000;
     return dateMs > cutoffMs;
   };
 
@@ -105,22 +111,22 @@ function checkRecentUpgrades(
   const recentUpgrades = history.filter((h) => {
     return (
       isRecent(h.epochGradeDate) &&
-      (h.action === "up" || h.action === "upgrade")
+      (h.action === 'up' || h.action === 'upgrade')
     );
   });
 
   const recentDowngrades = history.filter((h) => {
     return (
       isRecent(h.epochGradeDate) &&
-      (h.action === "down" || h.action === "downgrade")
+      (h.action === 'down' || h.action === 'downgrade')
     );
   });
-  
+
   // Also count initiations separately (new coverage is generally bullish)
   const recentInitiations = history.filter((h) => {
     return (
       isRecent(h.epochGradeDate) &&
-      (h.action === "init" || h.action === "initiated")
+      (h.action === 'init' || h.action === 'initiated')
     );
   });
 
@@ -129,19 +135,19 @@ function checkRecentUpgrades(
   // Strong upgrade momentum
   if (netUpgrades >= thresholds.recentUpgradesMin) {
     return {
-      name: "Recent Upgrades",
-      category: "analyst",
+      name: 'Recent Upgrades',
+      category: 'analyst',
       points: defaultWeights.analyst.recentUpgrades,
       description: `${recentUpgrades.length} up vs ${recentDowngrades.length} down (net +${netUpgrades})`,
       value: netUpgrades,
     };
   }
-  
+
   // New analyst coverage (initiations indicate interest)
   if (recentInitiations.length >= 3) {
     return {
-      name: "New Analyst Coverage",
-      category: "analyst",
+      name: 'New Analyst Coverage',
+      category: 'analyst',
       points: 3,
       description: `${recentInitiations.length} analysts initiated coverage`,
       value: recentInitiations.length,
@@ -180,10 +186,10 @@ function checkRecommendationTrend(summary: QuoteSummary): Signal | null {
   // Strong buy consensus (relaxed: 70%+ bullish with at least 3 analysts)
   // Old: bullish > bearish * 3 AND bullish >= 5 (too strict)
   // New: 70%+ bullish AND at least 3 bullish ratings
-  if (bullishRatio >= 0.70 && bullish >= 3) {
+  if (bullishRatio >= 0.7 && bullish >= 3) {
     return {
-      name: "Strong Buy Consensus",
-      category: "analyst",
+      name: 'Strong Buy Consensus',
+      category: 'analyst',
       points: 5,
       description: `${bullish} Buy vs ${bearish} Sell (${(bullishRatio * 100).toFixed(0)}% bullish)`,
       value: bullishRatio,
@@ -191,10 +197,10 @@ function checkRecommendationTrend(summary: QuoteSummary): Signal | null {
   }
 
   // Moderate buy consensus (60%+ bullish with at least 4 analysts)
-  if (bullishRatio >= 0.60 && bullish >= 4) {
+  if (bullishRatio >= 0.6 && bullish >= 4) {
     return {
-      name: "Buy Consensus",
-      category: "analyst",
+      name: 'Buy Consensus',
+      category: 'analyst',
       points: 3,
       description: `${bullish} Buy vs ${bearish} Sell (${(bullishRatio * 100).toFixed(0)}% bullish)`,
       value: bullishRatio,
@@ -204,8 +210,8 @@ function checkRecommendationTrend(summary: QuoteSummary): Signal | null {
   // Mixed but leaning bullish (more buys than sells with decent coverage)
   if (bullish > bearish && totalAnalysts >= 5 && bullishRatio >= 0.45) {
     return {
-      name: "Leaning Bullish",
-      category: "analyst",
+      name: 'Leaning Bullish',
+      category: 'analyst',
       points: 2,
       description: `${bullish} Buy vs ${bearish} Sell, ${hold} Hold`,
       value: bullishRatio,
@@ -224,8 +230,8 @@ function checkEarningsRevisions(summary: QuoteSummary): Signal | null {
   if (!trends || trends.length === 0) return null;
 
   // Look for positive growth estimates
-  const currentQuarter = trends.find((t) => t.period === "0q");
-  const nextQuarter = trends.find((t) => t.period === "+1q");
+  const currentQuarter = trends.find((t) => t.period === '0q');
+  const nextQuarter = trends.find((t) => t.period === '+1q');
 
   if (!currentQuarter?.growth?.raw && !nextQuarter?.growth?.raw) {
     return null;
@@ -237,10 +243,11 @@ function checkEarningsRevisions(summary: QuoteSummary): Signal | null {
   // Positive earnings growth expected
   if (currentGrowth > 0.05 || nextGrowth > 0.05) {
     return {
-      name: "Positive Earnings Outlook",
-      category: "analyst",
+      name: 'Positive Earnings Outlook',
+      category: 'analyst',
       points: defaultWeights.analyst.positiveRevisions,
-      description: `Expected EPS growth: ` +
+      description:
+        `Expected EPS growth: ` +
         `${(Math.max(currentGrowth, nextGrowth) * 100).toFixed(0)}%`,
       value: Math.max(currentGrowth, nextGrowth),
     };
@@ -260,8 +267,8 @@ function checkAnalystCoverage(summary: QuoteSummary): Signal | null {
   // High analyst coverage
   if (numAnalysts >= 20) {
     return {
-      name: "High Analyst Coverage",
-      category: "analyst",
+      name: 'High Analyst Coverage',
+      category: 'analyst',
       points: 2, // Small bonus
       description: `${numAnalysts} analysts covering`,
       value: numAnalysts,
@@ -274,9 +281,7 @@ function checkAnalystCoverage(summary: QuoteSummary): Signal | null {
 /**
  * Calculate all analyst signals for a stock
  */
-export function calculateAnalystSignals(
-  summary: QuoteSummary
-): AnalystResult {
+export function calculateAnalystSignals(summary: QuoteSummary): AnalystResult {
   const signals: Signal[] = [];
   let score = 0;
   let upsidePotential = 0;
@@ -324,4 +329,3 @@ export function calculateAnalystSignals(
     upsidePotential,
   };
 }
-

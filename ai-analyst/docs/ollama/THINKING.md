@@ -2,15 +2,15 @@
 
 Thinking-capable models emit a `thinking` field that separates their reasoning trace from the final answer.
 
-Use this capability to audit model steps, animate the model *thinking* in a UI, or hide the trace entirely when you only need the final response.
+Use this capability to audit model steps, animate the model _thinking_ in a UI, or hide the trace entirely when you only need the final response.
 
 ## Supported models
 
-* [Qwen 3](https://ollama.com/library/qwen3)
-* [GPT-OSS](https://ollama.com/library/gpt-oss) *(use `think` levels: `low`, `medium`, `high` — the trace cannot be fully disabled)*
-* [DeepSeek-v3.1](https://ollama.com/library/deepseek-v3.1)
-* [DeepSeek R1](https://ollama.com/library/deepseek-r1)
-* Browse the latest additions under [thinking models](https://ollama.com/search?c=thinking)
+- [Qwen 3](https://ollama.com/library/qwen3)
+- [GPT-OSS](https://ollama.com/library/gpt-oss) _(use `think` levels: `low`, `medium`, `high` — the trace cannot be fully disabled)_
+- [DeepSeek-v3.1](https://ollama.com/library/deepseek-v3.1)
+- [DeepSeek R1](https://ollama.com/library/deepseek-r1)
+- Browse the latest additions under [thinking models](https://ollama.com/search?c=thinking)
 
 ## Enable thinking in API calls
 
@@ -49,6 +49,7 @@ The `message.thinking` (chat endpoint) or `thinking` (generate endpoint) field c
     print('Thinking:\n', response.message.thinking)
     print('Answer:\n', response.message.content)
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -65,6 +66,7 @@ The `message.thinking` (chat endpoint) or `thinking` (generate endpoint) field c
     console.log('Thinking:\n', response.message.thinking)
     console.log('Answer:\n', response.message.content)
     ```
+
   </Tab>
 </Tabs>
 
@@ -104,6 +106,7 @@ Thinking streams interleave reasoning tokens before answer tokens. Detect the fi
         print(chunk.message.content, end='')
 
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -140,19 +143,19 @@ Thinking streams interleave reasoning tokens before answer tokens. Detect the fi
 
     main()
     ```
+
   </Tab>
 </Tabs>
 
 ## CLI quick reference
 
-* Enable thinking for a single run: `ollama run deepseek-r1 --think "Where should I visit in Lisbon?"`
-* Disable thinking: `ollama run deepseek-r1 --think=false "Summarize this article"`
-* Hide the trace while still using a thinking model: `ollama run deepseek-r1 --hidethinking "Is 9.9 bigger or 9.11?"`
-* Inside interactive sessions, toggle with `/set think` or `/set nothink`.
-* GPT-OSS only accepts levels: `ollama run gpt-oss --think=low "Draft a headline"` (replace `low` with `medium` or `high` as needed).
+- Enable thinking for a single run: `ollama run deepseek-r1 --think "Where should I visit in Lisbon?"`
+- Disable thinking: `ollama run deepseek-r1 --think=false "Summarize this article"`
+- Hide the trace while still using a thinking model: `ollama run deepseek-r1 --hidethinking "Is 9.9 bigger or 9.11?"`
+- Inside interactive sessions, toggle with `/set think` or `/set nothink`.
+- GPT-OSS only accepts levels: `ollama run gpt-oss --think=low "Draft a headline"` (replace `low` with `medium` or `high` as needed).
 
 <Note>Thinking is enabled by default in the CLI and API for supported models.</Note>
-
 
 ---
 

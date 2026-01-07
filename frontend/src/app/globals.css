@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @plugin "tailwindcss-animate";
 
@@ -48,7 +48,11 @@
 /* Light mode: Off-white theme */
 :root {
   --background: rgb(252, 252, 250); /* Softer off-white background */
-  --foreground: rgb(34, 34, 37); /* Darker text (almost black) for better contrast */
+  --foreground: rgb(
+    34,
+    34,
+    37
+  ); /* Darker text (almost black) for better contrast */
   --card: rgb(252, 252, 250);
   --card-foreground: rgb(34, 34, 37);
   --popover: rgb(252, 252, 250);
@@ -58,7 +62,11 @@
   --secondary: rgb(244, 244, 245); /* Zinc-100 */
   --secondary-foreground: rgb(53, 53, 60);
   --muted: rgb(244, 244, 245); /* Zinc-100 */
-  --muted-foreground: rgb(87, 87, 95); /* Darker muted text for better readability */
+  --muted-foreground: rgb(
+    87,
+    87,
+    95
+  ); /* Darker muted text for better readability */
   --accent: rgb(244, 244, 245); /* Zinc-100 */
   --accent-foreground: rgb(53, 53, 60);
   --destructive: rgb(220, 38, 38); /* Slightly darker red for better contrast */
@@ -66,18 +74,18 @@
   --border: rgb(228, 228, 231); /* Zinc-200 */
   --input: rgb(228, 228, 231); /* Zinc-200 */
   --ring: rgb(161, 161, 170); /* Zinc-400 */
-  
+
   /* Keep original chart colors */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  
+
   --radius: 0.5rem; /* Slightly smaller radius for a more elegant look */
-  
+
   /* Sidebar variables */
-  --sidebar: rgb(252, 252, 250); 
+  --sidebar: rgb(252, 252, 250);
   --sidebar-foreground: rgb(34, 34, 37);
   --sidebar-primary: rgb(53, 53, 60);
   --sidebar-primary-foreground: rgb(252, 252, 250);
@@ -100,7 +108,11 @@
   --secondary: rgb(39, 39, 42); /* Zinc-800 */
   --secondary-foreground: rgb(245, 245, 244);
   --muted: rgb(39, 39, 42); /* Zinc-800 */
-  --muted-foreground: rgb(180, 180, 186); /* Lighter gray for better contrast in dark mode */
+  --muted-foreground: rgb(
+    180,
+    180,
+    186
+  ); /* Lighter gray for better contrast in dark mode */
   --accent: rgb(39, 39, 42); /* Zinc-800 */
   --accent-foreground: rgb(245, 245, 244);
   --destructive: rgb(248, 113, 113); /* Red-400 */
@@ -108,14 +120,14 @@
   --border: rgb(63, 63, 70); /* Zinc-700 */
   --input: rgb(63, 63, 70); /* Zinc-700 */
   --ring: rgb(113, 113, 122); /* Zinc-500 */
-  
+
   /* Keep original chart colors */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  
+
   /* Sidebar variables */
   --sidebar: rgb(24, 24, 27); /* Zinc-900 */
   --sidebar-foreground: rgb(245, 245, 244);
@@ -137,31 +149,45 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "ss01", "ss03", "cv01", "cv02", "cv03", "cv04";
+    font-feature-settings: 'ss01', 'ss03', 'cv01', 'cv02', 'cv03', 'cv04';
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  
+
   /* Fallback for browsers that don't support scrollbar-gutter */
   @supports not (scrollbar-gutter: stable) {
     html {
       overflow-y: scroll;
     }
   }
-  
+
   /* Compensate for scrollbar when body overflow is hidden (modals open) */
-  body[style*="overflow: hidden"] {
+  body[style*='overflow: hidden'] {
     padding-right: var(--scrollbar-width, 0px);
   }
   /* Ensure text is selectable by default */
-  p, h1, h2, h3, h4, h5, h6, li, span, div {
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  span,
+  div {
     @apply select-text;
   }
   /* Enhanced typography for better readability */
   p {
     @apply text-[13px] sm:text-sm leading-relaxed tracking-tight;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply tracking-tight font-medium;
   }
 }
@@ -175,7 +201,7 @@
   .text-caption {
     @apply text-[11px] leading-tight;
   }
-  
+
   /* Background colors */
   .bg-app {
     @apply bg-background;
@@ -192,7 +218,7 @@
   .bg-accent {
     @apply bg-accent;
   }
-  
+
   /* Text colors */
   .text-app {
     @apply text-foreground;
@@ -209,7 +235,7 @@
   .text-secondary {
     @apply text-secondary-foreground;
   }
-  
+
   /* Border colors */
   .border-app {
     @apply border-border;
@@ -223,7 +249,7 @@
   .border-accent {
     @apply border-accent;
   }
-  
+
   /* Ring colors */
   .ring-app {
     @apply ring-ring;
@@ -254,11 +280,11 @@
   @apply text-primary underline underline-offset-4 font-medium hover:text-primary/80 transition-colors;
 }
 
-.prose h1, 
-.prose h2, 
-.prose h3, 
-.prose h4, 
-.prose h5, 
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
 .prose h6 {
   @apply font-medium tracking-tighter scroll-mt-20;
 }
@@ -279,7 +305,7 @@
   @apply border-l-4 border-primary pl-6 italic text-muted-foreground;
 }
 
-.prose ul, 
+.prose ul,
 .prose ol {
   @apply my-5 ml-6;
 }
@@ -378,7 +404,7 @@
 
 /* Add a nice transition when sections become active */
 .toc-container nav a::before {
-  content: "";
+  content: '';
   @apply absolute left-0 top-0 bottom-0 w-0 opacity-0 -z-10 transition-all duration-200 ease-out rounded-r;
 }
 
@@ -426,16 +452,20 @@ h4:hover .anchor-icon {
 }
 
 /* Fix floating punctuation and typography issues */
-.prose p, 
-.prose li, 
-.prose h1, 
-.prose h2, 
-.prose h3, 
-.prose h4, 
-.prose h5, 
+.prose p,
+.prose li,
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
 .prose h6 {
   text-rendering: optimizeLegibility;
-  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1;
+  font-feature-settings:
+    'kern' 1,
+    'liga' 1,
+    'clig' 1,
+    'calt' 1;
 }
 
 /* Prevent orphaned punctuation */

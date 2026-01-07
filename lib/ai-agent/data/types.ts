@@ -1,6 +1,6 @@
 /**
  * Shared Data Types for AI Agent Tools
- * 
+ *
  * Types used by both CLI and Frontend for ticker analysis.
  */
 
@@ -13,7 +13,7 @@ export interface TickerData {
   price: number;
   change: number;
   changePct: number;
-  
+
   // Technical indicators
   rsi?: number;
   adx?: number;
@@ -22,14 +22,14 @@ export interface TickerData {
   ma20?: number;
   ma50?: number;
   ma200?: number;
-  
+
   // Volatility (standalone for convenience)
   hv20?: number;
-  
+
   // 52-week range
   fiftyTwoWeekLow?: number;
   fiftyTwoWeekHigh?: number;
-  
+
   // Fundamentals
   marketCap?: number;
   peRatio?: number;
@@ -37,38 +37,38 @@ export interface TickerData {
   eps?: number;
   dividendYield?: number;
   beta?: number;
-  
+
   // Options data
   spread?: SpreadRecommendation;
   iv?: IVAnalysis;
-  
+
   // Analysis
   earningsDays?: number | null;
   earningsWarning?: boolean;
   grade?: TradeGrade;
-  
+
   // Support/Resistance
   support?: number;
   resistance?: number;
-  
+
   // News
   news?: NewsItem[];
-  
+
   // Data quality
   dataQuality?: DataQuality;
-  
+
   // Additional context
   analystRatings?: AnalystRatings;
   targetPrices?: TargetPrices;
   performance?: PricePerformance;
   sectorContext?: SectorContext;
   shortInterest?: ShortInterest;
-  
+
   // NEW: Rich data (same as CLI)
   optionsFlow?: OptionsFlow;
   relativeStrength?: RelativeStrength;
   earnings?: EarningsHistory;
-  
+
   // Psychological Fair Value (PFV)
   pfv?: {
     fairValue: number;
@@ -76,7 +76,7 @@ export interface TickerData {
     confidence: 'HIGH' | 'MEDIUM' | 'LOW';
     deviationPercent: number;
   };
-  
+
   // Explanation when no viable spread is found
   noSpreadReason?: string;
 }
@@ -170,22 +170,22 @@ export interface ShortInterest {
 }
 
 export interface OptionsFlow {
-  pcRatioOI: number;     // Put/Call ratio by open interest
-  pcRatioVol: number;    // Put/Call ratio by volume
+  pcRatioOI: number; // Put/Call ratio by open interest
+  pcRatioVol: number; // Put/Call ratio by volume
   sentiment: 'bullish' | 'neutral' | 'bearish';
 }
 
 export interface RelativeStrength {
-  vsSPY: number;         // % outperformance vs SPY (30 days)
+  vsSPY: number; // % outperformance vs SPY (30 days)
   trend: 'outperforming' | 'inline' | 'underperforming';
 }
 
 export interface EarningsHistory {
   date?: string;
   daysUntil?: number;
-  streak?: number;           // Positive = beats, negative = misses
-  lastSurprise?: number;     // Last EPS surprise %
-  avgSurprise?: number;      // Avg surprise over last 4 quarters
+  streak?: number; // Positive = beats, negative = misses
+  lastSurprise?: number; // Last EPS surprise %
+  avgSurprise?: number; // Avg surprise over last 4 quarters
 }
 
 // ============================================================================
@@ -194,15 +194,15 @@ export interface EarningsHistory {
 
 export interface IncomeStatement {
   revenue: number;
-  revenueGrowth?: number;           // YoY growth %
+  revenueGrowth?: number; // YoY growth %
   grossProfit: number;
-  grossMargin: number;              // %
+  grossMargin: number; // %
   operatingIncome: number;
-  operatingMargin: number;          // %
+  operatingMargin: number; // %
   netIncome: number;
-  netMargin: number;                // %
+  netMargin: number; // %
   eps: number;
-  epsGrowth?: number;               // YoY growth %
+  epsGrowth?: number; // YoY growth %
 }
 
 export interface BalanceSheet {
@@ -220,7 +220,7 @@ export interface CashFlow {
   operatingCashFlow: number;
   capitalExpenditure: number;
   freeCashFlow: number;
-  fcfYield?: number;                // FCF / Market Cap %
+  fcfYield?: number; // FCF / Market Cap %
   dividendsPaid?: number;
 }
 
@@ -250,13 +250,13 @@ export interface InstitutionalHolder {
   shares: number;
   value: number;
   percentOfPortfolio?: number;
-  change?: number;                  // Change in shares
+  change?: number; // Change in shares
   changeType?: 'NEW' | 'INCREASED' | 'DECREASED' | 'SOLD_OUT' | 'UNCHANGED';
 }
 
 export interface InstitutionalHoldings {
   ticker: string;
-  institutionalOwnership: number;   // % owned by institutions
+  institutionalOwnership: number; // % owned by institutions
   numberOfHolders: number;
   topHolders: InstitutionalHolder[];
   recentActivity?: {
@@ -265,7 +265,7 @@ export interface InstitutionalHoldings {
     decreasedPositions: number;
     soldOut: number;
   };
-  insiderOwnership?: number;        // % owned by insiders
+  insiderOwnership?: number; // % owned by insiders
 }
 
 // ============================================================================
@@ -277,35 +277,35 @@ export interface UnusualOptionsSignal {
   ticker: string;
   optionSymbol: string;
   strike: number;
-  expiry: string;                   // ISO date
+  expiry: string; // ISO date
   optionType: 'call' | 'put';
   daysToExpiry: number;
   moneyness: 'ITM' | 'ATM' | 'OTM';
-  
+
   // Volume metrics
   currentVolume: number;
   averageVolume: number;
   volumeRatio: number;
-  
+
   // Premium flow
   premiumFlow: number;
-  
+
   // Flags
   hasVolumeAnomaly: boolean;
   hasOISpike: boolean;
   hasSweep: boolean;
   hasBlockTrade: boolean;
-  
+
   // Scoring
-  overallScore: number;             // 0-1
+  overallScore: number; // 0-1
   grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-  
+
   // Context
   sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
   underlyingPrice: number;
   impliedVolatility?: number;
-  
+
   // Metadata
   detectionTimestamp: string;
   isNew: boolean;
@@ -359,4 +359,3 @@ export interface SearchResult {
   url: string;
   snippet: string;
 }
-

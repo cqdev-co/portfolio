@@ -8,7 +8,7 @@
 [![npm downloads (total)](https://img.shields.io/npm/dt/@toon-format/toon.svg?labelColor=1b1b1f&color=fef3c0)](https://www.npmjs.com/package/@toon-format/toon)
 [![License: MIT](https://img.shields.io/badge/license-MIT-fef3c0?labelColor=1b1b1f)](./LICENSE)
 
-**Token-Oriented Object Notation** is a compact, human-readable encoding of the JSON data model that minimizes tokens and makes structure easy for models to follow. It's intended for *LLM input* as a drop-in, lossless representation of your existing JSON.
+**Token-Oriented Object Notation** is a compact, human-readable encoding of the JSON data model that minimizes tokens and makes structure easy for models to follow. It's intended for _LLM input_ as a drop-in, lossless representation of your existing JSON.
 
 TOON combines YAML's indentation-based structure for nested objects with a CSV-style tabular layout for uniform arrays. TOON's sweet spot is uniform arrays of objects (multiple fields per row, same structure across items), achieving CSV-like compactness while adding explicit structure that helps LLMs parse and validate data reliably. For deeply nested or non-uniform data, JSON may be more efficient.
 
@@ -167,21 +167,22 @@ Benchmarks test LLM comprehension across different input formats using 209 data 
 
 #### Dataset Catalog
 
-| Dataset | Rows | Structure | CSV Support | Eligibility |
-| ------- | ---- | --------- | ----------- | ----------- |
-| Uniform employee records | 100 | uniform | ✓ | 100% |
-| E-commerce orders with nested structures | 50 | nested | ✗ | 33% |
-| Time-series analytics data | 60 | uniform | ✓ | 100% |
-| Top 100 GitHub repositories | 100 | uniform | ✓ | 100% |
-| Semi-uniform event logs | 75 | semi-uniform | ✗ | 50% |
-| Deeply nested configuration | 11 | deep | ✗ | 0% |
-| Valid complete dataset (control) | 20 | uniform | ✓ | 100% |
-| Array truncated: 3 rows removed from end | 17 | uniform | ✓ | 100% |
-| Extra rows added beyond declared length | 23 | uniform | ✓ | 100% |
-| Inconsistent field count (missing salary in row 10) | 20 | uniform | ✓ | 100% |
-| Missing required fields (no email in multiple rows) | 20 | uniform | ✓ | 100% |
+| Dataset                                             | Rows | Structure    | CSV Support | Eligibility |
+| --------------------------------------------------- | ---- | ------------ | ----------- | ----------- |
+| Uniform employee records                            | 100  | uniform      | ✓           | 100%        |
+| E-commerce orders with nested structures            | 50   | nested       | ✗           | 33%         |
+| Time-series analytics data                          | 60   | uniform      | ✓           | 100%        |
+| Top 100 GitHub repositories                         | 100  | uniform      | ✓           | 100%        |
+| Semi-uniform event logs                             | 75   | semi-uniform | ✗           | 50%         |
+| Deeply nested configuration                         | 11   | deep         | ✗           | 0%          |
+| Valid complete dataset (control)                    | 20   | uniform      | ✓           | 100%        |
+| Array truncated: 3 rows removed from end            | 17   | uniform      | ✓           | 100%        |
+| Extra rows added beyond declared length             | 23   | uniform      | ✓           | 100%        |
+| Inconsistent field count (missing salary in row 10) | 20   | uniform      | ✓           | 100%        |
+| Missing required fields (no email in multiple rows) | 20   | uniform      | ✓           | 100%        |
 
 **Structure classes:**
+
 - **uniform**: All objects have identical fields with primitive values
 - **semi-uniform**: Mix of uniform and non-uniform structures
 - **nested**: Objects with nested structures (nested objects or arrays)
@@ -205,7 +206,7 @@ JSON           ███████████░░░░░░░░░   15
 XML            ██████████░░░░░░░░░░   13.0 acc%/1K tok  │  67.1% acc  │  5,167 tokens
 ```
 
-*Efficiency score = (Accuracy % ÷ Tokens) × 1,000. Higher is better.*
+_Efficiency score = (Accuracy % ÷ Tokens) × 1,000. Higher is better._
 
 > [!TIP]
 > TOON achieves **73.9%** accuracy (vs JSON's 69.7%) while using **39.6% fewer tokens**.
@@ -258,179 +259,179 @@ grok-4-fast-non-reasoning
 
 #### Performance by Question Type
 
-| Question Type | TOON | JSON compact | JSON | CSV | YAML | XML |
-| ------------- | ---- | ---- | ---- | ---- | ---- | ---- |
-| Field Retrieval | 99.6% | 99.3% | 99.3% | 100.0% | 98.2% | 98.9% |
-| Aggregation | 54.4% | 47.2% | 48.8% | 44.0% | 47.6% | 41.3% |
-| Filtering | 56.3% | 57.3% | 50.5% | 49.1% | 51.0% | 47.9% |
-| Structure Awareness | 88.0% | 83.0% | 83.0% | 85.9% | 80.0% | 80.0% |
-| Structural Validation | 70.0% | 45.0% | 50.0% | 80.0% | 60.0% | 80.0% |
+| Question Type         | TOON  | JSON compact | JSON  | CSV    | YAML  | XML   |
+| --------------------- | ----- | ------------ | ----- | ------ | ----- | ----- |
+| Field Retrieval       | 99.6% | 99.3%        | 99.3% | 100.0% | 98.2% | 98.9% |
+| Aggregation           | 54.4% | 47.2%        | 48.8% | 44.0%  | 47.6% | 41.3% |
+| Filtering             | 56.3% | 57.3%        | 50.5% | 49.1%  | 51.0% | 47.9% |
+| Structure Awareness   | 88.0% | 83.0%        | 83.0% | 85.9%  | 80.0% | 80.0% |
+| Structural Validation | 70.0% | 45.0%        | 50.0% | 80.0%  | 60.0% | 80.0% |
 
 #### Performance by Dataset
 
 ##### Uniform employee records
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 72.0% | 2,352 | 118/164 |
-| `toon` | 73.8% | 2,518 | 121/164 |
-| `json-compact` | 69.5% | 3,953 | 114/164 |
-| `yaml` | 68.3% | 4,982 | 112/164 |
-| `json-pretty` | 68.3% | 6,360 | 112/164 |
-| `xml` | 69.5% | 7,324 | 114/164 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 72.0%    | 2,352  | 118/164       |
+| `toon`         | 73.8%    | 2,518  | 121/164       |
+| `json-compact` | 69.5%    | 3,953  | 114/164       |
+| `yaml`         | 68.3%    | 4,982  | 112/164       |
+| `json-pretty`  | 68.3%    | 6,360  | 112/164       |
+| `xml`          | 69.5%    | 7,324  | 114/164       |
 
 ##### E-commerce orders with nested structures
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `toon` | 81.1% | 7,232 | 133/164 |
-| `json-compact` | 76.8% | 6,794 | 126/164 |
-| `yaml` | 75.6% | 8,347 | 124/164 |
-| `json-pretty` | 76.2% | 10,713 | 125/164 |
-| `xml` | 74.4% | 12,023 | 122/164 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `toon`         | 81.1%    | 7,232  | 133/164       |
+| `json-compact` | 76.8%    | 6,794  | 126/164       |
+| `yaml`         | 75.6%    | 8,347  | 124/164       |
+| `json-pretty`  | 76.2%    | 10,713 | 125/164       |
+| `xml`          | 74.4%    | 12,023 | 122/164       |
 
 ##### Time-series analytics data
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 73.3% | 1,406 | 88/120 |
-| `toon` | 72.5% | 1,548 | 87/120 |
-| `json-compact` | 71.7% | 2,349 | 86/120 |
-| `yaml` | 71.7% | 2,949 | 86/120 |
-| `json-pretty` | 68.3% | 3,676 | 82/120 |
-| `xml` | 68.3% | 4,384 | 82/120 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 73.3%    | 1,406  | 88/120        |
+| `toon`         | 72.5%    | 1,548  | 87/120        |
+| `json-compact` | 71.7%    | 2,349  | 86/120        |
+| `yaml`         | 71.7%    | 2,949  | 86/120        |
+| `json-pretty`  | 68.3%    | 3,676  | 82/120        |
+| `xml`          | 68.3%    | 4,384  | 82/120        |
 
 ##### Top 100 GitHub repositories
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `toon` | 62.9% | 8,779 | 83/132 |
-| `csv` | 61.4% | 8,527 | 81/132 |
-| `yaml` | 59.8% | 13,141 | 79/132 |
-| `json-compact` | 55.3% | 11,464 | 73/132 |
-| `json-pretty` | 56.1% | 15,157 | 74/132 |
-| `xml` | 48.5% | 17,105 | 64/132 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `toon`         | 62.9%    | 8,779  | 83/132        |
+| `csv`          | 61.4%    | 8,527  | 81/132        |
+| `yaml`         | 59.8%    | 13,141 | 79/132        |
+| `json-compact` | 55.3%    | 11,464 | 73/132        |
+| `json-pretty`  | 56.1%    | 15,157 | 74/132        |
+| `xml`          | 48.5%    | 17,105 | 64/132        |
 
 ##### Semi-uniform event logs
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `json-compact` | 63.3% | 4,819 | 76/120 |
-| `toon` | 57.5% | 5,799 | 69/120 |
-| `json-pretty` | 59.2% | 6,797 | 71/120 |
-| `yaml` | 48.3% | 5,827 | 58/120 |
-| `xml` | 46.7% | 7,709 | 56/120 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `json-compact` | 63.3%    | 4,819  | 76/120        |
+| `toon`         | 57.5%    | 5,799  | 69/120        |
+| `json-pretty`  | 59.2%    | 6,797  | 71/120        |
+| `yaml`         | 48.3%    | 5,827  | 58/120        |
+| `xml`          | 46.7%    | 7,709  | 56/120        |
 
 ##### Deeply nested configuration
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `json-compact` | 92.2% | 574 | 107/116 |
-| `toon` | 95.7% | 666 | 111/116 |
-| `yaml` | 91.4% | 686 | 106/116 |
-| `json-pretty` | 94.0% | 932 | 109/116 |
-| `xml` | 92.2% | 1,018 | 107/116 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `json-compact` | 92.2%    | 574    | 107/116       |
+| `toon`         | 95.7%    | 666    | 111/116       |
+| `yaml`         | 91.4%    | 686    | 106/116       |
+| `json-pretty`  | 94.0%    | 932    | 109/116       |
+| `xml`          | 92.2%    | 1,018  | 107/116       |
 
 ##### Valid complete dataset (control)
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `toon` | 100.0% | 544 | 4/4 |
-| `json-compact` | 100.0% | 795 | 4/4 |
-| `yaml` | 100.0% | 1,003 | 4/4 |
-| `json-pretty` | 100.0% | 1,282 | 4/4 |
-| `csv` | 25.0% | 492 | 1/4 |
-| `xml` | 0.0% | 1,467 | 0/4 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `toon`         | 100.0%   | 544    | 4/4           |
+| `json-compact` | 100.0%   | 795    | 4/4           |
+| `yaml`         | 100.0%   | 1,003  | 4/4           |
+| `json-pretty`  | 100.0%   | 1,282  | 4/4           |
+| `csv`          | 25.0%    | 492    | 1/4           |
+| `xml`          | 0.0%     | 1,467  | 0/4           |
 
 ##### Array truncated: 3 rows removed from end
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 100.0% | 425 | 4/4 |
-| `xml` | 100.0% | 1,251 | 4/4 |
-| `toon` | 0.0% | 474 | 0/4 |
-| `json-compact` | 0.0% | 681 | 0/4 |
-| `json-pretty` | 0.0% | 1,096 | 0/4 |
-| `yaml` | 0.0% | 859 | 0/4 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 100.0%   | 425    | 4/4           |
+| `xml`          | 100.0%   | 1,251  | 4/4           |
+| `toon`         | 0.0%     | 474    | 0/4           |
+| `json-compact` | 0.0%     | 681    | 0/4           |
+| `json-pretty`  | 0.0%     | 1,096  | 0/4           |
+| `yaml`         | 0.0%     | 859    | 0/4           |
 
 ##### Extra rows added beyond declared length
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 100.0% | 566 | 4/4 |
-| `toon` | 75.0% | 621 | 3/4 |
-| `xml` | 100.0% | 1,692 | 4/4 |
-| `yaml` | 75.0% | 1,157 | 3/4 |
-| `json-compact` | 50.0% | 917 | 2/4 |
-| `json-pretty` | 50.0% | 1,476 | 2/4 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 100.0%   | 566    | 4/4           |
+| `toon`         | 75.0%    | 621    | 3/4           |
+| `xml`          | 100.0%   | 1,692  | 4/4           |
+| `yaml`         | 75.0%    | 1,157  | 3/4           |
+| `json-compact` | 50.0%    | 917    | 2/4           |
+| `json-pretty`  | 50.0%    | 1,476  | 2/4           |
 
 ##### Inconsistent field count (missing salary in row 10)
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 75.0% | 489 | 3/4 |
-| `yaml` | 100.0% | 996 | 4/4 |
-| `toon` | 100.0% | 1,019 | 4/4 |
-| `json-compact` | 75.0% | 790 | 3/4 |
-| `xml` | 100.0% | 1,458 | 4/4 |
-| `json-pretty` | 75.0% | 1,274 | 3/4 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 75.0%    | 489    | 3/4           |
+| `yaml`         | 100.0%   | 996    | 4/4           |
+| `toon`         | 100.0%   | 1,019  | 4/4           |
+| `json-compact` | 75.0%    | 790    | 3/4           |
+| `xml`          | 100.0%   | 1,458  | 4/4           |
+| `json-pretty`  | 75.0%    | 1,274  | 3/4           |
 
 ##### Missing required fields (no email in multiple rows)
 
-| Format | Accuracy | Tokens | Correct/Total |
-| ------ | -------- | ------ | ------------- |
-| `csv` | 100.0% | 329 | 4/4 |
-| `xml` | 100.0% | 1,411 | 4/4 |
-| `toon` | 75.0% | 983 | 3/4 |
-| `yaml` | 25.0% | 960 | 1/4 |
-| `json-pretty` | 25.0% | 1,230 | 1/4 |
-| `json-compact` | 0.0% | 755 | 0/4 |
+| Format         | Accuracy | Tokens | Correct/Total |
+| -------------- | -------- | ------ | ------------- |
+| `csv`          | 100.0%   | 329    | 4/4           |
+| `xml`          | 100.0%   | 1,411  | 4/4           |
+| `toon`         | 75.0%    | 983    | 3/4           |
+| `yaml`         | 25.0%    | 960    | 1/4           |
+| `json-pretty`  | 25.0%    | 1,230  | 1/4           |
+| `json-compact` | 0.0%     | 755    | 0/4           |
 
 #### Performance by Model
 
 ##### claude-haiku-4-5-20251001
 
-| Format | Accuracy | Correct/Total |
-| ------ | -------- | ------------- |
-| `toon` | 59.8% | 125/209 |
-| `json-pretty` | 57.4% | 120/209 |
-| `yaml` | 56.0% | 117/209 |
-| `xml` | 55.5% | 116/209 |
-| `json-compact` | 55.0% | 115/209 |
-| `csv` | 50.5% | 55/109 |
+| Format         | Accuracy | Correct/Total |
+| -------------- | -------- | ------------- |
+| `toon`         | 59.8%    | 125/209       |
+| `json-pretty`  | 57.4%    | 120/209       |
+| `yaml`         | 56.0%    | 117/209       |
+| `xml`          | 55.5%    | 116/209       |
+| `json-compact` | 55.0%    | 115/209       |
+| `csv`          | 50.5%    | 55/109        |
 
 ##### gemini-2.5-flash
 
-| Format | Accuracy | Correct/Total |
-| ------ | -------- | ------------- |
-| `toon` | 87.6% | 183/209 |
-| `csv` | 86.2% | 94/109 |
-| `json-compact` | 82.3% | 172/209 |
-| `yaml` | 79.4% | 166/209 |
-| `xml` | 79.4% | 166/209 |
-| `json-pretty` | 77.0% | 161/209 |
+| Format         | Accuracy | Correct/Total |
+| -------------- | -------- | ------------- |
+| `toon`         | 87.6%    | 183/209       |
+| `csv`          | 86.2%    | 94/109        |
+| `json-compact` | 82.3%    | 172/209       |
+| `yaml`         | 79.4%    | 166/209       |
+| `xml`          | 79.4%    | 166/209       |
+| `json-pretty`  | 77.0%    | 161/209       |
 
 ##### gpt-5-nano
 
-| Format | Accuracy | Correct/Total |
-| ------ | -------- | ------------- |
-| `toon` | 90.9% | 190/209 |
-| `json-compact` | 90.9% | 190/209 |
-| `json-pretty` | 89.0% | 186/209 |
-| `csv` | 89.0% | 97/109 |
-| `yaml` | 87.1% | 182/209 |
-| `xml` | 80.9% | 169/209 |
+| Format         | Accuracy | Correct/Total |
+| -------------- | -------- | ------------- |
+| `toon`         | 90.9%    | 190/209       |
+| `json-compact` | 90.9%    | 190/209       |
+| `json-pretty`  | 89.0%    | 186/209       |
+| `csv`          | 89.0%    | 97/109        |
+| `yaml`         | 87.1%    | 182/209       |
+| `xml`          | 80.9%    | 169/209       |
 
 ##### grok-4-fast-non-reasoning
 
-| Format | Accuracy | Correct/Total |
-| ------ | -------- | ------------- |
-| `toon` | 57.4% | 120/209 |
-| `json-pretty` | 55.5% | 116/209 |
-| `json-compact` | 54.5% | 114/209 |
-| `yaml` | 53.6% | 112/209 |
-| `xml` | 52.6% | 110/209 |
-| `csv` | 52.3% | 57/109 |
+| Format         | Accuracy | Correct/Total |
+| -------------- | -------- | ------------- |
+| `toon`         | 57.4%    | 120/209       |
+| `json-pretty`  | 55.5%    | 116/209       |
+| `json-compact` | 54.5%    | 114/209       |
+| `yaml`         | 53.6%    | 112/209       |
+| `xml`          | 52.6%    | 110/209       |
+| `csv`          | 52.3%    | 57/109        |
 
 </details>
 
@@ -754,16 +755,16 @@ yarn add @toon-format/toon
 **Example usage:**
 
 ```ts
-import { encode } from '@toon-format/toon'
+import { encode } from '@toon-format/toon';
 
 const data = {
   users: [
     { id: 1, name: 'Alice', role: 'admin' },
-    { id: 2, name: 'Bob', role: 'user' }
-  ]
-}
+    { id: 2, name: 'Bob', role: 'user' },
+  ],
+};
 
-console.log(encode(data))
+console.log(encode(data));
 // users[2]{id,name,role}:
 //   1,Alice,admin
 //   2,Bob,user
@@ -772,13 +773,13 @@ console.log(encode(data))
 **Streaming large datasets:**
 
 ```ts
-import { encodeLines } from '@toon-format/toon'
+import { encodeLines } from '@toon-format/toon';
 
-const largeData = await fetchThousandsOfRecords()
+const largeData = await fetchThousandsOfRecords();
 
 // Memory-efficient streaming for large data
 for (const line of encodeLines(largeData)) {
-  process.stdout.write(`${line}\n`)
+  process.stdout.write(`${line}\n`);
 }
 ```
 
@@ -788,22 +789,22 @@ for (const line of encodeLines(largeData)) {
 **Transforming values with replacer:**
 
 ```ts
-import { encode } from '@toon-format/toon'
+import { encode } from '@toon-format/toon';
 
 // Remove sensitive fields
-const user = { name: 'Alice', password: 'secret', email: 'alice@example.com' }
+const user = { name: 'Alice', password: 'secret', email: 'alice@example.com' };
 const safe = encode(user, {
-  replacer: (key, value) => key === 'password' ? undefined : value
-})
+  replacer: (key, value) => (key === 'password' ? undefined : value),
+});
 // name: Alice
 // email: alice@example.com
 
 // Transform values
-const data = { status: 'active', count: 5 }
+const data = { status: 'active', count: 5 };
 const transformed = encode(data, {
   replacer: (key, value) =>
-    typeof value === 'string' ? value.toUpperCase() : value
-})
+    typeof value === 'string' ? value.toUpperCase() : value,
+});
 // status: ACTIVE
 // count: 5
 ```
@@ -897,7 +898,7 @@ Comprehensive guides, references, and resources to help you get the most out of 
 
 ### Tools & Integration
 
-- [CLI](https://toonformat.dev/cli/) – Command-line tool for  JSON↔TOON conversions
+- [CLI](https://toonformat.dev/cli/) – Command-line tool for JSON↔TOON conversions
 - [Using TOON with LLMs](https://toonformat.dev/guide/llm-prompts) – Prompting strategies & validation
 - [Playgrounds](https://toonformat.dev/ecosystem/tools-and-playgrounds) – Interactive tools
 
@@ -917,9 +918,9 @@ Comprehensive guides, references, and resources to help you get the most out of 
 > [!TIP]
 > These implementations are actively being developed by dedicated teams. Contributions are welcome! Join the effort by opening issues, submitting PRs, or discussing implementation details in the respective repositories.
 
-- **.NET:** [toon_format](https://github.com/toon-format/toon-dotnet) *(in development)*
-- **Dart:** [toon](https://github.com/toon-format/toon-dart) *(in development)*
-- **Go:** [toon-go](https://github.com/toon-format/toon-go) *(in development)*
+- **.NET:** [toon_format](https://github.com/toon-format/toon-dotnet) _(in development)_
+- **Dart:** [toon](https://github.com/toon-format/toon-dart) _(in development)_
+- **Go:** [toon-go](https://github.com/toon-format/toon-go) _(in development)_
 - **Java:** [JToon](https://github.com/toon-format/toon-java)
 - **Julia:** [ToonFormat.jl](https://github.com/toon-format/ToonFormat.jl)
 - **Python:** [toon_format](https://github.com/toon-format/toon-python)

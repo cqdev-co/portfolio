@@ -2,6 +2,8 @@
  * Cloudflare Cache API wrapper
  */
 
+import { logger } from './logger';
+
 const CACHE_PREFIX = 'https://yahoo-cache.internal';
 
 /**
@@ -24,15 +26,15 @@ export async function getFromCache<T>(cacheKey: string): Promise<{
   try {
     const cache = caches.default;
     const response = await cache.match(new Request(cacheKey));
-    
+
     if (!response) return null;
-    
-    const data = await response.json() as T;
+
+    const data = (await response.json()) as T;
     const cachedAt = response.headers.get('X-Cached-At');
     const age = cachedAt
       ? Math.floor((Date.now() - parseInt(cachedAt)) / 1000)
       : 0;
-    
+
     return { data, age };
   } catch {
     return null;
@@ -58,7 +60,7 @@ export async function storeInCache(
     });
     await cache.put(new Request(cacheKey), response);
   } catch (e) {
-    console.error('[Cache] Store failed:', e);
+    logger.error('[Cache] Store failed:', e);
   }
 }
 
@@ -73,4 +75,3 @@ export async function deleteFromCache(cacheKey: string): Promise<boolean> {
     return false;
   }
 }
-

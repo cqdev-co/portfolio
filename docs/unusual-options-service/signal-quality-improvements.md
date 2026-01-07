@@ -6,18 +6,18 @@ Based on analysis of signals over multiple weeks, several improvements were made
 
 ### Latest Update: Performance-Based Filtering (Dec 20)
 
-After one week of collecting signals with the new algorithm, we analyzed actual 
+After one week of collecting signals with the new algorithm, we analyzed actual
 performance and made further refinements.
 
 #### Performance Analysis Results
 
-| Segment | Win Rate | Avg Return | Action |
-|---------|----------|------------|--------|
-| **Mid DTE CALLS (11-21d)** | **60.0%** | +0.83% | ✅ EDGE - Focus here |
-| Short DTE CALLS (≤10d) | 27.3% | -0.43% | ❌ NOISE - Filtered |
-| All PUT signals | 16.7% | +1.23%* | ❌ HEDGING - Excluded |
+| Segment                    | Win Rate  | Avg Return | Action                |
+| -------------------------- | --------- | ---------- | --------------------- |
+| **Mid DTE CALLS (11-21d)** | **60.0%** | +0.83%     | ✅ EDGE - Focus here  |
+| Short DTE CALLS (≤10d)     | 27.3%     | -0.43%     | ❌ NOISE - Filtered   |
+| All PUT signals            | 16.7%     | +1.23%\*   | ❌ HEDGING - Excluded |
 
-*PUTs showed inverse returns: stock went UP when PUTs were detected (hedging)
+\*PUTs showed inverse returns: stock went UP when PUTs were detected (hedging)
 
 #### Key Findings
 
@@ -36,8 +36,8 @@ FLAG_LIKELY_HEDGES = True       # Flag hedges instead of excluding
 MAX_SIGNALS_PER_TICKER = 3      # Prevent single ticker domination
 ```
 
-**Note**: We don't exclude PUTs by default. Market conditions vary - in bearish 
-weeks, PUT signals could be the edge. Use `hedge_analyzer.py` to filter hedges 
+**Note**: We don't exclude PUTs by default. Market conditions vary - in bearish
+weeks, PUT signals could be the edge. Use `hedge_analyzer.py` to filter hedges
 when analyzing, and track CALL vs PUT performance separately over time.
 
 ---
@@ -46,20 +46,20 @@ when analyzing, and track CALL vs PUT performance separately over time.
 
 #### Conviction-Based Scoring (Dec 12)
 
-| Metric | Correct Signals | Wrong Signals | Insight |
-|--------|-----------------|---------------|---------|
-| **CALL Avg Premium** | $23.3M | $3.3M | **7x higher!** |
-| **PUT Avg Premium** | $7.7M | $2.6M | 3x higher |
-| **CALL Avg DTE** | 14 days | 26 days | Shorter = more conviction |
+| Metric               | Correct Signals | Wrong Signals | Insight                   |
+| -------------------- | --------------- | ------------- | ------------------------- |
+| **CALL Avg Premium** | $23.3M          | $3.3M         | **7x higher!**            |
+| **PUT Avg Premium**  | $7.7M           | $2.6M         | 3x higher                 |
+| **CALL Avg DTE**     | 14 days         | 26 days       | Shorter = more conviction |
 
 ---
 
-| Issue | Finding | Fix |
-|-------|---------|-----|
-| Grade Inflation | 51% were S-grade | Stricter scoring thresholds |
-| Short-DTE Noise | 35% were 0-7 DTE | Filter short-dated contracts |
-| Ticker Domination | TSLA alone = 11% of signals | Cap signals per ticker |
-| PUT Hedging | 73% of PUTs are hedges | Exclude PUT signals |
+| Issue             | Finding                     | Fix                          |
+| ----------------- | --------------------------- | ---------------------------- |
+| Grade Inflation   | 51% were S-grade            | Stricter scoring thresholds  |
+| Short-DTE Noise   | 35% were 0-7 DTE            | Filter short-dated contracts |
+| Ticker Domination | TSLA alone = 11% of signals | Cap signals per ticker       |
+| PUT Hedging       | 73% of PUTs are hedges      | Exclude PUT signals          |
 
 ## Changes Made
 
@@ -74,7 +74,7 @@ when analyzing, and track CALL vs PUT performance separately over time.
 normalized_score = total_score / total_weight
 
 # NEW: Use raw weighted sum (max ~0.35 for single type)
-normalized_score = total_score  
+normalized_score = total_score
 
 # NEW: Bonus for multiple detection types
 if detection_count >= 4: bonus = 0.25
@@ -90,11 +90,13 @@ if detection_count == 1:
 ### 2. Grade Thresholds Adjusted
 
 **Old thresholds** (resulted in 51% S-grade):
+
 - S: >= 0.85
 - A: >= 0.75
 - B: >= 0.65
 
 **New thresholds** (target distribution):
+
 - S: >= 0.55 (~5% of signals - exceptional multi-factor)
 - A: >= 0.45 (~10% of signals)
 - B: >= 0.35 (~25% of signals)
@@ -140,7 +142,7 @@ Keeps highest-scoring signals for each ticker.
 ```python
 # High-volume tickers (defined list)
 HIGH_VOLUME_TICKERS = {
-    'TSLA', 'NVDA', 'META', 'SPY', 'QQQ', 'AMD', 'AAPL', 'AMZN', 
+    'TSLA', 'NVDA', 'META', 'SPY', 'QQQ', 'AMD', 'AAPL', 'AMZN',
     'GOOGL', 'MSFT', 'PLTR', 'AVGO', 'IWM', 'XLF', 'GLD', 'SLV',
     'COIN', 'MSTR', 'HOOD', 'SOFI', 'NIO', 'BABA', 'INTC', 'MU'
 }
@@ -179,12 +181,14 @@ MIN_PREMIUM_FLOW=500000          # Minimum premium (default: $500K)
 ## Expected Impact
 
 ### Before (Week 1 - Original Algorithm):
+
 - 51% S-grade (grade inflation)
 - 33% 1-Day Win Rate (below coin flip)
 - 73% of signals were hedging activity
 - PUT signals acted as inverse indicators
 
 ### After (Week 2 - Performance-Based Filters):
+
 - Both CALLS and PUTS captured (market conditions vary)
 - Mid DTE (11-21d) focus = better signal quality
 - Max 3 signals per ticker
@@ -235,4 +239,3 @@ asyncio.run(test())
 - `src/unusual_options/scoring/grader.py` - Scoring algorithm
 - `src/unusual_options/scanner/detector.py` - Premium thresholds, DTE filter
 - `src/unusual_options/scanner/orchestrator.py` - Ticker cap, signal filtering
-

@@ -23,10 +23,11 @@
 
 ## The 5-Filter System
 
-Use this systematic approach to filter 1,000+ signals down to your best 5-10 
+Use this systematic approach to filter 1,000+ signals down to your best 5-10
 plays:
 
 ### Filter 1: Quality Score (Reduce to ~300 signals)
+
 ```
 Keep only:
 - Grade: S or A
@@ -34,10 +35,11 @@ Keep only:
 - Confidence: ≥ 0.70
 ```
 
-**Why:** These signals have the highest statistical edge and institutional 
+**Why:** These signals have the highest statistical edge and institutional
 backing.
 
 ### Filter 2: Time Decay Protection (Reduce to ~150 signals)
+
 ```
 Keep only:
 - Days to Expiry: ≥ 10 days
@@ -47,16 +49,18 @@ Keep only:
 **Why:** Gives you time to be right. Theta decay under 7 days is brutal.
 
 ### Filter 3: Premium Flow Significance (Reduce to ~75 signals)
+
 ```
 Keep only:
 - Premium Flow: ≥ $500,000
 - OR Volume Ratio: ≥ 5x average
 ```
 
-**Why:** Small bets aren't worth following. Need meaningful institutional 
+**Why:** Small bets aren't worth following. Need meaningful institutional
 commitment.
 
 ### Filter 4: Moneyness Sweet Spot (Reduce to ~40 signals)
+
 ```
 Keep only:
 - ITM (already profitable)
@@ -64,10 +68,11 @@ Keep only:
 - Avoid: Deep ITM (likely hedges) and Far OTM (lottery tickets)
 ```
 
-**Why:** ATM/ITM options have better risk/reward and less likely to be 
+**Why:** ATM/ITM options have better risk/reward and less likely to be
 pure hedges.
 
 ### Filter 5: Ticker Consistency (Reduce to ~10-20 plays)
+
 ```
 Prioritize:
 - Tickers with 3+ signals in same direction
@@ -86,33 +91,39 @@ Before entering ANY trade, validate with this 10-point checklist:
 ### ✅ Technical Validation
 
 **1. Chart Confirmation**
+
 - [ ] Stock at support/resistance level that aligns with signal
 - [ ] RSI not overbought (>70) for calls, oversold (<30) for puts
 - [ ] MACD confirms direction
 - [ ] Volume trending up
 
 **2. IV Rank Check**
+
 - [ ] IV Rank < 50 for buying options (cheaper premium)
 - [ ] IV Rank > 50 for selling options (expensive premium)
 - [ ] Not expecting IV crush (post-earnings)
 
 **3. Earnings Calendar**
+
 - [ ] No earnings within expiration window (unless intentional play)
 - [ ] If earnings play: confirmed by multiple signals + high premium flow
 
 ### ✅ Signal Quality Validation
 
 **4. Score Breakdown**
+
 - [ ] Overall score ≥ 0.75
 - [ ] Grade: S or A preferred
 - [ ] Confidence ≥ 0.75
 
 **5. Flow Analysis**
+
 - [ ] Premium flow ≥ $500K
 - [ ] Volume ratio ≥ 3x (shows unusual activity)
 - [ ] Not marked as "likely_spread" (unless both legs identified)
 
 **6. Timing Check**
+
 - [ ] Signal detected within last 24 hours (fresher = better)
 - [ ] Multiple detections across different timestamps (continuity)
 - [ ] Days to expiry: 10-45 optimal
@@ -120,26 +131,31 @@ Before entering ANY trade, validate with this 10-point checklist:
 ### ✅ Macro Validation
 
 **7. Market Environment**
+
 - [ ] SPY/QQQ trend aligns with trade direction
 - [ ] VIX not spiking (unless hedging strategy)
 - [ ] Sector momentum supports thesis
 
 **8. Ticker Fundamentals**
+
 - [ ] No pending legal issues or negative catalysts
 - [ ] Check recent news for context
 - [ ] Understand WHY institutions might be betting this way
 
 **9. Risk Assessment**
+
 - [ ] Risk factors acceptable (review risk_factors field)
 - [ ] Position size doesn't exceed limits
 - [ ] Stop loss planned before entry
 
 **10. Correlation Check**
+
 - [ ] Multiple signals on same ticker pointing same direction
 - [ ] Not contradicted by opposite signals (calls vs puts)
 - [ ] Aligns with sector trend
 
 ### Scoring System
+
 - **10/10 = Enter immediately** (rare, perfect setup)
 - **8-9/10 = Strong entry** (most good trades)
 - **6-7/10 = Watch list** (wait for confirmation)
@@ -150,15 +166,18 @@ Before entering ANY trade, validate with this 10-point checklist:
 ## Entry Timing Strategies
 
 ### Strategy 1: The First Hour Fade
+
 **Best for:** Day trading high-conviction signals
 
 **Process:**
+
 1. Market opens, watch first 30 minutes
 2. Identify direction (gap up/down)
 3. Wait for fade/pullback (30-60 min into session)
 4. Enter on the retracement
 
 **Example:**
+
 - AMD gaps up to $260 on bullish signal
 - Pulls back to $258.50 at 10:30am
 - Enter AMD $260C at discounted premium
@@ -166,14 +185,17 @@ Before entering ANY trade, validate with this 10-point checklist:
 **Why it works:** Avoid paying inflated IV at open, get better entry
 
 ### Strategy 2: The Confirmation Entry
+
 **Best for:** Swing trades (10-30 day holds)
 
 **Process:**
+
 1. Signal detected (e.g., AAPL $270C)
 2. Wait for next day's price action
 3. Enter only if stock confirms direction (breaks key level)
 
 **Example:**
+
 - AAPL signal shows $270C buying
 - Next day: AAPL breaks above $272 (resistance)
 - Enter $270C now that direction confirmed
@@ -181,14 +203,17 @@ Before entering ANY trade, validate with this 10-point checklist:
 **Why it works:** Reduces false signals, confirms institutions right
 
 ### Strategy 3: The Scale-In Approach
+
 **Best for:** Large positions or uncertain entries
 
 **Process:**
+
 1. Enter 33% position immediately
 2. Add 33% if profitable after 2 days
 3. Add final 33% if hitting targets
 
 **Example:**
+
 - TSM $297.5C signal at $9.50 premium
 - Day 1: Buy 3 contracts
 - Day 3: TSM at $307, contracts at $13 → Add 3 more
@@ -197,14 +222,17 @@ Before entering ANY trade, validate with this 10-point checklist:
 **Why it works:** Reduces risk of mistiming, pyramids winners
 
 ### Strategy 4: The Spread Entry
+
 **Best for:** Risk reduction, expensive premium
 
 **Process:**
+
 1. See expensive call signal (e.g., $12 premium)
 2. Instead of naked call, buy call spread
 3. Buy signal strike, sell higher strike
 
 **Example:**
+
 - AMD $260C premium = $10 (expensive)
 - Buy AMD $260C / Sell AMD $265C spread
 - Net cost: $3.50 instead of $10
@@ -213,15 +241,18 @@ Before entering ANY trade, validate with this 10-point checklist:
 **Why it works:** Reduces capital, increases win rate, limits losses
 
 ### Strategy 5: The Gap-Fill Entry
+
 **Best for:** Signals on stocks with overnight gaps
 
 **Process:**
+
 1. Stock gaps 2%+ on news
 2. Signal appears after gap
 3. Wait for gap to fill 50%
 4. Enter at better price
 
 **Example:**
+
 - COIN gaps from $315 to $330 on Bitcoin rally
 - Signal: COIN $340C
 - Wait for pullback to $322.50 (50% fill)
@@ -236,16 +267,19 @@ Before entering ANY trade, validate with this 10-point checklist:
 ### The Kelly Criterion Adapted for Options
 
 **Formula:**
+
 ```
 Position Size = (Win Rate × Avg Win - Loss Rate × Avg Loss) / Avg Win
 ```
 
 **For unusual options signals:**
+
 - High conviction (score ≥0.85): 55-60% win rate
 - Medium conviction (score 0.70-0.84): 45-50% win rate
 - Spec plays: 30-35% win rate
 
 **Example Calculation:**
+
 ```
 Signal: AAPL $262.5C, Score 0.90, High Conviction
 - Win Rate: 60%
@@ -261,16 +295,19 @@ Position Size = (0.60 × 0.50 - 0.40 × 0.25) / 0.50
 ### The 3-Tier Position Sizing System
 
 **Tier 1: High Conviction (Score ≥0.85)**
+
 - Position size: 3-5% per trade
 - Max simultaneous positions: 3
 - Max total exposure: 15%
 
 **Tier 2: Medium Conviction (Score 0.70-0.84)**
+
 - Position size: 2-3% per trade
 - Max simultaneous positions: 4
 - Max total exposure: 12%
 
 **Tier 3: Spec Plays (Score <0.70 or Far OTM)**
+
 - Position size: 0.5-1% per trade
 - Max simultaneous positions: 5
 - Max total exposure: 5%
@@ -281,12 +318,12 @@ Position Size = (0.60 × 0.50 - 0.40 × 0.25) / 0.50
 
 **Example $50,000 Portfolio:**
 
-| Tier | Per Trade | Max Positions | Max Total |
-|------|-----------|---------------|-----------|
-| Tier 1 | $1,500-2,500 | 3 | $7,500 |
-| Tier 2 | $1,000-1,500 | 4 | $6,000 |
-| Tier 3 | $250-500 | 5 | $2,500 |
-| **Total** | - | 12 | $16,000 (32%) |
+| Tier      | Per Trade    | Max Positions | Max Total     |
+| --------- | ------------ | ------------- | ------------- |
+| Tier 1    | $1,500-2,500 | 3             | $7,500        |
+| Tier 2    | $1,000-1,500 | 4             | $6,000        |
+| Tier 3    | $250-500     | 5             | $2,500        |
+| **Total** | -            | 12            | $16,000 (32%) |
 
 **Pro Tip:** Start at lower end of ranges, scale up as you prove profitability
 
@@ -299,71 +336,87 @@ When multiple signals align, probability increases significantly.
 ### The Confirmation Matrix
 
 **Single Signal (1 indicator):**
+
 - Win rate: ~45%
 - Position size: 2%
 
 **Double Confirmation (2 indicators):**
+
 - Win rate: ~55%
 - Position size: 3%
 
 **Triple Confirmation (3 indicators):**
+
 - Win rate: ~65%
 - Position size: 4-5%
 
 ### Correlation Types
 
 #### 1. Same Strike Repetition
+
 ```
 Signal 1: AAPL $270C detected 11/3 at 10am
 Signal 2: AAPL $270C detected 11/3 at 2pm
 Signal 3: AAPL $270C detected 11/4 at 11am
 ```
+
 **Interpretation:** Sustained buying pressure = high conviction
 
 #### 2. Strike Ladder (Bullish)
+
 ```
 Signal 1: AMD $255C
 Signal 2: AMD $260C
 Signal 3: AMD $265C
 ```
-**Interpretation:** Institutions buying multiple upside strikes = 
+
+**Interpretation:** Institutions buying multiple upside strikes =
 major move expected
 
 #### 3. Strike Ladder (Bearish)
+
 ```
 Signal 1: ORCL $260P
 Signal 2: ORCL $255P
 Signal 3: ORCL $250P
 ```
+
 **Interpretation:** Downside protection across strikes = bearish or hedging
 
 #### 4. Time Spread
+
 ```
 Signal 1: GOOG $280C exp 11/14
 Signal 2: GOOG $280C exp 11/21
 Signal 3: GOOG $280C exp 12/19
 ```
+
 **Interpretation:** Sustained move expected over time = swing trade
 
 #### 5. Sector Rotation
+
 ```
 Signal 1: AMD $260C
 Signal 2: NVDA $950C
 Signal 3: TSM $310C
 Signal 4: AVGO $360C
 ```
+
 **Interpretation:** Semiconductor sector rally = broad bullish thesis
 
 #### 6. Hedging Pattern (Avoid or Fade)
+
 ```
 Signal 1: SPY $580C (large premium)
 Signal 2: SPY $560P (large premium)
 ```
+
 **Interpretation:** Straddle = volatility play, not directional
 
 ### Correlation Score System
 
 **Award points for each confirmation:**
+
 - Same strike repetition: +3 points
 - Adjacent strikes same direction: +2 points
 - Different expirations same strike: +2 points
@@ -372,6 +425,7 @@ Signal 2: SPY $560P (large premium)
 - Multiple days of signals: +1 point per day
 
 **Scoring:**
+
 - 8+ points = Highest conviction (5% position)
 - 5-7 points = High conviction (3-4% position)
 - 3-4 points = Medium conviction (2-3% position)
@@ -385,7 +439,9 @@ Signal 2: SPY $560P (large premium)
 Build a balanced options portfolio across risk levels:
 
 ### Tier 1: Core Holdings (60% of options capital)
+
 **Characteristics:**
+
 - High conviction (score ≥0.85)
 - ITM or ATM options
 - 14-45 days to expiry
@@ -393,6 +449,7 @@ Build a balanced options portfolio across risk levels:
 - Large premium flow (>$1M)
 
 **Current Examples:**
+
 1. AAPL $262.5C exp 11/14 (ITM, 0.90 score)
 2. TSM $297.5C exp 11/14 (ITM, 0.90 score)
 3. DAVE $220C exp 11/21 (ITM, $4.79M flow)
@@ -401,13 +458,16 @@ Build a balanced options portfolio across risk levels:
 **Risk Profile:** Low-Medium
 
 ### Tier 2: Opportunistic Plays (30% of options capital)
+
 **Characteristics:**
+
 - Medium conviction (score 0.70-0.84)
 - ATM or slightly OTM
 - 10-30 days to expiry
 - Moderate premium flow ($500K-$1M)
 
 **Current Examples:**
+
 1. AMD $260C exp 11/14 (ATM, 0.79 score)
 2. BE $120C exp 11/21 (ITM, high IV)
 3. COIN $340C exp 11/14 (OTM but 0.90 score)
@@ -416,13 +476,16 @@ Build a balanced options portfolio across risk levels:
 **Risk Profile:** Medium
 
 ### Tier 3: Lottery Tickets (10% of options capital)
+
 **Characteristics:**
+
 - Spec plays
 - OTM options (>10% from current price)
 - LEAPS or short-dated
 - High premium flow despite distance
 
 **Current Examples:**
+
 1. RIO $72.5C exp 01/16/26 (5% OTM, LEAPS)
 2. HUT $58C exp 11/21 (16% OTM, crypto play)
 3. ASTS $85C exp 11/14 (far OTM, high vol)
@@ -435,21 +498,25 @@ Build a balanced options portfolio across risk levels:
 **$50,000 Portfolio, $15,000 allocated to options:**
 
 **Tier 1 - $9,000 (60%):**
+
 - $3,000 AAPL $262.5C exp 11/14 × 30 contracts
 - $3,000 TSM $297.5C exp 11/14 × 30 contracts
 - $3,000 DAVE $220C exp 11/21 × 15 contracts
 
 **Tier 2 - $4,500 (30%):**
+
 - $1,500 AMD $260C exp 11/14 × 25 contracts
 - $1,500 BE $120C exp 11/21 × 12 contracts
 - $1,500 COIN $340C exp 11/14 × 20 contracts
 
 **Tier 3 - $1,500 (10%):**
+
 - $500 RIO $72.5C exp 01/16/26 × 20 contracts
 - $500 HUT $58C exp 11/21 × 100 contracts
 - $500 ASTS $85C exp 11/14 × 150 contracts
 
 **Expected Outcomes:**
+
 - Tier 1: 2/3 profitable = $2,700 profit (30% avg gain)
 - Tier 2: 1/3 profitable = $750 profit (50% on winner)
 - Tier 3: 1/3 profitable = $1,000 profit (200% on winner)
@@ -462,30 +529,35 @@ Build a balanced options portfolio across risk levels:
 ### Daily Monitoring Routine
 
 **Pre-Market (8:00 AM - 9:30 AM EST):**
+
 1. Check overnight news on all holdings
 2. Review futures (SPY, QQQ, sector ETFs)
 3. Check if any new signals on existing positions
 4. Adjust stop losses if needed
 
 **First Hour (9:30 AM - 10:30 AM):**
+
 1. Watch price action on holdings
 2. Identify entry opportunities on watch list
 3. Don't chase - wait for pullbacks
 4. Take profits on overnight gaps >50% gain
 
 **Mid-Day Check (12:00 PM - 1:00 PM):**
+
 1. Review P&L on positions
 2. Tighten stops on profitable positions
 3. Check for new signals from service
 4. Add to watch list for afternoon
 
 **Power Hour (3:00 PM - 4:00 PM):**
+
 1. Final monitoring of positions
 2. Decide on overnight holds vs exits
 3. Close anything <7 days to expiry unless very confident
 4. Set alerts for next day
 
 **Post-Market (4:00 PM - 5:00 PM):**
+
 1. Run fresh scan if service allows
 2. Review daily performance
 3. Journal trades (what worked, what didn't)
@@ -495,15 +567,16 @@ Build a balanced options portfolio across risk levels:
 
 Track each position with these metrics:
 
-| Metric | Green (Hold) | Yellow (Watch) | Red (Exit) |
-|--------|-------------|----------------|------------|
-| P&L | >0% | -10% to 0% | <-20% |
-| Days to Expiry | >10 days | 7-10 days | <7 days |
-| Underlying vs Strike | Moving toward | Sideways | Moving away |
-| Theta Decay | <5% per day | 5-10% per day | >10% per day |
-| New Signals | Same direction | None | Opposite direction |
+| Metric               | Green (Hold)   | Yellow (Watch) | Red (Exit)         |
+| -------------------- | -------------- | -------------- | ------------------ |
+| P&L                  | >0%            | -10% to 0%     | <-20%              |
+| Days to Expiry       | >10 days       | 7-10 days      | <7 days            |
+| Underlying vs Strike | Moving toward  | Sideways       | Moving away        |
+| Theta Decay          | <5% per day    | 5-10% per day  | >10% per day       |
+| New Signals          | Same direction | None           | Opposite direction |
 
 **Action Rules:**
+
 - **All Green:** Hold, consider adding
 - **1-2 Yellow:** Watch closely, tighten stop
 - **Any Red:** Consider exit or roll
@@ -512,18 +585,21 @@ Track each position with these metrics:
 ### Alert System Setup
 
 **Critical Alerts (Immediate action):**
+
 - Position hits stop loss (-20% to -25%)
 - Position hits profit target (+50%, +100%)
 - Underlying moves >5% against position
 - Major news/earnings announcement
 
 **Watch Alerts (Review within hour):**
+
 - New signal same ticker/strike
 - Underlying approaching key support/resistance
 - IV change >20%
 - Days to expiry hits 7
 
 **Info Alerts (Daily review):**
+
 - New signals same sector
 - Insider trading activity
 - Analyst upgrades/downgrades
@@ -536,16 +612,19 @@ Track each position with these metrics:
 ### The 3-Step Exit System
 
 **Step 1: Take Initial Profits (50% position at 50% gain)**
+
 - Lock in profits
 - Reduce risk
 - Let remaining position run
 
 **Step 2: Secure Winners (25% position at 100% gain)**
+
 - Bank substantial gains
 - Keep skin in game
 - Trail stop on remaining
 
 **Step 3: Trail the Moon Shot (Final 25%)**
+
 - Trail with 20-25% stop
 - Let winners run to maximum
 - Accept getting stopped out
@@ -553,6 +632,7 @@ Track each position with these metrics:
 ### Exit by Position Type
 
 #### ITM Options Exit
+
 ```
 Entry: AAPL $262.5C at $10.50 (stock at $270)
 Exit 1: Sell 50% at $15.75 (+50% at $275)
@@ -561,6 +641,7 @@ Exit 3: Trail final 25% with $4 stop
 ```
 
 #### ATM Options Exit
+
 ```
 Entry: AMD $260C at $6.00 (stock at $258)
 Exit 1: Sell 50% at $9.00 (+50% at $265)
@@ -569,6 +650,7 @@ Exit 3: Trail final 25% with $2.50 stop
 ```
 
 #### OTM Options Exit
+
 ```
 Entry: COIN $340C at $3.00 (stock at $318)
 Exit 1: Sell 50% at $4.50 (+50% at $330)
@@ -579,16 +661,19 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Time-Based Exits
 
 **With 14+ days remaining:**
+
 - Let winners run
 - Trail stops
 - Don't take quick profits unless >100% gain
 
 **With 7-14 days remaining:**
+
 - Tighten stops to 15-20%
 - Take profits at 50%+ if uncertain
 - Roll winning positions to next month
 
 **With <7 days remaining:**
+
 - Close anything not deep ITM
 - Take profits immediately on any gains
 - Don't hold through expiration week unless 100% confident
@@ -596,12 +681,14 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Signal-Based Exits
 
 **Exit Immediately If:**
+
 - Multiple opposite signals appear (calls when you have puts)
 - Premium flow reverses direction
 - Underlying breaks key technical level
 - Major negative news
 
 **Consider Exit If:**
+
 - No new signals detected in 2+ days (flow dried up)
 - Market (SPY/QQQ) reverses hard
 - VIX spikes >30%
@@ -614,6 +701,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Sunday (Preparation)
 
 **Evening (6:00 PM - 8:00 PM):**
+
 1. Export latest signals from service (if fresh data available)
 2. Run analysis script from GitHub Actions or manual
 3. Apply 5-Filter System to identify top 20 signals
@@ -621,7 +709,8 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 5. Check economic calendar for week ahead
 6. Prepare watch list for Monday
 
-**Output:** 
+**Output:**
+
 - Watch list with 10-20 tickers
 - Entry prices identified
 - Position sizes planned
@@ -629,16 +718,19 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Monday (Fresh Start)
 
 **Pre-Market:**
+
 - Review weekend news
 - Check futures sentiment
 - Confirm watch list still valid
 
 **During Market:**
+
 - Execute 2-3 highest conviction entries
 - Use First Hour Fade strategy
 - Don't over-trade - patience
 
 **Post-Market:**
+
 - Review entries
 - Set stops
 - Journal reasoning
@@ -646,6 +738,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Tuesday-Thursday (Management Days)
 
 **Focus:**
+
 - Monitor existing positions
 - Add to winners if confirmed
 - Cut losers at stops
@@ -653,6 +746,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 - Take profits systematically
 
 **Key Activities:**
+
 - Run daily monitoring routine
 - Check for new signals on holdings
 - Scale in/out as appropriate
@@ -661,17 +755,20 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Friday (Week-End Review)
 
 **During Market:**
+
 - Take profits on positions <10 days to expiry
 - Don't hold risky positions through weekend
 - Close losers you don't believe in
 
 **Post-Market:**
+
 - Calculate week's performance
 - Journal lessons learned
 - Identify what worked/didn't
 - Prepare watchlist for next week
 
 **Weekend:**
+
 - Deep analysis of upcoming week
 - Research macro events
 - Update strategy based on results
@@ -685,16 +782,19 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** 180 signals with $388M premium = high volatility expected
 
 **Setup:**
+
 - Buy AMD $258 Straddle (ATM call + ATM put) exp 11/21
 - Cost: ~$12 ($6 call + $6 put)
 - Breakeven: $246 or $270 (need 4.6% move either direction)
 
 **Win Conditions:**
+
 - AMD moves significantly in either direction
 - Volatility spike increases both premiums
 - Profitable if move >5% by expiration
 
 **Risk Management:**
+
 - Max loss: $12 per straddle (if AMD stays at $258)
 - Close at 50% profit (AMD at $252 or $264)
 - Hold one side, sell other if directional
@@ -704,6 +804,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** Want call exposure but expensive premium
 
 **Setup:**
+
 - Instead of buying AAPL $270C for $10
 - Buy AAPL $262.5C (ITM) for $13
 - Sell AAPL $277.5C (OTM) for $4
@@ -711,6 +812,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 - Max profit: $15 - $9 = $6 (67% return)
 
 **Benefits:**
+
 - Lower cost basis
 - Higher delta (more movement with stock)
 - Defined risk
@@ -720,6 +822,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** Expect major move in AMD but unsure of direction
 
 **Setup (Bullish Bias):**
+
 - Sell 1x AMD $260C
 - Buy 2x AMD $265C
 - Net credit or small debit
@@ -727,6 +830,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 - Breakeven: $270
 
 **When to Use:**
+
 - High conviction in volatility
 - Directional lean but want protection
 - IV elevated (collect more premium)
@@ -736,6 +840,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** Signal shows both Nov and Dec options on same strike
 
 **Setup:**
+
 - Sell GOOG $280C exp 11/14 (collect premium)
 - Buy GOOG $280C exp 12/19 (long-term position)
 - Net debit: ~$3
@@ -743,6 +848,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 - Keep long December call for continuation
 
 **Benefits:**
+
 - Reduces cost of long-dated options
 - Profits from time decay
 - Maintains upside exposure
@@ -752,17 +858,20 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** Multiple signals ahead of earnings
 
 **Setup (for Nov 12 earnings):**
+
 - Buy AMD $250P exp 11/14 (OTM)
 - Buy AMD $270C exp 11/14 (OTM)
 - Cost: ~$8 total
 - Need >3% move either direction
 
 **Timing:**
+
 - Enter 2-3 days before earnings
 - Exit immediately after earnings (IV crush)
 - Don't hold through entire expiration
 
 **Risk:**
+
 - IV crush after earnings can hurt both sides
 - Need significant move to overcome premium cost
 
@@ -771,6 +880,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 **Thesis:** Multiple semiconductor signals
 
 **Setup:**
+
 - Instead of betting on one, diversify
 - $1,000 AMD $260C
 - $1,000 TSM $310C
@@ -779,6 +889,7 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 - Total: $4,000 across sector
 
 **Benefits:**
+
 - Reduces single-stock risk
 - Captures sector momentum
 - One big winner can carry others
@@ -791,35 +902,26 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 
 1. **Thou shalt not risk more than 5% on any single trade**
    - Even highest conviction needs limits
-   
 2. **Thou shalt always use stop losses**
    - 20-25% on options is standard
    - Move to breakeven after 50% profit
-   
 3. **Thou shalt take profits systematically**
    - 50% at 50%, 25% at 100%, trail remainder
    - Pigs get fat, hogs get slaughtered
-   
 4. **Thou shalt not hold options <7 days to expiry without conviction**
    - Theta decay accelerates exponentially
-   
 5. **Thou shalt size positions by conviction, not excitement**
    - Score-based sizing system is your friend
-   
 6. **Thou shalt not average down on options**
    - Options are wasting assets
    - Down 20%? Cut it. Don't add to it.
-   
 7. **Thou shalt diversify across tickers**
    - Max 30% in any single underlying
-   
 8. **Thou shalt not trade the first or last 10 minutes**
    - Liquidity and spreads are terrible
-   
 9. **Thou shalt respect the macro environment**
    - Don't fight the Fed
    - Don't fight the trend
-   
 10. **Thou shalt keep a trading journal**
     - Track every trade
     - Learn from mistakes
@@ -832,24 +934,28 @@ Exit 3: Let final 25% expire or hit $10+ (homerun)
 ### Metrics to Track Weekly
 
 **Win Rate:**
+
 ```
 Winning Trades / Total Trades
 Target: >50% for Tier 1, >40% for Tier 2
 ```
 
 **Average Win/Loss Ratio:**
+
 ```
 Avg Win % / Avg Loss %
 Target: >1.5 (win $1.50 for every $1 lost)
 ```
 
 **Return on Capital:**
+
 ```
 Net Profit / Capital Deployed
 Target: >30% quarterly on options capital
 ```
 
 **Max Drawdown:**
+
 ```
 Largest peak-to-trough decline
 Target: <15% max
@@ -881,17 +987,18 @@ Success with unusual options signals requires:
 9. **Workflow:** Weekly rhythm creates consistency
 10. **Risk Management:** The 10 Commandments save you
 
-**Remember:** These signals show you what smart money is doing, but you 
-still need to execute with discipline. The edge is real, but only if you 
+**Remember:** These signals show you what smart money is doing, but you
+still need to execute with discipline. The edge is real, but only if you
 follow the system.
 
-Start small, track everything, iterate based on results. The traders who 
-make consistent money aren't the ones who find the best signals - they're 
+Start small, track everything, iterate based on results. The traders who
+make consistent money aren't the ones who find the best signals - they're
 the ones who execute the same system repeatedly with discipline.
 
 ---
 
 **Next Steps:**
+
 1. Print this framework
 2. Set up your monitoring dashboard
 3. Run the 5-Filter System on current signals
@@ -901,4 +1008,3 @@ the ones who execute the same system repeatedly with discipline.
 7. Iterate and improve
 
 Good luck, and trade safe! 🚀
-

@@ -5,6 +5,10 @@
   "description": "Shared AI agent logic for CLI and Frontend",
   "main": "./index.ts",
   "types": "./index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
   "dependencies": {
     "@toon-format/toon": "^2.1.0",
     "yahoo-finance2": "^3.10.2"
@@ -13,4 +17,3 @@
     "typescript": "^5.0.0"
   }
 }
-

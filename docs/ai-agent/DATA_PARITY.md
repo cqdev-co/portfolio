@@ -6,7 +6,7 @@
 
 ## Overview
 
-Both CLI (ai-analyst) and Frontend (portfolio) now use the **exact same** 
+Both CLI (ai-analyst) and Frontend (portfolio) now use the **exact same**
 data fetching logic from the shared `lib/ai-agent/` library. This ensures:
 
 - Same ticker data for both environments
@@ -48,6 +48,7 @@ instead of using its own local implementation. This ensures:
 - **Same rich data** (options flow, relative strength, earnings)
 
 CLI-specific additions (not in shared library):
+
 - Ownership data (insider %, institutional %)
 - Advanced trade grading (A-F system)
 - Detailed support/resistance levels
@@ -56,44 +57,44 @@ CLI-specific additions (not in shared library):
 
 ### ✅ Core Ticker Data
 
-| Feature | Shared Module | Notes |
-|---------|---------------|-------|
-| Price, Change % | `lib/ai-agent/data/yahoo.ts` | Real-time quote |
-| RSI, ADX | `lib/ai-agent/data/yahoo.ts` | Calculated from history |
-| Moving Averages | `lib/ai-agent/data/yahoo.ts` | MA20, MA50, MA200 |
-| Support/Resistance | `lib/ai-agent/data/yahoo.ts` | From recent highs/lows |
-| Analyst Ratings | `lib/ai-agent/data/yahoo.ts` | Bullish %, breakdown |
-| Target Prices | `lib/ai-agent/data/yahoo.ts` | Low/mean/high, upside |
+| Feature            | Shared Module                | Notes                   |
+| ------------------ | ---------------------------- | ----------------------- |
+| Price, Change %    | `lib/ai-agent/data/yahoo.ts` | Real-time quote         |
+| RSI, ADX           | `lib/ai-agent/data/yahoo.ts` | Calculated from history |
+| Moving Averages    | `lib/ai-agent/data/yahoo.ts` | MA20, MA50, MA200       |
+| Support/Resistance | `lib/ai-agent/data/yahoo.ts` | From recent highs/lows  |
+| Analyst Ratings    | `lib/ai-agent/data/yahoo.ts` | Bullish %, breakdown    |
+| Target Prices      | `lib/ai-agent/data/yahoo.ts` | Low/mean/high, upside   |
 
 ### ✅ Options Data (Real, Not Approximated)
 
-| Feature | Shared Module | Notes |
-|---------|---------------|-------|
-| IV | `lib/ai-agent/options/iv.ts` | From ATM options |
-| IV Percentile | `lib/ai-agent/options/iv.ts` | Real percentile |
-| Spread Pricing | `lib/ai-agent/options/spreads.ts` | Real bid/ask |
-| PoP | `lib/ai-agent/options/spreads.ts` | Calculated from IV+DTE |
-| PFV | `lib/ai-agent/pfv/index.ts` | Full psychological analysis |
-| Put/Call Walls | `lib/ai-agent/pfv/index.ts` | For spread context |
+| Feature        | Shared Module                     | Notes                       |
+| -------------- | --------------------------------- | --------------------------- |
+| IV             | `lib/ai-agent/options/iv.ts`      | From ATM options            |
+| IV Percentile  | `lib/ai-agent/options/iv.ts`      | Real percentile             |
+| Spread Pricing | `lib/ai-agent/options/spreads.ts` | Real bid/ask                |
+| PoP            | `lib/ai-agent/options/spreads.ts` | Calculated from IV+DTE      |
+| PFV            | `lib/ai-agent/pfv/index.ts`       | Full psychological analysis |
+| Put/Call Walls | `lib/ai-agent/pfv/index.ts`       | For spread context          |
 
 ### ✅ Rich Data (NEW - December 28, 2025)
 
-| Feature | Shared Module | Notes |
-|---------|---------------|-------|
-| Options Flow | `lib/ai-agent/data/yahoo.ts` | P/C ratio OI & volume |
-| Relative Strength | `lib/ai-agent/data/yahoo.ts` | vs SPY (30-day) |
-| Short Interest | `lib/ai-agent/data/yahoo.ts` | % float, days to cover |
-| Earnings History | `lib/ai-agent/data/yahoo.ts` | Beat streak, surprise % |
-| Sector P/E | `lib/ai-agent/data/yahoo.ts` | vs sector average |
+| Feature           | Shared Module                | Notes                   |
+| ----------------- | ---------------------------- | ----------------------- |
+| Options Flow      | `lib/ai-agent/data/yahoo.ts` | P/C ratio OI & volume   |
+| Relative Strength | `lib/ai-agent/data/yahoo.ts` | vs SPY (30-day)         |
+| Short Interest    | `lib/ai-agent/data/yahoo.ts` | % float, days to cover  |
+| Earnings History  | `lib/ai-agent/data/yahoo.ts` | Beat streak, surprise % |
+| Sector P/E        | `lib/ai-agent/data/yahoo.ts` | vs sector average       |
 
 ### ✅ Market Regime (NEW - December 28, 2025)
 
-| Feature | Shared Module | Notes |
-|---------|---------------|-------|
-| VIX Analysis | `lib/ai-agent/market/index.ts` | Level, description |
-| SPY Trend | `lib/ai-agent/market/index.ts` | Bullish/Bearish/Neutral |
-| Sector Rotation | `lib/ai-agent/market/index.ts` | Leading/lagging sectors |
-| Trading Recommendation | `lib/ai-agent/market/index.ts` | Based on regime |
+| Feature                | Shared Module                  | Notes                   |
+| ---------------------- | ------------------------------ | ----------------------- |
+| VIX Analysis           | `lib/ai-agent/market/index.ts` | Level, description      |
+| SPY Trend              | `lib/ai-agent/market/index.ts` | Bullish/Bearish/Neutral |
+| Sector Rotation        | `lib/ai-agent/market/index.ts` | Leading/lagging sectors |
+| Trading Recommendation | `lib/ai-agent/market/index.ts` | Based on regime         |
 
 ## Types Exported
 
@@ -130,9 +131,9 @@ import {
   fetchTickerData,
   getMarketRegime,
   formatRegimeForAI,
-} from "../../../lib/ai-agent";
+} from '../../../lib/ai-agent';
 
-const data = await fetchTickerData("NVDA");
+const data = await fetchTickerData('NVDA');
 const regime = await getMarketRegime();
 ```
 
@@ -143,9 +144,9 @@ import {
   fetchTickerData,
   getMarketRegime,
   formatRegimeForAI,
-} from "@lib/ai-agent";
+} from '@lib/ai-agent';
 
-const data = await fetchTickerData("NVDA");
+const data = await fetchTickerData('NVDA');
 const regime = await getMarketRegime();
 ```
 
@@ -176,33 +177,33 @@ User asks: "How does NVDA look?"
 
 Both CLI and Frontend benefit from TOON encoding for AI context:
 
-| Metric | TOON | JSON |
-|--------|------|------|
-| Tokens | **40% fewer** | Baseline |
-| Accuracy | **74%** | 70% |
+| Metric   | TOON           | JSON        |
+| -------- | -------------- | ----------- |
+| Tokens   | **40% fewer**  | Baseline    |
+| Accuracy | **74%**        | 70%         |
 | Best for | Uniform arrays | Nested data |
 
 ### TOON Encoders Available
 
 ```typescript
 import {
-  encodeTickerToTOON,       // Single ticker (full details)
-  encodeTickerTableToTOON,  // Multiple tickers (most efficient)
+  encodeTickerToTOON, // Single ticker (full details)
+  encodeTickerTableToTOON, // Multiple tickers (most efficient)
   encodeMarketRegimeToTOON, // Market conditions
-  encodeScanResultsToTOON,  // Scanner output
+  encodeScanResultsToTOON, // Scanner output
 } from 'lib/ai-agent';
 ```
 
 ### When to Use TOON
 
-| Use Case | Format | Reason |
-|----------|--------|--------|
-| Tool results to AI | TOON | Token efficiency |
-| Multiple tickers | TOON (tabular) | 50%+ savings |
-| Market regime | TOON | Structured data |
-| Scan results | TOON | Uniform arrays |
-| Human display | JSON/Text | Readability |
-| Frontend cards | JSON | Direct rendering |
+| Use Case           | Format         | Reason           |
+| ------------------ | -------------- | ---------------- |
+| Tool results to AI | TOON           | Token efficiency |
+| Multiple tickers   | TOON (tabular) | 50%+ savings     |
+| Market regime      | TOON           | Structured data  |
+| Scan results       | TOON           | Uniform arrays   |
+| Human display      | JSON/Text      | Readability      |
+| Frontend cards     | JSON           | Direct rendering |
 
 ## Future Considerations
 
@@ -210,13 +211,13 @@ import {
 
 The `ticker-data-card.tsx` component now displays all rich data:
 
-| Field | Display |
-|-------|---------|
-| Options Flow | P/C ratio with bullish/neutral/bearish badge |
-| Relative Strength | vs SPY % with trend indicator |
-| Sector P/E | vs sector average % |
-| PFV | Value, divergence %, bias, confidence |
-| Earnings History | Beat streak, last surprise %, avg surprise |
+| Field             | Display                                      |
+| ----------------- | -------------------------------------------- |
+| Options Flow      | P/C ratio with bullish/neutral/bearish badge |
+| Relative Strength | vs SPY % with trend indicator                |
+| Sector P/E        | vs sector average %                          |
+| PFV               | Value, divergence %, bias, confidence        |
+| Earnings History  | Beat streak, last surprise %, avg surprise   |
 
 ### ✅ AI Thinking Display (December 28, 2025)
 
@@ -229,29 +230,30 @@ The `chat-message.tsx` component now shows AI reasoning:
 
 ### Different Features, Same Data
 
-While CLI and Frontend share the same **data layer**, they have 
+While CLI and Frontend share the same **data layer**, they have
 different **features**:
 
-| Feature | CLI | Frontend |
-|---------|-----|----------|
-| Full Scanner | ✅ | Planned |
-| Trade History | ✅ | Not planned |
-| TOON Context | ✅ | ✅ (now shared) |
-| Interactive UI | ❌ | ✅ |
-| Data Cards | ✅ Rich | ✅ Rich (now identical) |
-| Streaming | Terminal | Web |
+| Feature        | CLI      | Frontend                |
+| -------------- | -------- | ----------------------- |
+| Full Scanner   | ✅       | Planned                 |
+| Trade History  | ✅       | Not planned             |
+| TOON Context   | ✅       | ✅ (now shared)         |
+| Interactive UI | ❌       | ✅                      |
+| Data Cards     | ✅ Rich  | ✅ Rich (now identical) |
+| Streaming      | Terminal | Web                     |
 
 ### ✅ P/E Null Handling (January 5, 2026)
 
 Cloudflare Worker v3.3 now properly handles null P/E ratios:
 
-| Scenario | Old Behavior | New Behavior |
-|----------|--------------|--------------|
-| Loss-making company | `peRatio: 0` | `peRatio: null` |
-| Negative EPS | `eps: 0` | `eps: -3.1` (actual value) |
-| Beta unavailable | `beta: 0` | `beta: null` |
+| Scenario            | Old Behavior | New Behavior               |
+| ------------------- | ------------ | -------------------------- |
+| Loss-making company | `peRatio: 0` | `peRatio: null`            |
+| Negative EPS        | `eps: 0`     | `eps: -3.1` (actual value) |
+| Beta unavailable    | `beta: 0`    | `beta: null`               |
 
 This allows the frontend to distinguish between:
+
 - "P/E is zero" (mathematically possible but rare)
 - "P/E is unavailable" (loss-making company)
 
@@ -259,18 +261,19 @@ This allows the frontend to distinguish between:
 
 The `ticker-data-card.tsx` component now displays all proxy data:
 
-| New Field | Display |
-|-----------|---------|
-| Beta | Color-coded (high/normal/low volatility) |
-| EPS | Dollar value, red if negative |
-| Forward P/E | Valuation metric |
-| Dividend Yield | Green percentage |
-| 52-Week Range | Visual progress bar with current position |
-| Price Change | Dollar amount + percentage |
+| New Field      | Display                                   |
+| -------------- | ----------------------------------------- |
+| Beta           | Color-coded (high/normal/low volatility)  |
+| EPS            | Dollar value, red if negative             |
+| Forward P/E    | Valuation metric                          |
+| Dividend Yield | Green percentage                          |
+| 52-Week Range  | Visual progress bar with current position |
+| Price Change   | Dollar amount + percentage                |
 
 ### Caching Strategy (TODO)
 
 Consider adding caching for expensive calls:
+
 - Options chains (rate limited)
 - PFV calculations (compute intensive)
 - Market regime (can be cached 5 min)
@@ -279,4 +282,3 @@ Consider adding caching for expensive calls:
 
 - `docs/ai-agent/INTEGRATION_PLAN.md` - Full integration roadmap
 - `docs/ai-agent/SHARED_LIBRARY.md` - Library usage guide
-

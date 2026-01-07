@@ -7,6 +7,7 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 ### December 2025 - Performance Improvements
 
 **Major fixes based on real performance data (248 signals, 65 closed trades):**
+
 - ✅ **Stop loss widened**: 15% → 25% max (60% were hitting stops)
 - ✅ **Breakout detection improved**: Multiple scenarios now qualify (was only 5.2%)
 - ✅ **Score inflation fixed**: Removed partial credit for unimplemented features
@@ -15,6 +16,7 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 - ✅ **Recommendation logic improved**: No longer all "BUY"
 
 **New Features:**
+
 - 🔔 **Discord Alerts**: Automatic notifications for S/A-Tier signals
 - 📊 **SPY Comparison**: Market outperformance now actually calculated
 - 🎯 **Profit Target Tracking**: Track 10%, 20%, 30% targets with dynamic levels
@@ -24,6 +26,7 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 ### November 2025 - Initial Fixes
 
 **Fixed Critical Issues:**
+
 - ✅ Timezone-aware datetime handling (no more crash errors)
 - ✅ Supabase pagination (now fetches all 1715 symbols)
 - ✅ Signal continuity tracking integrated
@@ -90,6 +93,7 @@ The scanner includes a **GitHub Actions workflow** for automated scanning:
 - **Requirements**: Supabase secrets configured in GitHub repository
 
 **To enable:**
+
 1. Ensure Supabase secrets are set in GitHub → Settings → Secrets
 2. The workflow will run automatically on schedule
 3. Manual trigger available via Actions tab
@@ -101,8 +105,8 @@ Since penny stocks are less time-sensitive than intraday patterns, you may prefe
 ```yaml
 # Modify .github/workflows/penny-scanner.yml schedule to:
 schedule:
-  - cron: '30 13 * * 1-5'  # Once daily at market open
-  - cron: '0 20 * * 1-5'   # Once daily at market close
+  - cron: '30 13 * * 1-5' # Once daily at market open
+  - cron: '0 20 * * 1-5' # Once daily at market close
 ```
 
 ## 📖 Usage
@@ -141,6 +145,7 @@ poetry run penny-scanner scan-all --min-score 0.50
 ```
 
 **Recommended Settings:**
+
 - **Discovery mode**: `--min-score 0.50` (more signals, ~4% hit rate)
 - **Quality mode**: `--min-score 0.70` (fewer, higher-quality signals)
 - **Testing**: `--max-symbols 100` (quick validation)
@@ -176,6 +181,7 @@ poetry run penny-scanner list-tickers --sector Technology
 ### The "Explosion Setup" Pattern
 
 The scanner identifies penny stocks showing:
+
 1. ✅ Consolidation in tight range (5-10+ days)
 2. ✅ Volume surge (2-5x) with price breakout
 3. ✅ Higher lows forming (accumulation)
@@ -185,23 +191,27 @@ The scanner identifies penny stocks showing:
 ### Scoring System
 
 **Volume Analysis (50%)**: The dominant signal
+
 - Relative volume surge (20%)
 - Volume acceleration (15%)
 - Volume consistency (10%)
 - Liquidity depth (5%)
 
 **Price Momentum (30%)**
+
 - Consolidation detection (12%)
 - Price acceleration (10%)
 - Higher lows pattern (5%)
 - Moving average position (3%)
 
 **Relative Strength (15%)**
+
 - Market outperformance (8%)
 - Sector leadership (4%)
 - 52-week position (3%)
 
 **Risk & Liquidity (5%)**
+
 - Bid-ask spread (2%)
 - Float analysis (2%)
 - Price stability (1%)
@@ -268,6 +278,7 @@ penny-stock-scanner/
 ## 📚 Documentation
 
 See the `docs/penny-stock-scanner/` directory:
+
 - **README.md**: Overview and introduction
 - **system-overview.md**: Architecture and design
 - **user-guide.md**: Complete CLI reference
@@ -277,16 +288,20 @@ See the `docs/penny-stock-scanner/` directory:
 ## 🐛 Troubleshooting
 
 ### "Table penny_stock_signals not found"
+
 - **Solution**: Run the SQL schema from `db/penny_stock_signals.sql` in Supabase
 
 ### "No signals found"
+
 - **Solution**: Lower the `--min-score` threshold (try 0.50)
 - **Solution**: Adjust volume filters in `.env` to more lenient values
 
 ### "Timezone datetime errors"
+
 - **Solution**: Fixed in November 2025 update - pull latest changes
 
 ### "Only fetching 1000 symbols"
+
 - **Solution**: Fixed in November 2025 update - pagination now works correctly
 
 ## ⚠️ Disclaimer

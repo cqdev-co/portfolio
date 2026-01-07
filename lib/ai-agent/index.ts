@@ -1,35 +1,35 @@
 /**
  * AI Agent - Shared Logic for CLI and Frontend
- * 
+ *
  * This library provides shared components for building AI trading
  * assistants that work across different runtime environments:
- * 
+ *
  * - CLI (ai-analyst): Full-featured with tool calling
  * - Frontend (portfolio): Lightweight chat integration
- * 
+ *
  * @example
  * ```typescript
  * // CLI usage (full context)
- * import { 
+ * import {
  *   buildVictorSystemPrompt,
  *   AGENT_TOOLS,
  *   toOllamaTools,
- *   classifyQuestion 
+ *   classifyQuestion
  * } from '@lib/ai-agent';
- * 
+ *
  * const tools = toOllamaTools(AGENT_TOOLS);
  * const classification = classifyQuestion(userMessage);
  * const systemPrompt = buildVictorSystemPrompt({
  *   accountSize: 1750,
  *   context: await buildContext(classification),
  * });
- * 
+ *
  * // Frontend usage (lite)
  * import { buildVictorLitePrompt } from '@lib/ai-agent';
- * 
+ *
  * const systemPrompt = buildVictorLitePrompt({ accountSize: 1500 });
  * ```
- * 
+ *
  * @packageDocumentation
  */
 
@@ -42,7 +42,7 @@ export {
   buildVictorSystemPrompt,
   buildVictorLitePrompt,
   buildVictorMinimalPrompt,
-  
+
   // Building blocks
   VICTOR_PERSONA,
   TRADING_STRATEGY,
@@ -52,10 +52,19 @@ export {
   DATA_RULES,
   RESPONSE_STYLE,
   buildKeyRules,
-  
+
+  // Position analysis prompts
+  buildPositionAnalysisPrompt,
+  buildSpreadAnalysisPrompt,
+  buildPortfolioAdvisorPrompt,
+  getSpreadTypeGuidance,
+
   // Types
   type VictorPromptConfig,
   type VictorLiteConfig,
+  type PositionPromptConfig,
+  type SpreadPromptConfig,
+  type PortfolioPromptConfig,
 } from './prompts';
 
 // ============================================================================
@@ -67,19 +76,19 @@ export {
   AGENT_TOOLS,
   RESEARCH_TOOLS,
   BASIC_TOOLS,
-  
+
   // Individual tools
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
   GET_FINANCIALS_DEEP_TOOL,
   GET_INSTITUTIONAL_HOLDINGS_TOOL,
   GET_UNUSUAL_OPTIONS_TOOL,
-  
+
   // Converters
   toOllamaTools,
   getToolByName,
   filterTools,
-  
+
   // Types
   type AgentTool,
   type OllamaTool,
@@ -94,11 +103,11 @@ export {
   // Main function
   classifyQuestion,
   extractTickers,
-  
+
   // Helpers
   needsMarketData,
   needsTools,
-  
+
   // Types
   type QuestionType,
   type QuestionClassification,
@@ -114,22 +123,22 @@ export {
   clearYahooCache,
   isYahooRateLimited,
   fetchTickerDataFromPolygon,
-  
+
   // Cloudflare Worker proxy
   isProxyConfigured,
   checkProxyHealth,
-  
+
   // Formatters
   formatTickerDataForAI,
   formatSearchResultsForAI,
   formatTickerSummary,
-  
+
   // Technical helpers
   calculateRSI,
   calculateADX,
   getTrendStrength,
   checkDataStaleness,
-  
+
   // Types
   type TickerData,
   type SpreadRecommendation,
@@ -168,10 +177,10 @@ export {
   handleGetFinancialsDeep,
   handleGetInstitutionalHoldings,
   handleGetUnusualOptionsActivity,
-  
+
   // Unified executor
   executeToolCall,
-  
+
   // Types
   type ToolCall,
   type ToolExecutorOptions,
@@ -192,20 +201,20 @@ export {
   // Ticker encoders
   encodeTickerToTOON,
   encodeTickersToTOON,
-  encodeTickerTableToTOON,  // Most efficient for multiple tickers
-  
+  encodeTickerTableToTOON, // Most efficient for multiple tickers
+
   // Search encoder
   encodeSearchToTOON,
-  
+
   // Market regime encoder
   encodeMarketRegimeToTOON,
-  
+
   // Scan results encoder
   encodeScanResultsToTOON,
-  
+
   // Generic encoder
   encodeTOON,
-  
+
   // System prompt helper
   getTOONDecoderSpec,
 } from './toon';
@@ -217,14 +226,14 @@ export {
 export {
   // Chain fetching
   getOptionsChain,
-  
+
   // IV analysis (REAL from ATM options)
   getIVAnalysis,
-  
+
   // Spread recommendations (REAL from bid/ask)
   findOptimalSpread,
   findSpreadWithAlternatives,
-  
+
   // Types
   type OptionContract,
   type OptionsChain,
@@ -240,12 +249,12 @@ export {
 export {
   // Main function (SAME as CLI uses)
   getPsychologicalFairValue,
-  
+
   // Helpers
   getKeyMagneticLevels,
   extractWallsFromPFV,
   formatPFVResult,
-  
+
   // Types
   type PsychologicalFairValue,
   type PFVServiceOptions,
@@ -259,16 +268,16 @@ export {
 export {
   // Main function
   getMarketRegime,
-  
+
   // Individual data fetchers
   getVIXData,
   getSPYTrend,
   getSectorPerformance,
-  
+
   // Formatters
   formatRegimeForAI,
   getRegimeBadge,
-  
+
   // Types
   type MarketRegime,
   type MarketRegimeType,
@@ -277,4 +286,3 @@ export {
   type SPYTrend,
   type SectorPerformance,
 } from './market';
-

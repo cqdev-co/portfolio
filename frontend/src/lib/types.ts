@@ -7,4 +7,4 @@ export interface PageParams {
 export interface PageProps<P = PageParams> {
   params: P;
   searchParams?: { [key: string]: string | string[] | undefined };
-} 
+}

@@ -1,14 +1,14 @@
 /**
  * Psychological Fair Value (PFV) Service
- * 
+ *
  * Shared PFV service for CLI and Frontend.
  * Fetches data and calculates psychological fair value
  * including put/call walls that affect spread selection.
- * 
+ *
  * This is the SAME logic used by the CLI.
  */
 
-import type { 
+import type {
   PFVInput,
   TechnicalData,
   OptionsExpiration,
@@ -16,7 +16,7 @@ import type {
   PFVCalculatorOptions,
   TickerProfileType,
 } from '../../utils/ts/psychological-fair-value/types';
-import { 
+import {
   calculatePsychologicalFairValue,
   formatPFVResult,
 } from '../../utils/ts/psychological-fair-value/calculator';
@@ -36,7 +36,7 @@ async function fetchOptionsExpirations(
   try {
     const YahooFinance = (await import('yahoo-finance2')).default;
     const yahooFinance = new YahooFinance({
-      suppressNotices: ['yahooSurvey', 'rippiReport'],
+      suppressNotices: ['yahooSurvey'],
     });
 
     // Get available expiration dates
@@ -50,7 +50,7 @@ async function fetchOptionsExpirations(
 
     // Get first N expirations that are in the future
     const validExpirations = optionsResult.expirationDates
-      .filter(d => d > now)
+      .filter((d) => d > now)
       .slice(0, maxExpirations);
 
     for (const expDate of validExpirations) {
@@ -64,37 +64,41 @@ async function fetchOptionsExpirations(
         );
 
         // Map calls
-        const calls = (opts.calls ?? []).map((c: {
-          strike: number;
-          openInterest?: number;
-          volume?: number;
-          impliedVolatility?: number;
-        }) => ({
-          strike: c.strike,
-          openInterest: c.openInterest ?? 0,
-          volume: c.volume ?? 0,
-          iv: (c.impliedVolatility ?? 0) * 100,
-        }));
+        const calls = (opts.calls ?? []).map(
+          (c: {
+            strike: number;
+            openInterest?: number;
+            volume?: number;
+            impliedVolatility?: number;
+          }) => ({
+            strike: c.strike,
+            openInterest: c.openInterest ?? 0,
+            volume: c.volume ?? 0,
+            iv: (c.impliedVolatility ?? 0) * 100,
+          })
+        );
 
         // Map puts
-        const puts = (opts.puts ?? []).map((p: {
-          strike: number;
-          openInterest?: number;
-          volume?: number;
-          impliedVolatility?: number;
-        }) => ({
-          strike: p.strike,
-          openInterest: p.openInterest ?? 0,
-          volume: p.volume ?? 0,
-          iv: (p.impliedVolatility ?? 0) * 100,
-        }));
+        const puts = (opts.puts ?? []).map(
+          (p: {
+            strike: number;
+            openInterest?: number;
+            volume?: number;
+            impliedVolatility?: number;
+          }) => ({
+            strike: p.strike,
+            openInterest: p.openInterest ?? 0,
+            volume: p.volume ?? 0,
+            iv: (p.impliedVolatility ?? 0) * 100,
+          })
+        );
 
         // Calculate total OI for the expiration
         const totalCallOI = calls.reduce((sum, c) => sum + c.openInterest, 0);
         const totalPutOI = puts.reduce((sum, p) => sum + p.openInterest, 0);
 
         expirations.push({
-          expiration: expDate,  // Field name must match OptionsExpiration interface
+          expiration: expDate, // Field name must match OptionsExpiration interface
           dte,
           calls,
           puts,
@@ -147,16 +151,16 @@ async function fetchTechnicalDataForPFV(
 
       if (history?.quotes && history.quotes.length > 0) {
         const highs = history.quotes
-          .map(q => q.high)
+          .map((q) => q.high)
           .filter((h): h is number => h !== null && h !== undefined);
         const lows = history.quotes
-          .map(q => q.low)
+          .map((q) => q.low)
           .filter((l): l is number => l !== null && l !== undefined);
         const closes = history.quotes
-          .map(q => q.close)
+          .map((q) => q.close)
           .filter((c): c is number => c !== null && c !== undefined);
         const volumes = history.quotes
-          .map(q => q.volume)
+          .map((q) => q.volume)
           .filter((v): v is number => v !== null && v !== undefined);
 
         if (highs.length > 0) recentSwingHigh = Math.max(...highs);
@@ -184,6 +188,9 @@ async function fetchTechnicalDataForPFV(
       ma20: quote.fiftyDayAverage, // Approximation
       ma50: quote.fiftyDayAverage,
       ma200: quote.twoHundredDayAverage,
+      fiftyTwoWeekHigh:
+        quote.fiftyTwoWeekHigh ?? quote.regularMarketPrice * 1.2,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? quote.regularMarketPrice * 0.8,
       vwap,
       recentSwingHigh,
       recentSwingLow,
@@ -206,15 +213,15 @@ export interface PFVServiceOptions {
 
 /**
  * Calculate Psychological Fair Value for a ticker
- * 
+ *
  * This is the SAME function used by CLI - now shared with Frontend.
  */
 export async function getPsychologicalFairValue(
   ticker: string,
   options: PFVServiceOptions = {}
 ): Promise<PsychologicalFairValue | null> {
-  const { 
-    maxExpirations = 4, 
+  const {
+    maxExpirations = 4,
     profileOverride,
     calculatorOptions = {},
   } = options;
@@ -244,7 +251,9 @@ export async function getPsychologicalFairValue(
 
   try {
     const result = calculatePsychologicalFairValue(input, calculatorOptions);
-    console.log(`[PFV] Fair value for ${ticker}: $${result.fairValue.toFixed(2)} (${result.bias})`);
+    console.log(
+      `[PFV] Fair value for ${ticker}: $${result.fairValue.toFixed(2)} (${result.bias})`
+    );
     return result;
   } catch (error) {
     console.error(`[PFV] Calculation failed for ${ticker}:`, error);
@@ -265,7 +274,7 @@ export function getKeyMagneticLevels(
   return pfv.magneticLevels
     .sort((a, b) => b.strength - a.strength)
     .slice(0, maxLevels)
-    .map(l => ({
+    .map((l) => ({
       price: l.price,
       type: l.type,
       strength: l.strength,
@@ -275,17 +284,18 @@ export function getKeyMagneticLevels(
 /**
  * Extract put walls and call walls for spread context
  */
-export function extractWallsFromPFV(
-  pfv: PsychologicalFairValue
-): { putWalls: number[]; callWalls: number[] } {
+export function extractWallsFromPFV(pfv: PsychologicalFairValue): {
+  putWalls: number[];
+  callWalls: number[];
+} {
   const putWalls: number[] = [];
   const callWalls: number[] = [];
 
   if (pfv.magneticLevels) {
     for (const level of pfv.magneticLevels) {
-      if (level.type === 'PUT_WALL' || level.type === 'GAMMA_PUT') {
+      if (level.type === 'PUT_WALL') {
         putWalls.push(level.price);
-      } else if (level.type === 'CALL_WALL' || level.type === 'GAMMA_CALL') {
+      } else if (level.type === 'CALL_WALL' || level.type === 'GAMMA_WALL') {
         callWalls.push(level.price);
       }
     }
@@ -297,4 +307,3 @@ export function extractWallsFromPFV(
 // Re-export types
 export type { PsychologicalFairValue, TickerProfileType };
 export { formatPFVResult };
-

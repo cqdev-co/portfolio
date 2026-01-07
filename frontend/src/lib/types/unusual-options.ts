@@ -5,65 +5,65 @@ export interface UnusualOptionsSignalDB {
   ticker: string;
   option_symbol: string;
   detection_timestamp: string;
-  
+
   // Option Details
   strike: number;
   expiry: string;
   option_type: 'call' | 'put';
   days_to_expiry: number;
   moneyness: 'ITM' | 'ATM' | 'OTM' | null;
-  
+
   // Volume Metrics
   current_volume: number;
   average_volume: number;
   volume_ratio: number | null;
-  
+
   // Open Interest Metrics
   current_oi: number;
   previous_oi: number;
   oi_change_pct: number | null;
-  
+
   // Premium Metrics
   premium_flow: number;
   aggressive_order_pct: number | null;
-  
+
   // Detection Flags
   has_volume_anomaly: boolean;
   has_oi_spike: boolean;
   has_premium_flow: boolean;
   has_sweep: boolean;
   has_block_trade: boolean;
-  
+
   // Scoring
   overall_score: number;
   grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
   confidence: number | null;
-  
+
   // Risk Assessment
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
   risk_factors: Record<string, unknown>; // JSONB
-  
+
   // Market Context
   underlying_price: number;
   implied_volatility: number | null;
   iv_rank: number | null;
   market_cap: number | null;
   avg_daily_volume: number | null;
-  
+
   // Directional Bias
   sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   put_call_ratio: number | null;
-  
+
   // Additional Context
   days_to_earnings: number | null;
   has_upcoming_catalyst: boolean;
   catalyst_description: string | null;
-  
+
   // Metadata
   data_provider: string | null;
   detection_version: string | null;
   raw_detection_data: Record<string, unknown>; // JSONB
-  
+
   // Signal Continuity (for cron job deduplication)
   is_new_signal: boolean;
   signal_group_id: string | null;
@@ -71,7 +71,7 @@ export interface UnusualOptionsSignalDB {
   last_detected_at: string | null;
   detection_count: number;
   is_active: boolean;
-  
+
   // Spread Detection (Phase 1)
   is_likely_spread: boolean;
   spread_confidence: number | null;
@@ -80,7 +80,7 @@ export interface UnusualOptionsSignalDB {
   spread_strike_width: number | null;
   spread_detection_reason: string | null;
   spread_net_premium: number | null;
-  
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -156,29 +156,29 @@ export interface UnusualOptionsStats {
 // Helper function to format premium flow
 export function formatPremiumFlow(amount: number | null): string {
   if (!amount || amount === 0) return '-';
-  
+
   const absAmount = Math.abs(amount);
   const isNegative = amount < 0;
   const sign = isNegative ? '-' : '';
-  
+
   // Handle billions (1B+)
   const billions = absAmount / 1_000_000_000;
   if (billions >= 1) {
     return `${sign}$${billions.toFixed(2)}B`;
   }
-  
+
   // Handle millions (1M+)
   const millions = absAmount / 1_000_000;
   if (millions >= 1) {
     return `${sign}$${millions.toFixed(1)}M`;
   }
-  
+
   // Handle thousands (1K+)
   const thousands = absAmount / 1_000;
   if (thousands >= 1) {
     return `${sign}$${thousands.toFixed(0)}K`;
   }
-  
+
   // Handle smaller amounts (< 1K)
   return `${sign}$${absAmount.toFixed(0)}`;
 }
@@ -186,12 +186,12 @@ export function formatPremiumFlow(amount: number | null): string {
 // Helper function to get grade color
 export function getGradeColor(grade: string): string {
   const colors: Record<string, string> = {
-    'S': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-    'A': 'bg-green-500/10 text-green-500 border-green-500/20',
-    'B': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    'C': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-    'D': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-    'F': 'bg-red-500/10 text-red-500 border-red-500/20',
+    S: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    A: 'bg-green-500/10 text-green-500 border-green-500/20',
+    B: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    C: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+    D: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    F: 'bg-red-500/10 text-red-500 border-red-500/20',
   };
   return colors[grade] || colors['F'];
 }
@@ -199,15 +199,17 @@ export function getGradeColor(grade: string): string {
 // Helper function to get risk level color
 export function getRiskLevelColor(riskLevel: string | null): string {
   const colors: Record<string, string> = {
-    'LOW': 'bg-green-500/10 text-green-500',
-    'MEDIUM': 'bg-yellow-500/10 text-yellow-500',
-    'HIGH': 'bg-red-500/10 text-red-500',
+    LOW: 'bg-green-500/10 text-green-500',
+    MEDIUM: 'bg-yellow-500/10 text-yellow-500',
+    HIGH: 'bg-red-500/10 text-red-500',
   };
   return colors[riskLevel || 'MEDIUM'] || colors['MEDIUM'];
 }
 
 // Helper function to parse numeric field
-export function parseNumericField(value: string | number | null): number | null {
+export function parseNumericField(
+  value: string | number | null
+): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return value;
   const parsed = parseFloat(value);
@@ -217,12 +219,12 @@ export function parseNumericField(value: string | number | null): number | null 
 // Helper function to get time since last detection
 export function getTimeSinceDetection(lastDetectedAt: string | null): string {
   if (!lastDetectedAt) return 'Unknown';
-  
+
   const now = new Date();
   const detected = new Date(lastDetectedAt);
   const diffMs = now.getTime() - detected.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
-  
+
   if (diffHours < 1) {
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     return `${diffMinutes}m ago`;
@@ -251,25 +253,27 @@ export function formatDetectionCount(count: number): string {
 // Helper function to get spread badge color
 export function getSpreadBadgeColor(confidence: number | null): string {
   if (!confidence) return '';
-  if (confidence >= 0.80) return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-  if (confidence >= 0.60) return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+  if (confidence >= 0.8)
+    return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+  if (confidence >= 0.6)
+    return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
   return '';
 }
 
 // Helper function to format spread type for display
 export function formatSpreadType(spreadType: string | null): string {
   if (!spreadType) return '';
-  
+
   const typeMap: Record<string, string> = {
-    'VERTICAL_CALL_SPREAD': 'Call Spread',
-    'VERTICAL_PUT_SPREAD': 'Put Spread',
-    'CALENDAR_SPREAD': 'Calendar',
-    'IRON_CONDOR': 'Iron Condor',
-    'STRADDLE': 'Straddle',
-    'STRANGLE': 'Strangle',
-    'POSSIBLE_SPREAD': 'Possible Spread',
+    VERTICAL_CALL_SPREAD: 'Call Spread',
+    VERTICAL_PUT_SPREAD: 'Put Spread',
+    CALENDAR_SPREAD: 'Calendar',
+    IRON_CONDOR: 'Iron Condor',
+    STRADDLE: 'Straddle',
+    STRANGLE: 'Strangle',
+    POSSIBLE_SPREAD: 'Possible Spread',
   };
-  
+
   return typeMap[spreadType] || spreadType;
 }
 
@@ -350,39 +354,45 @@ export function groupSignalsByTicker(
   signals: UnusualOptionsSignal[]
 ): GroupedTickerSignals[] {
   const grouped = new Map<string, UnusualOptionsSignal[]>();
-  
+
   // Group signals by ticker
-  signals.forEach(signal => {
+  signals.forEach((signal) => {
     const existing = grouped.get(signal.ticker) || [];
     existing.push(signal);
     grouped.set(signal.ticker, existing);
   });
-  
+
   // Transform to GroupedTickerSignals
   const result: GroupedTickerSignals[] = [];
-  
+
   grouped.forEach((tickerSignals, ticker) => {
     const totalPremiumFlow = tickerSignals.reduce(
-      (sum, s) => sum + (s.premium_flow || 0), 0
+      (sum, s) => sum + (s.premium_flow || 0),
+      0
     );
-    
+
     const callCount = tickerSignals.filter(
-      s => s.option_type === 'call'
+      (s) => s.option_type === 'call'
     ).length;
     const putCount = tickerSignals.length - callCount;
-    
+
     // Determine highest grade (S > A > B > C > D > F)
-    const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
-    const highestGrade = tickerSignals.reduce((best, signal) => {
-      return gradeOrder[signal.grade] > gradeOrder[best] ? signal.grade : best;
-    }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F');
-    
+    const gradeOrder = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+    const highestGrade = tickerSignals.reduce(
+      (best, signal) => {
+        return gradeOrder[signal.grade] > gradeOrder[best]
+          ? signal.grade
+          : best;
+      },
+      'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
+    );
+
     // Determine dominant sentiment
     const bullishCount = tickerSignals.filter(
-      s => s.sentiment === 'BULLISH'
+      (s) => s.sentiment === 'BULLISH'
     ).length;
     const bearishCount = tickerSignals.filter(
-      s => s.sentiment === 'BEARISH'
+      (s) => s.sentiment === 'BEARISH'
     ).length;
     let dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
     if (bullishCount > bearishCount) {
@@ -390,27 +400,28 @@ export function groupSignalsByTicker(
     } else if (bearishCount > bullishCount) {
       dominantSentiment = 'BEARISH';
     }
-    
+
     // Calculate average confidence
     const confidences = tickerSignals
-      .map(s => s.confidence)
+      .map((s) => s.confidence)
       .filter((c): c is number => c !== null);
-    const avgConfidence = confidences.length > 0
-      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
-      : 0;
-    
+    const avgConfidence =
+      confidences.length > 0
+        ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+        : 0;
+
     // Check if has high conviction (S or A grade)
     const hasHighConviction = tickerSignals.some(
-      s => s.grade === 'S' || s.grade === 'A'
+      (s) => s.grade === 'S' || s.grade === 'A'
     );
-    
+
     // Get latest detection timestamp
     const latestDetection = tickerSignals.reduce((latest, signal) => {
-      return signal.detection_timestamp > latest 
-        ? signal.detection_timestamp 
+      return signal.detection_timestamp > latest
+        ? signal.detection_timestamp
         : latest;
     }, tickerSignals[0].detection_timestamp);
-    
+
     result.push({
       ticker,
       signals: tickerSignals.sort(
@@ -424,10 +435,10 @@ export function groupSignalsByTicker(
       dominantSentiment,
       avgConfidence,
       hasHighConviction,
-      latestDetection
+      latestDetection,
     });
   });
-  
+
   return result;
 }
 
@@ -460,22 +471,18 @@ export function createAggregatedSummary(
   // Basic metrics
   const totalSignals = signals.length;
   const totalPremiumFlow = signals.reduce(
-    (sum, s) => sum + (s.premium_flow || 0), 
+    (sum, s) => sum + (s.premium_flow || 0),
     0
   );
-  const callCount = signals.filter(s => s.option_type === 'call').length;
+  const callCount = signals.filter((s) => s.option_type === 'call').length;
   const putCount = signals.length - callCount;
   const highConvictionCount = signals.filter(
-    s => s.grade === 'S' || s.grade === 'A'
+    (s) => s.grade === 'S' || s.grade === 'A'
   ).length;
 
   // Determine dominant sentiment
-  const bullishCount = signals.filter(
-    s => s.sentiment === 'BULLISH'
-  ).length;
-  const bearishCount = signals.filter(
-    s => s.sentiment === 'BEARISH'
-  ).length;
+  const bullishCount = signals.filter((s) => s.sentiment === 'BULLISH').length;
+  const bearishCount = signals.filter((s) => s.sentiment === 'BEARISH').length;
   let dominantSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
   if (bullishCount > bearishCount) {
     dominantSentiment = 'BULLISH';
@@ -485,14 +492,15 @@ export function createAggregatedSummary(
 
   // Calculate average confidence
   const confidences = signals
-    .map(s => s.confidence)
+    .map((s) => s.confidence)
     .filter((c): c is number => c !== null);
-  const avgConfidence = confidences.length > 0
-    ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
-    : 0;
+  const avgConfidence =
+    confidences.length > 0
+      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+      : 0;
 
   // Date range
-  const timestamps = signals.map(s => s.detection_timestamp).sort();
+  const timestamps = signals.map((s) => s.detection_timestamp).sort();
   const dateRange = {
     earliest: timestamps[0],
     latest: timestamps[timestamps.length - 1],
@@ -500,44 +508,42 @@ export function createAggregatedSummary(
 
   // Group by strike
   const strikeMap = new Map<number, UnusualOptionsSignal[]>();
-  signals.forEach(signal => {
+  signals.forEach((signal) => {
     const existing = strikeMap.get(signal.strike) || [];
     existing.push(signal);
     strikeMap.set(signal.strike, existing);
   });
 
-  const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+  const gradeOrder = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
   const topStrikes: SignalsByStrike[] = Array.from(strikeMap.entries())
     .map(([strike, strikeSignals]) => ({
       strike,
       signals: strikeSignals,
       signalCount: strikeSignals.length,
       totalPremiumFlow: strikeSignals.reduce(
-        (sum, s) => sum + (s.premium_flow || 0), 
+        (sum, s) => sum + (s.premium_flow || 0),
         0
       ),
-      callCount: strikeSignals.filter(
-        s => s.option_type === 'call'
-      ).length,
-      putCount: strikeSignals.filter(
-        s => s.option_type === 'put'
-      ).length,
-      avgScore: strikeSignals.reduce(
-        (sum, s) => sum + s.overall_score, 
-        0
-      ) / strikeSignals.length,
-      highestGrade: strikeSignals.reduce((best, signal) => {
-        return gradeOrder[signal.grade] > gradeOrder[best] 
-          ? signal.grade 
-          : best;
-      }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'),
+      callCount: strikeSignals.filter((s) => s.option_type === 'call').length,
+      putCount: strikeSignals.filter((s) => s.option_type === 'put').length,
+      avgScore:
+        strikeSignals.reduce((sum, s) => sum + s.overall_score, 0) /
+        strikeSignals.length,
+      highestGrade: strikeSignals.reduce(
+        (best, signal) => {
+          return gradeOrder[signal.grade] > gradeOrder[best]
+            ? signal.grade
+            : best;
+        },
+        'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
+      ),
     }))
     .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow)
     .slice(0, 5);
 
   // Group by expiry
   const expiryMap = new Map<string, UnusualOptionsSignal[]>();
-  signals.forEach(signal => {
+  signals.forEach((signal) => {
     const existing = expiryMap.get(signal.expiry) || [];
     existing.push(signal);
     expiryMap.set(signal.expiry, existing);
@@ -549,15 +555,11 @@ export function createAggregatedSummary(
       signals: expirySignals,
       signalCount: expirySignals.length,
       totalPremiumFlow: expirySignals.reduce(
-        (sum, s) => sum + (s.premium_flow || 0), 
+        (sum, s) => sum + (s.premium_flow || 0),
         0
       ),
-      callCount: expirySignals.filter(
-        s => s.option_type === 'call'
-      ).length,
-      putCount: expirySignals.filter(
-        s => s.option_type === 'put'
-      ).length,
+      callCount: expirySignals.filter((s) => s.option_type === 'call').length,
+      putCount: expirySignals.filter((s) => s.option_type === 'put').length,
       daysToExpiry: expirySignals[0]?.days_to_expiry || 0,
     }))
     .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow)
@@ -565,11 +567,11 @@ export function createAggregatedSummary(
 
   // Detection flags
   const detectionFlags = {
-    volumeAnomaly: signals.filter(s => s.has_volume_anomaly).length,
-    oiSpike: signals.filter(s => s.has_oi_spike).length,
-    premiumFlow: signals.filter(s => s.has_premium_flow).length,
-    sweep: signals.filter(s => s.has_sweep).length,
-    blockTrade: signals.filter(s => s.has_block_trade).length,
+    volumeAnomaly: signals.filter((s) => s.has_volume_anomaly).length,
+    oiSpike: signals.filter((s) => s.has_oi_spike).length,
+    premiumFlow: signals.filter((s) => s.has_premium_flow).length,
+    sweep: signals.filter((s) => s.has_sweep).length,
+    blockTrade: signals.filter((s) => s.has_block_trade).length,
   };
 
   return {
@@ -592,15 +594,15 @@ export function groupSignalsByStrike(
   signals: UnusualOptionsSignal[]
 ): SignalsByStrike[] {
   const strikeMap = new Map<number, UnusualOptionsSignal[]>();
-  
-  signals.forEach(signal => {
+
+  signals.forEach((signal) => {
     const existing = strikeMap.get(signal.strike) || [];
     existing.push(signal);
     strikeMap.set(signal.strike, existing);
   });
 
-  const gradeOrder = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
-  
+  const gradeOrder = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+
   return Array.from(strikeMap.entries())
     .map(([strike, strikeSignals]) => ({
       strike,
@@ -609,24 +611,22 @@ export function groupSignalsByStrike(
       ),
       signalCount: strikeSignals.length,
       totalPremiumFlow: strikeSignals.reduce(
-        (sum, s) => sum + (s.premium_flow || 0), 
+        (sum, s) => sum + (s.premium_flow || 0),
         0
       ),
-      callCount: strikeSignals.filter(
-        s => s.option_type === 'call'
-      ).length,
-      putCount: strikeSignals.filter(
-        s => s.option_type === 'put'
-      ).length,
-      avgScore: strikeSignals.reduce(
-        (sum, s) => sum + s.overall_score, 
-        0
-      ) / strikeSignals.length,
-      highestGrade: strikeSignals.reduce((best, signal) => {
-        return gradeOrder[signal.grade] > gradeOrder[best] 
-          ? signal.grade 
-          : best;
-      }, 'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'),
+      callCount: strikeSignals.filter((s) => s.option_type === 'call').length,
+      putCount: strikeSignals.filter((s) => s.option_type === 'put').length,
+      avgScore:
+        strikeSignals.reduce((sum, s) => sum + s.overall_score, 0) /
+        strikeSignals.length,
+      highestGrade: strikeSignals.reduce(
+        (best, signal) => {
+          return gradeOrder[signal.grade] > gradeOrder[best]
+            ? signal.grade
+            : best;
+        },
+        'F' as 'S' | 'A' | 'B' | 'C' | 'D' | 'F'
+      ),
     }))
     .sort((a, b) => b.totalPremiumFlow - a.totalPremiumFlow);
 }
@@ -636,8 +636,8 @@ export function groupSignalsByExpiry(
   signals: UnusualOptionsSignal[]
 ): SignalsByExpiry[] {
   const expiryMap = new Map<string, UnusualOptionsSignal[]>();
-  
-  signals.forEach(signal => {
+
+  signals.forEach((signal) => {
     const existing = expiryMap.get(signal.expiry) || [];
     existing.push(signal);
     expiryMap.set(signal.expiry, existing);
@@ -651,15 +651,11 @@ export function groupSignalsByExpiry(
       ),
       signalCount: expirySignals.length,
       totalPremiumFlow: expirySignals.reduce(
-        (sum, s) => sum + (s.premium_flow || 0), 
+        (sum, s) => sum + (s.premium_flow || 0),
         0
       ),
-      callCount: expirySignals.filter(
-        s => s.option_type === 'call'
-      ).length,
-      putCount: expirySignals.filter(
-        s => s.option_type === 'put'
-      ).length,
+      callCount: expirySignals.filter((s) => s.option_type === 'call').length,
+      putCount: expirySignals.filter((s) => s.option_type === 'put').length,
       daysToExpiry: expirySignals[0]?.days_to_expiry || 0,
     }))
     .sort((a, b) => a.daysToExpiry - b.daysToExpiry);
@@ -670,8 +666,8 @@ export function groupSignalsByDate(
   signals: UnusualOptionsSignal[]
 ): SignalsByDate[] {
   const dateMap = new Map<string, UnusualOptionsSignal[]>();
-  
-  signals.forEach(signal => {
+
+  signals.forEach((signal) => {
     const date = signal.detection_timestamp.split('T')[0];
     const existing = dateMap.get(date) || [];
     existing.push(signal);
@@ -686,16 +682,11 @@ export function groupSignalsByDate(
       ),
       signalCount: dateSignals.length,
       totalPremiumFlow: dateSignals.reduce(
-        (sum, s) => sum + (s.premium_flow || 0), 
+        (sum, s) => sum + (s.premium_flow || 0),
         0
       ),
-      callCount: dateSignals.filter(
-        s => s.option_type === 'call'
-      ).length,
-      putCount: dateSignals.filter(
-        s => s.option_type === 'put'
-      ).length,
+      callCount: dateSignals.filter((s) => s.option_type === 'call').length,
+      putCount: dateSignals.filter((s) => s.option_type === 'put').length,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
-

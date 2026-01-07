@@ -6,9 +6,9 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
 
 ## Recommended models
 
-* [embeddinggemma](https://ollama.com/library/embeddinggemma)
-* [qwen3-embedding](https://ollama.com/library/qwen3-embedding)
-* [all-minilm](https://ollama.com/library/all-minilm)
+- [embeddinggemma](https://ollama.com/library/embeddinggemma)
+- [qwen3-embedding](https://ollama.com/library/qwen3-embedding)
+- [all-minilm](https://ollama.com/library/all-minilm)
 
 ## Generate embeddings
 
@@ -27,6 +27,7 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
     ```
 
     Output is a JSON array.
+
   </Tab>
 
   <Tab title="cURL">
@@ -50,6 +51,7 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
     )
     print(len(single['embeddings'][0]))  # vector length
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -62,6 +64,7 @@ Embeddings turn text into numeric vectors you can store in a vector database, se
     })
     console.log(single.embeddings[0].length) // vector length
     ```
+
   </Tab>
 </Tabs>
 
@@ -103,6 +106,7 @@ Pass an array of strings to `input`.
     )
     print(len(batch['embeddings']))  # number of vectors
     ```
+
   </Tab>
 
   <Tab title="JavaScript">
@@ -119,14 +123,14 @@ Pass an array of strings to `input`.
     })
     console.log(batch.embeddings.length) // number of vectors
     ```
+
   </Tab>
 </Tabs>
 
 ## Tips
 
-* Use cosine similarity for most semantic search use cases.
-* Use the same embedding model for both indexing and querying.
-
+- Use cosine similarity for most semantic search use cases.
+- Use the same embedding model for both indexing and querying.
 
 ---
 

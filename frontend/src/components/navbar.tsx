@@ -1,23 +1,22 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Dock, DockIcon } from "@/components/magicui/dock";
-import { ModeToggle } from "@/components/mode-toggle";
-import { buttonVariants } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Dock, DockIcon } from '@/components/magicui/dock';
+import { ModeToggle } from '@/components/mode-toggle';
+import { buttonVariants } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { DATA } from "@/data/resume";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { ChatPanel } from "@/components/chat/chat-panel";
-import { SparklesIcon } from "@/components/chat/chat-icons";
+} from '@/components/ui/tooltip';
+import { DATA } from '@/data/resume';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { ChatPanel, useGlobalChat } from '@/components/chat';
+import { SparklesIcon } from '@/components/chat/chat-icons';
 
 export default function Navbar() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const { isOpen: isChatOpen, openChat, closeChat } = useGlobalChat();
 
   return (
     <>
@@ -31,8 +30,8 @@ export default function Navbar() {
                   <Link
                     href={item.href}
                     className={cn(
-                      buttonVariants({ variant: "ghost", size: "icon" }),
-                      "size-12"
+                      buttonVariants({ variant: 'ghost', size: 'icon' }),
+                      'size-12'
                     )}
                   >
                     <item.icon className="size-4" />
@@ -54,8 +53,8 @@ export default function Navbar() {
                     <Link
                       href={social.url}
                       className={cn(
-                        buttonVariants({ variant: "ghost", size: "icon" }),
-                        "size-12"
+                        buttonVariants({ variant: 'ghost', size: 'icon' }),
+                        'size-12'
                       )}
                     >
                       <social.icon className="size-4" />
@@ -82,10 +81,10 @@ export default function Navbar() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setIsChatOpen(true)}
+                  onClick={() => openChat()}
                   className={cn(
-                    buttonVariants({ variant: "ghost", size: "icon" }),
-                    "size-12 cursor-pointer"
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
+                    'size-12 cursor-pointer'
                   )}
                   aria-label="Open AI Chat"
                 >
@@ -101,7 +100,7 @@ export default function Navbar() {
       </div>
 
       {/* Chat Panel */}
-      <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <ChatPanel isOpen={isChatOpen} onClose={closeChat} />
     </>
   );
 }

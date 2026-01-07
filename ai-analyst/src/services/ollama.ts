@@ -4,9 +4,9 @@
  * Supports tool calling and thinking mode per Ollama docs
  */
 
-import { Ollama } from "ollama";
+import { Ollama } from 'ollama';
 
-export type OllamaMode = "local" | "cloud";
+export type OllamaMode = 'local' | 'cloud';
 
 export interface OllamaConfig {
   mode: OllamaMode;
@@ -32,12 +32,12 @@ export interface ToolCall {
 }
 
 export interface ToolDefinition {
-  type: "function";
+  type: 'function';
   function: {
     name: string;
     description: string;
     parameters: {
-      type: "object";
+      type: 'object';
       required?: string[];
       properties: Record<string, { type: string; description: string }>;
     };
@@ -45,7 +45,7 @@ export interface ToolDefinition {
 }
 
 export interface AgentMessage {
-  role: "user" | "assistant" | "system" | "tool";
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   thinking?: string;
   tool_calls?: ToolCall[];
@@ -53,21 +53,21 @@ export interface AgentMessage {
 }
 
 const DEFAULT_MODELS: Record<OllamaMode, string> = {
-  local: "llama3.2",
-  cloud: "deepseek-v3.2:cloud",
+  local: 'llama3.2',
+  cloud: 'deepseek-v3.2:cloud',
 };
 
 function createClient(mode: OllamaMode): Ollama {
-  if (mode === "cloud") {
+  if (mode === 'cloud') {
     const apiKey = process.env.OLLAMA_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "OLLAMA_API_KEY environment variable required for cloud mode"
+        'OLLAMA_API_KEY environment variable required for cloud mode'
       );
     }
 
     return new Ollama({
-      host: "https://ollama.com",
+      host: 'https://ollama.com',
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
@@ -75,7 +75,7 @@ function createClient(mode: OllamaMode): Ollama {
   }
 
   return new Ollama({
-    host: "http://localhost:11434",
+    host: 'http://localhost:11434',
   });
 }
 
@@ -102,8 +102,8 @@ export async function generateCompletion(
   const response = await client.chat({
     model,
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
     stream: false,
   });
@@ -145,13 +145,13 @@ export async function* generateStreamingCompletion(
   const response = await client.chat({
     model,
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
     stream: true,
   });
 
-  let fullContent = "";
+  let fullContent = '';
   let promptTokens = 0;
   let completionTokens = 0;
 
@@ -160,7 +160,7 @@ export async function* generateStreamingCompletion(
       fullContent += chunk.message.content;
       yield chunk.message.content;
     }
-    
+
     // Capture token counts from final chunk
     if (chunk.done) {
       promptTokens = chunk.prompt_eval_count ?? 0;
@@ -189,16 +189,16 @@ export interface AIValidationResult {
 export async function validateAIRequirement(
   mode: OllamaMode
 ): Promise<AIValidationResult> {
-  if (mode === "cloud") {
+  if (mode === 'cloud') {
     const apiKey = process.env.OLLAMA_API_KEY;
     if (!apiKey) {
       return {
         available: false,
-        error: "OLLAMA_API_KEY environment variable not set",
-        suggestion: 
-          "Add OLLAMA_API_KEY to your .env file or export it:\n" +
-          "  export OLLAMA_API_KEY=your-api-key\n" +
-          "  Or use local mode: --ai-mode local",
+        error: 'OLLAMA_API_KEY environment variable not set',
+        suggestion:
+          'Add OLLAMA_API_KEY to your .env file or export it:\n' +
+          '  export OLLAMA_API_KEY=your-api-key\n' +
+          '  Or use local mode: --ai-mode local',
       };
     }
   }
@@ -206,22 +206,22 @@ export async function validateAIRequirement(
   try {
     const isAvailable = await checkOllamaAvailability(mode);
     if (!isAvailable) {
-      if (mode === "local") {
+      if (mode === 'local') {
         return {
           available: false,
-          error: "Cannot connect to local Ollama instance",
-          suggestion: 
-            "Start Ollama locally:\n" +
-            "  ollama serve\n" +
-            "  Or use cloud mode: --ai-mode cloud",
+          error: 'Cannot connect to local Ollama instance',
+          suggestion:
+            'Start Ollama locally:\n' +
+            '  ollama serve\n' +
+            '  Or use cloud mode: --ai-mode cloud',
         };
       } else {
         return {
           available: false,
-          error: "Cannot connect to Ollama cloud API",
-          suggestion: 
-            "Check your OLLAMA_API_KEY is valid\n" +
-            "  Or use local mode: --ai-mode local",
+          error: 'Cannot connect to Ollama cloud API',
+          suggestion:
+            'Check your OLLAMA_API_KEY is valid\n' +
+            '  Or use local mode: --ai-mode local',
         };
       }
     }
@@ -231,9 +231,10 @@ export async function validateAIRequirement(
     return {
       available: false,
       error: `AI service error: ${errorMessage}`,
-      suggestion: mode === "cloud"
-        ? "Check your API key and network connection"
-        : "Ensure Ollama is running: ollama serve",
+      suggestion:
+        mode === 'cloud'
+          ? 'Check your API key and network connection'
+          : 'Ensure Ollama is running: ollama serve',
     };
   }
 }
@@ -275,7 +276,7 @@ export async function chatWithTools(
 
   const response = await client.chat({
     model,
-    messages: messages.map(m => ({
+    messages: messages.map((m) => ({
       role: m.role,
       content: m.content,
       thinking: m.thinking,
@@ -290,7 +291,7 @@ export async function chatWithTools(
   const duration = Date.now() - startTime;
 
   return {
-    content: response.message.content ?? "",
+    content: response.message.content ?? '',
     thinking: (response.message as { thinking?: string }).thinking,
     toolCalls: (response.message as { tool_calls?: ToolCall[] }).tool_calls,
     model,
@@ -305,7 +306,7 @@ export async function chatWithTools(
  * Streaming agent response with tool calls and thinking
  */
 export interface StreamingAgentChunk {
-  type: "thinking" | "content" | "tool_call";
+  type: 'thinking' | 'content' | 'tool_call';
   text?: string;
   toolCall?: ToolCall;
 }
@@ -337,7 +338,7 @@ export async function* streamChatWithTools(
 
   const response = await client.chat({
     model,
-    messages: messages.map(m => ({
+    messages: messages.map((m) => ({
       role: m.role,
       content: m.content,
       thinking: m.thinking,
@@ -349,48 +350,47 @@ export async function* streamChatWithTools(
     stream: true,
   });
 
-  let fullContent = "";
-  let fullThinking = "";
+  let fullContent = '';
+  let fullThinking = '';
   const toolCalls: ToolCall[] = [];
   let promptTokens = 0;
   let completionTokens = 0;
 
   for await (const chunk of response) {
-    
     // Cast message to include optional thinking field
     const message = chunk.message as {
       content?: string;
       thinking?: string;
       tool_calls?: ToolCall[];
     };
-    
+
     // Also check chunk-level thinking (some models put it there)
     const chunkThinking = (chunk as { thinking?: string }).thinking;
-    
+
     // Handle thinking chunks (comes before content in thinking-enabled models)
     if (message.thinking) {
       fullThinking += message.thinking;
-      yield { type: "thinking", text: message.thinking };
+      yield { type: 'thinking', text: message.thinking };
     } else if (chunkThinking) {
       // Fallback: check chunk-level thinking
       fullThinking += chunkThinking;
-      yield { type: "thinking", text: chunkThinking };
+      yield { type: 'thinking', text: chunkThinking };
     }
-    
+
     // Handle content chunks
     if (message.content) {
       fullContent += message.content;
-      yield { type: "content", text: message.content };
+      yield { type: 'content', text: message.content };
     }
-    
+
     // Handle tool calls
     if (message.tool_calls) {
       for (const call of message.tool_calls) {
         toolCalls.push(call);
-        yield { type: "tool_call", toolCall: call };
+        yield { type: 'tool_call', toolCall: call };
       }
     }
-    
+
     // Capture token counts from final chunk
     if (chunk.done) {
       promptTokens = chunk.prompt_eval_count ?? 0;
@@ -411,4 +411,3 @@ export async function* streamChatWithTools(
     duration,
   };
 }
-

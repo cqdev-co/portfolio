@@ -1,13 +1,13 @@
 /**
  * Ticker Profile Definitions
- * 
+ *
  * Different stock types have different psychological profiles
  * affecting how price responds to various factors.
  */
 
-import type { 
-  TickerProfile, 
-  TickerProfileType, 
+import type {
+  TickerProfile,
+  TickerProfileType,
   ProfileWeights,
   TechnicalData,
   OptionsExpiration,
@@ -24,10 +24,10 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
     description: 'Large-cap institutional stocks (AAPL, MSFT, GOOGL)',
     weights: {
       maxPain: 0.25,
-      gammaWalls: 0.10,
-      technical: 0.30,
+      gammaWalls: 0.1,
+      technical: 0.3,
       volume: 0.25,
-      roundNumber: 0.10,
+      roundNumber: 0.1,
     },
     characteristics: [
       'Institutional-driven price action',
@@ -42,7 +42,7 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
     name: 'Meme / High Retail',
     description: 'Retail-driven stocks (GME, AMC, PLTR, RIVN)',
     weights: {
-      maxPain: 0.20,
+      maxPain: 0.2,
       gammaWalls: 0.25,
       technical: 0.15,
       volume: 0.15,
@@ -62,10 +62,10 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
     description: 'Index ETFs with massive options volume (SPY, QQQ, IWM)',
     weights: {
       maxPain: 0.35,
-      gammaWalls: 0.10,
+      gammaWalls: 0.1,
       technical: 0.25,
-      volume: 0.20,
-      roundNumber: 0.10,
+      volume: 0.2,
+      roundNumber: 0.1,
     },
     characteristics: [
       'Massive options volume makes max pain reliable',
@@ -80,9 +80,9 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
     name: 'Low Float / Squeeze Candidate',
     description: 'Small float stocks prone to gamma squeezes',
     weights: {
-      maxPain: 0.20,
-      gammaWalls: 0.30,
-      technical: 0.20,
+      maxPain: 0.2,
+      gammaWalls: 0.3,
+      technical: 0.2,
       volume: 0.15,
       roundNumber: 0.15,
     },
@@ -99,10 +99,10 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
     name: 'Standard',
     description: 'Balanced approach for unknown ticker types',
     weights: {
-      maxPain: 0.30,
-      gammaWalls: 0.10,
+      maxPain: 0.3,
+      gammaWalls: 0.1,
       technical: 0.25,
-      volume: 0.20,
+      volume: 0.2,
       roundNumber: 0.15,
     },
     characteristics: [
@@ -119,43 +119,133 @@ export const PROFILES: Record<TickerProfileType, TickerProfile> = {
 
 const KNOWN_MEME_TICKERS = new Set([
   // Classic meme stocks
-  'GME', 'AMC', 'BB', 'BBBY', 'KOSS', 'EXPR',
+  'GME',
+  'AMC',
+  'BB',
+  'BBBY',
+  'KOSS',
+  'EXPR',
   // High retail interest
-  'PLTR', 'RIVN', 'LCID', 'NIO', 'SOFI', 'WISH',
-  'CLOV', 'SPCE', 'HOOD', 'DKNG', 'RBLX',
+  'PLTR',
+  'RIVN',
+  'LCID',
+  'NIO',
+  'SOFI',
+  'WISH',
+  'CLOV',
+  'SPCE',
+  'HOOD',
+  'DKNG',
+  'RBLX',
   // Crypto-adjacent
-  'COIN', 'MSTR', 'RIOT', 'MARA', 'HUT', 'BITF',
+  'COIN',
+  'MSTR',
+  'RIOT',
+  'MARA',
+  'HUT',
+  'BITF',
 ]);
 
 const KNOWN_ETF_TICKERS = new Set([
   // Major index ETFs
-  'SPY', 'QQQ', 'IWM', 'DIA', 'VOO', 'VTI',
+  'SPY',
+  'QQQ',
+  'IWM',
+  'DIA',
+  'VOO',
+  'VTI',
   // Sector ETFs
-  'XLF', 'XLE', 'XLK', 'XLV', 'XLI', 'XLU', 'XLP', 'XLY',
+  'XLF',
+  'XLE',
+  'XLK',
+  'XLV',
+  'XLI',
+  'XLU',
+  'XLP',
+  'XLY',
   // Leveraged ETFs
-  'TQQQ', 'SQQQ', 'SPXL', 'SPXS', 'UVXY', 'VXX',
+  'TQQQ',
+  'SQQQ',
+  'SPXL',
+  'SPXS',
+  'UVXY',
+  'VXX',
   // Bond ETFs
-  'TLT', 'HYG', 'LQD', 'AGG',
+  'TLT',
+  'HYG',
+  'LQD',
+  'AGG',
   // International
-  'EEM', 'EFA', 'FXI', 'EWZ',
+  'EEM',
+  'EFA',
+  'FXI',
+  'EWZ',
 ]);
 
 const KNOWN_BLUE_CHIP_TICKERS = new Set([
   // Mega cap tech
-  'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'NVDA',
+  'AAPL',
+  'MSFT',
+  'GOOGL',
+  'GOOG',
+  'AMZN',
+  'META',
+  'NVDA',
   // Large cap tech
-  'TSLA', 'AMD', 'NFLX', 'CRM', 'ORCL', 'ADBE', 'INTC',
-  'CSCO', 'QCOM', 'AVGO', 'TXN',
+  'TSLA',
+  'AMD',
+  'NFLX',
+  'CRM',
+  'ORCL',
+  'ADBE',
+  'INTC',
+  'CSCO',
+  'QCOM',
+  'AVGO',
+  'TXN',
   // Finance
-  'JPM', 'BAC', 'GS', 'MS', 'V', 'MA', 'AXP', 'WFC', 'C',
+  'JPM',
+  'BAC',
+  'GS',
+  'MS',
+  'V',
+  'MA',
+  'AXP',
+  'WFC',
+  'C',
   // Healthcare
-  'UNH', 'JNJ', 'PFE', 'MRK', 'ABBV', 'LLY', 'TMO', 'ABT',
+  'UNH',
+  'JNJ',
+  'PFE',
+  'MRK',
+  'ABBV',
+  'LLY',
+  'TMO',
+  'ABT',
   // Consumer
-  'WMT', 'COST', 'HD', 'TGT', 'NKE', 'SBUX', 'MCD', 'PG',
+  'WMT',
+  'COST',
+  'HD',
+  'TGT',
+  'NKE',
+  'SBUX',
+  'MCD',
+  'PG',
   // Industrial
-  'BA', 'CAT', 'DE', 'UPS', 'FDX', 'HON', 'GE', 'MMM',
+  'BA',
+  'CAT',
+  'DE',
+  'UPS',
+  'FDX',
+  'HON',
+  'GE',
+  'MMM',
   // Energy
-  'XOM', 'CVX', 'COP', 'SLB', 'OXY',
+  'XOM',
+  'CVX',
+  'COP',
+  'SLB',
+  'OXY',
 ]);
 
 // ============================================================================
@@ -203,10 +293,11 @@ function detectProfileFromData(
   expirations: OptionsExpiration[]
 ): TickerProfile | null {
   const price = technical.currentPrice;
-  
+
   // Calculate total options OI
-  const totalOI = expirations.reduce((sum, exp) => 
-    sum + exp.totalCallOI + exp.totalPutOI, 0
+  const totalOI = expirations.reduce(
+    (sum, exp) => sum + exp.totalCallOI + exp.totalPutOI,
+    0
   );
 
   // Calculate price volatility proxy (52w range / price)
@@ -215,7 +306,7 @@ function detectProfileFromData(
 
   // High OI relative to likely market cap = likely ETF or popular stock
   // This is a rough heuristic
-  
+
   // Very high volatility + moderate OI = likely meme/retail
   if (volatilityProxy > 1.5) {
     return PROFILES.MEME_RETAIL;
@@ -250,7 +341,7 @@ export function createCustomProfile(
   name?: string
 ): TickerProfile {
   const base = PROFILES[baseType];
-  
+
   return {
     ...base,
     name: name || `Custom (${base.name})`,
@@ -265,13 +356,13 @@ export function createCustomProfile(
  * Validate that weights sum to 1.0
  */
 export function validateWeights(weights: ProfileWeights): boolean {
-  const sum = 
-    weights.maxPain + 
-    weights.gammaWalls + 
-    weights.technical + 
-    weights.volume + 
+  const sum =
+    weights.maxPain +
+    weights.gammaWalls +
+    weights.technical +
+    weights.volume +
     weights.roundNumber;
-  
+
   return Math.abs(sum - 1.0) < 0.001;
 }
 
@@ -279,21 +370,21 @@ export function validateWeights(weights: ProfileWeights): boolean {
  * Normalize weights to sum to 1.0
  */
 export function normalizeWeights(weights: ProfileWeights): ProfileWeights {
-  const sum = 
-    weights.maxPain + 
-    weights.gammaWalls + 
-    weights.technical + 
-    weights.volume + 
+  const sum =
+    weights.maxPain +
+    weights.gammaWalls +
+    weights.technical +
+    weights.volume +
     weights.roundNumber;
 
   if (sum === 0) {
     // Return equal weights if all zero
     return {
-      maxPain: 0.20,
-      gammaWalls: 0.20,
-      technical: 0.20,
-      volume: 0.20,
-      roundNumber: 0.20,
+      maxPain: 0.2,
+      gammaWalls: 0.2,
+      technical: 0.2,
+      volume: 0.2,
+      roundNumber: 0.2,
     };
   }
 
@@ -305,4 +396,3 @@ export function normalizeWeights(weights: ProfileWeights): ProfileWeights {
     roundNumber: weights.roundNumber / sum,
   };
 }
-

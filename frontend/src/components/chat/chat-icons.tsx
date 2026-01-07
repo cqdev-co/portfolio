@@ -2,7 +2,7 @@ export const SparklesIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
   >
@@ -36,7 +36,7 @@ export const ArrowUpIcon = ({
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor", ...props.style }}
+    style={{ color: 'currentcolor', ...props.style }}
     viewBox="0 0 16 16"
     width={size}
     {...props}
@@ -59,7 +59,7 @@ export const StopIcon = ({
 }: { size?: number } & React.SVGProps<SVGSVGElement>) => (
   <svg
     height={size}
-    style={{ color: "currentcolor", ...props.style }}
+    style={{ color: 'currentcolor', ...props.style }}
     viewBox="0 0 16 16"
     width={size}
     {...props}
@@ -77,7 +77,7 @@ export const MessageIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
   >
@@ -106,7 +106,7 @@ export const CrossIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
   >
@@ -127,7 +127,7 @@ export const ArrowDownIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
   >
@@ -147,7 +147,7 @@ export const RefreshIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
     fill="none"
@@ -161,4 +161,3 @@ export const RefreshIcon = ({ size = 16 }: { size?: number }) => (
     <path d="M10.5 4.5L12 3l1.5 1.5M5.5 11.5L4 13l-1.5-1.5" />
   </svg>
 );
-

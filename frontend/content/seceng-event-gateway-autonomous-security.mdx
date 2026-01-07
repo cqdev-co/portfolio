@@ -2,13 +2,13 @@
 title: >
   Building a Security Event Gateway: From Alert Fatigue 
   to Autonomous Response
-publishedAt: "2025-10-27"
+publishedAt: '2025-10-27'
 summary: >
   The story of how we built a FastAPI event gateway to optimize our CSPM
   alert processing, turning high-volume alerts into intelligent,
   automated security responses with custom automation capabilities.
-image: "/wallpapers/Cyera_Red_Background.png"
-tags: ["Security", "Automation", "FastAPI", "DevSecOps", "SOAR", "CSPM"]
+image: '/wallpapers/Cyera_Red_Background.png'
+tags: ['Security', 'Automation', 'FastAPI', 'DevSecOps', 'SOAR', 'CSPM']
 ---
 
 ![SecEng Event Gateway](/wallpapers/Cyera_Red_Background.png)
@@ -17,7 +17,7 @@ tags: ["Security", "Automation", "FastAPI", "DevSecOps", "SOAR", "CSPM"]
 
 Every morning at 9 AM, our Security Engineering team would gather for our
 daily standup, and the conversation always started the same way: "How many
-CSPM alerts came in overnight?" The answer was consistently high, anywhere 
+CSPM alerts came in overnight?" The answer was consistently high, anywhere
 from 20-100+ alerts that needed our attention and analysis.
 
 As a Security Engineer at Cyera, I recognized this as a common challenge
@@ -29,8 +29,8 @@ Meanwhile, the genuine security events that required immediate attention
 were sometimes delayed in our response queue, which wasn't the level of
 security operations we wanted to maintain.
 
-I remember thinking: *"There has to be a better way. We're security
-engineers, not alert triagers."* That frustration sparked an idea, what if
+I remember thinking: _"There has to be a better way. We're security
+engineers, not alert triagers."_ That frustration sparked an idea, what if
 I
 could build something that would intelligently filter these alerts and
 respond automatically to real threats? This is how I built my
@@ -52,7 +52,7 @@ Our situation was typical of fast-growing companies: **~100 alerts per
 week** during peak periods, with an estimated **~85% of alerts requiring
 no action** after investigation. Each alert took **~15 minutes** to
 properly triage, meaning we were spending **1-2 hours daily** on alert
-investigation. 
+investigation.
 
 The timing challenge was another problem. With our engineering team
 primarily in Eastern time zones, routine alerts generated during off-hours
@@ -77,9 +77,9 @@ As I started sketching out the solution, I realized I was facing several
 technical and business challenges simultaneously. From a **business
 perspective**, I needed to prove that custom automation could deliver
 measurable ROI while positioning our team for fully autonomous security
-operations. I kept asking myself: *"How do I build something that not only
+operations. I kept asking myself: _"How do I build something that not only
 solves today's problem but proves we can scale this approach across all our
-security tools?"*
+security tools?"_
 
 The technical requirements were equally demanding: **sub-100ms internal
 processing** (because real-time response matters), **intelligent false
@@ -93,8 +93,8 @@ documentation that would make onboarding other engineers easier. Why Google
 Pub/Sub? Because I wanted reliable message queuing without managing
 infrastructure. Why Cloud Run? Because the pay-per-use pricing model meant
 I could prove the concept without significant upfront costs. I remember
-thinking: *"If this fails, at least it won't be because we spent too much
-money on infrastructure."*
+thinking: _"If this fails, at least it won't be because we spent too much
+money on infrastructure."_
 
 ## The Solution
 
@@ -117,24 +117,23 @@ platform.
 
 ![SecEng Event Gateway](/images/event-gateway-architecture.png)
 
-
 ## Technical Implementation
 
 I started with a focused proof-of-concept: **CSPM Webhook
 Processing**. The goal seemed simple: receive CSPM alerts, intelligently
-filter them, and automate responses for real threats. *How hard could it
-be?*
+filter them, and automate responses for real threats. _How hard could it
+be?_
 
 ### The Challenge That Humbled Me
 
 My first major hurdle wasn't architectural: it was handling webhook format
-variations. I discovered that our CSPM tool sends webhooks with 
+variations. I discovered that our CSPM tool sends webhooks with
 `Content-Type: application/octet-stream` instead of the more common
 `application/json`. This is actually not uncommon in enterprise security
 tools, but it caused FastAPI to reject every webhook with 422 errors.
 
-I remember staring at the logs thinking: *"This should be working. The JSON
-looks fine, the endpoint is correct... what am I missing?"* It took me
+I remember staring at the logs thinking: _"This should be working. The JSON
+looks fine, the endpoint is correct... what am I missing?"_ It took me
 some debugging to realize that FastAPI's automatic JSON parsing was failing
 because of the content type. This taught me an important lesson about
 webhook integration: always validate the actual format first, regardless
@@ -156,7 +155,7 @@ async def cspm_webhook_handler(request: Request):
         payload = json.loads(body.decode())
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
-    
+
     # Now we can process the webhook
     return await process_cspm_event(payload)
 
@@ -165,25 +164,26 @@ async def cspm_webhook_handler(request: Request):
 ### The CSPM Event Processor
 
 My PoC focuses on two types of CSPM events:
+
 1. **Threat Detections**: Active security threats and suspicious activity
 2. **Configuration Findings**: Misconfigurations and policy violations
 
 Here's how I process these events:
 
 ```python
-async def process_event(self, 
+async def process_event(self,
                         payload: Dict[str, Any])
                         -> Dict[str, Any]:
-                        
-        # Parse the CSPM event 
+
+        # Parse the CSPM event
         # (either threat detection or config finding)
         event_type = payload.get("category", "").lower()
-        
+
         if "threat" in event_type or "config" in event_type:
             event = cspmThreatDetectionEvent.parse_obj(payload)
         else:
             event = cspmConfigurationFindingEvent.parse_obj(payload)
-        
+
         # Extract key information
         cloud_info = {
             "cloud_provider": event.resource.cloud_provider,
@@ -192,7 +192,7 @@ async def process_event(self,
             "resource_type": event.resource.type,
             "region": event.resource.region or "unknown"
         }
-        
+
         # Execute my security playbook
         await self._execute_security_playbook(
             event_id=event.id,
@@ -202,7 +202,7 @@ async def process_event(self,
             cloud_info=cloud_info,
             payload=payload
         )
-        
+
         return {"status": "processed", "event_id": event.id}
 ```
 
@@ -215,19 +215,19 @@ would make, but faster and more consistently:
 
 ```python
 async def _execute_security_playbook(
-    self, event_id: str, title: str, description: str, 
+    self, event_id: str, title: str, description: str,
     severity: str, cloud_info: Dict[str, str], payload: Dict[str, Any]
 ):
     """Execute my automated security response playbook."""
-    
+
     # Step 1: Check Asset Exceptions (configuration management)
     is_exception = await self._check_cloud_asset_exceptions(cloud_info)
-    
+
     if is_exception:
         # Auto-archive if it's a known exception
         await self._archive_threat_in_cspm(event_id)
         return {"status": "archived", "reason": "known_exception"}
-    
+
     # Step 2: Follow analyst playbook for real findings
     actions = [
         {
@@ -237,27 +237,27 @@ async def _execute_security_playbook(
         },
         {
             "type": "create_jira_ticket",
-            "status": "pending", 
+            "status": "pending",
             "description": "Creating JIRA ticket for tracking"
         }
     ]
-    
+
     # Step 3: Send notification to the user
     console_link = payload.get(
         "console_link",
         f"https://console.example.com/
         threats?selectedDetectionId={event_id}"
     )
-    
+
     event_details = {
         "cloud_provider": cloud_info["cloud_provider"],
-        "account_id": cloud_info["cloud_account_id"], 
+        "account_id": cloud_info["cloud_account_id"],
         "resource_name": cloud_info["resource_name"],
         "resource_type": cloud_info["resource_type"],
         "region": cloud_info["region"],
         "console_link": console_link
     }
-    
+
     # Send Slack notification informing user of misconfiguration/threat
     await self.slack_notifier.post_security_event(
         event_id=event_id,
@@ -268,7 +268,7 @@ async def _execute_security_playbook(
         details=event_details,
         actions=actions
     )
-    
+
     # Step 4: Create JIRA ticket for status tracking
     await self._create_jira_ticket(event_id, title, description, severity)
 ```
@@ -281,18 +281,20 @@ work in production. But the data exceeded my expectations. Here's what I
 presented to leadership:
 
 **SecEng Event Gateway: Performance Analysis (Illustrative)**
+
 - **Time Savings**: ~2 weeks of analyst time saved through automation
 - **Financial Impact**: ~$1,000 saved in 2 weeks, projected ~$2,000/month,
-                        ~$25,000/year if trend holds
+  ~$25,000/year if trend holds
 - **Event Processing**: ~120 cloud security events processed with ~90%
-                        noise
-                        reduction
+  noise
+  reduction
 - **Performance**: Gateway internal processing <100ms; total E2E ~4 seconds
-                   (remainder is downstream I/O to Slack/BigQuery)
+  (remainder is downstream I/O to Slack/BigQuery)
 - **Infrastructure Cost**: ~$0.50/day for the entire platform
 - **Reliability**: 100% uptime during testing period
 
 ### Impact (Based on Internal Analysis)
+
 **Before**: Our team spent 2+ hours each morning triaging overnight alerts.
 The volume of routine alerts was creating operational overhead, with
 engineers spending significant time on repetitive investigation work
@@ -309,8 +311,8 @@ strategic security initiatives rather than alert triage.
 
 Looking back, starting small and focused was crucial, I didn't try to solve
 every security automation problem at once. I kept reminding myself:
-*"Perfect is the enemy of good. Get something working first, then make it
-better."* Focusing on our biggest pain point (CSPM false positives)
+_"Perfect is the enemy of good. Get something working first, then make it
+better."_ Focusing on our biggest pain point (CSPM false positives)
 allowed me to prove the concept quickly, learn from real production data,
 build confidence with the team, and iterate based on actual usage.
 
@@ -328,8 +330,8 @@ gave me **proper testing** with pytest and comprehensive test coverage,
 **version control** with Git and proper code review processes, **CI/CD
 integration** with automated deployments, **easy debugging** with
 structured logging and error handling, and **team knowledge sharing** since
-everyone on the team knows Python. I thought: *"If I get hit by a bus
-tomorrow, someone else should be able to maintain this."*
+everyone on the team knows Python. I thought: _"If I get hit by a bus
+tomorrow, someone else should be able to maintain this."_
 
 ## The Future
 
@@ -341,8 +343,8 @@ handle additional security tools and use cases.
 My immediate focus is on **EDR integration** for automated
 endpoint threat containment, **IAM integration** for identity-based threat
 response, and **VM integration**. Each integration follows the same
-pattern: 
-intelligent filtering, automated response for high-severity events, and 
+pattern:
+intelligent filtering, automated response for high-severity events, and
 comprehensive audit trails.
 
 The broader vision is creating a unified security automation platform that
@@ -350,10 +352,10 @@ can handle any security tool's webhooks, apply consistent business logic
 for threat assessment, and execute appropriate response playbooks; all
 while
 maintaining the sub-100ms internal processing performance that makes
-real-time response possible. 
+real-time response possible.
 
-*Note: These roadmap items are subject to
-change based on business priorities and threat landscape evolution.*
+_Note: These roadmap items are subject to
+change based on business priorities and threat landscape evolution._
 
 ## Lessons Learned
 
@@ -379,8 +381,8 @@ webhook format validation** (test content types and parsing early, would
 have saved me hours), **add more comprehensive
 metrics** (better visibility into automation effectiveness), and
 **implement gradual rollout** (deploy new playbooks to staging environments
-first). The biggest lesson? *Always assume the vendor's documentation is
-incomplete.*
+first). The biggest lesson? _Always assume the vendor's documentation is
+incomplete._
 
 ## Why Build vs Buy?
 
@@ -438,7 +440,6 @@ response workflows. This modular approach makes adding new security tools
 straightforward and maintains operational consistency across your entire
 security stack.
 
-
 ## Conclusion
 
 Six months ago, our security team was facing the common challenge of alert
@@ -448,18 +449,19 @@ intelligent Event Gateway that automates the routine analysis and allows
 our team to focus on high-value security work.
 
 ### What I Achieved
+
 - **Transformed our daily routine**: From 2+ hours of alert triage to ~15
-                                     minutes of strategic review
+  minutes of strategic review
 - **Reduced alert volume**: ~95% noise reduction and ~90% reduction in
-                             false positive investigation time
+  false positive investigation time
 - **Optimized global operations**: 24/7 automated response for routine
-                                   events
+  events
 - **Accelerated response times**: Automated responses now handle routine
-                                  events in under 30 seconds
+  events in under 30 seconds
 - **Saved significant costs**: 99% cost reduction compared to enterprise
-                               SOAR platforms (~$200/year vs $50K+)
+  SOAR platforms (~$200/year vs $50K+)
 - **Improved team morale**: Engineers focused on strategic security work
-                            instead of repetitive tasks
+  instead of repetitive tasks
 
 ### The Bigger Picture
 
@@ -502,7 +504,5 @@ metrics to prove ROI and identify areas for improvement).
 
 ---
 
-*Interested in learning more about my security automation approach?
-Connect with me on [LinkedIn](https://linkedin.com/in/conorgquinlan).*
-
-
+_Interested in learning more about my security automation approach?
+Connect with me on [LinkedIn](https://linkedin.com/in/conorgquinlan)._

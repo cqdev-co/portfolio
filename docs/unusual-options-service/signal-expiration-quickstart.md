@@ -6,15 +6,16 @@ Automatic daily cleanup system that marks expired options signals as inactive ev
 
 ## 📁 Files Created
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `unusual-options-service/scripts/expire_signals.py` | Python script to expire signals | 235 |
-| `.github/workflows/uos-expire-signals.yml` | GitHub Actions workflow | 81 |
-| `docs/unusual-options-service/signal-expiration.md` | Full documentation | 209 |
+| File                                                | Purpose                         | Lines |
+| --------------------------------------------------- | ------------------------------- | ----- |
+| `unusual-options-service/scripts/expire_signals.py` | Python script to expire signals | 235   |
+| `.github/workflows/uos-expire-signals.yml`          | GitHub Actions workflow         | 81    |
+| `docs/unusual-options-service/signal-expiration.md` | Full documentation              | 209   |
 
 ## 🎯 Quick Commands
 
 ### Test Locally (Dry Run)
+
 ```bash
 cd unusual-options-service
 export SUPABASE_URL="your_url"
@@ -23,12 +24,14 @@ poetry run python scripts/expire_signals.py --dry-run
 ```
 
 ### Run Expiration
+
 ```bash
 cd unusual-options-service
 poetry run python scripts/expire_signals.py
 ```
 
 ### Manual Trigger via GitHub Actions
+
 1. Go to **Actions** tab
 2. Click **"Expire Unusual Options Signals"**
 3. Click **"Run workflow"**
@@ -51,6 +54,7 @@ poetry run python scripts/expire_signals.py
 ## ✅ Success Check
 
 After running, verify:
+
 - [x] Workflow completed successfully in GitHub Actions
 - [x] Logs show "Successfully expired X signals"
 - [x] Frontend only shows non-expired signals
@@ -75,16 +79,17 @@ Top Tickers:
 
 ## 🛟 Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Workflow doesn't run | Check cron schedule and workflow is enabled |
-| Permission denied | Verify SUPABASE_SERVICE_KEY secret is set |
-| No signals found | Check that signals have correct expiry dates |
-| Timeout | Increase timeout in workflow file (default: 10 min) |
+| Issue                | Solution                                            |
+| -------------------- | --------------------------------------------------- |
+| Workflow doesn't run | Check cron schedule and workflow is enabled         |
+| Permission denied    | Verify SUPABASE_SERVICE_KEY secret is set           |
+| No signals found     | Check that signals have correct expiry dates        |
+| Timeout              | Increase timeout in workflow file (default: 10 min) |
 
 ## 📖 Full Documentation
 
 For detailed information, see:
+
 - [Complete System Documentation](./signal-expiration.md)
 - [Implementation Details](./signal-expiration-implementation.md)
 - [Scripts README](../../unusual-options-service/scripts/README.md)
@@ -94,4 +99,3 @@ For detailed information, see:
 The system runs automatically every weekday after market close. No manual intervention needed!
 
 **Note:** Expired signals are never deleted, just marked inactive for historical analysis.
-

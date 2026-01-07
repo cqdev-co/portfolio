@@ -1,6 +1,6 @@
 /**
  * Signal Continuity Badges Component
- * 
+ *
  * Displays badges for signal continuity tracking from hourly cron jobs:
  * - NEW badge for first-time detections
  * - Detection count badge for continuing signals
@@ -10,10 +10,10 @@
 
 import { Badge } from '@/components/ui/badge';
 import type { UnusualOptionsSignal } from '@/lib/types/unusual-options';
-import { 
-  getTimeSinceDetection, 
+import {
+  getTimeSinceDetection,
   getActiveStatusColor,
-  formatDetectionCount 
+  formatDetectionCount,
 } from '@/lib/types/unusual-options';
 
 interface SignalContinuityBadgesProps {
@@ -35,7 +35,7 @@ export function SignalContinuityBadges({
     <div className="flex items-center gap-2 flex-wrap">
       {/* NEW badge for first-time detections */}
       {showNewBadge && signal.is_new_signal && (
-        <Badge 
+        <Badge
           className="bg-green-500/10 text-green-500 border-green-500/20"
           variant="outline"
         >
@@ -45,7 +45,7 @@ export function SignalContinuityBadges({
 
       {/* Detection count for continuing signals */}
       {showDetectionCount && signal.detection_count > 1 && (
-        <Badge 
+        <Badge
           variant="outline"
           className="bg-blue-500/10 text-blue-500 border-blue-500/20"
         >
@@ -55,7 +55,7 @@ export function SignalContinuityBadges({
 
       {/* Active/Inactive status */}
       {showActiveStatus && (
-        <Badge 
+        <Badge
           variant="outline"
           className={getActiveStatusColor(signal.is_active)}
         >
@@ -76,10 +76,10 @@ export function SignalContinuityBadges({
 /**
  * Compact version for table cells
  */
-export function CompactContinuityBadge({ 
-  signal 
-}: { 
-  signal: UnusualOptionsSignal 
+export function CompactContinuityBadge({
+  signal,
+}: {
+  signal: UnusualOptionsSignal;
 }) {
   // Show most important badge only
   if (signal.is_new_signal) {
@@ -112,17 +112,17 @@ export function CompactContinuityBadge({
 /**
  * Detailed view for signal detail pages
  */
-export function DetailedContinuityInfo({ 
-  signal 
-}: { 
-  signal: UnusualOptionsSignal 
+export function DetailedContinuityInfo({
+  signal,
+}: {
+  signal: UnusualOptionsSignal;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-4">
         <SignalContinuityBadges signal={signal} />
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
           <span className="text-muted-foreground">First Detected:</span>
@@ -132,7 +132,7 @@ export function DetailedContinuityInfo({
               : 'Unknown'}
           </p>
         </div>
-        
+
         <div>
           <span className="text-muted-foreground">Last Detected:</span>
           <p className="font-medium">
@@ -141,12 +141,12 @@ export function DetailedContinuityInfo({
               : 'Unknown'}
           </p>
         </div>
-        
+
         <div>
           <span className="text-muted-foreground">Detection Count:</span>
           <p className="font-medium">{signal.detection_count}x</p>
         </div>
-        
+
         <div>
           <span className="text-muted-foreground">Status:</span>
           <p className="font-medium">
@@ -157,4 +157,3 @@ export function DetailedContinuityInfo({
     </div>
   );
 }
-

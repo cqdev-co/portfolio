@@ -16,6 +16,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_advanced_checks:
+        description: 'Skip advanced quality checks (faster but lower quality)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   issues: write
@@ -24,47 +29,52 @@ permissions:
 jobs:
   fetch-tickers:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 45 # Advanced checks can take 15-20 min
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run ticker fetch (dry-run)
-      if: github.event.inputs.dry_run == 'true'
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-      run: |
-        cd .github/scripts
-        python fetch_tickers.py --dry-run ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
-        
-    - name: Run ticker fetch (production)
-      if: github.event.inputs.dry_run != 'true'
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
-        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-        FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-      run: |
-        cd .github/scripts
-        python fetch_tickers.py ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run ticker fetch (dry-run)
+        if: github.event.inputs.dry_run == 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          cd .github/scripts
+          python fetch_tickers.py --dry-run \
+            ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} \
+            ${{ github.event.inputs.skip_advanced_checks != 'true' && '--enable-advanced-checks' || '' }}
+
+      - name: Run ticker fetch (production)
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          cd .github/scripts
+          python fetch_tickers.py \
+            ${{ github.event.inputs.verbose == 'true' && '--verbose' || '' }} \
+            ${{ github.event.inputs.skip_advanced_checks != 'true' && '--enable-advanced-checks' || '' }}

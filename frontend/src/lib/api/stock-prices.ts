@@ -24,8 +24,7 @@ export interface DetectionPoint {
   signalId: string;
 }
 
-export type TimeRange = 
-  '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | '5Y' | 'MAX';
+export type TimeRange = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | '5Y' | 'MAX';
 
 /**
  * Fetch historical stock price data
@@ -46,7 +45,7 @@ export async function fetchHistoricalPrices(
       '6M': '6mo',
       '1Y': '1y',
       '5Y': '5y',
-      'MAX': 'max'
+      MAX: 'max',
     };
 
     // Adjust interval based on range
@@ -58,35 +57,33 @@ export async function fetchHistoricalPrices(
       '6M': '1d',
       '1Y': '1d',
       '5Y': '1wk',
-      'MAX': '1mo'
+      MAX: '1mo',
     };
 
     const period = periodMap[range] || '1mo';
     const adjustedInterval = intervalMap[range] || interval;
 
     // Call our Next.js API route (server-side fetch)
-    const url = 
+    const url =
       `/api/stock-prices?ticker=${encodeURIComponent(ticker)}` +
       `&range=${period}&interval=${adjustedInterval}`;
 
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        errorData.error || 
-        `Failed to fetch price data: ${response.statusText}`
+        errorData.error || `Failed to fetch price data: ${response.statusText}`
       );
     }
 
     const result = await response.json();
-    
+
     if (!result.data || !Array.isArray(result.data)) {
       throw new Error('Invalid response format');
     }
 
     return result.data as PriceDataPoint[];
-
   } catch (error) {
     console.error('Error fetching historical prices:', error);
     throw error;
@@ -96,9 +93,11 @@ export async function fetchHistoricalPrices(
 /**
  * Get the price change and percentage for display
  */
-export function getPriceChange(
-  priceData: PriceDataPoint[]
-): { change: number; changePercent: number; isPositive: boolean } {
+export function getPriceChange(priceData: PriceDataPoint[]): {
+  change: number;
+  changePercent: number;
+  isPositive: boolean;
+} {
   if (priceData.length < 2) {
     return { change: 0, changePercent: 0, isPositive: true };
   }
@@ -118,9 +117,7 @@ export function getPriceChange(
 /**
  * Get the current price (most recent data point)
  */
-export function getCurrentPrice(
-  priceData: PriceDataPoint[]
-): number {
+export function getCurrentPrice(priceData: PriceDataPoint[]): number {
   if (priceData.length === 0) return 0;
   return priceData[priceData.length - 1].price;
 }
@@ -130,9 +127,9 @@ export function getCurrentPrice(
  */
 export function formatPrice(price: number): string {
   if (price >= 1000) {
-    return `$${price.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    return `$${price.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     })}`;
   }
   return `$${price.toFixed(2)}`;
@@ -142,7 +139,7 @@ export function formatPrice(price: number): string {
  * Format price change for display
  */
 export function formatPriceChange(
-  change: number, 
+  change: number,
   changePercent: number
 ): string {
   const sign = change >= 0 ? '+' : '';
@@ -152,17 +149,17 @@ export function formatPriceChange(
 /**
  * Get min and max prices from data for chart scaling
  */
-export function getPriceRange(
-  priceData: PriceDataPoint[]
-): { min: number; max: number } {
+export function getPriceRange(priceData: PriceDataPoint[]): {
+  min: number;
+  max: number;
+} {
   if (priceData.length === 0) {
     return { min: 0, max: 0 };
   }
 
-  const prices = priceData.map(d => d.price);
+  const prices = priceData.map((d) => d.price);
   return {
     min: Math.min(...prices),
     max: Math.max(...prices),
   };
 }
-

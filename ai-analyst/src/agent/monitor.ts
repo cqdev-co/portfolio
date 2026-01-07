@@ -3,7 +3,7 @@
  * Background daemon for continuous market monitoring
  */
 
-import chalk from "chalk";
+import chalk from 'chalk';
 import {
   getWatchlist,
   getConfig,
@@ -13,37 +13,37 @@ import {
   updateAlertCooldown,
   type WatchlistItem,
   type AlertType,
-} from "../services/supabase.ts";
-import { scanForOpportunities, type ScanResult } from "../services/scanner.ts";
+} from '../services/supabase.ts';
+import { scanForOpportunities, type ScanResult } from '../services/scanner.ts';
 import {
-  sendDiscordAlert, 
-  sendEntrySignal, 
+  sendDiscordAlert,
+  sendEntrySignal,
   isDiscordConfigured,
-} from "../services/discord.ts";
+} from '../services/discord.ts';
 import {
   evaluateEntrySignal,
   shouldSendAlert,
   type AlertDecision,
   type MarketContext,
-} from "./decision.ts";
-import { reviewAlert } from "./ai-review.ts";
-import { generateMorningBriefing } from "./briefing.ts";
-import { getMarketRegime } from "../services/market-regime.ts";
-import type { OllamaMode } from "../services/ollama.ts";
+} from './decision.ts';
+import { reviewAlert } from './ai-review.ts';
+import { generateMorningBriefing } from './briefing.ts';
+import { getMarketRegime } from '../services/market-regime.ts';
+import type { OllamaMode } from '../services/ollama.ts';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface AgentConfig {
-  scanIntervalMs: number;      // Default: 30 min (1800000)
-  briefingTime: string;        // Default: "09:00" ET
-  alertCooldownMs: number;     // Default: 2 hours (7200000)
+  scanIntervalMs: number; // Default: 30 min (1800000)
+  briefingTime: string; // Default: "09:00" ET
+  alertCooldownMs: number; // Default: 2 hours (7200000)
   discordEnabled: boolean;
   aiReviewEnabled: boolean;
-  minConviction: number;       // 1-10, default: 6
-  extendedHours: boolean;      // Scan outside market hours (default: false)
-  debug: boolean;              // Log rejection reasons (default: false)
+  minConviction: number; // 1-10, default: 6
+  extendedHours: boolean; // Scan outside market hours (default: false)
+  debug: boolean; // Log rejection reasons (default: false)
   aiMode: OllamaMode;
   aiModel?: string;
 }
@@ -86,13 +86,13 @@ async function loadConfig(): Promise<AgentConfig> {
     minConviction,
     extendedHours,
   ] = await Promise.all([
-    getConfig<number>("scan_interval_ms", 1800000),
-    getConfig<string>("briefing_time", "09:00"),
-    getConfig<number>("alert_cooldown_ms", 7200000),
-    getConfig<boolean>("discord_enabled", true),
-    getConfig<boolean>("ai_review_enabled", true),
-    getConfig<number>("min_conviction", 6),
-    getConfig<boolean>("extended_hours", false),
+    getConfig<number>('scan_interval_ms', 1800000),
+    getConfig<string>('briefing_time', '09:00'),
+    getConfig<number>('alert_cooldown_ms', 7200000),
+    getConfig<boolean>('discord_enabled', true),
+    getConfig<boolean>('ai_review_enabled', true),
+    getConfig<number>('min_conviction', 6),
+    getConfig<boolean>('extended_hours', false),
   ]);
 
   return {
@@ -104,7 +104,7 @@ async function loadConfig(): Promise<AgentConfig> {
     minConviction,
     extendedHours,
     debug: false,
-    aiMode: "cloud",
+    aiMode: 'cloud',
   };
 }
 
@@ -118,19 +118,24 @@ export async function startAgent(options?: {
   debug?: boolean;
 }): Promise<void> {
   if (isRunning) {
-    console.log(chalk.yellow("  Agent is already running"));
+    console.log(chalk.yellow('  Agent is already running'));
     return;
   }
 
   console.log();
-  console.log(chalk.bold.green("  🤖 STARTING AGENTIC VICTOR"));
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+  console.log(chalk.bold.green('  🤖 STARTING AGENTIC VICTOR'));
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
   console.log();
 
   const config = await loadConfig();
   if (options?.aiMode) config.aiMode = options.aiMode;
   if (options?.aiModel) config.aiModel = options.aiModel;
-  if (options?.extendedHours !== undefined) config.extendedHours = options.extendedHours;
+  if (options?.extendedHours !== undefined)
+    config.extendedHours = options.extendedHours;
   if (options?.debug !== undefined) config.debug = options.debug;
 
   isRunning = true;
@@ -142,14 +147,22 @@ export async function startAgent(options?: {
 
   // Show current ET time for clarity
   const etNow = getEasternTime();
-  const etTimeStr = `${etNow.hour.toString().padStart(2, "0")}:${etNow.minute.toString().padStart(2, "0")}`;
-  
+  const etTimeStr = `${etNow.hour.toString().padStart(2, '0')}:${etNow.minute.toString().padStart(2, '0')}`;
+
   console.log(chalk.gray(`  Current time: ${etTimeStr} ET`));
-  console.log(chalk.gray(`  Scan interval: ${config.scanIntervalMs / 60000} minutes`));
+  console.log(
+    chalk.gray(`  Scan interval: ${config.scanIntervalMs / 60000} minutes`)
+  );
   console.log(chalk.gray(`  Briefing time: ${config.briefingTime} ET`));
-  console.log(chalk.gray(`  Alert cooldown: ${config.alertCooldownMs / 3600000} hours`));
-  console.log(chalk.gray(`  Discord: ${config.discordEnabled && isDiscordConfigured() ? "✓" : "✗"}`));
-  console.log(chalk.gray(`  AI review: ${config.aiReviewEnabled ? "✓" : "✗"}`));
+  console.log(
+    chalk.gray(`  Alert cooldown: ${config.alertCooldownMs / 3600000} hours`)
+  );
+  console.log(
+    chalk.gray(
+      `  Discord: ${config.discordEnabled && isDiscordConfigured() ? '✓' : '✗'}`
+    )
+  );
+  console.log(chalk.gray(`  AI review: ${config.aiReviewEnabled ? '✓' : '✗'}`));
   if (config.extendedHours) {
     console.log(chalk.yellow(`  Extended hours: ✓ (scanning 24/7)`));
   } else {
@@ -161,7 +174,7 @@ export async function startAgent(options?: {
   console.log();
 
   // Run initial scan
-  console.log(chalk.cyan("  Running initial scan..."));
+  console.log(chalk.cyan('  Running initial scan...'));
   await runScan(config);
 
   // Schedule regular scans
@@ -175,16 +188,16 @@ export async function startAgent(options?: {
   // Schedule morning briefing
   scheduleBriefing(config);
 
-  console.log(chalk.green("  ✓ Agent started successfully"));
-  console.log(chalk.gray("  Press Ctrl+C to stop"));
+  console.log(chalk.green('  ✓ Agent started successfully'));
+  console.log(chalk.gray('  Press Ctrl+C to stop'));
   console.log();
 
   // Handle shutdown
-  process.on("SIGINT", () => {
+  process.on('SIGINT', () => {
     stopAgent();
     process.exit(0);
   });
-  process.on("SIGTERM", () => {
+  process.on('SIGTERM', () => {
     stopAgent();
     process.exit(0);
   });
@@ -195,12 +208,12 @@ export async function startAgent(options?: {
  */
 export function stopAgent(): void {
   if (!isRunning) {
-    console.log(chalk.yellow("  Agent is not running"));
+    console.log(chalk.yellow('  Agent is not running'));
     return;
   }
 
   console.log();
-  console.log(chalk.yellow("  Stopping agent..."));
+  console.log(chalk.yellow('  Stopping agent...'));
 
   if (scanInterval) {
     clearInterval(scanInterval);
@@ -215,7 +228,7 @@ export function stopAgent(): void {
   isRunning = false;
   status.running = false;
 
-  console.log(chalk.green("  ✓ Agent stopped"));
+  console.log(chalk.green('  ✓ Agent stopped'));
   console.log(chalk.gray(`  Total scans: ${status.scanCount}`));
   console.log(chalk.gray(`  Total alerts: ${status.alertCount}`));
   console.log();
@@ -246,14 +259,16 @@ async function runScan(config: AgentConfig): Promise<void> {
     ]);
 
     if (watchlist.length === 0) {
-      console.log(chalk.gray(`  [${getETTimestamp()}] No tickers in watchlist`));
+      console.log(
+        chalk.gray(`  [${getETTimestamp()}] No tickers in watchlist`)
+      );
       return;
     }
 
     // Build market context for dynamic threshold adjustments
     const marketContext: MarketContext = {
       regime: regime.regime,
-      spyTrend: regime.spyTrend,
+      spyTrend: regime.spy.trend,
       vix: regime.vix.current,
       vixLevel: regime.vix.level,
     };
@@ -261,27 +276,40 @@ async function runScan(config: AgentConfig): Promise<void> {
     // Scan watchlist tickers
     const tickers = watchlist.map((w: WatchlistItem) => w.ticker);
     const results = await scanForOpportunities(tickers, {
-      minGrade: "C",
+      minGrade: 'C',
       maxRisk: 10,
       minCushion: 0,
     });
 
     // Evaluate each result for alerts (with market context for dynamic thresholds)
     let alertsTriggered = 0;
-    const debugRejections: { ticker: string; reason: string; grade: string; adjustments?: string[] }[] = [];
-    
+    const debugRejections: {
+      ticker: string;
+      reason: string;
+      grade: string;
+      adjustments?: string[];
+    }[] = [];
+
     for (const result of results) {
-      const watchlistItem = watchlist.find((w: WatchlistItem) => w.ticker === result.ticker);
+      const watchlistItem = watchlist.find(
+        (w: WatchlistItem) => w.ticker === result.ticker
+      );
       if (!watchlistItem) continue;
 
       // Check entry signal with market context
-      const decision = evaluateEntrySignal(result, watchlistItem, marketContext);
+      const decision = evaluateEntrySignal(
+        result,
+        watchlistItem,
+        marketContext
+      );
       if (decision.trigger) {
         const sent = await processAlert(decision, config);
         if (sent) alertsTriggered++;
       } else if (config.debug) {
         // Log rejection reason in debug mode
-        const adjustments = (decision.data?.adjustments as { reasons?: string[] })?.reasons;
+        const adjustments = (
+          decision.data?.adjustments as { reasons?: string[] }
+        )?.reasons;
         debugRejections.push({
           ticker: result.ticker,
           reason: decision.reason,
@@ -297,10 +325,10 @@ async function runScan(config: AgentConfig): Promise<void> {
 
     // Log scan
     await logScan({
-      scanType: "WATCHLIST",
+      scanType: 'WATCHLIST',
       tickersScanned: tickers.length,
-      opportunitiesFound: results.filter(r => 
-        gradeToValue(r.grade.grade) >= gradeToValue("B")
+      opportunitiesFound: results.filter(
+        (r) => gradeToValue(r.grade.grade) >= gradeToValue('B')
       ).length,
       alertsTriggered,
       executionTimeMs: executionTime,
@@ -308,46 +336,65 @@ async function runScan(config: AgentConfig): Promise<void> {
 
     console.log(
       chalk.gray(`  [${getETTimestamp()}]`) +
-      chalk.white(` Scanned ${tickers.length} tickers`) +
-      chalk.gray(` | ${results.length} opportunities`) +
-      chalk.yellow(` | ${alertsTriggered} alerts`) +
-      chalk.gray(` | ${executionTime}ms`)
+        chalk.white(` Scanned ${tickers.length} tickers`) +
+        chalk.gray(` | ${results.length} opportunities`) +
+        chalk.yellow(` | ${alertsTriggered} alerts`) +
+        chalk.gray(` | ${executionTime}ms`)
     );
 
     // Debug output: show market regime and rejection reasons
     if (config.debug) {
       // Show market context
-      const regimeColor = marketContext.regime === "RISK_ON" ? chalk.green :
-                         marketContext.regime === "RISK_OFF" ? chalk.red :
-                         marketContext.regime === "VOLATILE" ? chalk.yellow : chalk.gray;
-      const trendIcon = marketContext.spyTrend === "BULLISH" ? "📈" :
-                       marketContext.spyTrend === "BEARISH" ? "📉" : "➡️";
+      const regimeColor =
+        marketContext.regime === 'RISK_ON'
+          ? chalk.green
+          : marketContext.regime === 'RISK_OFF'
+            ? chalk.red
+            : marketContext.regime === 'HIGH_VOL'
+              ? chalk.yellow
+              : chalk.gray;
+      const trendIcon =
+        marketContext.spyTrend === 'BULLISH'
+          ? '📈'
+          : marketContext.spyTrend === 'BEARISH'
+            ? '📉'
+            : '➡️';
       console.log(
         chalk.magenta(`\n  🌡️  MARKET CONTEXT: `) +
-        regimeColor(`${marketContext.regime}`) +
-        chalk.gray(` | SPY ${trendIcon} ${marketContext.spyTrend}`) +
-        chalk.gray(` | VIX ${marketContext.vix.toFixed(1)} (${marketContext.vixLevel})`)
+          regimeColor(`${marketContext.regime}`) +
+          chalk.gray(` | SPY ${trendIcon} ${marketContext.spyTrend}`) +
+          chalk.gray(
+            ` | VIX ${marketContext.vix.toFixed(1)} (${marketContext.vixLevel})`
+          )
       );
-      
+
       if (debugRejections.length > 0) {
-        console.log(chalk.magenta(`\n  📋 REJECTION REASONS (${debugRejections.length} tickers):`));
+        console.log(
+          chalk.magenta(
+            `\n  📋 REJECTION REASONS (${debugRejections.length} tickers):`
+          )
+        );
         for (const rej of debugRejections) {
-          const gradeColor = rej.grade.startsWith('A') ? chalk.green : 
-                            rej.grade.startsWith('B') ? chalk.yellow : chalk.gray;
+          const gradeColor = rej.grade.startsWith('A')
+            ? chalk.green
+            : rej.grade.startsWith('B')
+              ? chalk.yellow
+              : chalk.gray;
           console.log(
-            chalk.gray(`     ${rej.ticker}`) + 
-            gradeColor(` [${rej.grade}]`) + 
-            chalk.dim(` → ${rej.reason}`)
+            chalk.gray(`     ${rej.ticker}`) +
+              gradeColor(` [${rej.grade}]`) +
+              chalk.dim(` → ${rej.reason}`)
           );
           // Show dynamic adjustments if any
           if (rej.adjustments && rej.adjustments.length > 0) {
-            console.log(chalk.cyan(`        ⚡ Dynamic: ${rej.adjustments.join(", ")}`));
+            console.log(
+              chalk.cyan(`        ⚡ Dynamic: ${rej.adjustments.join(', ')}`)
+            );
           }
         }
       }
       console.log();
     }
-
   } catch (error) {
     status.errorCount++;
     console.error(chalk.red(`  [${getETTimestamp()}] Scan error:`), error);
@@ -373,13 +420,13 @@ async function processAlert(
   let aiConviction: number | undefined;
   let aiReasoning: string | undefined;
 
-  if (config.aiReviewEnabled && decision.alertType === "ENTRY_SIGNAL") {
+  if (config.aiReviewEnabled && decision.alertType === 'ENTRY_SIGNAL') {
     try {
       const regime = await getMarketRegime();
       const review = await reviewAlert(
         decision.data as unknown as ScanResult,
         decision.alertType,
-        { regime, recentAlerts: [] },
+        { regime, recentAlerts: [], positions: [] },
         { aiMode: config.aiMode, aiModel: config.aiModel }
       );
 
@@ -395,16 +442,22 @@ async function processAlert(
         decision.priority = review.adjustedPriority;
       }
     } catch (error) {
-      console.error(chalk.yellow("  AI review failed, sending anyway:"), error);
+      console.error(chalk.yellow('  AI review failed, sending anyway:'), error);
     }
   }
 
   // Check if we should send based on config
-  if (!shouldSendAlert(decision, {
-    minPriority: "MEDIUM",
-    aiReviewEnabled: config.aiReviewEnabled,
-    minConviction: config.minConviction,
-  }, aiConviction)) {
+  if (
+    !shouldSendAlert(
+      decision,
+      {
+        minPriority: 'MEDIUM',
+        aiReviewEnabled: config.aiReviewEnabled,
+        minConviction: config.minConviction,
+      },
+      aiConviction
+    )
+  ) {
     return false;
   }
 
@@ -425,7 +478,7 @@ async function processAlert(
 
   // Send to Discord if enabled
   if (config.discordEnabled && isDiscordConfigured()) {
-    if (decision.alertType === "ENTRY_SIGNAL") {
+    if (decision.alertType === 'ENTRY_SIGNAL') {
       const data = decision.data as {
         ticker: string;
         price: number;
@@ -433,7 +486,12 @@ async function processAlert(
         grade: string;
         rsi?: number;
         iv?: { current: number; percentile: number; level: string };
-        spread?: { strikes: string; debit: number; cushion: number; dte: number };
+        spread?: {
+          strikes: string;
+          debit: number;
+          cushion: number;
+          dte: number;
+        };
       };
 
       await sendEntrySignal({
@@ -462,53 +520,55 @@ async function processAlert(
  * Schedule morning briefing
  */
 function scheduleBriefing(config: AgentConfig): void {
-  const [targetHours, targetMinutes] = config.briefingTime.split(":").map(Number);
-  
+  const [targetHours, targetMinutes] = config.briefingTime
+    .split(':')
+    .map(Number);
+
   // Get current ET time
   const etNow = getEasternTime();
   const currentETMinutes = etNow.hour * 60 + etNow.minute;
   const targetETMinutes = targetHours * 60 + targetMinutes;
-  
+
   // Calculate minutes until target time
   let minutesUntil: number;
   let daysToAdd = 0;
-  
+
   if (targetETMinutes > currentETMinutes) {
     // Target is later today
     minutesUntil = targetETMinutes - currentETMinutes;
   } else {
     // Target is tomorrow
-    minutesUntil = (24 * 60 - currentETMinutes) + targetETMinutes;
+    minutesUntil = 24 * 60 - currentETMinutes + targetETMinutes;
     daysToAdd = 1;
   }
-  
+
   // Check if landing on weekend (need to check ET day)
   let targetDay = (etNow.day + daysToAdd) % 7;
-  
+
   // Skip Saturday (6) and Sunday (0)
   while (targetDay === 0 || targetDay === 6) {
     minutesUntil += 24 * 60; // Add a day
     targetDay = (targetDay + 1) % 7;
   }
-  
+
   const msUntilBriefing = minutesUntil * 60 * 1000;
-  
+
   // Calculate display time
   const displayTime = new Date(Date.now() + msUntilBriefing);
-  const displayStr = displayTime.toLocaleString("en-US", { 
-    timeZone: "America/New_York",
-    weekday: "short",
-    month: "short", 
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
+  const displayStr = displayTime.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
   });
 
   console.log(
     chalk.gray(`  Next briefing scheduled for `) +
-    chalk.white(displayStr) +
-    chalk.gray(" ET")
+      chalk.white(displayStr) +
+      chalk.gray(' ET')
   );
 
   briefingTimeout = setTimeout(async () => {
@@ -522,7 +582,9 @@ function scheduleBriefing(config: AgentConfig): void {
  * Run morning briefing
  */
 async function runBriefing(config: AgentConfig): Promise<void> {
-  console.log(chalk.cyan(`  [${getETTimestamp()}] Generating morning briefing...`));
+  console.log(
+    chalk.cyan(`  [${getETTimestamp()}] Generating morning briefing...`)
+  );
 
   try {
     await generateMorningBriefing({
@@ -548,34 +610,44 @@ async function runBriefing(config: AgentConfig): Promise<void> {
  */
 function getEasternTime(): { hour: number; minute: number; day: number } {
   const now = new Date();
-  
+
   // Use Intl.DateTimeFormat for reliable parsing (handles DST automatically)
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "numeric",
-    weekday: "short",
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: 'numeric',
+    weekday: 'short',
     hour12: false,
   });
-  
+
   const parts = formatter.formatToParts(now);
-  
+
   let hour = 0;
   let minute = 0;
-  let dayName = "";
-  
+  let dayName = '';
+
   for (const part of parts) {
-    if (part.type === "hour") hour = parseInt(part.value, 10);
-    if (part.type === "minute") minute = parseInt(part.value, 10);
-    if (part.type === "weekday") dayName = part.value;
+    if (part.type === 'hour') hour = parseInt(part.value, 10);
+    if (part.type === 'minute') minute = parseInt(part.value, 10);
+    if (part.type === 'weekday') dayName = part.value;
   }
-  
+
   // Convert weekday name to day number (0 = Sunday)
   const dayMap: Record<string, number> = {
-    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
   };
-  const day = dayMap[dayName] ?? new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" })).getDay();
-  
+  const day =
+    dayMap[dayName] ??
+    new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    ).getDay();
+
   return { hour, minute, day };
 }
 
@@ -583,13 +655,15 @@ function getEasternTime(): { hour: number; minute: number; day: number } {
  * Get formatted ET timestamp for logging
  */
 function getETTimestamp(): string {
-  return new Date().toLocaleTimeString("en-US", { 
-    timeZone: "America/New_York",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true
-  }) + " ET";
+  return (
+    new Date().toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    }) + ' ET'
+  );
 }
 
 /**
@@ -597,25 +671,32 @@ function getETTimestamp(): string {
  */
 function isMarketHours(): boolean {
   const { hour, minute, day } = getEasternTime();
-  
+
   // Skip weekends (0 = Sunday, 6 = Saturday)
   if (day === 0 || day === 6) return false;
 
   const timeInMinutes = hour * 60 + minute;
 
   // Market hours: 9:30 AM - 4:00 PM ET
-  const marketOpen = 9 * 60 + 30;   // 9:30 AM ET
-  const marketClose = 16 * 60;       // 4:00 PM ET
+  const marketOpen = 9 * 60 + 30; // 9:30 AM ET
+  const marketClose = 16 * 60; // 4:00 PM ET
 
   return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
 }
 
 function gradeToValue(grade: string): number {
   const grades: Record<string, number> = {
-    'A+': 12, 'A': 11, 'A-': 10,
-    'B+': 9, 'B': 8, 'B-': 7,
-    'C+': 6, 'C': 5, 'C-': 4,
-    'D': 3, 'F': 1,
+    'A+': 12,
+    A: 11,
+    'A-': 10,
+    'B+': 9,
+    B: 8,
+    'B-': 7,
+    'C+': 6,
+    C: 5,
+    'C-': 4,
+    D: 3,
+    F: 1,
   };
   return grades[grade] ?? 0;
 }
@@ -625,28 +706,50 @@ function gradeToValue(grade: string): number {
  */
 export function displayAgentStatus(): void {
   console.log();
-  console.log(chalk.bold.white("  🤖 AGENT STATUS"));
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+  console.log(chalk.bold.white('  🤖 AGENT STATUS'));
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
   console.log();
 
   const s = getAgentStatus();
 
-  console.log(chalk.white("  Status:       ") + (s.running ? chalk.green("RUNNING") : chalk.red("STOPPED")));
-  
+  console.log(
+    chalk.white('  Status:       ') +
+      (s.running ? chalk.green('RUNNING') : chalk.red('STOPPED'))
+  );
+
   if (s.startedAt) {
-    console.log(chalk.white("  Started:      ") + chalk.gray(s.startedAt.toLocaleString()));
+    console.log(
+      chalk.white('  Started:      ') + chalk.gray(s.startedAt.toLocaleString())
+    );
   }
   if (s.lastScanAt) {
-    console.log(chalk.white("  Last scan:    ") + chalk.gray(s.lastScanAt.toLocaleString()));
+    console.log(
+      chalk.white('  Last scan:    ') +
+        chalk.gray(s.lastScanAt.toLocaleString())
+    );
   }
   if (s.lastBriefingAt) {
-    console.log(chalk.white("  Last brief:   ") + chalk.gray(s.lastBriefingAt.toLocaleString()));
+    console.log(
+      chalk.white('  Last brief:   ') +
+        chalk.gray(s.lastBriefingAt.toLocaleString())
+    );
   }
 
   console.log();
-  console.log(chalk.white("  Scans:        ") + chalk.cyan(s.scanCount.toString()));
-  console.log(chalk.white("  Alerts sent:  ") + chalk.yellow(s.alertCount.toString()));
-  console.log(chalk.white("  Errors:       ") + (s.errorCount > 0 ? chalk.red(s.errorCount.toString()) : chalk.gray("0")));
+  console.log(
+    chalk.white('  Scans:        ') + chalk.cyan(s.scanCount.toString())
+  );
+  console.log(
+    chalk.white('  Alerts sent:  ') + chalk.yellow(s.alertCount.toString())
+  );
+  console.log(
+    chalk.white('  Errors:       ') +
+      (s.errorCount > 0 ? chalk.red(s.errorCount.toString()) : chalk.gray('0'))
+  );
 
   console.log();
 }
@@ -662,9 +765,17 @@ export async function runDryScan(options?: {
   aiMode?: OllamaMode;
 }): Promise<void> {
   console.log();
-  console.log(chalk.bold.cyan("  🔍 DRY RUN SCAN"));
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
-  console.log(chalk.dim("  This scan shows all rejection reasons. No alerts will be sent."));
+  console.log(chalk.bold.cyan('  🔍 DRY RUN SCAN'));
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
+  console.log(
+    chalk.dim(
+      '  This scan shows all rejection reasons. No alerts will be sent.'
+    )
+  );
   console.log();
 
   const startTime = Date.now();
@@ -677,58 +788,89 @@ export async function runDryScan(options?: {
     ]);
 
     if (watchlist.length === 0) {
-      console.log(chalk.yellow("  No tickers in watchlist. Add tickers with:"));
-      console.log(chalk.dim("    bun run watch add NVDA"));
+      console.log(chalk.yellow('  No tickers in watchlist. Add tickers with:'));
+      console.log(chalk.dim('    bun run watch add NVDA'));
       return;
     }
 
     // Build market context for dynamic threshold adjustments
     const marketContext: MarketContext = {
       regime: regime.regime,
-      spyTrend: regime.spyTrend,
+      spyTrend: regime.spy.trend,
       vix: regime.vix.current,
       vixLevel: regime.vix.level,
     };
 
     // Show market context
-    const regimeColor = marketContext.regime === "RISK_ON" ? chalk.green :
-                       marketContext.regime === "RISK_OFF" ? chalk.red :
-                       marketContext.regime === "VOLATILE" ? chalk.yellow : chalk.gray;
-    const trendIcon = marketContext.spyTrend === "BULLISH" ? "📈" :
-                     marketContext.spyTrend === "BEARISH" ? "📉" : "➡️";
+    const regimeColor =
+      marketContext.regime === 'RISK_ON'
+        ? chalk.green
+        : marketContext.regime === 'RISK_OFF'
+          ? chalk.red
+          : marketContext.regime === 'HIGH_VOL'
+            ? chalk.yellow
+            : chalk.gray;
+    const trendIcon =
+      marketContext.spyTrend === 'BULLISH'
+        ? '📈'
+        : marketContext.spyTrend === 'BEARISH'
+          ? '📉'
+          : '➡️';
     console.log(
       chalk.cyan(`  🌡️  Market: `) +
-      regimeColor(`${marketContext.regime}`) +
-      chalk.gray(` | SPY ${trendIcon} ${marketContext.spyTrend}`) +
-      chalk.gray(` | VIX ${marketContext.vix.toFixed(1)} (${marketContext.vixLevel})`)
+        regimeColor(`${marketContext.regime}`) +
+        chalk.gray(` | SPY ${trendIcon} ${marketContext.spyTrend}`) +
+        chalk.gray(
+          ` | VIX ${marketContext.vix.toFixed(1)} (${marketContext.vixLevel})`
+        )
     );
-    console.log(chalk.dim(`  Dynamic thresholds will adjust based on these conditions.`));
+    console.log(
+      chalk.dim(`  Dynamic thresholds will adjust based on these conditions.`)
+    );
     console.log();
 
     console.log(chalk.gray(`  Scanning ${watchlist.length} tickers...`));
     console.log();
 
     // Scan watchlist tickers
-    const tickers = watchlist.map(w => w.ticker);
+    const tickers = watchlist.map((w) => w.ticker);
     const results = await scanForOpportunities(tickers, {
-      minGrade: "C",
+      minGrade: 'C',
       maxRisk: 10,
       minCushion: 0,
     });
 
     // Group results by alert decision
-    const wouldAlert: { ticker: string; grade: string; reason: string; adjustments?: string[] }[] = [];
-    const rejected: { ticker: string; grade: string; reason: string; details: string; adjustments?: string[] }[] = [];
+    const wouldAlert: {
+      ticker: string;
+      grade: string;
+      reason: string;
+      adjustments?: string[];
+    }[] = [];
+    const rejected: {
+      ticker: string;
+      grade: string;
+      reason: string;
+      details: string;
+      adjustments?: string[];
+    }[] = [];
 
     for (const result of results) {
-      const watchlistItem = watchlist.find(w => w.ticker === result.ticker);
+      const watchlistItem = watchlist.find((w) => w.ticker === result.ticker);
       if (!watchlistItem) continue;
 
       // Use market context for dynamic thresholds
-      const decision = evaluateEntrySignal(result, watchlistItem, marketContext);
-      const adjustments = (decision.data?.adjustments as { reasons?: string[] })?.reasons;
-      const criteria = decision.data?.criteria as { rsiLow?: number; rsiHigh?: number; ivThreshold?: number } | undefined;
-      
+      const decision = evaluateEntrySignal(
+        result,
+        watchlistItem,
+        marketContext
+      );
+      const adjustments = (decision.data?.adjustments as { reasons?: string[] })
+        ?.reasons;
+      const criteria = decision.data?.criteria as
+        | { rsiLow?: number; rsiHigh?: number; ivThreshold?: number }
+        | undefined;
+
       if (decision.trigger) {
         wouldAlert.push({
           ticker: result.ticker,
@@ -739,34 +881,49 @@ export async function runDryScan(options?: {
       } else {
         // Build detailed info for rejected tickers (show EFFECTIVE thresholds)
         const details: string[] = [];
-        
+
         // Show RSI with effective thresholds
         const effectiveRsiLow = criteria?.rsiLow ?? watchlistItem.targetRsiLow;
-        const effectiveRsiHigh = criteria?.rsiHigh ?? watchlistItem.targetRsiHigh;
+        const effectiveRsiHigh =
+          criteria?.rsiHigh ?? watchlistItem.targetRsiHigh;
         if (result.grade.rsi !== undefined) {
-          const rsiInRange = result.grade.rsi >= effectiveRsiLow && result.grade.rsi <= effectiveRsiHigh;
-          details.push(`RSI: ${result.grade.rsi.toFixed(0)} (range: ${effectiveRsiLow}-${effectiveRsiHigh}) ${rsiInRange ? "✓" : "✗"}`);
+          const rsiInRange =
+            result.grade.rsi >= effectiveRsiLow &&
+            result.grade.rsi <= effectiveRsiHigh;
+          details.push(
+            `RSI: ${result.grade.rsi.toFixed(0)} (range: ${effectiveRsiLow}-${effectiveRsiHigh}) ${rsiInRange ? '✓' : '✗'}`
+          );
         } else {
-          details.push(`RSI: N/A (range: ${effectiveRsiLow}-${effectiveRsiHigh})`);
+          details.push(
+            `RSI: N/A (range: ${effectiveRsiLow}-${effectiveRsiHigh})`
+          );
         }
-        
+
         // Show IV with effective threshold
-        const effectiveIv = criteria?.ivThreshold ?? watchlistItem.ivPercentileMin;
+        const effectiveIv =
+          criteria?.ivThreshold ?? watchlistItem.ivPercentileMin;
         if (result.iv?.percentile !== undefined && effectiveIv) {
           const ivOk = result.iv.percentile <= effectiveIv;
-          details.push(`IV: ${result.iv.percentile}% (max: ${effectiveIv}%) ${ivOk ? "✓" : "✗"}`);
+          details.push(
+            `IV: ${result.iv.percentile}% (max: ${effectiveIv}%) ${ivOk ? '✓' : '✗'}`
+          );
         }
         if (result.spread?.cushion !== undefined) {
-          const cushionOk = result.spread.cushion >= watchlistItem.minCushionPct;
-          details.push(`Cushion: ${result.spread.cushion.toFixed(1)}% (min: ${watchlistItem.minCushionPct}%) ${cushionOk ? "✓" : "✗"}`);
+          const cushionOk =
+            result.spread.cushion >= watchlistItem.minCushionPct;
+          details.push(
+            `Cushion: ${result.spread.cushion.toFixed(1)}% (min: ${watchlistItem.minCushionPct}%) ${cushionOk ? '✓' : '✗'}`
+          );
         }
-        details.push(`Grade: ${result.grade.grade} (min: ${watchlistItem.minGrade}) ${gradeToValue(result.grade.grade) >= gradeToValue(watchlistItem.minGrade) ? "✓" : "✗"}`);
-        
+        details.push(
+          `Grade: ${result.grade.grade} (min: ${watchlistItem.minGrade}) ${gradeToValue(result.grade.grade) >= gradeToValue(watchlistItem.minGrade) ? '✓' : '✗'}`
+        );
+
         rejected.push({
           ticker: result.ticker,
           grade: result.grade.grade,
           reason: decision.reason,
-          details: details.join(", "),
+          details: details.join(', '),
           adjustments,
         });
       }
@@ -776,16 +933,22 @@ export async function runDryScan(options?: {
 
     // Display results
     if (wouldAlert.length > 0) {
-      console.log(chalk.green.bold(`  ✅ WOULD TRIGGER ALERTS (${wouldAlert.length}):`));
+      console.log(
+        chalk.green.bold(`  ✅ WOULD TRIGGER ALERTS (${wouldAlert.length}):`)
+      );
       for (const item of wouldAlert) {
-        const gradeColor = item.grade.startsWith('A') ? chalk.green : chalk.yellow;
+        const gradeColor = item.grade.startsWith('A')
+          ? chalk.green
+          : chalk.yellow;
         console.log(
           chalk.green(`     ${item.ticker}`) +
-          gradeColor(` [${item.grade}]`) +
-          chalk.dim(` — ${item.reason}`)
+            gradeColor(` [${item.grade}]`) +
+            chalk.dim(` — ${item.reason}`)
         );
         if (item.adjustments && item.adjustments.length > 0) {
-          console.log(chalk.cyan(`        ⚡ Dynamic: ${item.adjustments.join(", ")}`));
+          console.log(
+            chalk.cyan(`        ⚡ Dynamic: ${item.adjustments.join(', ')}`)
+          );
         }
       }
       console.log();
@@ -794,32 +957,39 @@ export async function runDryScan(options?: {
     if (rejected.length > 0) {
       console.log(chalk.yellow.bold(`  ❌ FILTERED OUT (${rejected.length}):`));
       for (const item of rejected) {
-        const gradeColor = item.grade.startsWith('A') ? chalk.green : 
-                          item.grade.startsWith('B') ? chalk.yellow : chalk.gray;
+        const gradeColor = item.grade.startsWith('A')
+          ? chalk.green
+          : item.grade.startsWith('B')
+            ? chalk.yellow
+            : chalk.gray;
         console.log(
-          chalk.white(`     ${item.ticker}`) +
-          gradeColor(` [${item.grade}]`)
+          chalk.white(`     ${item.ticker}`) + gradeColor(` [${item.grade}]`)
         );
         console.log(chalk.red(`        → ${item.reason}`));
         console.log(chalk.dim(`        ${item.details}`));
         if (item.adjustments && item.adjustments.length > 0) {
-          console.log(chalk.cyan(`        ⚡ Dynamic: ${item.adjustments.join(", ")}`));
+          console.log(
+            chalk.cyan(`        ⚡ Dynamic: ${item.adjustments.join(', ')}`)
+          );
         }
       }
       console.log();
     }
 
     // Summary
-    console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+    console.log(
+      chalk.gray(
+        '  ────────────────────────────────────────────────────────────────────'
+      )
+    );
     console.log(
       chalk.white(`  ${results.length} opportunities scanned`) +
-      chalk.green(` | ${wouldAlert.length} would alert`) +
-      chalk.yellow(` | ${rejected.length} filtered`) +
-      chalk.gray(` | ${executionTime}ms`)
+        chalk.green(` | ${wouldAlert.length} would alert`) +
+        chalk.yellow(` | ${rejected.length} filtered`) +
+        chalk.gray(` | ${executionTime}ms`)
     );
     console.log();
-
   } catch (error) {
-    console.error(chalk.red("  Scan error:"), error);
+    console.error(chalk.red('  Scan error:'), error);
   }
 }

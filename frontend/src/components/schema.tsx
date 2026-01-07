@@ -42,13 +42,14 @@ export function PersonSchema() {
       '@type': 'WebPage',
       '@id': 'https://conorq.com',
     },
-    worksFor: DATA.work && DATA.work.length > 0
-      ? {
-          '@type': 'Organization',
-          name: DATA.work[0].company,
-          url: DATA.work[0].href,
-        }
-      : undefined,
+    worksFor:
+      DATA.work && DATA.work.length > 0
+        ? {
+            '@type': 'Organization',
+            name: DATA.work[0].company,
+            url: DATA.work[0].href,
+          }
+        : undefined,
   };
 
   return (
@@ -67,7 +68,8 @@ export function WebsiteSchema() {
     '@id': 'https://conorq.com/#website',
     name: `${DATA.name}'s Portfolio`,
     url: DATA.url,
-    description: DATA.description || `${DATA.name} - Security Engineer Portfolio`,
+    description:
+      DATA.description || `${DATA.name} - Security Engineer Portfolio`,
     author: {
       '@type': 'Person',
       '@id': 'https://conorq.com/#person',
@@ -78,7 +80,7 @@ export function WebsiteSchema() {
       '@id': 'https://conorq.com/#person',
       name: DATA.name,
     },
-    inLanguage: 'en-US'
+    inLanguage: 'en-US',
   };
 
   return (
@@ -91,43 +93,43 @@ export function WebsiteSchema() {
 }
 
 // BlogPostSchema for blog post structured data
-export function BlogPostSchema({ 
-  title, 
-  description, 
-  image, 
-  slug, 
-  publishedAt, 
-  updatedAt 
-}: { 
-  title: string; 
-  description: string; 
-  image?: string; 
-  slug: string; 
-  publishedAt: string; 
-  updatedAt?: string; 
+export function BlogPostSchema({
+  title,
+  description,
+  image,
+  slug,
+  publishedAt,
+  updatedAt,
+}: {
+  title: string;
+  description: string;
+  image?: string;
+  slug: string;
+  publishedAt: string;
+  updatedAt?: string;
 }) {
   const schema = {
-    "@context": "https://schema.org",
-    "@type": "BlogPosting",
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
     headline: title,
     description: description,
     image: image ? `${DATA.url}${image}` : `${DATA.url}/og?title=${title}`,
     datePublished: publishedAt,
     dateModified: updatedAt || publishedAt,
     author: {
-      "@type": "Person",
+      '@type': 'Person',
       name: DATA.name,
-      url: DATA.url
+      url: DATA.url,
     },
     publisher: {
-      "@type": "Person",
+      '@type': 'Person',
       name: DATA.name,
-      url: DATA.url
+      url: DATA.url,
     },
     mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": `${DATA.url}/blog/${slug}`
-    }
+      '@type': 'WebPage',
+      '@id': `${DATA.url}/blog/${slug}`,
+    },
   };
 
   return (
@@ -140,7 +142,11 @@ export function BlogPostSchema({
 }
 
 // BreadcrumbList Schema for structured navigation
-export function BreadcrumbSchema({ items }: { items: {name: string, url: string}[] }) {
+export function BreadcrumbSchema({
+  items,
+}: {
+  items: { name: string; url: string }[];
+}) {
   const itemListElement = items.map((item, index) => ({
     '@type': 'ListItem',
     position: index + 1,
@@ -161,4 +167,4 @@ export function BreadcrumbSchema({ items }: { items: {name: string, url: string}
       dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
     />
   );
-} 
+}

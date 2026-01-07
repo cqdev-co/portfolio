@@ -1,13 +1,13 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
-type LogLevel = "info" | "success" | "warn" | "error" | "debug";
+type LogLevel = 'info' | 'success' | 'warn' | 'error' | 'debug';
 
 const LOG_PREFIXES: Record<LogLevel, string> = {
-  info: chalk.blue("ℹ"),
-  success: chalk.green("✓"),
-  warn: chalk.yellow("⚠"),
-  error: chalk.red("✗"),
-  debug: chalk.gray("⋯"),
+  info: chalk.blue('ℹ'),
+  success: chalk.green('✓'),
+  warn: chalk.yellow('⚠'),
+  error: chalk.red('✗'),
+  debug: chalk.gray('⋯'),
 };
 
 class Logger {
@@ -40,21 +40,18 @@ class Logger {
   }
 
   ticker(symbol: string, score: number, signals: string[]): void {
-    const scoreColor = score >= 80 
-      ? chalk.green 
-      : score >= 60 
-        ? chalk.yellow 
-        : chalk.red;
-    
+    const scoreColor =
+      score >= 80 ? chalk.green : score >= 60 ? chalk.yellow : chalk.red;
+
     console.log(
       `  ${chalk.bold(symbol.padEnd(6))} ` +
-      `${scoreColor(score.toString().padStart(3))} pts  ` +
-      `${chalk.gray(signals.slice(0, 3).join(", "))}`
+        `${scoreColor(score.toString().padStart(3))} pts  ` +
+        `${chalk.gray(signals.slice(0, 3).join(', '))}`
     );
   }
 
   divider(): void {
-    console.log(chalk.gray("─".repeat(60)));
+    console.log(chalk.gray('─'.repeat(60)));
   }
 
   header(title: string): void {
@@ -65,4 +62,3 @@ class Logger {
 }
 
 export const logger = new Logger();
-

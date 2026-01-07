@@ -3,6 +3,7 @@
 ## Overview
 
 This document describes the Supabase database schema for the Unusual Options Activity Scanner. The schema is designed for:
+
 - Fast signal storage and retrieval
 - Historical performance tracking
 - Backtest analysis
@@ -70,65 +71,65 @@ CREATE TABLE unusual_options_signals (
     ticker TEXT NOT NULL,
     option_symbol TEXT NOT NULL,
     detection_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     -- Option Details
     strike NUMERIC(10, 2) NOT NULL,
     expiry DATE NOT NULL,
     option_type TEXT NOT NULL CHECK (option_type IN ('call', 'put')),
     days_to_expiry INTEGER NOT NULL,
     moneyness TEXT CHECK (moneyness IN ('ITM', 'ATM', 'OTM')),
-    
+
     -- Volume Metrics
     current_volume INTEGER NOT NULL DEFAULT 0,
     average_volume NUMERIC(10, 2) NOT NULL DEFAULT 0,
     volume_ratio NUMERIC(6, 2),
-    
+
     -- Open Interest Metrics
     current_oi INTEGER NOT NULL DEFAULT 0,
     previous_oi INTEGER NOT NULL DEFAULT 0,
     oi_change_pct NUMERIC(6, 4),
-    
+
     -- Premium Metrics
     premium_flow NUMERIC(12, 2) NOT NULL DEFAULT 0,
     aggressive_order_pct NUMERIC(4, 2),
-    
+
     -- Detection Flags
     has_volume_anomaly BOOLEAN DEFAULT FALSE,
     has_oi_spike BOOLEAN DEFAULT FALSE,
     has_premium_flow BOOLEAN DEFAULT FALSE,
     has_sweep BOOLEAN DEFAULT FALSE,
     has_block_trade BOOLEAN DEFAULT FALSE,
-    
+
     -- Scoring
     overall_score NUMERIC(4, 3) NOT NULL CHECK (overall_score >= 0 AND overall_score <= 1),
     grade TEXT NOT NULL CHECK (grade IN ('S', 'A', 'B', 'C', 'D', 'F')),
     confidence NUMERIC(4, 3) CHECK (confidence >= 0 AND confidence <= 1),
-    
+
     -- Risk Assessment
     risk_level TEXT NOT NULL CHECK (risk_level IN ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')),
     risk_factors JSONB DEFAULT '[]'::jsonb,
-    
+
     -- Market Context
     underlying_price NUMERIC(10, 2) NOT NULL,
     implied_volatility NUMERIC(6, 4),
     iv_rank NUMERIC(4, 2),
     market_cap BIGINT,
     avg_daily_volume BIGINT,
-    
+
     -- Directional Bias
     sentiment TEXT CHECK (sentiment IN ('BULLISH', 'BEARISH', 'NEUTRAL')),
     put_call_ratio NUMERIC(6, 4),
-    
+
     -- Additional Context
     days_to_earnings INTEGER,
     has_upcoming_catalyst BOOLEAN DEFAULT FALSE,
     catalyst_description TEXT,
-    
+
     -- Metadata
     data_provider TEXT,
     detection_version TEXT,
     raw_detection_data JSONB,
-    
+
     -- Indexes
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -143,8 +144,8 @@ CREATE INDEX idx_signals_expiry ON unusual_options_signals(expiry);
 CREATE INDEX idx_signals_score ON unusual_options_signals(overall_score DESC);
 
 -- Composite index for common queries
-CREATE INDEX idx_signals_recent_high_grade 
-ON unusual_options_signals(detection_timestamp DESC, grade) 
+CREATE INDEX idx_signals_recent_high_grade
+ON unusual_options_signals(detection_timestamp DESC, grade)
 WHERE grade IN ('S', 'A', 'B');
 ```
 
@@ -158,45 +159,45 @@ CREATE TABLE signal_performance (
     performance_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     signal_id UUID NOT NULL REFERENCES unusual_options_signals(signal_id) ON DELETE CASCADE,
     ticker TEXT NOT NULL,
-    
+
     -- Entry Context
     entry_timestamp TIMESTAMPTZ NOT NULL,
     entry_price NUMERIC(10, 2) NOT NULL,
     option_symbol TEXT NOT NULL,
     signal_grade TEXT NOT NULL,
     signal_sentiment TEXT,
-    
+
     -- Price Tracking
     price_1d_later NUMERIC(10, 2),
     price_5d_later NUMERIC(10, 2),
     price_30d_later NUMERIC(10, 2),
     current_price NUMERIC(10, 2),
-    
+
     -- Forward Returns
     forward_return_1d NUMERIC(6, 4),
     forward_return_5d NUMERIC(6, 4),
     forward_return_30d NUMERIC(6, 4),
-    
+
     -- Win/Loss Classification
     win_1d BOOLEAN,
     win_5d BOOLEAN,
     win_30d BOOLEAN,
     overall_win BOOLEAN,
-    
+
     -- Performance Metrics
     max_favorable_move NUMERIC(6, 4),  -- Best price reached
     max_adverse_move NUMERIC(6, 4),     -- Worst price reached
     volatility_realized NUMERIC(6, 4),
-    
+
     -- Option Outcome (if tracked)
     option_entry_price NUMERIC(10, 2),
     option_exit_price NUMERIC(10, 2),
     option_return_pct NUMERIC(6, 4),
-    
+
     -- Notes
     trade_notes TEXT,
     exit_reason TEXT,
-    
+
     -- Metadata
     last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -220,39 +221,39 @@ CREATE TABLE options_flow_history (
     flow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ticker TEXT NOT NULL,
     option_symbol TEXT NOT NULL,
-    
+
     -- Trade Details
     trade_timestamp TIMESTAMPTZ NOT NULL,
     trade_price NUMERIC(10, 4) NOT NULL,
     trade_size INTEGER NOT NULL,
     trade_premium NUMERIC(12, 2) NOT NULL,
-    
+
     -- Option Details
     strike NUMERIC(10, 2) NOT NULL,
     expiry DATE NOT NULL,
     option_type TEXT NOT NULL CHECK (option_type IN ('call', 'put')),
-    
+
     -- Trade Classification
     trade_type TEXT CHECK (trade_type IN ('buy', 'sell', 'sweep', 'block')),
     execution_style TEXT CHECK (execution_style IN ('aggressive', 'passive', 'neutral')),
     exchange TEXT,
-    
+
     -- Market Context at Time of Trade
     underlying_price NUMERIC(10, 2),
     bid_price NUMERIC(10, 4),
     ask_price NUMERIC(10, 4),
     mid_price NUMERIC(10, 4),
     implied_volatility NUMERIC(6, 4),
-    
+
     -- Volume and OI at Time
     contract_volume INTEGER,
     contract_oi INTEGER,
-    
+
     -- Metadata
     data_provider TEXT NOT NULL,
     is_sweep_leg BOOLEAN DEFAULT FALSE,
     sweep_id UUID,  -- Groups sweep trades together
-    
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -276,11 +277,11 @@ CREATE TABLE scanner_config (
     config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID,  -- Optional: for multi-user support
     config_name TEXT NOT NULL,
-    
+
     -- Watchlists
     watchlists JSONB DEFAULT '[]'::jsonb,
     -- Example: [{"name": "tech", "tickers": ["AAPL", "MSFT", "GOOGL"]}, ...]
-    
+
     -- Alert Preferences
     alert_preferences JSONB DEFAULT '{}'::jsonb,
     -- Example: {
@@ -290,7 +291,7 @@ CREATE TABLE scanner_config (
     --   "discord_webhook": "https://...",
     --   "quiet_hours": {"start": "22:00", "end": "06:00"}
     -- }
-    
+
     -- Detection Thresholds
     detection_thresholds JSONB DEFAULT '{}'::jsonb,
     -- Example: {
@@ -299,7 +300,7 @@ CREATE TABLE scanner_config (
     --   "min_premium_flow": 100000,
     --   "min_avg_volume": 1000000
     -- }
-    
+
     -- Scanning Preferences
     scan_preferences JSONB DEFAULT '{}'::jsonb,
     -- Example: {
@@ -309,11 +310,11 @@ CREATE TABLE scanner_config (
     --   "dte_max": 90,
     --   "exclude_tickers": ["TSLA", "GME"]
     -- }
-    
+
     -- Active Status
     is_active BOOLEAN DEFAULT TRUE,
     is_default BOOLEAN DEFAULT FALSE,
-    
+
     -- Metadata
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -334,13 +335,13 @@ CREATE TABLE backtest_results (
     -- Identity
     backtest_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     backtest_name TEXT NOT NULL,
-    
+
     -- Test Parameters
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     tickers_tested TEXT[],
     detection_version TEXT NOT NULL,
-    
+
     -- Overall Performance
     total_signals INTEGER NOT NULL DEFAULT 0,
     total_trades INTEGER NOT NULL DEFAULT 0,
@@ -349,7 +350,7 @@ CREATE TABLE backtest_results (
     avg_loser_pct NUMERIC(6, 4),
     sharpe_ratio NUMERIC(6, 4),
     max_drawdown NUMERIC(6, 4),
-    
+
     -- Performance by Grade
     grade_breakdown JSONB DEFAULT '{}'::jsonb,
     -- Example: {
@@ -357,7 +358,7 @@ CREATE TABLE backtest_results (
     --   "A": {"count": 45, "win_rate": 0.67, "avg_return": 0.08},
     --   ...
     -- }
-    
+
     -- Performance by Timeframe
     timeframe_breakdown JSONB DEFAULT '{}'::jsonb,
     -- Example: {
@@ -365,23 +366,23 @@ CREATE TABLE backtest_results (
     --   "5d": {"win_rate": 0.60, "avg_return": 0.08},
     --   "30d": {"win_rate": 0.62, "avg_return": 0.12}
     -- }
-    
+
     -- Additional Metrics
     best_trade_return NUMERIC(6, 4),
     worst_trade_return NUMERIC(6, 4),
     avg_days_in_trade NUMERIC(5, 2),
-    
+
     -- Configuration Used
     thresholds_used JSONB,
     filters_applied JSONB,
-    
+
     -- Execution Metadata
     execution_time_seconds INTEGER,
     signals_per_day NUMERIC(6, 2),
-    
+
     -- Notes
     notes TEXT,
-    
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -397,7 +398,7 @@ CREATE INDEX idx_backtest_created ON backtest_results(created_at DESC);
 
 ```sql
 CREATE OR REPLACE VIEW v_recent_high_grade_signals AS
-SELECT 
+SELECT
     signal_id,
     ticker,
     option_symbol,
@@ -410,7 +411,7 @@ SELECT
     risk_level,
     underlying_price
 FROM unusual_options_signals
-WHERE 
+WHERE
     detection_timestamp > NOW() - INTERVAL '7 days'
     AND grade IN ('S', 'A', 'B')
 ORDER BY detection_timestamp DESC;
@@ -420,7 +421,7 @@ ORDER BY detection_timestamp DESC;
 
 ```sql
 CREATE OR REPLACE VIEW v_signal_performance_summary AS
-SELECT 
+SELECT
     s.ticker,
     s.grade,
     COUNT(*) as total_signals,
@@ -440,7 +441,7 @@ ORDER BY win_rate_5d DESC;
 
 ```sql
 CREATE OR REPLACE VIEW v_daily_activity_summary AS
-SELECT 
+SELECT
     DATE(detection_timestamp) as signal_date,
     COUNT(*) as total_signals,
     COUNT(DISTINCT ticker) as unique_tickers,
@@ -463,13 +464,13 @@ ALTER TABLE unusual_options_signals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scanner_config ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can read all signals
-CREATE POLICY "Anyone can read signals" 
-ON unusual_options_signals FOR SELECT 
+CREATE POLICY "Anyone can read signals"
+ON unusual_options_signals FOR SELECT
 USING (true);
 
 -- Policy: Users can only modify their own config
-CREATE POLICY "Users can manage own config" 
-ON scanner_config FOR ALL 
+CREATE POLICY "Users can manage own config"
+ON scanner_config FOR ALL
 USING (auth.uid() = user_id);
 ```
 
@@ -486,11 +487,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_signals_updated_at 
+CREATE TRIGGER update_signals_updated_at
 BEFORE UPDATE ON unusual_options_signals
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_config_updated_at 
+CREATE TRIGGER update_config_updated_at
 BEFORE UPDATE ON scanner_config
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
@@ -530,13 +531,13 @@ CREATE OR REPLACE FUNCTION get_similar_signal_performance(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         AVG(p.forward_return_5d) as avg_return,
         SUM(CASE WHEN p.win_5d THEN 1 ELSE 0 END)::NUMERIC / COUNT(*) as win_rate,
         COUNT(*)::INTEGER as signal_count
     FROM unusual_options_signals s
     JOIN signal_performance p ON s.signal_id = p.signal_id
-    WHERE 
+    WHERE
         s.ticker = p_ticker
         AND s.grade = p_grade
         AND s.sentiment = p_sentiment
@@ -551,7 +552,7 @@ $$ LANGUAGE plpgsql;
 ### Find all S-grade signals from last 24 hours
 
 ```sql
-SELECT 
+SELECT
     ticker,
     option_symbol,
     detection_timestamp,
@@ -560,7 +561,7 @@ SELECT
     volume_ratio,
     sentiment
 FROM unusual_options_signals
-WHERE 
+WHERE
     grade = 'S'
     AND detection_timestamp > NOW() - INTERVAL '24 hours'
 ORDER BY overall_score DESC;
@@ -569,7 +570,7 @@ ORDER BY overall_score DESC;
 ### Get performance for all AAPL signals
 
 ```sql
-SELECT 
+SELECT
     s.detection_timestamp,
     s.option_symbol,
     s.grade,
@@ -586,7 +587,7 @@ LIMIT 50;
 ### Find best performing signal types
 
 ```sql
-SELECT 
+SELECT
     s.grade,
     s.sentiment,
     COUNT(*) as count,
@@ -594,7 +595,7 @@ SELECT
     SUM(CASE WHEN p.win_5d THEN 1 ELSE 0 END)::FLOAT / COUNT(*) as win_rate
 FROM unusual_options_signals s
 JOIN signal_performance p ON s.signal_id = p.signal_id
-WHERE 
+WHERE
     p.forward_return_5d IS NOT NULL
     AND s.detection_timestamp > NOW() - INTERVAL '90 days'
 GROUP BY s.grade, s.sentiment
@@ -605,7 +606,7 @@ ORDER BY win_rate DESC;
 ### Get daily signal volume and quality
 
 ```sql
-SELECT 
+SELECT
     DATE(detection_timestamp) as date,
     COUNT(*) as total_signals,
     COUNT(DISTINCT ticker) as unique_tickers,
@@ -623,7 +624,7 @@ ORDER BY date DESC;
 
 ```sql
 -- Delete old flow history (keep 90 days)
-DELETE FROM options_flow_history 
+DELETE FROM options_flow_history
 WHERE trade_timestamp < NOW() - INTERVAL '90 days';
 
 -- Archive old signals (keep 1 year in main table)
@@ -662,4 +663,3 @@ See `db/unusual_options_schema.sql` for the complete deployment script.
 ---
 
 **Next**: [CLI Reference](cli-reference.md) | [Back to Overview](system-overview.md)
-

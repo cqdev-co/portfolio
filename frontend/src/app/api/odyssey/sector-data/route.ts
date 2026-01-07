@@ -1,10 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
 // Simple in-memory cache
-const cache = new Map<
-  string,
-  { data: SectorData[]; timestamp: number }
->();
+const cache = new Map<string, { data: SectorData[]; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface SectorData {
@@ -16,7 +13,7 @@ interface SectorData {
 }
 
 export async function GET() {
-  const cacheKey = "sector-data";
+  const cacheKey = 'sector-data';
   const cached = cache.get(cacheKey);
 
   // Return cached data if still valid
@@ -26,21 +23,21 @@ export async function GET() {
 
   try {
     // Import dynamically
-    const { default: yahooFinance } = await import("yahoo-finance2");
+    const { default: yahooFinance } = await import('yahoo-finance2');
 
     // Sector ETF symbols
     const sectors = [
-      { symbol: "XLK", name: "Technology" },
-      { symbol: "XLF", name: "Financials" },
-      { symbol: "XLE", name: "Energy" },
-      { symbol: "XLV", name: "Healthcare" },
-      { symbol: "XLY", name: "Consumer Discretionary" },
-      { symbol: "XLP", name: "Consumer Staples" },
-      { symbol: "XLI", name: "Industrials" },
-      { symbol: "XLB", name: "Materials" },
-      { symbol: "XLU", name: "Utilities" },
-      { symbol: "XLRE", name: "Real Estate" },
-      { symbol: "XLC", name: "Communication Services" },
+      { symbol: 'XLK', name: 'Technology' },
+      { symbol: 'XLF', name: 'Financials' },
+      { symbol: 'XLE', name: 'Energy' },
+      { symbol: 'XLV', name: 'Healthcare' },
+      { symbol: 'XLY', name: 'Consumer Discretionary' },
+      { symbol: 'XLP', name: 'Consumer Staples' },
+      { symbol: 'XLI', name: 'Industrials' },
+      { symbol: 'XLB', name: 'Materials' },
+      { symbol: 'XLU', name: 'Utilities' },
+      { symbol: 'XLRE', name: 'Real Estate' },
+      { symbol: 'XLC', name: 'Communication Services' },
     ];
 
     const data: SectorData[] = [];
@@ -48,21 +45,18 @@ export async function GET() {
     // Fetch real data from Yahoo Finance
     const symbols = sectors.map((s) => s.symbol);
     const quotes = await yahooFinance.quote(symbols);
-    
+
     for (let i = 0; i < quotes.length; i++) {
       const quote = quotes[i];
       const sector = sectors[i];
-      
+
       if (quote) {
         const price = quote.regularMarketPrice || 0;
-        const previousClose = 
-          quote.regularMarketPreviousClose || price;
+        const previousClose = quote.regularMarketPreviousClose || price;
         const change = price - previousClose;
-        const changePercent = 
-          previousClose !== 0 
-            ? (change / previousClose) * 100 
-            : 0;
-        
+        const changePercent =
+          previousClose !== 0 ? (change / previousClose) * 100 : 0;
+
         data.push({
           symbol: sector.symbol,
           name: sector.name,
@@ -78,11 +72,10 @@ export async function GET() {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Error fetching sector data:", error);
+    console.error('Error fetching sector data:', error);
     return NextResponse.json(
-      { error: "Failed to fetch sector data" },
+      { error: 'Failed to fetch sector data' },
       { status: 500 }
     );
   }
 }
-

@@ -1,14 +1,9 @@
-"use client";
+'use client';
 
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { 
-  Activity, 
-  TrendingUp, 
-  Zap, 
-  Package 
-} from "lucide-react";
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Activity, TrendingUp, Zap, Package } from 'lucide-react';
 
 interface DetectionFlagsFilterProps {
   hasVolumeAnomaly: boolean | undefined;
@@ -26,7 +21,7 @@ interface DetectionFlagsFilterProps {
  * Reusable detection flags filter component
  * Toggle filters for volume anomaly, OI spike, sweep, and block trades
  */
-export function DetectionFlagsFilter({ 
+export function DetectionFlagsFilter({
   hasVolumeAnomaly,
   hasOiSpike,
   hasSweep,
@@ -35,40 +30,40 @@ export function DetectionFlagsFilter({
   onOiSpikeChange,
   onSweepChange,
   onBlockTradeChange,
-  label = "Detection Patterns" 
+  label = 'Detection Patterns',
 }: DetectionFlagsFilterProps) {
   const flags = [
     {
-      key: "volume",
-      label: "Volume Anomaly",
+      key: 'volume',
+      label: 'Volume Anomaly',
       icon: Activity,
       value: hasVolumeAnomaly,
       onChange: onVolumeAnomalyChange,
     },
     {
-      key: "oi",
-      label: "OI Spike",
+      key: 'oi',
+      label: 'OI Spike',
       icon: TrendingUp,
       value: hasOiSpike,
       onChange: onOiSpikeChange,
     },
     {
-      key: "sweep",
-      label: "Sweep",
+      key: 'sweep',
+      label: 'Sweep',
       icon: Zap,
       value: hasSweep,
       onChange: onSweepChange,
     },
     {
-      key: "block",
-      label: "Block Trade",
+      key: 'block',
+      label: 'Block Trade',
       icon: Package,
       value: hasBlockTrade,
       onChange: onBlockTradeChange,
     },
   ];
 
-  const activeCount = flags.filter(f => f.value === true).length;
+  const activeCount = flags.filter((f) => f.value === true).length;
 
   return (
     <div className="space-y-2">
@@ -80,20 +75,20 @@ export function DetectionFlagsFilter({
           </span>
         )}
       </Label>
-      
+
       <div className="grid grid-cols-2 gap-1.5">
         {flags.map((flag) => {
           const Icon = flag.icon;
           const isActive = flag.value === true;
-          
+
           return (
             <Badge
               key={flag.key}
-              variant={isActive ? "default" : "outline"}
+              variant={isActive ? 'default' : 'outline'}
               className={cn(
-                "cursor-pointer transition-all text-[10px] px-2 py-1.5",
-                "hover:scale-[1.02] flex items-center gap-1 justify-center",
-                isActive && "bg-primary/10 text-primary border-primary/20"
+                'cursor-pointer transition-all text-[10px] px-2 py-1.5',
+                'hover:scale-[1.02] flex items-center gap-1 justify-center',
+                isActive && 'bg-primary/10 text-primary border-primary/20'
               )}
               onClick={() => flag.onChange(isActive ? undefined : true)}
             >
@@ -113,8 +108,8 @@ export function DetectionFlagsFilter({
             onBlockTradeChange(undefined);
           }}
           className={
-            "text-[10px] text-muted-foreground " +
-            "hover:text-foreground transition-colors"
+            'text-[10px] text-muted-foreground ' +
+            'hover:text-foreground transition-colors'
           }
         >
           Clear all
@@ -123,4 +118,3 @@ export function DetectionFlagsFilter({
     </div>
   );
 }
-

@@ -4,12 +4,12 @@ A comprehensive testing framework to ensure calculation accuracy, tool usage, an
 
 ## Current Coverage
 
-| Phase | Tests | Status |
-|-------|-------|--------|
-| Phase 1: Calculation Tests | 38 | ✅ Complete |
-| Phase 2: Tool Usage Tests | 17 | ✅ Complete |
-| Phase 3: Response Quality | 30 | ✅ Complete |
-| Phase 4: Backtesting | 28 | ✅ Complete |
+| Phase                      | Tests | Status      |
+| -------------------------- | ----- | ----------- |
+| Phase 1: Calculation Tests | 38    | ✅ Complete |
+| Phase 2: Tool Usage Tests  | 17    | ✅ Complete |
+| Phase 3: Response Quality  | 30    | ✅ Complete |
+| Phase 4: Backtesting       | 28    | ✅ Complete |
 
 **Total: 113 tests**
 
@@ -51,12 +51,13 @@ eval/
 
 ### Phase 1: Calculation Accuracy (38 tests)
 
-| Test File | What It Tests |
-|-----------|---------------|
-| `position-analysis.test.ts` | P&L calculations, profit capture %, cushion, breakeven |
-| `spread-recommendations.test.ts` | Spread math, PoP calculation, R/R ratios |
+| Test File                        | What It Tests                                          |
+| -------------------------------- | ------------------------------------------------------ |
+| `position-analysis.test.ts`      | P&L calculations, profit capture %, cushion, breakeven |
+| `spread-recommendations.test.ts` | Spread math, PoP calculation, R/R ratios               |
 
 **Position Analysis Tests:**
+
 - P&L calculations (max profit, current profit, profit captured %)
 - Cushion calculations (above/below short strike)
 - Breakeven calculations
@@ -64,6 +65,7 @@ eval/
 - Edge cases (zero cost, max cost, small spreads)
 
 **Spread Recommendation Tests:**
+
 - Basic spread math (width, debit, max profit)
 - Cushion calculations
 - Return on risk validation
@@ -73,23 +75,25 @@ eval/
 
 ### Phase 2: Tool Usage (17 tests)
 
-| Scenario Type | What It Tests |
-|--------------|---------------|
+| Scenario Type     | What It Tests                                      |
+| ----------------- | -------------------------------------------------- |
 | Position Analysis | Triggers `analyze_position` for existing positions |
-| Ticker Data | Triggers `get_ticker_data` for new inquiries |
-| Spread Requests | Triggers `find_spread` for trade recommendations |
-| News Requests | Triggers `get_news` for news inquiries |
-| Efficiency | Avoids unnecessary tool calls when data exists |
+| Ticker Data       | Triggers `get_ticker_data` for new inquiries       |
+| Spread Requests   | Triggers `find_spread` for trade recommendations   |
+| News Requests     | Triggers `get_news` for news inquiries             |
+| Efficiency        | Avoids unnecessary tool calls when data exists     |
 
 ### Phase 3: Response Quality (30 tests)
 
 **Quality Dimensions** (`response-quality.test.ts`)
+
 - Structure scoring (ticker, price, recommendations, data references)
 - Reasoning scoring (cause-effect, multi-factor, quantitative, scenarios)
 - Risk management scoring (warnings, exits, sizing, cushion, breakeven)
 - Actionability scoring (clear actions, specific levels, timing, confidence)
 
 **Validators**
+
 - Hallucination detection (wrong tickers, unrealistic prices)
 - Position response validation (tool usage, correct calculations)
 
@@ -105,17 +109,20 @@ eval/
 ### Phase 4: Backtesting (28 tests)
 
 **Recommendation Tracking** (`backtest.test.ts`)
+
 - Log recommendations with full context (ticker, price, spread, confidence)
 - Track pending vs closed recommendations
 - Auto-calculate days held
 
 **Outcome Evaluation**
+
 - Price target / stop loss checking
 - Call debit spread evaluation at expiration
 - Partial profit/loss scenarios
 - Auto-detect win/loss/breakeven
 
 **Performance Metrics**
+
 - Win rate, profit factor, total P&L
 - Average win/loss amounts
 - Average holding period
@@ -124,22 +131,28 @@ eval/
 - Sharpe ratio calculation
 
 **Usage Example:**
+
 ```typescript
-import { logRecommendation, recordOutcome, calculateMetrics, formatMetricsReport } from "./lib/backtest.ts";
+import {
+  logRecommendation,
+  recordOutcome,
+  calculateMetrics,
+  formatMetricsReport,
+} from './lib/backtest.ts';
 
 // Log a recommendation
 const rec = logRecommendation({
-  ticker: "NVDA",
+  ticker: 'NVDA',
   priceAtRecommendation: 188.61,
-  recommendation: "BULLISH",
+  recommendation: 'BULLISH',
   spread: {
-    type: "CALL_DEBIT",
+    type: 'CALL_DEBIT',
     longStrike: 185,
     shortStrike: 190,
-    expiration: "2024-02-16",
-    estimatedDebit: 3.80,
-    estimatedMaxProfit: 1.20,
-    breakeven: 188.80,
+    expiration: '2024-02-16',
+    estimatedDebit: 3.8,
+    estimatedMaxProfit: 1.2,
+    breakeven: 188.8,
     pop: 65,
   },
   confidence: 75,
@@ -147,10 +160,10 @@ const rec = logRecommendation({
 
 // Later, record the outcome
 recordOutcome(rec.id, {
-  status: "WIN",
+  status: 'WIN',
   closedAt: new Date().toISOString(),
   priceAtClose: 195,
-  actualProfit: 1.20,
+  actualProfit: 1.2,
 });
 
 // Generate performance report
@@ -159,6 +172,7 @@ console.log(formatMetricsReport(metrics));
 ```
 
 **Sample Report Output:**
+
 ```
 📊 BACKTEST PERFORMANCE REPORT
 ══════════════════════════════════════════════════
@@ -217,7 +231,7 @@ Position Value Capture ≠ Profit Capture
 ### Calculation Tests
 
 ```typescript
-test("New calculation scenario", () => {
+test('New calculation scenario', () => {
   const result = calculateMetrics({
     // ... input params
   });

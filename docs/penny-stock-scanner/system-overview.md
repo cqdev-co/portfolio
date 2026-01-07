@@ -9,6 +9,7 @@ The Penny Stock Scanner is a professional-grade CLI service that identifies penn
 ### Why Volume-Focused?
 
 Traditional technical analysis relies heavily on indicators like RSI, MACD, and chart patterns. These work well for large-cap stocks but **fail consistently on penny stocks** due to:
+
 - Erratic price action with low volume days
 - Limited trading history creating false signals
 - Susceptibility to manipulation
@@ -55,6 +56,7 @@ overall_score = (
 ### Component Breakdown
 
 #### 1. Volume Analysis (50%)
+
 **Why dominant**: Penny stocks don't move without volume. This is the #1 predictor.
 
 - **Relative Volume Surge (20%)**:
@@ -80,6 +82,7 @@ overall_score = (
   - $200k+ = 0.6 score
 
 #### 2. Price Momentum & Consolidation (30%)
+
 **Why important**: Timing the breakout from consolidation is key.
 
 - **Consolidation Detection (12%)**:
@@ -102,6 +105,7 @@ overall_score = (
   - Confirms trend direction
 
 #### 3. Relative Strength (15%)
+
 **Why matters**: Want stocks showing strength when market is weak.
 
 - **Market Outperformance (8%)**:
@@ -118,6 +122,7 @@ overall_score = (
   - Breaking resistance = bonus points
 
 #### 4. Risk & Liquidity (5%)
+
 **Why critical**: Ensures tradability and filters pump-and-dumps.
 
 - **Bid-Ask Spread (2%)**:
@@ -136,6 +141,7 @@ overall_score = (
 ## Pre-Scan Filters
 
 Before scoring, signals must pass:
+
 - ✅ Price: $0.10 - $5.00
 - ✅ Volume: >200,000 shares/day
 - ✅ Dollar Volume: >$100,000/day
@@ -143,13 +149,13 @@ Before scoring, signals must pass:
 
 ## Opportunity Ranking
 
-| Rank | Score Range | Description | Action |
-|------|------------|-------------|---------|
-| S-Tier | ≥0.90 | Exceptional setup | Strong buy consideration |
-| A-Tier | ≥0.80 | Excellent signal | Buy consideration |
-| B-Tier | ≥0.70 | Solid opportunity | Watch/accumulate |
-| C-Tier | ≥0.60 | Fair signal | Monitor |
-| D-Tier | <0.60 | Weak (filtered out) | Ignore |
+| Rank   | Score Range | Description         | Action                   |
+| ------ | ----------- | ------------------- | ------------------------ |
+| S-Tier | ≥0.90       | Exceptional setup   | Strong buy consideration |
+| A-Tier | ≥0.80       | Excellent signal    | Buy consideration        |
+| B-Tier | ≥0.70       | Solid opportunity   | Watch/accumulate         |
+| C-Tier | ≥0.60       | Fair signal         | Monitor                  |
+| D-Tier | <0.60       | Weak (filtered out) | Ignore                   |
 
 ## Architecture
 
@@ -212,6 +218,7 @@ penny-stock-scanner/
 ### Database Schema
 
 **penny_stock_signals** table stores:
+
 - Overall scores and component scores
 - Volume metrics (all volume-related data)
 - Momentum metrics (consolidation, breakout, price changes)
@@ -220,6 +227,7 @@ penny-stock-scanner/
 - Risk management (stop loss, position size)
 
 **Indexes** for fast querying:
+
 - symbol, scan_date (composite)
 - overall_score (DESC)
 - opportunity_rank
@@ -228,11 +236,13 @@ penny-stock-scanner/
 ## Risk Management
 
 ### Stop Loss Calculation
+
 - ATR-based: `stop_loss = price - (ATR * 2.0)`
 - Maximum 15% down from entry
 - Adaptive based on volatility
 
 ### Position Sizing
+
 - Scales with signal quality:
   - S-Tier (≥0.90): 8% of capital
   - A-Tier (≥0.80): 6.8% of capital
@@ -240,6 +250,7 @@ penny-stock-scanner/
   - C-Tier (≥0.60): 4% of capital
 
 ### Risk Warnings
+
 - **Pump-and-Dump Detection**: Flags extreme single-day moves (>30-50%)
 - **Liquidity Checks**: Ensures tradability with dollar volume minimums
 - **Float Analysis**: Identifies low float (high risk, high reward)
@@ -247,12 +258,14 @@ penny-stock-scanner/
 ## Performance Considerations
 
 ### Scanning Speed
+
 - **Target**: Scan 2000+ penny stocks in <15 minutes
 - **Concurrency**: 10 concurrent API requests (respects rate limits)
 - **Batch Processing**: Efficient bulk operations
 - **Caching**: YFinance data cached (configurable TTL)
 
 ### Data Quality
+
 - **Completeness**: Requires 50+ days of data
 - **Recency**: Flags stale data (>3 days old)
 - **Validation**: NaN/null checks on all indicators
@@ -261,11 +274,13 @@ penny-stock-scanner/
 ## Success Metrics
 
 Scan Quality:
+
 - Signal Rate: 1-3% of scanned symbols (20-60 signals per 2000 stocks)
 - S/A-Tier Rate: 10-20% of all signals
 - Data Retrieval: >90% success rate
 
 Signal Quality:
+
 - Average Score: 0.70-0.80 for identified signals
 - Volume Confirmation: 100% of signals have >1.5x volume
 - Breakout Rate: 30-50% actively breaking out
@@ -273,6 +288,7 @@ Signal Quality:
 ## Future Enhancements
 
 ### Phase 2 Features
+
 1. **ML Signal Ranking**: Train model on historical performance
 2. **Catalyst Detection**: News API integration (earnings, FDA, etc.)
 3. **Pattern Recognition**: Chart patterns (cup-and-handle, flags)
@@ -282,6 +298,7 @@ Signal Quality:
 7. **Sector Data**: Sector leadership scoring
 
 ### Backtesting
+
 - Historical signal validation
 - Win rate tracking
 - Average return analysis
@@ -290,12 +307,14 @@ Signal Quality:
 ## Limitations
 
 ### Strategy Limitations
+
 - **No Catalyst Detection**: Currently no news/earnings analysis
 - **No SPY Data**: Market outperformance not yet calculated
 - **No Bid/Ask Data**: Spread analysis placeholder
 - **Volume Focus**: May miss low-volume accumulation setups
 
 ### Technical Limitations
+
 - **Rate Limits**: YFinance API has limits (handled with delays)
 - **Data Availability**: Some penny stocks have limited historical data
 - **Real-time**: Daily data only (no intraday analysis)
@@ -304,6 +323,7 @@ Signal Quality:
 ## Best Practices
 
 ### For Traders
+
 1. **Paper Trade First**: Test strategy before risking capital
 2. **Start Small**: Begin with minimal position sizes
 3. **Use Stop Losses**: Always use calculated stop levels
@@ -311,9 +331,9 @@ Signal Quality:
 5. **Track Performance**: Monitor your own results
 
 ### For Developers
+
 1. **Respect Rate Limits**: API delays are intentional
 2. **Validate Data**: Always check data quality scores
 3. **Update Regularly**: Keep ticker database fresh
 4. **Monitor Logs**: Check for errors and warnings
 5. **Test Changes**: Validate scoring changes with historical data
-

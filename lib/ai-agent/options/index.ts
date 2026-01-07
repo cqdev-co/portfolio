@@ -1,6 +1,6 @@
 /**
  * Options Module
- * 
+ *
  * Real options chain analysis shared between CLI and Frontend.
  * Uses actual Yahoo Finance options data for accurate:
  * - IV (from ATM options)
@@ -22,4 +22,3 @@ export type {
 export { getOptionsChain } from './chain';
 export { getIVAnalysis } from './iv';
 export { findOptimalSpread, findSpreadWithAlternatives } from './spreads';
-

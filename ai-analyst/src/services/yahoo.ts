@@ -3,10 +3,10 @@
  * Fetches options chains, earnings dates, and enhanced ticker data
  */
 
-import YahooFinance from "yahoo-finance2";
+import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance({
-  suppressNotices: ["yahooSurvey", "rippiReport"],
+  suppressNotices: ['yahooSurvey'],
   validation: {
     logErrors: false,
     logOptionsErrors: false,
@@ -45,17 +45,17 @@ export interface SpreadRecommendation {
   estimatedDebit: number;
   maxProfit: number;
   breakeven: number;
-  cushion: number;  // Distance from current price to breakeven as %
-  longDelta: number;  // Approximate based on ITM %
-  returnOnRisk: number;  // Max profit / debit as percentage
-  spreadWidth: number;  // Width between strikes
-  pop?: number;  // Probability of Profit (0-100%)
+  cushion: number; // Distance from current price to breakeven as %
+  longDelta: number; // Approximate based on ITM %
+  returnOnRisk: number; // Max profit / debit as percentage
+  spreadWidth: number; // Width between strikes
+  pop?: number; // Probability of Profit (0-100%)
 }
 
 export interface SpreadAlternatives {
   primary: SpreadRecommendation | null;
   alternatives: SpreadRecommendation[];
-  reason?: string;  // Why alternatives are suggested
+  reason?: string; // Why alternatives are suggested
 }
 
 export interface DataQuality {
@@ -81,18 +81,19 @@ export interface MarketStatus {
  * Accurate to ~1.5 x 10^-7
  */
 function normalCDF(x: number): number {
-  const a1 =  0.254829592;
+  const a1 = 0.254829592;
   const a2 = -0.284496736;
-  const a3 =  1.421413741;
+  const a3 = 1.421413741;
   const a4 = -1.453152027;
-  const a5 =  1.061405429;
-  const p  =  0.3275911;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
 
   const sign = x < 0 ? -1 : 1;
   x = Math.abs(x) / Math.sqrt(2);
 
   const t = 1.0 / (1.0 + p * x);
-  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  const y =
+    1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
 
   return 0.5 * (1.0 + sign * y);
 }
@@ -100,30 +101,35 @@ function normalCDF(x: number): number {
 /**
  * Calculate Probability of Profit for a call debit spread
  * Uses Black-Scholes-inspired approximation with IV
- * 
+ *
  * @param currentPrice - Current underlying price
  * @param breakeven - Breakeven price (need price > this for profit)
  * @param iv - Implied volatility as decimal (e.g., 0.35 for 35%)
  * @param dte - Days to expiration
  * @returns Probability of profit as percentage (0-100)
  */
-function calculatePoP(currentPrice: number, breakeven: number, iv: number, dte: number): number {
+function calculatePoP(
+  currentPrice: number,
+  breakeven: number,
+  iv: number,
+  dte: number
+): number {
   if (iv <= 0 || dte <= 0) {
     // If no IV or DTE, use simple cushion-based estimate
     return currentPrice > breakeven ? 75 : 25;
   }
-  
+
   // Convert DTE to years
   const T = dte / 365;
-  
+
   // Z-score: how many standard deviations is breakeven from current price
   // For lognormal distribution: ln(currentPrice/breakeven) / (IV * sqrt(T))
   const z = Math.log(currentPrice / breakeven) / (iv * Math.sqrt(T));
-  
+
   // Probability that price will be above breakeven at expiration
   // This is N(z) where N is the cumulative normal distribution
   const pop = normalCDF(z) * 100;
-  
+
   // Clamp between reasonable bounds
   return Math.min(95, Math.max(5, Math.round(pop)));
 }
@@ -135,21 +141,25 @@ function calculatePoP(currentPrice: number, breakeven: number, iv: number, dte: 
 /**
  * Check if market data is stale (weekend/after-hours)
  */
-export function checkDataStaleness(regularMarketTime?: Date | number): DataQuality {
+export function checkDataStaleness(
+  regularMarketTime?: Date | number
+): DataQuality {
   if (!regularMarketTime) {
     return { isStale: false };
   }
-  
-  const marketTime = typeof regularMarketTime === 'number' 
-    ? new Date(regularMarketTime * 1000) 
-    : regularMarketTime;
-  
-  const hoursSinceUpdate = (Date.now() - marketTime.getTime()) / (1000 * 60 * 60);
-  
+
+  const marketTime =
+    typeof regularMarketTime === 'number'
+      ? new Date(regularMarketTime * 1000)
+      : regularMarketTime;
+
+  const hoursSinceUpdate =
+    (Date.now() - marketTime.getTime()) / (1000 * 60 * 60);
+
   // Weekend check
   const dayOfWeek = new Date().getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  
+
   if (hoursSinceUpdate > 48 || (isWeekend && hoursSinceUpdate > 16)) {
     return {
       isStale: true,
@@ -163,7 +173,7 @@ export function checkDataStaleness(regularMarketTime?: Date | number): DataQuali
       warning: '⚠️ Weekend/after-hours data - prices from last trading session',
     };
   }
-  
+
   return { isStale: false, staleHours: Math.round(hoursSinceUpdate) };
 }
 
@@ -172,11 +182,14 @@ export function checkDataStaleness(regularMarketTime?: Date | number): DataQuali
  */
 export function validateIV(iv: number): { valid: boolean; warning?: string } {
   // IV should be between 10% and 200% for most stocks
-  if (iv < 0.10) {
+  if (iv < 0.1) {
     return { valid: false, warning: 'IV data appears invalid (too low)' };
   }
   if (iv > 2.0) {
-    return { valid: false, warning: 'IV data appears invalid (extremely high)' };
+    return {
+      valid: false,
+      warning: 'IV data appears invalid (extremely high)',
+    };
   }
   return { valid: true };
 }
@@ -188,20 +201,22 @@ export function validateIV(iv: number): { valid: boolean; warning?: string } {
 export function getMarketStatus(): MarketStatus {
   const now = new Date();
   const dayOfWeek = now.getDay();
-  
+
   // Get current time in ET
-  const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const etTime = new Date(
+    now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+  );
   const hour = etTime.getHours();
   const minute = etTime.getMinutes();
   const timeInMinutes = hour * 60 + minute;
-  
+
   // Weekend
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     const daysUntilMonday = dayOfWeek === 0 ? 1 : 2;
     const nextOpen = new Date(now);
     nextOpen.setDate(nextOpen.getDate() + daysUntilMonday);
     nextOpen.setHours(9, 30, 0, 0);
-    
+
     return {
       isOpen: false,
       status: 'CLOSED',
@@ -209,16 +224,16 @@ export function getMarketStatus(): MarketStatus {
       warning: '📅 Weekend - Markets closed. Data is from Friday close.',
     };
   }
-  
-  const marketOpen = 9 * 60 + 30;   // 9:30 AM
-  const marketClose = 16 * 60;       // 4:00 PM
-  const preMarketStart = 4 * 60;     // 4:00 AM
-  const afterHoursEnd = 20 * 60;     // 8:00 PM
-  
+
+  const marketOpen = 9 * 60 + 30; // 9:30 AM
+  const marketClose = 16 * 60; // 4:00 PM
+  const preMarketStart = 4 * 60; // 4:00 AM
+  const afterHoursEnd = 20 * 60; // 8:00 PM
+
   if (timeInMinutes >= marketOpen && timeInMinutes < marketClose) {
     return { isOpen: true, status: 'OPEN' };
   }
-  
+
   if (timeInMinutes >= preMarketStart && timeInMinutes < marketOpen) {
     return {
       isOpen: false,
@@ -226,7 +241,7 @@ export function getMarketStatus(): MarketStatus {
       warning: '🌅 Pre-market session - Limited liquidity, wider spreads.',
     };
   }
-  
+
   if (timeInMinutes >= marketClose && timeInMinutes < afterHoursEnd) {
     return {
       isOpen: false,
@@ -234,14 +249,14 @@ export function getMarketStatus(): MarketStatus {
       warning: '🌙 After-hours - Limited liquidity, prices may gap at open.',
     };
   }
-  
+
   // Overnight
   const nextOpen = new Date(now);
   if (timeInMinutes >= afterHoursEnd) {
     nextOpen.setDate(nextOpen.getDate() + 1);
   }
   nextOpen.setHours(9, 30, 0, 0);
-  
+
   return {
     isOpen: false,
     status: 'CLOSED',
@@ -253,12 +268,12 @@ export function getMarketStatus(): MarketStatus {
 export interface EarningsInfo {
   nextEarningsDate: Date | null;
   daysUntilEarnings: number | null;
-  withinEarningsWindow: boolean;  // Within 14 days
+  withinEarningsWindow: boolean; // Within 14 days
 }
 
 export interface IVAnalysis {
-  currentIV: number;           // Current implied volatility (ATM average)
-  ivPercentile: number;        // Where current IV sits vs historical (0-100)
+  currentIV: number; // Current implied volatility (ATM average)
+  ivPercentile: number; // Where current IV sits vs historical (0-100)
   ivLevel: 'LOW' | 'NORMAL' | 'ELEVATED' | 'HIGH';
   recommendation: string;
 }
@@ -272,9 +287,17 @@ export interface SupportResistance {
 
 export interface PriceLevel {
   price: number;
-  type: 'MA20' | 'MA50' | 'MA200' | 'ROUND' | 'RECENT_LOW' | 'RECENT_HIGH' | '52W_LOW' | '52W_HIGH';
+  type:
+    | 'MA20'
+    | 'MA50'
+    | 'MA200'
+    | 'ROUND'
+    | 'RECENT_LOW'
+    | 'RECENT_HIGH'
+    | '52W_LOW'
+    | '52W_HIGH';
   strength: 'WEAK' | 'MODERATE' | 'STRONG';
-  distance: number;  // % from current price
+  distance: number; // % from current price
 }
 
 // ============================================================================
@@ -436,23 +459,23 @@ export async function findOptimalSpread(
   // Calculate spread metrics
   const spreadWidth = shortCall.strike - longCall.strike;
   let estimatedDebit = longCall.mid - shortCall.mid;
-  
+
   // If debit is 0, negative, or exceeds spread width (bad data), estimate properly
   if (estimatedDebit <= 0 || estimatedDebit >= spreadWidth) {
     // For deep ITM spreads, debit should be close to (but less than) spread width
     // Estimate: ~80-90% of spread width for deep ITM calls
     const itmPercent = (underlyingPrice - longCall.strike) / underlyingPrice;
-    const estimatedDebitRatio = 0.75 + (itmPercent * 0.2); // 75-95% based on ITM depth
+    const estimatedDebitRatio = 0.75 + itmPercent * 0.2; // 75-95% based on ITM depth
     estimatedDebit = spreadWidth * Math.min(0.95, estimatedDebitRatio);
   }
-  
+
   const maxProfit = spreadWidth - estimatedDebit;
   const breakeven = longCall.strike + estimatedDebit;
   const cushion = ((underlyingPrice - breakeven) / underlyingPrice) * 100;
 
   // VALIDATION: Reject spreads with poor risk/reward (< 10% return)
   const returnOnRisk = maxProfit / estimatedDebit;
-  if (returnOnRisk < 0.10) {
+  if (returnOnRisk < 0.1) {
     // This spread has terrible risk/reward, try to find a better one
     // or return null if none found
     return null;
@@ -460,10 +483,10 @@ export async function findOptimalSpread(
 
   // Approximate delta based on how deep ITM
   const itmPercent = (underlyingPrice - longCall.strike) / underlyingPrice;
-  const longDelta = Math.min(0.95, 0.50 + itmPercent * 3); // Rough approximation
+  const longDelta = Math.min(0.95, 0.5 + itmPercent * 3); // Rough approximation
 
   // Calculate Probability of Profit using IV from the long call
-  const iv = longCall.impliedVolatility || 0.30; // Default to 30% if not available
+  const iv = longCall.impliedVolatility || 0.3; // Default to 30% if not available
   const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
 
   return {
@@ -476,7 +499,7 @@ export async function findOptimalSpread(
     breakeven: Math.round(breakeven * 100) / 100,
     cushion: Math.round(cushion * 10) / 10,
     longDelta: Math.round(longDelta * 100) / 100,
-    returnOnRisk: Math.round(returnOnRisk * 1000) / 10,  // As percentage
+    returnOnRisk: Math.round(returnOnRisk * 1000) / 10, // As percentage
     spreadWidth,
     pop,
   };
@@ -490,26 +513,26 @@ export interface SpreadSelectionContext {
   // Support/Resistance levels
   supports?: { price: number; strength: 'WEAK' | 'MODERATE' | 'STRONG' }[];
   resistances?: { price: number; strength: 'WEAK' | 'MODERATE' | 'STRONG' }[];
-  
+
   // Moving averages
   ma20?: number;
   ma50?: number;
   ma200?: number;
-  
+
   // Psychological Fair Value
   pfv?: number;
   pfvBias?: 'BULLISH' | 'NEUTRAL' | 'BEARISH';
-  
+
   // Options-based levels
   maxPain?: number;
-  putWalls?: number[];  // Strong put OI strikes (support)
+  putWalls?: number[]; // Strong put OI strikes (support)
   callWalls?: number[]; // Strong call OI strikes (resistance)
 }
 
 /**
  * Find optimal spread WITH alternatives for different budgets
  * Returns primary recommendation plus smaller/larger alternatives
- * 
+ *
  * IMPROVED: Prioritizes FILLABLE spreads with good liquidity AND technical alignment
  * - Filters by open interest (min 50 OI on both legs)
  * - Uses realistic pricing (ask for long, bid for short)
@@ -519,8 +542,8 @@ export interface SpreadSelectionContext {
 export async function findSpreadWithAlternatives(
   symbol: string,
   targetDTE: number = 30,
-  maxDebit?: number,  // Max debit budget (e.g., $300 for position limit)
-  context?: SpreadSelectionContext  // Technical context for smarter selection
+  maxDebit?: number, // Max debit budget (e.g., $300 for position limit)
+  context?: SpreadSelectionContext // Technical context for smarter selection
 ): Promise<SpreadAlternatives> {
   const chain = await getOptionsChain(symbol, targetDTE);
   if (!chain || chain.calls.length === 0) {
@@ -531,12 +554,12 @@ export async function findSpreadWithAlternatives(
   const sortedCalls = [...calls].sort((a, b) => a.strike - b.strike);
 
   // Minimum liquidity thresholds
-  const MIN_OI = 50;  // Minimum open interest for fillable strikes
-  const MIN_VOLUME_PREFERRED = 10;  // Prefer strikes with recent volume
+  const MIN_OI = 50; // Minimum open interest for fillable strikes
+  const MIN_VOLUME_PREFERRED = 10; // Prefer strikes with recent volume
 
   // Find spreads with different widths: $2.50, $5, $10
   const widths = [2.5, 5, 10];
-  const allSpreads: (SpreadRecommendation & { 
+  const allSpreads: (SpreadRecommendation & {
     liquidityScore: number;
     bidAskScore: number;
     totalScore: number;
@@ -545,12 +568,12 @@ export async function findSpreadWithAlternatives(
   for (const width of widths) {
     // IMPROVED: Looser ITM range (3-10% ITM) for better liquidity
     // Deep ITM (>10%) has terrible liquidity on most stocks
-    const minITM = underlyingPrice * 0.90;  // 10% ITM max
-    const maxITM = underlyingPrice * 0.97;  // 3% ITM min
+    const minITM = underlyingPrice * 0.9; // 10% ITM max
+    const maxITM = underlyingPrice * 0.97; // 3% ITM min
 
     for (const longCall of sortedCalls) {
       if (longCall.strike < minITM || longCall.strike > maxITM) continue;
-      if (longCall.strike >= underlyingPrice) continue;  // Must be ITM
+      if (longCall.strike >= underlyingPrice) continue; // Must be ITM
 
       // IMPROVED: Skip strikes with low open interest
       if (longCall.openInterest < MIN_OI) continue;
@@ -558,7 +581,7 @@ export async function findSpreadWithAlternatives(
       // Find matching short strike
       const targetShort = longCall.strike + width;
       const shortCall = sortedCalls.find(
-        c => Math.abs(c.strike - targetShort) < 0.5
+        (c) => Math.abs(c.strike - targetShort) < 0.5
       );
       if (!shortCall) continue;
 
@@ -579,64 +602,75 @@ export async function findSpreadWithAlternatives(
         estimatedDebit = longCall.mid - shortCall.mid;
         if (estimatedDebit <= 0 || estimatedDebit >= spreadWidth) {
           const itmPct = (underlyingPrice - longCall.strike) / underlyingPrice;
-          const ratio = 0.75 + (itmPct * 0.2);
+          const ratio = 0.75 + itmPct * 0.2;
           estimatedDebit = spreadWidth * Math.min(0.95, ratio);
         }
       }
 
       const maxProfit = spreadWidth - estimatedDebit;
       const returnOnRisk = maxProfit / estimatedDebit;
-      
+
       // Skip poor risk/reward
-      if (returnOnRisk < 0.10) continue;
+      if (returnOnRisk < 0.1) continue;
 
       const breakeven = longCall.strike + estimatedDebit;
       const cushion = ((underlyingPrice - breakeven) / underlyingPrice) * 100;
-      
+
       // Skip if cushion is too low (< 2%)
       if (cushion < 2) continue;
 
       const itmPct = (underlyingPrice - longCall.strike) / underlyingPrice;
-      const longDelta = Math.min(0.95, 0.50 + itmPct * 3);
+      const longDelta = Math.min(0.95, 0.5 + itmPct * 3);
 
       // IMPROVED: Calculate liquidity score
       const avgOI = (longCall.openInterest + shortCall.openInterest) / 2;
       const avgVolume = (longCall.volume + shortCall.volume) / 2;
-      const liquidityScore = Math.min(100, (avgOI / 500) * 50 + (avgVolume / 100) * 50);
+      const liquidityScore = Math.min(
+        100,
+        (avgOI / 500) * 50 + (avgVolume / 100) * 50
+      );
 
       // IMPROVED: Calculate bid-ask tightness score
-      const longSpread = longCall.ask > 0 && longCall.bid > 0 
-        ? (longCall.ask - longCall.bid) / longCall.mid 
-        : 0.1;
-      const shortSpread = shortCall.ask > 0 && shortCall.bid > 0
-        ? (shortCall.ask - shortCall.bid) / shortCall.mid
-        : 0.1;
+      const longSpread =
+        longCall.ask > 0 && longCall.bid > 0
+          ? (longCall.ask - longCall.bid) / longCall.mid
+          : 0.1;
+      const shortSpread =
+        shortCall.ask > 0 && shortCall.bid > 0
+          ? (shortCall.ask - shortCall.bid) / shortCall.mid
+          : 0.1;
       const avgBidAskPct = (longSpread + shortSpread) / 2;
-      const bidAskScore = Math.max(0, 100 - avgBidAskPct * 500);  // Tighter = higher score
+      const bidAskScore = Math.max(0, 100 - avgBidAskPct * 500); // Tighter = higher score
 
       // NEW: Calculate technical alignment score based on context
-      let technicalScore = 50;  // Neutral baseline
-      
+      let technicalScore = 50; // Neutral baseline
+
       if (context) {
         // Support Level Score: Bonus if breakeven is below key support levels
         if (context.supports && context.supports.length > 0) {
-          const supportsBelow = context.supports.filter(s => s.price > breakeven);
+          const supportsBelow = context.supports.filter(
+            (s) => s.price > breakeven
+          );
           if (supportsBelow.length > 0) {
             // More supports above breakeven = better protection
-            const strongSupports = supportsBelow.filter(s => s.strength === 'STRONG').length;
-            const moderateSupports = supportsBelow.filter(s => s.strength === 'MODERATE').length;
+            const strongSupports = supportsBelow.filter(
+              (s) => s.strength === 'STRONG'
+            ).length;
+            const moderateSupports = supportsBelow.filter(
+              (s) => s.strength === 'MODERATE'
+            ).length;
             technicalScore += strongSupports * 15 + moderateSupports * 8;
           }
         }
-        
+
         // MA Score: Bonus if breakeven is below moving averages
         if (context.ma20 && breakeven < context.ma20) technicalScore += 10;
         if (context.ma50 && breakeven < context.ma50) technicalScore += 12;
         if (context.ma200 && breakeven < context.ma200) technicalScore += 15;
-        
+
         // PFV Score: Bonus if stock is at/below fair value with bullish bias
         if (context.pfv && context.pfvBias === 'BULLISH') {
-          const pfvDiff = (underlyingPrice - context.pfv) / context.pfv * 100;
+          const pfvDiff = ((underlyingPrice - context.pfv) / context.pfv) * 100;
           if (pfvDiff <= 0) {
             // Stock below PFV = bullish tailwind, bonus points
             technicalScore += 15;
@@ -645,36 +679,43 @@ export async function findSpreadWithAlternatives(
             technicalScore += 8;
           }
         }
-        
+
         // Put Wall Score: Bonus if there's a put wall above breakeven (protection)
         if (context.putWalls && context.putWalls.length > 0) {
-          const wallsAboveBreakeven = context.putWalls.filter(w => w > breakeven);
+          const wallsAboveBreakeven = context.putWalls.filter(
+            (w) => w > breakeven
+          );
           if (wallsAboveBreakeven.length > 0) {
             // Closest put wall protection
             const closestWall = Math.min(...wallsAboveBreakeven);
-            const wallCushion = ((closestWall - breakeven) / underlyingPrice) * 100;
+            const wallCushion =
+              ((closestWall - breakeven) / underlyingPrice) * 100;
             if (wallCushion > 0) {
-              technicalScore += Math.min(20, wallCushion * 4);  // Up to 20 pts
+              technicalScore += Math.min(20, wallCushion * 4); // Up to 20 pts
             }
           }
         }
-        
+
         // Max Pain Score: Slight bonus if breakeven is below max pain
         if (context.maxPain && breakeven < context.maxPain) {
           technicalScore += 5;
         }
       }
-      
+
       // Cap technical score at 100
       technicalScore = Math.min(100, technicalScore);
 
       // IMPROVED: Composite score with technical factors
       // Weights: Cushion 30%, Liquidity 25%, Bid-Ask 15%, Technical 30%
-      const cushionScore = Math.min(100, cushion * 10);  // 10% cushion = 100
-      const totalScore = (cushionScore * 0.30) + (liquidityScore * 0.25) + (bidAskScore * 0.15) + (technicalScore * 0.30);
+      const cushionScore = Math.min(100, cushion * 10); // 10% cushion = 100
+      const totalScore =
+        cushionScore * 0.3 +
+        liquidityScore * 0.25 +
+        bidAskScore * 0.15 +
+        technicalScore * 0.3;
 
       // Calculate Probability of Profit using IV from the long call
-      const iv = longCall.impliedVolatility || 0.30; // Default to 30% if not available
+      const iv = longCall.impliedVolatility || 0.3; // Default to 30% if not available
       const pop = calculatePoP(underlyingPrice, breakeven, iv, dte);
 
       allSpreads.push({
@@ -705,31 +746,40 @@ export async function findSpreadWithAlternatives(
   allSpreads.sort((a, b) => b.totalScore - a.totalScore);
 
   // Find primary (best overall score with $5 width preferred)
-  let primary = allSpreads.find(s => s.spreadWidth === 5 && s.totalScore >= allSpreads[0].totalScore - 10) 
-    ?? allSpreads[0];
+  let primary =
+    allSpreads.find(
+      (s) =>
+        s.spreadWidth === 5 && s.totalScore >= allSpreads[0].totalScore - 10
+    ) ?? allSpreads[0];
   let reason: string | undefined;
 
   // If maxDebit specified and primary exceeds it, find cheaper alternative
   if (maxDebit && primary.estimatedDebit * 100 > maxDebit) {
     const affordable = allSpreads.filter(
-      s => s.estimatedDebit * 100 <= maxDebit
+      (s) => s.estimatedDebit * 100 <= maxDebit
     );
     if (affordable.length > 0) {
       const newPrimary = affordable[0];
-      reason = `$${primary.longStrike}/$${primary.shortStrike} costs `
-        + `$${(primary.estimatedDebit * 100).toFixed(0)} (exceeds `
-        + `$${maxDebit} limit). Suggesting $${newPrimary.spreadWidth} `
-        + `wide spread instead.`;
+      reason =
+        `$${primary.longStrike}/$${primary.shortStrike} costs ` +
+        `$${(primary.estimatedDebit * 100).toFixed(0)} (exceeds ` +
+        `$${maxDebit} limit). Suggesting $${newPrimary.spreadWidth} ` +
+        `wide spread instead.`;
       primary = newPrimary;
     } else {
-      reason = `All spreads exceed $${maxDebit} budget. Consider `
-        + `waiting for pullback or reducing DTE.`;
+      reason =
+        `All spreads exceed $${maxDebit} budget. Consider ` +
+        `waiting for pullback or reducing DTE.`;
     }
   }
 
   // Get alternatives (different strikes/widths with good scores)
   const alternatives = allSpreads
-    .filter(s => s.longStrike !== primary.longStrike || s.spreadWidth !== primary.spreadWidth)
+    .filter(
+      (s) =>
+        s.longStrike !== primary.longStrike ||
+        s.spreadWidth !== primary.spreadWidth
+    )
     .slice(0, 2);
 
   return { primary, alternatives, reason };
@@ -745,7 +795,7 @@ export async function findSpreadWithAlternatives(
 export async function getEarningsInfo(symbol: string): Promise<EarningsInfo> {
   try {
     const summary = await yahooFinance.quoteSummary(symbol, {
-      modules: ["calendarEvents"],
+      modules: ['calendarEvents'],
     });
 
     const earningsDates = summary?.calendarEvents?.earnings?.earningsDate;
@@ -759,13 +809,13 @@ export async function getEarningsInfo(symbol: string): Promise<EarningsInfo> {
 
     // Try both dates if available (earnings dates are often a range)
     const now = new Date();
-    
+
     for (const dateVal of earningsDates) {
       const earningsDate = new Date(dateVal);
       const daysUntil = Math.ceil(
         (earningsDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
-      
+
       // Only return future earnings (positive days)
       if (daysUntil > 0) {
         return {
@@ -775,7 +825,7 @@ export async function getEarningsInfo(symbol: string): Promise<EarningsInfo> {
         };
       }
     }
-    
+
     // All earnings dates are in the past - no upcoming earnings known
     return {
       nextEarningsDate: null,
@@ -796,9 +846,9 @@ export async function getEarningsInfo(symbol: string): Promise<EarningsInfo> {
 // ============================================================================
 
 export interface EarningsHistoryData {
-  averageMove: number;         // Average % move on earnings day
-  averageSurprise: number;     // Average EPS surprise %
-  beatRate: number;            // % of times beat estimates
+  averageMove: number; // Average % move on earnings day
+  averageSurprise: number; // Average EPS surprise %
+  beatRate: number; // % of times beat estimates
   recentReactions: {
     date: Date;
     actualEps: number;
@@ -819,7 +869,7 @@ export async function getEarningsHistory(
 ): Promise<EarningsHistoryData | null> {
   try {
     const summary = await yahooFinance.quoteSummary(symbol, {
-      modules: ["earningsHistory", "earningsTrend"],
+      modules: ['earningsHistory', 'earningsTrend'],
     });
 
     const earningsHistory = summary?.earningsHistory?.history;
@@ -829,7 +879,7 @@ export async function getEarningsHistory(
 
     // Calculate metrics from earnings history
     const recentEarnings = earningsHistory.slice(0, 8); // Last 8 quarters
-    
+
     let totalSurprise = 0;
     let beats = 0;
     const recentReactions: EarningsHistoryData['recentReactions'] = [];
@@ -837,13 +887,19 @@ export async function getEarningsHistory(
     for (const earning of recentEarnings) {
       const actual = earning.epsActual;
       const estimated = earning.epsEstimate;
-      
-      if (actual !== undefined && estimated !== undefined && estimated !== 0) {
+
+      if (
+        actual !== undefined &&
+        actual !== null &&
+        estimated !== undefined &&
+        estimated !== null &&
+        estimated !== 0
+      ) {
         const surprise = ((actual - estimated) / Math.abs(estimated)) * 100;
         totalSurprise += surprise;
-        
+
         if (actual > estimated) beats++;
-        
+
         recentReactions.push({
           date: new Date(earning.quarter ?? Date.now()),
           actualEps: actual,
@@ -853,24 +909,27 @@ export async function getEarningsHistory(
       }
     }
 
-    const avgSurprise = recentEarnings.length > 0 
-      ? totalSurprise / recentEarnings.length 
-      : 0;
-    const beatRate = recentEarnings.length > 0 
-      ? (beats / recentEarnings.length) * 100 
-      : 50;
+    const avgSurprise =
+      recentEarnings.length > 0 ? totalSurprise / recentEarnings.length : 0;
+    const beatRate =
+      recentEarnings.length > 0 ? (beats / recentEarnings.length) * 100 : 50;
 
     // Estimate average move (typically 3-8% for most stocks)
     // Stocks with higher surprise variance tend to move more
-    const surpriseVariance = recentReactions.reduce((sum, r) => 
-      sum + Math.pow(r.surprise - avgSurprise, 2), 0
-    ) / Math.max(1, recentReactions.length);
-    const avgMove = Math.min(15, Math.max(3, Math.sqrt(surpriseVariance) * 1.5 + 4));
+    const surpriseVariance =
+      recentReactions.reduce(
+        (sum, r) => sum + Math.pow(r.surprise - avgSurprise, 2),
+        0
+      ) / Math.max(1, recentReactions.length);
+    const avgMove = Math.min(
+      15,
+      Math.max(3, Math.sqrt(surpriseVariance) * 1.5 + 4)
+    );
 
     // Assess IV crush risk based on typical move vs IV expectations
     let ivCrushRisk: EarningsHistoryData['ivCrushRisk'] = 'MEDIUM';
     let recommendation = 'Standard IV crush expected post-earnings';
-    
+
     if (avgMove < 4) {
       ivCrushRisk = 'LOW';
       recommendation = 'Low historical volatility - IV crush may be mild';
@@ -903,7 +962,7 @@ export async function getEnhancedEarningsInfo(symbol: string): Promise<{
     getEarningsInfo(symbol),
     getEarningsHistory(symbol),
   ]);
-  
+
   return { basic, history };
 }
 
@@ -914,7 +973,9 @@ export async function getEnhancedEarningsInfo(symbol: string): Promise<{
 /**
  * Analyze implied volatility from options chain
  */
-export async function getIVAnalysis(symbol: string): Promise<IVAnalysis | null> {
+export async function getIVAnalysis(
+  symbol: string
+): Promise<IVAnalysis | null> {
   try {
     const chain = await getOptionsChain(symbol, 30);
     if (!chain || chain.calls.length === 0) return null;
@@ -923,22 +984,31 @@ export async function getIVAnalysis(symbol: string): Promise<IVAnalysis | null> 
 
     // Find ATM options (closest to current price)
     const atmCalls = calls
-      .filter(c => Math.abs(c.strike - underlyingPrice) / underlyingPrice < 0.05)
-      .sort((a, b) => Math.abs(a.strike - underlyingPrice) - Math.abs(b.strike - underlyingPrice));
+      .filter(
+        (c) => Math.abs(c.strike - underlyingPrice) / underlyingPrice < 0.05
+      )
+      .sort(
+        (a, b) =>
+          Math.abs(a.strike - underlyingPrice) -
+          Math.abs(b.strike - underlyingPrice)
+      );
 
     if (atmCalls.length === 0) return null;
 
     // Average IV of ATM options (filter out zero IV - bad data)
-    const validIVCalls = atmCalls.filter(c => c.impliedVolatility > 0.01);
+    const validIVCalls = atmCalls.filter((c) => c.impliedVolatility > 0.01);
     if (validIVCalls.length === 0) {
       // No valid IV data (weekend or illiquid options)
       return null;
     }
-    
-    const avgIV = validIVCalls.slice(0, 3).reduce((sum, c) => sum + c.impliedVolatility, 0) / 
-                 Math.min(3, validIVCalls.length);
-    
-    const currentIV = avgIV * 100;  // Convert to percentage
+
+    const avgIV =
+      validIVCalls
+        .slice(0, 3)
+        .reduce((sum, c) => sum + c.impliedVolatility, 0) /
+      Math.min(3, validIVCalls.length);
+
+    const currentIV = avgIV * 100; // Convert to percentage
 
     // Estimate IV percentile based on typical ranges
     // This is simplified - ideally we'd compare to historical IV
@@ -948,21 +1018,22 @@ export async function getIVAnalysis(symbol: string): Promise<IVAnalysis | null> 
     let recommendation: string;
 
     if (currentIV < 20) {
-      ivPercentile = currentIV * 2;  // 0-40 percentile
+      ivPercentile = currentIV * 2; // 0-40 percentile
       ivLevel = 'LOW';
       recommendation = 'IV is low - good for buying spreads (cheaper premium)';
     } else if (currentIV < 35) {
-      ivPercentile = 30 + (currentIV - 20) * 2;  // 30-60 percentile
+      ivPercentile = 30 + (currentIV - 20) * 2; // 30-60 percentile
       ivLevel = 'NORMAL';
       recommendation = 'IV is normal - standard entry conditions';
     } else if (currentIV < 50) {
-      ivPercentile = 60 + (currentIV - 35) * 1.5;  // 60-82 percentile
+      ivPercentile = 60 + (currentIV - 35) * 1.5; // 60-82 percentile
       ivLevel = 'ELEVATED';
       recommendation = 'IV is elevated - consider smaller position or wait';
     } else {
-      ivPercentile = Math.min(99, 80 + (currentIV - 50) * 0.4);  // 80-99 percentile
+      ivPercentile = Math.min(99, 80 + (currentIV - 50) * 0.4); // 80-99 percentile
       ivLevel = 'HIGH';
-      recommendation = 'IV is high - spreads are expensive, consider waiting for IV crush';
+      recommendation =
+        'IV is high - spreads are expensive, consider waiting for IV crush';
     }
 
     return {
@@ -1031,7 +1102,8 @@ export function calculateSupportResistance(input: SRInput): SupportResistance {
 
   // Add 52-week levels
   if (input.fiftyTwoWeekLow) {
-    const distance = ((input.fiftyTwoWeekLow - currentPrice) / currentPrice) * 100;
+    const distance =
+      ((input.fiftyTwoWeekLow - currentPrice) / currentPrice) * 100;
     levels.push({
       price: input.fiftyTwoWeekLow,
       type: '52W_LOW',
@@ -1041,7 +1113,8 @@ export function calculateSupportResistance(input: SRInput): SupportResistance {
   }
 
   if (input.fiftyTwoWeekHigh) {
-    const distance = ((input.fiftyTwoWeekHigh - currentPrice) / currentPrice) * 100;
+    const distance =
+      ((input.fiftyTwoWeekHigh - currentPrice) / currentPrice) * 100;
     levels.push({
       price: input.fiftyTwoWeekHigh,
       type: '52W_HIGH',
@@ -1078,9 +1151,10 @@ export function calculateSupportResistance(input: SRInput): SupportResistance {
     Math.ceil(currentPrice / roundBase) * roundBase,
     Math.round(currentPrice / (roundBase / 2)) * (roundBase / 2),
   ];
-  
+
   for (const round of [...new Set(roundLevels)]) {
-    if (Math.abs(round - currentPrice) / currentPrice > 0.01) {  // At least 1% away
+    if (Math.abs(round - currentPrice) / currentPrice > 0.01) {
+      // At least 1% away
       const distance = ((round - currentPrice) / currentPrice) * 100;
       levels.push({
         price: round,
@@ -1093,12 +1167,12 @@ export function calculateSupportResistance(input: SRInput): SupportResistance {
 
   // Separate into supports and resistances
   const supports = levels
-    .filter(l => l.price < currentPrice)
-    .sort((a, b) => b.price - a.price);  // Closest first
+    .filter((l) => l.price < currentPrice)
+    .sort((a, b) => b.price - a.price); // Closest first
 
   const resistances = levels
-    .filter(l => l.price > currentPrice)
-    .sort((a, b) => a.price - b.price);  // Closest first
+    .filter((l) => l.price > currentPrice)
+    .sort((a, b) => a.price - b.price); // Closest first
 
   return {
     supports,
@@ -1111,7 +1185,9 @@ export function calculateSupportResistance(input: SRInput): SupportResistance {
 /**
  * Get full support/resistance analysis for a ticker
  */
-export async function getSupportResistance(symbol: string): Promise<SupportResistance | null> {
+export async function getSupportResistance(
+  symbol: string
+): Promise<SupportResistance | null> {
   try {
     const quote = await yahooFinance.quote(symbol);
     if (!quote?.regularMarketPrice) return null;
@@ -1128,13 +1204,17 @@ export async function getSupportResistance(symbol: string): Promise<SupportResis
       const history = await yahooFinance.chart(symbol, {
         period1: startDate,
         period2: endDate,
-        interval: "1d",
+        interval: '1d',
       });
 
       if (history?.quotes && history.quotes.length > 0) {
-        const highs = history.quotes.map(q => q.high).filter((h): h is number => h !== null && h !== undefined);
-        const lows = history.quotes.map(q => q.low).filter((l): l is number => l !== null && l !== undefined);
-        
+        const highs = history.quotes
+          .map((q) => q.high)
+          .filter((h): h is number => h !== null && h !== undefined);
+        const lows = history.quotes
+          .map((q) => q.low)
+          .filter((l): l is number => l !== null && l !== undefined);
+
         if (highs.length > 0) recentHigh = Math.max(...highs);
         if (lows.length > 0) recentLow = Math.min(...lows);
       }
@@ -1144,7 +1224,7 @@ export async function getSupportResistance(symbol: string): Promise<SupportResis
 
     return calculateSupportResistance({
       currentPrice: quote.regularMarketPrice,
-      ma20: undefined,  // Will be passed from caller
+      ma20: undefined, // Will be passed from caller
       ma50: quote.fiftyDayAverage ?? undefined,
       ma200: quote.twoHundredDayAverage ?? undefined,
       fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? undefined,
@@ -1172,11 +1252,14 @@ export interface NewsItem {
 /**
  * Get recent news for a ticker (filtered to relevant news only)
  */
-export async function getTickerNews(symbol: string, limit: number = 5): Promise<NewsItem[]> {
+export async function getTickerNews(
+  symbol: string,
+  limit: number = 5
+): Promise<NewsItem[]> {
   try {
     // Request more than needed since we'll filter
     const result = await yahooFinance.search(symbol, { newsCount: limit * 3 });
-    
+
     if (!result?.news || result.news.length === 0) {
       return [];
     }
@@ -1192,42 +1275,64 @@ export async function getTickerNews(symbol: string, limit: number = 5): Promise<
 
     // Filter news to only include items that mention the ticker or company
     const symbolUpper = symbol.toUpperCase();
-    const companyWords = companyName.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    
-    const filteredNews = result.news.filter(item => {
+    const companyWords = companyName
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3);
+
+    const filteredNews = result.news.filter((item) => {
       const title = item.title ?? '';
       const titleUpper = title.toUpperCase();
       const titleLower = title.toLowerCase();
-      
+
       // Check if ticker symbol appears in title (with word boundaries)
-      if (titleUpper.includes(symbolUpper + ':') || 
-          titleUpper.includes(symbolUpper + ' ') ||
-          titleUpper.includes('(' + symbolUpper + ')') ||
-          titleUpper.startsWith(symbolUpper + ' ')) {
+      if (
+        titleUpper.includes(symbolUpper + ':') ||
+        titleUpper.includes(symbolUpper + ' ') ||
+        titleUpper.includes('(' + symbolUpper + ')') ||
+        titleUpper.startsWith(symbolUpper + ' ')
+      ) {
         return true;
       }
-      
+
       // Check if company name words appear in title
       if (companyWords.length > 0) {
-        const matchCount = companyWords.filter(word => titleLower.includes(word)).length;
+        const matchCount = companyWords.filter((word) =>
+          titleLower.includes(word)
+        ).length;
         // Require at least 2 company name words to match, or 1 if it's the main word
-        if (matchCount >= 2 || (matchCount === 1 && companyWords[0].length > 4)) {
+        if (
+          matchCount >= 2 ||
+          (matchCount === 1 && companyWords[0].length > 4)
+        ) {
           return true;
         }
       }
-      
+
       return false;
     });
 
-    return filteredNews.slice(0, limit).map(item => ({
-      title: item.title ?? 'No title',
-      publisher: item.publisher ?? 'Unknown',
-      link: item.link ?? '',
-      publishedAt: item.providerPublishTime 
-        ? new Date(item.providerPublishTime * 1000) 
-        : new Date(),
-      summary: undefined,
-    }));
+    return filteredNews.slice(0, limit).map((item) => {
+      let publishedAt: Date;
+      if (item.providerPublishTime) {
+        // Handle number (Unix timestamp), string, or Date
+        if (typeof item.providerPublishTime === 'number') {
+          publishedAt = new Date(item.providerPublishTime * 1000);
+        } else {
+          publishedAt = new Date(item.providerPublishTime);
+        }
+      } else {
+        publishedAt = new Date();
+      }
+
+      return {
+        title: item.title ?? 'No title',
+        publisher: item.publisher ?? 'Unknown',
+        link: item.link ?? '',
+        publishedAt,
+        summary: undefined,
+      };
+    });
   } catch {
     return [];
   }
@@ -1238,14 +1343,14 @@ export async function getTickerNews(symbol: string, limit: number = 5): Promise<
  */
 export function formatNewsForAI(news: NewsItem[]): string {
   if (news.length === 0) return '';
-  
+
   let output = '\n=== RECENT NEWS ===\n';
   for (const item of news) {
     const timeAgo = getTimeAgo(item.publishedAt);
     output += `• [${timeAgo}] ${item.title} (${item.publisher})\n`;
   }
   output += '=== END NEWS ===\n';
-  
+
   return output;
 }
 
@@ -1254,7 +1359,7 @@ function getTimeAgo(date: Date): string {
   const diffMs = now.getTime() - date.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffHours / 24);
-  
+
   if (diffDays > 0) return `${diffDays}d ago`;
   if (diffHours > 0) return `${diffHours}h ago`;
   return 'Just now';
@@ -1273,24 +1378,24 @@ export interface PositionAnalysis {
   costBasis: number;
   currentValue: number;
   dte: number;
-  
+
   // P&L Analysis (per contract, in dollars)
   maxValue: number;
   maxProfit: number;
   currentProfit: number;
   profitCapturedPct: number;
   remainingProfit: number;
-  
+
   // Risk Analysis
   currentPrice: number;
   cushionToShortStrike: number;
   cushionPct: number;
   breakeven: number;
-  
+
   // Time Analysis
   thetaRemaining: 'HIGH' | 'MEDIUM' | 'LOW';
-  timeValueLeft: number;  // Estimated remaining time value
-  
+  timeValueLeft: number; // Estimated remaining time value
+
   // Recommendation
   recommendation: 'HOLD' | 'CLOSE' | 'ROLL';
   confidence: number;
@@ -1300,10 +1405,10 @@ export interface PositionAnalysis {
 /**
  * Analyze an existing call debit spread position
  * Provides accurate P&L calculations and recommendations
- * 
+ *
  * @param ticker - Stock ticker
  * @param longStrike - Long call strike price
- * @param shortStrike - Short call strike price  
+ * @param shortStrike - Short call strike price
  * @param costBasis - Original debit paid (per share, e.g., 3.62)
  * @param currentValue - Current mid price of spread (optional, will estimate if not provided)
  * @param dte - Days to expiration
@@ -1320,95 +1425,115 @@ export async function analyzePosition(
     // Fetch current price
     const quote = await yahooFinance.quote(ticker);
     if (!quote?.regularMarketPrice) return null;
-    
+
     const currentPrice = quote.regularMarketPrice;
     const spreadWidth = shortStrike - longStrike;
-    
+
     // Calculate max value (intrinsic value at expiration if above short strike)
     const maxValue = spreadWidth;
-    
+
     // If currentValue not provided, estimate it
     let estimatedValue = currentValue;
     if (estimatedValue === null) {
       // Estimate based on how deep ITM the spread is
       if (currentPrice >= shortStrike) {
         // Both strikes ITM - near max value
-        const timeValueDecay = Math.max(0, dte / 30) * 0.10; // ~10% time value per month
+        const timeValueDecay = Math.max(0, dte / 30) * 0.1; // ~10% time value per month
         estimatedValue = maxValue * (1 - timeValueDecay * 0.5);
       } else if (currentPrice >= longStrike) {
         // Long strike ITM, short OTM
         const intrinsicValue = currentPrice - longStrike;
-        const timeValue = Math.min(spreadWidth - intrinsicValue, spreadWidth * 0.3);
+        const timeValue = Math.min(
+          spreadWidth - intrinsicValue,
+          spreadWidth * 0.3
+        );
         estimatedValue = intrinsicValue + timeValue * (dte / 30);
       } else {
         // Both OTM - mostly time value
         estimatedValue = costBasis * 0.5; // Rough estimate
       }
     }
-    
+
     // P&L Calculations (all in dollars per share, multiply by 100 for per contract)
     const maxProfit = maxValue - costBasis;
     const currentProfit = estimatedValue - costBasis;
-    const profitCapturedPct = maxProfit > 0 
-      ? Math.round((currentProfit / maxProfit) * 1000) / 10 
-      : 0;
+    const profitCapturedPct =
+      maxProfit > 0 ? Math.round((currentProfit / maxProfit) * 1000) / 10 : 0;
     const remainingProfit = maxProfit - currentProfit;
-    
+
     // Risk Analysis
     const cushionToShortStrike = currentPrice - shortStrike;
-    const cushionPct = Math.round((cushionToShortStrike / currentPrice) * 1000) / 10;
+    const cushionPct =
+      Math.round((cushionToShortStrike / currentPrice) * 1000) / 10;
     const breakeven = longStrike + costBasis;
-    
+
     // Time Analysis
-    const timeValueLeft = Math.max(0, estimatedValue - Math.max(0, currentPrice - longStrike));
+    const timeValueLeft = Math.max(
+      0,
+      estimatedValue - Math.max(0, currentPrice - longStrike)
+    );
     let thetaRemaining: 'HIGH' | 'MEDIUM' | 'LOW';
-    if (dte > 21 && timeValueLeft > 0.20) {
+    if (dte > 21 && timeValueLeft > 0.2) {
       thetaRemaining = 'HIGH';
-    } else if (dte > 7 && timeValueLeft > 0.10) {
+    } else if (dte > 7 && timeValueLeft > 0.1) {
       thetaRemaining = 'MEDIUM';
     } else {
       thetaRemaining = 'LOW';
     }
-    
+
     // Generate recommendation
     const reasoning: string[] = [];
     let recommendation: 'HOLD' | 'CLOSE' | 'ROLL';
     let confidence = 70;
-    
+
     // Analyze profit capture
     if (profitCapturedPct >= 90) {
-      reasoning.push(`${profitCapturedPct.toFixed(1)}% of max profit captured - near max gain`);
+      reasoning.push(
+        `${profitCapturedPct.toFixed(1)}% of max profit captured - near max gain`
+      );
       recommendation = 'CLOSE';
       confidence += 15;
     } else if (profitCapturedPct >= 75) {
-      reasoning.push(`${profitCapturedPct.toFixed(1)}% profit captured - consider taking gains`);
+      reasoning.push(
+        `${profitCapturedPct.toFixed(1)}% profit captured - consider taking gains`
+      );
       recommendation = 'CLOSE';
       confidence += 5;
     } else if (profitCapturedPct >= 50) {
-      reasoning.push(`${profitCapturedPct.toFixed(1)}% profit captured - solid but room to run`);
+      reasoning.push(
+        `${profitCapturedPct.toFixed(1)}% profit captured - solid but room to run`
+      );
       recommendation = 'HOLD';
     } else {
-      reasoning.push(`Only ${profitCapturedPct.toFixed(1)}% profit captured - significant upside remaining`);
+      reasoning.push(
+        `Only ${profitCapturedPct.toFixed(1)}% profit captured - significant upside remaining`
+      );
       recommendation = 'HOLD';
       confidence += 10;
     }
-    
+
     // Analyze cushion/risk
     if (cushionPct > 10) {
-      reasoning.push(`Strong cushion: ${cushionPct.toFixed(1)}% above short strike ($${cushionToShortStrike.toFixed(2)})`);
+      reasoning.push(
+        `Strong cushion: ${cushionPct.toFixed(1)}% above short strike ($${cushionToShortStrike.toFixed(2)})`
+      );
       confidence += 10;
     } else if (cushionPct > 5) {
-      reasoning.push(`Decent cushion: ${cushionPct.toFixed(1)}% above short strike`);
+      reasoning.push(
+        `Decent cushion: ${cushionPct.toFixed(1)}% above short strike`
+      );
       confidence += 5;
     } else if (cushionPct > 0) {
-      reasoning.push(`Thin cushion: only ${cushionPct.toFixed(1)}% above short strike - watch closely`);
+      reasoning.push(
+        `Thin cushion: only ${cushionPct.toFixed(1)}% above short strike - watch closely`
+      );
       confidence -= 10;
     } else {
       reasoning.push(`⚠️ Price below short strike - position at risk`);
       confidence -= 20;
       if (dte > 14) recommendation = 'ROLL';
     }
-    
+
     // Analyze time
     if (dte <= 7 && profitCapturedPct < 80) {
       reasoning.push(`Only ${dte} DTE remaining - time running out`);
@@ -1420,20 +1545,26 @@ export async function analyzePosition(
     } else {
       reasoning.push(`${dte} DTE - adequate time remaining`);
     }
-    
+
     // Remaining profit analysis
     const remainingProfitPct = Math.round((remainingProfit / costBasis) * 100);
-    if (remainingProfit > 0.50) {
-      reasoning.push(`$${(remainingProfit * 100).toFixed(0)} per contract still on table (${remainingProfitPct}% of cost basis)`);
-    } else if (remainingProfit > 0.20) {
-      reasoning.push(`$${(remainingProfit * 100).toFixed(0)} per contract remaining - modest upside`);
+    if (remainingProfit > 0.5) {
+      reasoning.push(
+        `$${(remainingProfit * 100).toFixed(0)} per contract still on table (${remainingProfitPct}% of cost basis)`
+      );
+    } else if (remainingProfit > 0.2) {
+      reasoning.push(
+        `$${(remainingProfit * 100).toFixed(0)} per contract remaining - modest upside`
+      );
     } else {
-      reasoning.push(`Only $${(remainingProfit * 100).toFixed(0)} per contract remaining - limited upside`);
+      reasoning.push(
+        `Only $${(remainingProfit * 100).toFixed(0)} per contract remaining - limited upside`
+      );
     }
-    
+
     // Cap confidence
     confidence = Math.min(95, Math.max(30, confidence));
-    
+
     return {
       ticker,
       longStrike,
@@ -1466,9 +1597,11 @@ export async function analyzePosition(
 /**
  * Format position analysis for AI context
  */
-export function formatPositionAnalysisForAI(analysis: PositionAnalysis): string {
+export function formatPositionAnalysisForAI(
+  analysis: PositionAnalysis
+): string {
   const dollarFormat = (val: number) => `$${(val * 100).toFixed(0)}`;
-  
+
   return `
 === POSITION ANALYSIS: ${analysis.ticker} ===
 
@@ -1495,9 +1628,8 @@ TIME ANALYSIS:
   Time Value Left: ~${dollarFormat(analysis.timeValueLeft)} per contract
 
 RECOMMENDATION: ${analysis.recommendation} (${analysis.confidence}% confidence)
-${analysis.reasoning.map(r => `  • ${r}`).join('\n')}
+${analysis.reasoning.map((r) => `  • ${r}`).join('\n')}
 
 === END POSITION ANALYSIS ===
 `;
 }
-

@@ -2,9 +2,9 @@
 
 ## Overview
 
-The filter system is a modular, scalable architecture that allows users to 
-refine and narrow down unusual options signals based on various criteria. 
-The system is designed with extensibility in mind, making it easy to add 
+The filter system is a modular, scalable architecture that allows users to
+refine and narrow down unusual options signals based on various criteria.
+The system is designed with extensibility in mind, making it easy to add
 new filters without modifying core logic.
 
 ## Architecture
@@ -37,11 +37,13 @@ filters/
 Filters signals by their detection timestamp.
 
 **Features:**
+
 - Single date selection
 - Quick presets (Today, Yesterday, Last 3 days, Last 7 days)
 - Clear button for easy reset
 
 **Usage:**
+
 ```tsx
 <DateRangeFilter
   value={filters.detection_date}
@@ -51,6 +53,7 @@ Filters signals by their detection timestamp.
 ```
 
 **API Integration:**
+
 - Maps to `detection_date` in `UnusualOptionsFilters`
 - Backend queries signals within the selected date range
 - Uses `detection_timestamp` field for comparison
@@ -60,11 +63,13 @@ Filters signals by their detection timestamp.
 Filters signals by their quality grade (S, A, B, C, D, F).
 
 **Features:**
+
 - Multi-select badge interface
 - Color-coded grades for quick identification
 - "Clear selection" button
 
 **Usage:**
+
 ```tsx
 <GradeFilter
   value={filters.grade}
@@ -74,6 +79,7 @@ Filters signals by their quality grade (S, A, B, C, D, F).
 ```
 
 **API Integration:**
+
 - Maps to `grade` in `UnusualOptionsFilters`
 - Backend uses SQL `IN` operator for multi-select
 - Filters on `grade` column
@@ -83,11 +89,13 @@ Filters signals by their quality grade (S, A, B, C, D, F).
 Filters signals by option type (Calls or Puts).
 
 **Features:**
+
 - Toggle between Calls and Puts
 - Color-coded (green for calls, red for puts)
 - "Show all" button
 
 **Usage:**
+
 ```tsx
 <OptionTypeFilter
   value={filters.option_type}
@@ -97,6 +105,7 @@ Filters signals by option type (Calls or Puts).
 ```
 
 **API Integration:**
+
 - Maps to `option_type` in `UnusualOptionsFilters`
 - Backend uses SQL `IN` operator
 - Filters on `option_type` column
@@ -106,11 +115,13 @@ Filters signals by option type (Calls or Puts).
 Filters signals by premium flow range (min/max).
 
 **Features:**
+
 - Min/max range inputs
 - Quick presets (≥$100K, ≥$500K, ≥$1M, ≥$5M)
 - Clear button for both values
 
 **Usage:**
+
 ```tsx
 <PremiumFlowFilter
   minValue={filters.min_premium_flow}
@@ -122,6 +133,7 @@ Filters signals by premium flow range (min/max).
 ```
 
 **API Integration:**
+
 - Maps to `min_premium_flow` and `max_premium_flow`
 - Backend uses `gte` and `lte` operators
 - Filters on `premium_flow` column
@@ -131,6 +143,7 @@ Filters signals by premium flow range (min/max).
 Filters signals by detection pattern flags.
 
 **Features:**
+
 - Toggle filters for:
   - Volume Anomaly
   - OI Spike
@@ -140,15 +153,14 @@ Filters signals by detection pattern flags.
 - "Clear all" button
 
 **Usage:**
+
 ```tsx
 <DetectionFlagsFilter
   hasVolumeAnomaly={filters.has_volume_anomaly}
   hasOiSpike={filters.has_oi_spike}
   hasSweep={filters.has_sweep}
   hasBlockTrade={filters.has_block_trade}
-  onVolumeAnomalyChange={(val) => 
-    updateFilter('has_volume_anomaly', val)
-  }
+  onVolumeAnomalyChange={(val) => updateFilter('has_volume_anomaly', val)}
   onOiSpikeChange={(val) => updateFilter('has_oi_spike', val)}
   onSweepChange={(val) => updateFilter('has_sweep', val)}
   onBlockTradeChange={(val) => updateFilter('has_block_trade', val)}
@@ -157,6 +169,7 @@ Filters signals by detection pattern flags.
 ```
 
 **API Integration:**
+
 - Maps to boolean flags in `UnusualOptionsFilters`
 - Backend uses equality checks
 - Filters on respective boolean columns
@@ -166,6 +179,7 @@ Filters signals by detection pattern flags.
 The orchestrating component that brings all filters together.
 
 **Features:**
+
 - Slide-out panel design (right-side drawer)
 - Active filter count badge
 - Clear all functionality
@@ -173,6 +187,7 @@ The orchestrating component that brings all filters together.
 - Scrollable filter list
 
 **Usage:**
+
 ```tsx
 <FilterPanel
   isOpen={filterPanelOpen}
@@ -184,6 +199,7 @@ The orchestrating component that brings all filters together.
 ```
 
 **Props:**
+
 - `isOpen`: Controls panel visibility
 - `onClose`: Callback when panel is closed
 - `filters`: Current filter state
@@ -198,9 +214,9 @@ Create a new file in `components/unusual-options/filters/`:
 
 ```tsx
 // NewFilter.tsx
-"use client";
+'use client';
 
-import { Label } from "@/components/ui/label";
+import { Label } from '@/components/ui/label';
 
 interface NewFilterProps {
   value: string | undefined;
@@ -208,17 +224,15 @@ interface NewFilterProps {
   label?: string;
 }
 
-export function NewFilter({ 
-  value, 
+export function NewFilter({
+  value,
   onChange,
-  label = "New Filter" 
+  label = 'New Filter',
 }: NewFilterProps) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-foreground">
-        {label}
-      </Label>
-      
+      <Label className="text-xs font-medium text-foreground">{label}</Label>
+
       {/* Your filter UI here */}
     </div>
   );
@@ -230,7 +244,7 @@ export function NewFilter({
 Add to `filters/index.ts`:
 
 ```tsx
-export { NewFilter } from "./NewFilter";
+export { NewFilter } from './NewFilter';
 ```
 
 ### Step 3: Add to FilterPanel
@@ -250,7 +264,7 @@ import { NewFilter } from "./NewFilter";
 
 ### Step 4: Update Type Definition
 
-Add to `UnusualOptionsFilters` in 
+Add to `UnusualOptionsFilters` in
 `lib/types/unusual-options.ts`:
 
 ```tsx
@@ -285,7 +299,7 @@ if (filters.new_field) {
 
 ### Filter Persistence
 
-Currently, filters are stored in component state and reset on page 
+Currently, filters are stored in component state and reset on page
 reload. To add persistence:
 
 1. **localStorage**: Store filters in browser
@@ -297,10 +311,7 @@ Example with localStorage:
 ```tsx
 // Save filters
 useEffect(() => {
-  localStorage.setItem(
-    'unusual-options-filters', 
-    JSON.stringify(filters)
-  );
+  localStorage.setItem('unusual-options-filters', JSON.stringify(filters));
 }, [filters]);
 
 // Load filters
@@ -320,23 +331,24 @@ For text inputs (like ticker search), consider debouncing:
 
 ```tsx
 const debouncedSearch = useMemo(
-  () => debounce((term: string) => {
-    setSearchTerm(term);
-    loadData(true);
-  }, 300),
+  () =>
+    debounce((term: string) => {
+      setSearchTerm(term);
+      loadData(true);
+    }, 300),
   []
 );
 ```
 
 ### Memoization
 
-Filter components use React's built-in optimizations. For expensive 
+Filter components use React's built-in optimizations. For expensive
 calculations, use `useMemo`:
 
 ```tsx
 const activeFilterCount = useMemo(() => {
   return Object.keys(filters).filter(
-    k => filters[k as keyof UnusualOptionsFilters] !== undefined
+    (k) => filters[k as keyof UnusualOptionsFilters] !== undefined
   ).length;
 }, [filters]);
 ```
@@ -356,10 +368,10 @@ test('DateRangeFilter calls onChange with selected date', () => {
   const { getByRole } = render(
     <DateRangeFilter value={undefined} onChange={onChange} />
   );
-  
+
   const input = getByRole('textbox');
   fireEvent.change(input, { target: { value: '2024-01-15' } });
-  
+
   expect(onChange).toHaveBeenCalledWith('2024-01-15');
 });
 ```
@@ -380,14 +392,14 @@ test('FilterPanel applies multiple filters correctly', () => {
       onApply={onApply}
     />
   );
-  
+
   // Select filters
   fireEvent.click(getByText('Grade S'));
   fireEvent.click(getByText('Calls'));
-  
+
   // Apply
   fireEvent.click(getByText('Apply Filters'));
-  
+
   expect(onApply).toHaveBeenCalled();
 });
 ```
@@ -438,16 +450,16 @@ Example:
 
 ## Summary
 
-The filter system provides a clean, scalable architecture for filtering 
-unusual options signals. Its modular design makes it easy to extend and 
-maintain, while providing a great user experience with intuitive controls 
+The filter system provides a clean, scalable architecture for filtering
+unusual options signals. Its modular design makes it easy to extend and
+maintain, while providing a great user experience with intuitive controls
 and real-time feedback.
 
 Key benefits:
+
 - ✅ Modular and reusable components
 - ✅ Type-safe with full TypeScript support
 - ✅ Easy to extend with new filters
 - ✅ Clean state management
 - ✅ Responsive and accessible UI
 - ✅ Production-ready with proper error handling
-

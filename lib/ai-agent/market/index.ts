@@ -1,9 +1,9 @@
 /**
  * Market Regime Service
- * 
+ *
  * Shared market regime detection for CLI and Frontend.
  * Provides VIX awareness, SPY trend analysis, and sector rotation tracking.
- * 
+ *
  * This is the SAME logic used by the CLI - single source of truth.
  */
 
@@ -11,18 +11,18 @@
 // TYPES
 // ============================================================================
 
-export type MarketRegimeType = 
-  | 'RISK_ON'    // Bullish conditions, low VIX, above MA200
-  | 'RISK_OFF'   // Bearish conditions, high VIX, below MA200
-  | 'NEUTRAL'    // Mixed signals
-  | 'HIGH_VOL';  // Elevated volatility regardless of direction
+export type MarketRegimeType =
+  | 'RISK_ON' // Bullish conditions, low VIX, above MA200
+  | 'RISK_OFF' // Bearish conditions, high VIX, below MA200
+  | 'NEUTRAL' // Mixed signals
+  | 'HIGH_VOL'; // Elevated volatility regardless of direction
 
-export type VIXLevel = 
-  | 'CALM'       // VIX < 15
-  | 'NORMAL'     // VIX 15-20
-  | 'ELEVATED'   // VIX 20-30
-  | 'HIGH'       // VIX 30-40
-  | 'EXTREME';   // VIX > 40
+export type VIXLevel =
+  | 'CALM' // VIX < 15
+  | 'NORMAL' // VIX 15-20
+  | 'ELEVATED' // VIX 20-30
+  | 'HIGH' // VIX 30-40
+  | 'EXTREME'; // VIX > 40
 
 export interface VIXData {
   current: number;
@@ -116,7 +116,7 @@ export async function getVIXData(): Promise<VIXData | null> {
     const yahooFinance = new YahooFinance({
       suppressNotices: ['yahooSurvey'],
     });
-    
+
     const quote = await yahooFinance.quote('^VIX');
     if (!quote?.regularMarketPrice) return null;
 
@@ -150,7 +150,7 @@ export async function getSPYTrend(): Promise<SPYTrend | null> {
     const yahooFinance = new YahooFinance({
       suppressNotices: ['yahooSurvey'],
     });
-    
+
     const quote = await yahooFinance.quote('SPY');
     if (!quote?.regularMarketPrice) return null;
 
@@ -199,10 +199,10 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
     const yahooFinance = new YahooFinance({
       suppressNotices: ['yahooSurvey'],
     });
-    
+
     // Fetch all sector ETFs in parallel
     const quotes = await Promise.all(
-      SECTOR_ETFS.map(s => yahooFinance.quote(s.ticker).catch(() => null))
+      SECTOR_ETFS.map((s) => yahooFinance.quote(s.ticker).catch(() => null))
     );
 
     for (let i = 0; i < SECTOR_ETFS.length; i++) {
@@ -211,7 +211,7 @@ export async function getSectorPerformance(): Promise<SectorPerformance[]> {
 
       if (quote?.regularMarketChangePercent !== undefined) {
         const changePct = quote.regularMarketChangePercent;
-        
+
         // Classify momentum
         let momentum: SectorPerformance['momentum'] = 'NEUTRAL';
         if (changePct > 1) momentum = 'LEADING';
@@ -256,8 +256,10 @@ function determineRegime(
 
   // Check SPY trend
   if (spy) {
-    if (spy.trend === 'BULLISH' && 
-        (!vix || vix.level === 'CALM' || vix.level === 'NORMAL')) {
+    if (
+      spy.trend === 'BULLISH' &&
+      (!vix || vix.level === 'CALM' || vix.level === 'NORMAL')
+    ) {
       return 'RISK_ON';
     }
     if (spy.trend === 'BEARISH') {
@@ -329,21 +331,31 @@ function generateRecommendation(
 ): string {
   switch (regime) {
     case 'RISK_ON':
-      return 'Favorable for CDS entries. Normal position sizing. ' +
-        'Look for pullbacks to MA20.';
+      return (
+        'Favorable for CDS entries. Normal position sizing. ' +
+        'Look for pullbacks to MA20.'
+      );
     case 'RISK_OFF':
-      return 'Reduce exposure. Wait for trend reversal signals. ' +
-        'Consider defensive sectors.';
+      return (
+        'Reduce exposure. Wait for trend reversal signals. ' +
+        'Consider defensive sectors.'
+      );
     case 'HIGH_VOL':
       if (vix && vix.level === 'EXTREME') {
-        return 'Avoid new entries. Wait for VIX to drop below 30 ' +
-          'before trading.';
+        return (
+          'Avoid new entries. Wait for VIX to drop below 30 ' +
+          'before trading.'
+        );
       }
-      return 'Reduce position sizes by 50%. Wider stops required. ' +
-        'Consider waiting.';
+      return (
+        'Reduce position sizes by 50%. Wider stops required. ' +
+        'Consider waiting.'
+      );
     case 'NEUTRAL':
-      return 'Proceed with caution. Focus on Grade A setups only. ' +
-        'Normal position sizing.';
+      return (
+        'Proceed with caution. Focus on Grade A setups only. ' +
+        'Normal position sizing.'
+      );
   }
 }
 
@@ -400,23 +412,25 @@ export async function getMarketRegime(): Promise<MarketRegime> {
  */
 export function formatRegimeForAI(regime: MarketRegime): string {
   const lines: string[] = [];
-  
+
   lines.push(`REGIME: ${regime.regime}`);
   lines.push(`VIX: ${regime.vix.current} (${regime.vix.level})`);
-  lines.push(`SPY: $${regime.spy.price} ${regime.spy.trend} ${
-    regime.spy.aboveMA200 ? '↑MA200' : '↓MA200'
-  }`);
-  
+  lines.push(
+    `SPY: $${regime.spy.price} ${regime.spy.trend} ${
+      regime.spy.aboveMA200 ? '↑MA200' : '↓MA200'
+    }`
+  );
+
   if (regime.sectors.length > 0) {
     const top3 = regime.sectors.slice(0, 3);
-    const leaders = top3.map(s => 
-      `${s.name}:${s.changePct > 0 ? '+' : ''}${s.changePct}%`
+    const leaders = top3.map(
+      (s) => `${s.name}:${s.changePct > 0 ? '+' : ''}${s.changePct}%`
     );
     lines.push(`SECTORS: ${leaders.join(' | ')}`);
   }
-  
+
   lines.push(`→ ${regime.tradingRecommendation}`);
-  
+
   return lines.join('\n');
 }
 
@@ -424,16 +438,81 @@ export function formatRegimeForAI(regime: MarketRegime): string {
  * Get regime badge for display (very compact)
  */
 export function getRegimeBadge(regime: MarketRegime): string {
-  const vixEmoji = regime.vix.level === 'CALM' ? '🟢' 
-    : regime.vix.level === 'NORMAL' ? '🟡'
-    : regime.vix.level === 'ELEVATED' ? '🟠'
-    : '🔴';
-  
-  const trendEmoji = regime.spy.trend === 'BULLISH' ? '📈'
-    : regime.spy.trend === 'BEARISH' ? '📉'
-    : '➡️';
-  
+  const vixEmoji =
+    regime.vix.level === 'CALM'
+      ? '🟢'
+      : regime.vix.level === 'NORMAL'
+        ? '🟡'
+        : regime.vix.level === 'ELEVATED'
+          ? '🟠'
+          : '🔴';
+
+  const trendEmoji =
+    regime.spy.trend === 'BULLISH'
+      ? '📈'
+      : regime.spy.trend === 'BEARISH'
+        ? '📉'
+        : '➡️';
+
   return `${vixEmoji} VIX ${regime.vix.current} ${trendEmoji} ${regime.regime}`;
 }
 
+// ============================================================================
+// RE-EXPORTS FROM SUBMODULES
+// ============================================================================
 
+// Chop Index / ATR / ADX calculations
+export {
+  calculateATR,
+  getATRAnalysis,
+  calculateChopIndex,
+  getChopAnalysis,
+  countDirectionReversals,
+  isWhipsawCondition,
+  calculateADX,
+  getADXAnalysis,
+  type ChopAnalysis,
+  type ATRData,
+  type ADXAnalysis,
+} from './chop-index';
+
+// Signal conflict detection
+export {
+  analyzeSignalConflicts,
+  type Signal,
+  type SignalDirection,
+  type ConflictAnalysis,
+  type ConflictPair,
+  type SignalInputs,
+} from './signal-conflicts';
+
+// No-Trade Regime detection (Cash-Preserving Strategy)
+export {
+  analyzeTradingRegime,
+  getRegimeEmoji,
+  formatRegimeBadge,
+  formatRegimeForAI as formatTradingRegimeForAI,
+  formatWeeklySummary,
+  detectRegimeTransition,
+  formatTransitionWarning,
+  type TradingRegime,
+  type TradingRegimeAnalysis,
+  type RegimeReason,
+  type PriceHistory,
+  type RegimeTransition,
+  type RegimeMetricsSnapshot,
+} from './no-trade-regime';
+
+// Market Breadth indicators
+export {
+  SECTOR_ETFS,
+  BREADTH_PROXIES,
+  calculateSectorBreadth,
+  estimateBreadthFromProxies,
+  analyzeBreadth,
+  fetchBreadthViaProxy,
+  fetchSectorBreadthViaProxy,
+  type BreadthAnalysis,
+  type BreadthMetrics,
+  type SectorBreadth,
+} from './market-breadth';

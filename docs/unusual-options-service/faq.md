@@ -13,12 +13,14 @@ Common questions about the unusual options activity scanner.
 When an option contract reaches its expiration date, it can no longer be traded, so the signal is automatically marked as `is_active = FALSE`. This prevents expired contracts from cluttering the active signals feed shown to users.
 
 **Key Points:**
+
 - ✅ Signals remain active until their option contract expiration date
 - ✅ Not detecting a signal for hours or days does NOT make it inactive
 - ✅ Only active signals (non-expired) are shown on the frontend
 - ✅ Inactive signals remain in the database for historical analysis and backtesting
 
 **Example Timeline:**
+
 ```
 AAPL 185C expiring 2025-01-17
 
@@ -37,12 +39,14 @@ Jan 17: Option expires → is_active = FALSE (marked inactive)
 ### What is the difference between NEW and CONTINUING signals?
 
 **NEW Signal:**
+
 - First time the system has detected unusual activity on this specific option contract
 - Badge: `🆕 NEW`
 - `is_new_signal = TRUE`
 - `detection_count = 1`
 
 **CONTINUING Signal:**
+
 - The same option contract was detected in a previous scan (within 24 hours)
 - Badge: `🔄 CONTINUING`
 - `is_new_signal = FALSE`
@@ -50,6 +54,7 @@ Jan 17: Option expires → is_active = FALSE (marked inactive)
 - Shows the unusual activity is persistent, not just a one-time spike
 
 **Why This Matters:**
+
 - **NEW signals** → Fresh opportunity, act quickly
 - **CONTINUING signals** → Sustained interest, may indicate stronger conviction
 - Both can be valuable, but for different reasons
@@ -70,12 +75,14 @@ The system automatically prevents duplicate signals using these criteria:
 ```
 
 When a duplicate is detected:
+
 1. The existing signal is **updated** with new data (volume, price, score)
 2. `last_detected_at` timestamp is updated
 3. `detection_count` is incremented
 4. NO new database row is created
 
 This prevents:
+
 - Multiple alerts for the same signal
 - Database bloat from redundant entries
 - Confusion from duplicate signals in the UI
@@ -84,13 +91,15 @@ This prevents:
 
 ### Why do I see fewer signals in the frontend than in the database?
 
-The frontend **only shows active signals** (non-expired contracts). 
+The frontend **only shows active signals** (non-expired contracts).
 
 If you're querying the database directly, you'll see both:
+
 - **Active signals**: `WHERE is_active = TRUE`
 - **Inactive signals**: `WHERE is_active = FALSE` (expired contracts)
 
 **To see active signals only:**
+
 ```sql
 SELECT * FROM unusual_options_signals
 WHERE is_active = TRUE
@@ -98,6 +107,7 @@ ORDER BY last_detected_at DESC;
 ```
 
 **To see all signals (including expired):**
+
 ```sql
 SELECT * FROM unusual_options_signals
 ORDER BY last_detected_at DESC;
@@ -116,6 +126,7 @@ ORDER BY last_detected_at DESC;
 - Many valid signals were being incorrectly marked inactive
 
 **The Fix:**
+
 - Signals now ONLY go inactive when `expiry < CURRENT_DATE`
 - The 3-hour detection window is no longer used
 - Signals stay active until the actual option expiration date
@@ -129,6 +140,7 @@ python scripts/reactivate_valid_signals.py
 ```
 
 This will find signals that are:
+
 - Currently marked `is_active = FALSE`
 - Have `expiry >= today` (contract not expired)
 - Were detected recently
@@ -142,18 +154,21 @@ This will find signals that are:
 **Recommended Frequencies:**
 
 **Intraday Trading (Hourly):**
+
 ```bash
 # Every hour during market hours (9:30 AM - 4:00 PM ET)
 30 9-16 * * 1-5 unusual-options scan-all --min-grade B
 ```
 
 **Swing Trading (Daily):**
+
 ```bash
 # Once per day after market close
 30 16 * * 1-5 unusual-options scan-all --min-grade B
 ```
 
 **Position Trading (Weekly):**
+
 ```bash
 # Monday mornings
 0 9 * * 1 unusual-options scan-all --min-grade A
@@ -166,6 +181,7 @@ This will find signals that are:
 Signals are filtered out if they fail quality checks:
 
 **Pre-Storage Filters:**
+
 - Grade D or F (too low quality)
 - Overall score < 0.40
 - High risk + low score (risk_level = HIGH and score < 0.60)
@@ -204,6 +220,7 @@ Better to show fewer high-quality signals than flood users with noise.
 **Not recommended.** The system automatically manages signal lifecycle based on option expiration dates.
 
 If you really need to:
+
 ```sql
 UPDATE unusual_options_signals
 SET is_active = FALSE, updated_at = NOW()
@@ -217,6 +234,7 @@ But this will be overridden if the signal is detected again before expiration.
 ### How do I query signals by status?
 
 **Active signals:**
+
 ```sql
 SELECT * FROM unusual_options_signals
 WHERE is_active = TRUE
@@ -224,6 +242,7 @@ ORDER BY overall_score DESC;
 ```
 
 **Inactive signals (for backtesting):**
+
 ```sql
 SELECT * FROM unusual_options_signals
 WHERE is_active = FALSE
@@ -231,6 +250,7 @@ ORDER BY expiry DESC;
 ```
 
 **Signals expiring soon:**
+
 ```sql
 SELECT * FROM unusual_options_signals
 WHERE is_active = TRUE
@@ -239,6 +259,7 @@ ORDER BY expiry ASC;
 ```
 
 **Continuing signals (detected multiple times):**
+
 ```sql
 SELECT * FROM unusual_options_signals
 WHERE is_active = TRUE
@@ -255,6 +276,7 @@ ORDER BY detection_count DESC;
 This likely means the `mark_stale_signals_inactive()` function is incorrectly marking signals.
 
 **Diagnosis:**
+
 ```sql
 -- Check for incorrectly inactive signals
 SELECT COUNT(*) as incorrectly_inactive
@@ -266,12 +288,14 @@ WHERE is_active = FALSE
 If this count > 0, you have signals that should be active.
 
 **Fix:**
+
 ```bash
 cd unusual-options-service
 python scripts/reactivate_valid_signals.py
 ```
 
 Or manually:
+
 ```sql
 UPDATE unusual_options_signals
 SET is_active = TRUE, updated_at = NOW()
@@ -304,6 +328,7 @@ WHERE is_active = FALSE
    - After hours will have minimal activity
 
 **Debug Mode:**
+
 ```bash
 # See exactly what's happening
 unusual-options scan AAPL --debug
@@ -317,14 +342,16 @@ unusual-options scan AAPL --min-grade D
 ### How do I see signal history?
 
 **Via CLI:**
+
 ```bash
 unusual-options history AAPL --days 30
 ```
 
 **Via Database:**
+
 ```sql
 -- Signal timeline
-SELECT 
+SELECT
     ticker,
     option_symbol,
     detection_count,
@@ -352,12 +379,14 @@ ORDER BY detected_at DESC;
 **Typical Results (per scan):**
 
 **Scanning S&P 100 (~100 tickers):**
+
 - Total detections: 50-200
 - After filtering: 5-30 high-quality signals
 - Grade A or higher: 1-5 signals
 - Grade S: 0-2 signals (rare)
 
 **Single Ticker Scan:**
+
 - If unusual activity present: 1-10 signals
 - Most days: 0-2 signals
 - Some days: no signals (normal!)
@@ -371,14 +400,17 @@ ORDER BY detected_at DESC;
 **Performance Metrics:**
 
 **Single Ticker:**
+
 - With cache: 2-5 seconds
 - Without cache: 10-30 seconds
 
 **Batch (100 tickers):**
+
 - Concurrent requests: 5-15 minutes
 - Sequential: 30-60 minutes (not recommended)
 
 **Factors:**
+
 - Data provider speed
 - Network latency
 - Rate limits
@@ -397,4 +429,3 @@ ORDER BY detected_at DESC;
 ---
 
 **Still have questions?** Check the main [README](../../unusual-options-service/README.md) or review the code comments.
-

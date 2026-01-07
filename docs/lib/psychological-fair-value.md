@@ -2,13 +2,13 @@
 
 > **Location:** `lib/utils/ts/psychological-fair-value/`
 
-Calculates where stock price gravitates based on **behavioral biases** and 
+Calculates where stock price gravitates based on **behavioral biases** and
 **market mechanics** rather than traditional fundamental analysis.
 
 ## Concept Overview
 
-Traditional "fair value" comes from fundamentals (DCF, P/E, book value). 
-**Psychological Fair Value** is where price *gravitates toward* based on:
+Traditional "fair value" comes from fundamentals (DCF, P/E, book value).
+**Psychological Fair Value** is where price _gravitates toward_ based on:
 
 - **Options mechanics** (max pain, gamma hedging)
 - **Technical psychology** (MAs, support/resistance)
@@ -16,6 +16,7 @@ Traditional "fair value" comes from fundamentals (DCF, P/E, book value).
 - **Volume anchoring** (VWAP, high volume nodes)
 
 This is useful for:
+
 - Understanding price magnetism before major expirations
 - Identifying mean reversion opportunities
 - Setting realistic price targets
@@ -26,7 +27,7 @@ This is useful for:
 ## Quick Start
 
 ```typescript
-import { 
+import {
   calculatePsychologicalFairValue,
   formatPFVResult,
 } from '@lib/utils/ts/psychological-fair-value';
@@ -58,7 +59,7 @@ console.log(formatPFVResult(result));
 // ══════════════════════════════════════════════════
 // 📊 PSYCHOLOGICAL FAIR VALUE: AAPL
 // ══════════════════════════════════════════════════
-// 
+//
 // Current Price:  $178.50
 // Fair Value:     $175.00
 // Deviation:      -1.96% (BEARISH)
@@ -74,7 +75,7 @@ console.log(formatPFVResult(result));
 
 The strike price where **most options expire worthless**.
 
-Market makers profit from theta decay, so they have an incentive to 
+Market makers profit from theta decay, so they have an incentive to
 "pin" price near max pain as expiration approaches.
 
 ```typescript
@@ -85,13 +86,14 @@ const maxPain = calculateMaxPain(optionsExpiration, currentPrice);
 ```
 
 **When it's strongest:**
+
 - 0-7 days to expiration
 - Monthly OPEX (3rd Friday)
 - High total open interest
 
 ### 2. Gamma Walls (Default: 10% weight)
 
-Strikes with **abnormally high open interest** where market maker 
+Strikes with **abnormally high open interest** where market maker
 delta-hedging creates support/resistance.
 
 ```typescript
@@ -107,6 +109,7 @@ const walls = detectGammaWalls(expiration, currentPrice);
 ```
 
 **Types:**
+
 - **Call walls** (above price) → Resistance
 - **Put walls** (below price) → Support
 - **Combined walls** → Very strong levels
@@ -140,13 +143,13 @@ Where the most money has changed hands:
 Human cognitive bias toward round prices:
 
 - **Major:** $100, $50 intervals
-- **Moderate:** $25, $10 intervals  
+- **Moderate:** $25, $10 intervals
 - **Minor:** $5 intervals
 
 ```typescript
 import { analyzeRoundNumbers } from '@lib/utils/ts/psychological-fair-value';
 
-const rounds = analyzeRoundNumbers(178.50);
+const rounds = analyzeRoundNumbers(178.5);
 // Finds $180 as nearest major level with magnetic pull
 ```
 
@@ -156,17 +159,18 @@ const rounds = analyzeRoundNumbers(178.50);
 
 Different stocks have different "psychological profiles":
 
-| Profile | Best For | Key Characteristics |
-|---------|----------|---------------------|
-| `BLUE_CHIP` | AAPL, MSFT, GOOGL | Institutional-driven, MAs respected |
-| `MEME_RETAIL` | GME, AMC, PLTR | Round numbers strong, gamma squeezes |
-| `ETF` | SPY, QQQ, IWM | Max pain very reliable, OPEX pinning |
-| `LOW_FLOAT` | Small caps | Exaggerated gamma effects |
-| `DEFAULT` | Unknown | Balanced weighting |
+| Profile       | Best For          | Key Characteristics                  |
+| ------------- | ----------------- | ------------------------------------ |
+| `BLUE_CHIP`   | AAPL, MSFT, GOOGL | Institutional-driven, MAs respected  |
+| `MEME_RETAIL` | GME, AMC, PLTR    | Round numbers strong, gamma squeezes |
+| `ETF`         | SPY, QQQ, IWM     | Max pain very reliable, OPEX pinning |
+| `LOW_FLOAT`   | Small caps        | Exaggerated gamma effects            |
+| `DEFAULT`     | Unknown           | Balanced weighting                   |
 
 ### Auto-Detection
 
 Profiles are auto-detected based on:
+
 1. Known ticker lists
 2. Price volatility
 3. Options OI concentration
@@ -177,8 +181,8 @@ Profiles are auto-detected based on:
 import { createCustomProfile } from '@lib/utils/ts/psychological-fair-value';
 
 const myProfile = createCustomProfile('DEFAULT', {
-  maxPain: 0.40,      // Boost max pain weight
-  roundNumber: 0.20,  // Boost round number weight
+  maxPain: 0.4, // Boost max pain weight
+  roundNumber: 0.2, // Boost round number weight
 });
 ```
 
@@ -216,26 +220,26 @@ interface PsychologicalFairValue {
   fairValue: number;
   currentPrice: number;
   confidence: 'HIGH' | 'MEDIUM' | 'LOW';
-  
+
   // Deviation
   deviationPercent: number;
   deviationDollars: number;
   bias: 'BULLISH' | 'NEUTRAL' | 'BEARISH';
-  
+
   // Profile used
   profile: TickerProfile;
-  
+
   // Component breakdown
   components: PFVComponentBreakdown[];
-  
+
   // Expirations analyzed
   expirationAnalysis: ExpirationAnalysis[];
-  
+
   // Key price levels
   magneticLevels: MagneticLevel[];
   supportZone: { low: number; high: number } | null;
   resistanceZone: { low: number; high: number } | null;
-  
+
   // AI-ready context
   aiContext: string;
   interpretation: string;
@@ -258,6 +262,7 @@ const analysis = await aiAnalyst.analyze(ticker, {
 ```
 
 Example context output:
+
 ```
 === PSYCHOLOGICAL FAIR VALUE: AAPL ===
 
@@ -287,11 +292,11 @@ KEY MAGNETIC LEVELS:
 
 ## Confidence Levels
 
-| Level | Description |
-|-------|-------------|
-| `HIGH` | Components converge, good OI data, reasonable deviation |
-| `MEDIUM` | Some divergence or limited data |
-| `LOW` | Significant divergence or sparse options data |
+| Level    | Description                                             |
+| -------- | ------------------------------------------------------- |
+| `HIGH`   | Components converge, good OI data, reasonable deviation |
+| `MEDIUM` | Some divergence or limited data                         |
+| `LOW`    | Significant divergence or sparse options data           |
 
 ---
 
@@ -337,4 +342,3 @@ lib/utils/ts/psychological-fair-value/
 - [ ] Volume profile integration
 - [ ] Frontend visualization component
 - [ ] Python port for scanner integration
-

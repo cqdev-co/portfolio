@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
-import type { UnusualOptionsSignal, UnusualOptionsFilters, UnusualOptionsStats } from '@/lib/types/unusual-options';
+import type {
+  UnusualOptionsSignal,
+  UnusualOptionsFilters,
+  UnusualOptionsStats,
+} from '@/lib/types/unusual-options';
 import { fromZonedTime } from 'date-fns-tz';
 
 export interface SignalQueryOptions {
@@ -20,7 +24,9 @@ export interface SignalResponse {
 /**
  * Fetch unusual options signals from the database
  */
-export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {}): Promise<SignalResponse> {
+export async function fetchUnusualOptionsSignals(
+  options: SignalQueryOptions = {}
+): Promise<SignalResponse> {
   try {
     const {
       limit = 100,
@@ -28,7 +34,7 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
       sortBy = 'premium_flow',
       sortOrder = 'desc',
       filters = {},
-      searchTerm = ''
+      searchTerm = '',
     } = options;
 
     let query = supabase
@@ -118,21 +124,21 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
       // This ensures "Today" means "Today in market time" (EST)
       // regardless of user's local timezone
       const US_EASTERN_TZ = 'America/New_York';
-      
+
       // Parse the date string (e.g., "2025-11-07")
       const dateStr = filters.detection_date;
-      
+
       // Create start and end of day in EST timezone
       // e.g., "2025-11-07" becomes:
       //   Start: 2025-11-07 00:00:00 EST → 2025-11-07 05:00:00 UTC (during EST)
       //   End:   2025-11-07 23:59:59 EST → 2025-11-08 04:59:59 UTC (during EST)
       const startOfDayEST = new Date(`${dateStr}T00:00:00`);
       const endOfDayEST = new Date(`${dateStr}T23:59:59`);
-      
+
       // Convert EST date boundaries to UTC for database query
       const startOfDayUTC = fromZonedTime(startOfDayEST, US_EASTERN_TZ);
       const endOfDayUTC = fromZonedTime(endOfDayEST, US_EASTERN_TZ);
-      
+
       query = query
         .gte('detection_timestamp', startOfDayUTC.toISOString())
         .lte('detection_timestamp', endOfDayUTC.toISOString());
@@ -158,35 +164,35 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
     let allData: UnusualOptionsSignal[] = [];
     let currentOffset = offset;
     const pageSize = 1000; // Supabase max page size
-    
+
     if (limit > pageSize) {
       // Need to paginate
       let hasMore = true;
       let totalFetched = 0;
-      
+
       while (hasMore && totalFetched < limit) {
         const fetchLimit = Math.min(pageSize, limit - totalFetched);
         const pageQuery = query.range(
-          currentOffset, 
+          currentOffset,
           currentOffset + fetchLimit - 1
         );
-        
+
         const { data: pageData, error: pageError } = await pageQuery;
-        
+
         if (pageError) {
           console.error('Error fetching page:', pageError);
           break;
         }
-        
+
         if (!pageData || pageData.length === 0) {
           hasMore = false;
           break;
         }
-        
+
         allData.push(...pageData);
         totalFetched += pageData.length;
         currentOffset += pageData.length;
-        
+
         // If we got fewer results than requested, we've reached the end
         if (pageData.length < fetchLimit) {
           hasMore = false;
@@ -196,16 +202,16 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
       // Single page request
       query = query.range(offset, offset + limit - 1);
       const { data, error } = await query;
-      
+
       if (error) {
         console.error('Error fetching unusual options signals:', error);
         return {
           data: [],
           count: 0,
-          error: error.message
+          error: error.message,
         };
       }
-      
+
       allData = data || [];
     }
 
@@ -215,22 +221,21 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
       .select('*', { count: 'exact', head: true });
 
     // Transform data to add id field for frontend compatibility
-    const transformedData = allData.map(signal => ({
+    const transformedData = allData.map((signal) => ({
       ...signal,
-      id: signal.signal_id // Add id field mapping to signal_id
+      id: signal.signal_id, // Add id field mapping to signal_id
     }));
 
     return {
       data: transformedData,
-      count: count || 0
+      count: count || 0,
     };
-
   } catch (error) {
     console.error('Unexpected error fetching unusual options signals:', error);
     return {
       data: [],
       count: 0,
-      error: 'Failed to fetch unusual options signals'
+      error: 'Failed to fetch unusual options signals',
     };
   }
 }
@@ -240,14 +245,14 @@ export async function fetchUnusualOptionsSignals(options: SignalQueryOptions = {
  * Now filters for active signals only by default
  */
 export async function fetchLatestUnusualOptions(
-  limit: number = 50, 
+  limit: number = 50,
   activeOnly: boolean = true
 ): Promise<SignalResponse> {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dateStr = sevenDaysAgo.toISOString();
-    
+
     let query = supabase
       .from('unusual_options_signals')
       .select('*', { count: 'exact' })
@@ -258,9 +263,7 @@ export async function fetchLatestUnusualOptions(
       query = query.eq('is_active', true);
     }
 
-    query = query
-      .order('last_detected_at', { ascending: false })
-      .limit(limit);
+    query = query.order('last_detected_at', { ascending: false }).limit(limit);
 
     const { data, error, count } = await query;
 
@@ -269,27 +272,26 @@ export async function fetchLatestUnusualOptions(
       return {
         data: [],
         count: 0,
-        error: error.message
+        error: error.message,
       };
     }
 
     // Transform data to add id field for frontend compatibility
-    const transformedData = (data || []).map(signal => ({
+    const transformedData = (data || []).map((signal) => ({
       ...signal,
-      id: signal.signal_id
+      id: signal.signal_id,
     }));
 
     return {
       data: transformedData,
-      count: count || 0
+      count: count || 0,
     };
-
   } catch (error) {
     console.error('Unexpected error fetching latest unusual options:', error);
     return {
       data: [],
       count: 0,
-      error: 'Failed to fetch latest unusual options'
+      error: 'Failed to fetch latest unusual options',
     };
   }
 }
@@ -298,7 +300,9 @@ export async function fetchLatestUnusualOptions(
  * Fetch signal statistics for dashboard
  * Now filters for active signals only
  */
-export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Promise<UnusualOptionsStats | null> {
+export async function fetchUnusualOptionsStats(
+  activeOnly: boolean = true
+): Promise<UnusualOptionsStats | null> {
   try {
     // Get recent signals (last 7 days)
     const sevenDaysAgo = new Date();
@@ -307,7 +311,9 @@ export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Prom
 
     let query = supabase
       .from('unusual_options_signals')
-      .select('grade, option_type, risk_level, premium_flow, overall_score, detection_timestamp')
+      .select(
+        'grade, option_type, risk_level, premium_flow, overall_score, detection_timestamp'
+      )
       .gte('detection_timestamp', dateStr);
 
     // Filter for active signals only (default)
@@ -331,29 +337,29 @@ export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Prom
         total_premium_flow: 0,
         average_score: 0,
         latest_detection_date: new Date().toISOString().split('T')[0],
-        high_conviction_count: 0
+        high_conviction_count: 0,
       };
     }
 
     const by_grade = {
-      S: signals.filter(s => s.grade === 'S').length,
-      A: signals.filter(s => s.grade === 'A').length,
-      B: signals.filter(s => s.grade === 'B').length,
-      C: signals.filter(s => s.grade === 'C').length,
-      D: signals.filter(s => s.grade === 'D').length,
-      F: signals.filter(s => s.grade === 'F').length,
+      S: signals.filter((s) => s.grade === 'S').length,
+      A: signals.filter((s) => s.grade === 'A').length,
+      B: signals.filter((s) => s.grade === 'B').length,
+      C: signals.filter((s) => s.grade === 'C').length,
+      D: signals.filter((s) => s.grade === 'D').length,
+      F: signals.filter((s) => s.grade === 'F').length,
     };
 
     const by_type = {
-      calls: signals.filter(s => s.option_type === 'call').length,
-      puts: signals.filter(s => s.option_type === 'put').length,
+      calls: signals.filter((s) => s.option_type === 'call').length,
+      puts: signals.filter((s) => s.option_type === 'put').length,
     };
 
     const by_risk = {
-      LOW: signals.filter(s => s.risk_level === 'LOW').length,
-      MEDIUM: signals.filter(s => s.risk_level === 'MEDIUM').length,
-      HIGH: signals.filter(s => s.risk_level === 'HIGH').length,
-      EXTREME: signals.filter(s => s.risk_level === 'EXTREME').length,
+      LOW: signals.filter((s) => s.risk_level === 'LOW').length,
+      MEDIUM: signals.filter((s) => s.risk_level === 'MEDIUM').length,
+      HIGH: signals.filter((s) => s.risk_level === 'HIGH').length,
+      EXTREME: signals.filter((s) => s.risk_level === 'EXTREME').length,
     };
 
     const total_premium_flow = signals.reduce((sum, s) => {
@@ -361,12 +367,15 @@ export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Prom
       return sum + premium;
     }, 0);
 
-    const average_score = signals.reduce((sum, s) => {
-      const score = parseFloat(s.overall_score?.toString() || '0') || 0;
-      return sum + score;
-    }, 0) / signals.length;
+    const average_score =
+      signals.reduce((sum, s) => {
+        const score = parseFloat(s.overall_score?.toString() || '0') || 0;
+        return sum + score;
+      }, 0) / signals.length;
 
-    const latest_detection_date = signals[0]?.detection_timestamp?.split('T')[0] || new Date().toISOString().split('T')[0];
+    const latest_detection_date =
+      signals[0]?.detection_timestamp?.split('T')[0] ||
+      new Date().toISOString().split('T')[0];
 
     const high_conviction_count = by_grade.S + by_grade.A;
 
@@ -378,9 +387,8 @@ export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Prom
       total_premium_flow,
       average_score,
       latest_detection_date,
-      high_conviction_count
+      high_conviction_count,
     };
-
   } catch (error) {
     console.error('Unexpected error fetching unusual options stats:', error);
     return null;
@@ -390,7 +398,9 @@ export async function fetchUnusualOptionsStats(activeOnly: boolean = true): Prom
 /**
  * Fetch a single signal by ID
  */
-export async function fetchUnusualOptionById(id: string): Promise<UnusualOptionsSignal | null> {
+export async function fetchUnusualOptionById(
+  id: string
+): Promise<UnusualOptionsSignal | null> {
   try {
     const { data, error } = await supabase
       .from('unusual_options_signals')
@@ -405,7 +415,6 @@ export async function fetchUnusualOptionById(id: string): Promise<UnusualOptions
 
     // Transform data to add id field for frontend compatibility
     return data ? { ...data, id: data.signal_id } : null;
-
   } catch (error) {
     console.error('Unexpected error fetching unusual option by ID:', error);
     return null;
@@ -416,22 +425,26 @@ export async function fetchUnusualOptionById(id: string): Promise<UnusualOptions
  * Subscribe to real-time signal updates
  */
 export function subscribeToUnusualOptionsUpdates(
-  callback: (payload: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown>; errors: string[] | null }) => void,
+  callback: (payload: {
+    eventType: string;
+    new: Record<string, unknown>;
+    old: Record<string, unknown>;
+    errors: string[] | null;
+  }) => void,
   filters?: { scan_date?: string }
 ) {
-  const channel = supabase
-    .channel('unusual_options_changes')
-    .on(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      {
-        event: '*',
-        schema: 'public',
-        table: 'unusual_options_signals',
-        filter: filters?.scan_date ? `scan_date=eq.${filters.scan_date}` : undefined
-      },
-      callback
-    );
+  const channel = supabase.channel('unusual_options_changes').on(
+    'postgres_changes' as 'system',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'unusual_options_signals',
+      filter: filters?.scan_date
+        ? `scan_date=eq.${filters.scan_date}`
+        : undefined,
+    },
+    callback
+  );
 
   channel.subscribe();
 
@@ -457,24 +470,31 @@ export async function fetchUnusualOptionsFilterOptions() {
         grades: ['S', 'A', 'B', 'C', 'D', 'F'],
         risk_levels: ['LOW', 'MEDIUM', 'HIGH', 'EXTREME'],
         moneyness: ['ITM', 'ATM', 'OTM'],
-        sentiments: ['BULLISH', 'BEARISH', 'NEUTRAL']
+        sentiments: ['BULLISH', 'BEARISH', 'NEUTRAL'],
       };
     }
 
-    const option_types = [...new Set(data.map(d => d.option_type).filter(Boolean))];
-    const grades = [...new Set(data.map(d => d.grade).filter(Boolean))];
-    const risk_levels = [...new Set(data.map(d => d.risk_level).filter(Boolean))];
-    const moneyness = [...new Set(data.map(d => d.moneyness).filter(Boolean))];
-    const sentiments = [...new Set(data.map(d => d.sentiment).filter(Boolean))];
+    const option_types = [
+      ...new Set(data.map((d) => d.option_type).filter(Boolean)),
+    ];
+    const grades = [...new Set(data.map((d) => d.grade).filter(Boolean))];
+    const risk_levels = [
+      ...new Set(data.map((d) => d.risk_level).filter(Boolean)),
+    ];
+    const moneyness = [
+      ...new Set(data.map((d) => d.moneyness).filter(Boolean)),
+    ];
+    const sentiments = [
+      ...new Set(data.map((d) => d.sentiment).filter(Boolean)),
+    ];
 
     return {
       option_types,
       grades,
       risk_levels,
       moneyness,
-      sentiments
+      sentiments,
     };
-
   } catch (error) {
     console.error('Unexpected error fetching filter options:', error);
     return {
@@ -482,8 +502,7 @@ export async function fetchUnusualOptionsFilterOptions() {
       grades: ['S', 'A', 'B', 'C', 'D', 'F'],
       risk_levels: ['LOW', 'MEDIUM', 'HIGH', 'EXTREME'],
       moneyness: ['ITM', 'ATM', 'OTM'],
-      sentiments: ['BULLISH', 'BEARISH', 'NEUTRAL']
+      sentiments: ['BULLISH', 'BEARISH', 'NEUTRAL'],
     };
   }
 }
-

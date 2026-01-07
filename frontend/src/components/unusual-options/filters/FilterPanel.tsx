@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import type { UnusualOptionsFilters } from "@/lib/types/unusual-options";
-import { DateRangeFilter } from "./DateRangeFilter";
-import { GradeFilter } from "./GradeFilter";
-import { OptionTypeFilter } from "./OptionTypeFilter";
-import { PremiumFlowFilter } from "./PremiumFlowFilter";
-import { DetectionFlagsFilter } from "./DetectionFlagsFilter";
-import { X, Filter } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import type { UnusualOptionsFilters } from '@/lib/types/unusual-options';
+import { DateRangeFilter } from './DateRangeFilter';
+import { GradeFilter } from './GradeFilter';
+import { OptionTypeFilter } from './OptionTypeFilter';
+import { PremiumFlowFilter } from './PremiumFlowFilter';
+import { DetectionFlagsFilter } from './DetectionFlagsFilter';
+import { X, Filter } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface FilterPanelProps {
   isOpen: boolean;
@@ -25,12 +25,12 @@ interface FilterPanelProps {
  * Provides a unified interface for all filter options
  * Designed to be extensible - easy to add new filters
  */
-export function FilterPanel({ 
-  isOpen, 
-  onClose, 
-  filters, 
+export function FilterPanel({
+  isOpen,
+  onClose,
+  filters,
   onFiltersChange,
-  onApply 
+  onApply,
 }: FilterPanelProps) {
   // Count active filters for badge
   const getActiveFilterCount = (): number => {
@@ -68,42 +68,38 @@ export function FilterPanel({
     <>
       {/* Backdrop */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-40"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
       )}
-      
+
       {/* Filter Panel */}
-      <div className={cn(
-        "fixed top-0 right-0 h-full w-full sm:w-[400px]",
-        "bg-background border-l border-border z-50",
-        "shadow-2xl flex flex-col",
-        "transform transition-all duration-300 ease-out",
-        isOpen ? "translate-x-0" : "translate-x-full"
-      )}>
+      <div
+        className={cn(
+          'fixed top-0 right-0 h-full w-full sm:w-[400px]',
+          'bg-background border-l border-border z-50',
+          'shadow-2xl flex flex-col',
+          'transform transition-all duration-300 ease-out',
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
         {/* Header */}
-        <div 
+        <div
           className={
-            "flex items-center justify-between p-4 " +
-            "border-b border-border shrink-0"
+            'flex items-center justify-between p-4 ' +
+            'border-b border-border shrink-0'
           }
         >
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-primary" />
             <h2 className="text-base font-semibold">Filters</h2>
             {activeCount > 0 && (
-              <Badge 
-                variant="secondary" 
-                className="text-[10px] px-1.5 py-0"
-              >
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 {activeCount}
               </Badge>
             )}
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             className="h-8 w-8 p-0"
           >
@@ -153,14 +149,12 @@ export function FilterPanel({
             hasOiSpike={filters.has_oi_spike}
             hasSweep={filters.has_sweep}
             hasBlockTrade={filters.has_block_trade}
-            onVolumeAnomalyChange={(val) => 
+            onVolumeAnomalyChange={(val) =>
               updateFilter('has_volume_anomaly', val)
             }
             onOiSpikeChange={(val) => updateFilter('has_oi_spike', val)}
             onSweepChange={(val) => updateFilter('has_sweep', val)}
-            onBlockTradeChange={(val) => 
-              updateFilter('has_block_trade', val)
-            }
+            onBlockTradeChange={(val) => updateFilter('has_block_trade', val)}
           />
 
           {/* Future filters can be easily added here */}
@@ -176,10 +170,9 @@ export function FilterPanel({
         </div>
 
         {/* Footer Actions */}
-        <div 
+        <div
           className={
-            "shrink-0 p-4 border-t border-border " +
-            "flex items-center gap-2"
+            'shrink-0 p-4 border-t border-border ' + 'flex items-center gap-2'
           }
         >
           <Button
@@ -206,4 +199,3 @@ export function FilterPanel({
     </>
   );
 }
-

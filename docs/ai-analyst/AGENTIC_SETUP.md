@@ -18,6 +18,7 @@ db/agent_schema.sql
 ```
 
 This creates the following tables:
+
 - `agent_watchlist` - Tickers to monitor
 - `agent_alerts` - Alert history
 - `agent_scan_history` - Scan analytics
@@ -95,14 +96,14 @@ bun run analyst watch remove NVDA
 
 Alerts can be configured via the `agent_config` table or CLI:
 
-| Config Key | Default | Description |
-|------------|---------|-------------|
-| `scan_interval_ms` | 1800000 | Scan interval (30 min) |
-| `briefing_time` | "09:00" | Morning briefing time (ET) |
+| Config Key          | Default | Description                                  |
+| ------------------- | ------- | -------------------------------------------- |
+| `scan_interval_ms`  | 1800000 | Scan interval (30 min)                       |
+| `briefing_time`     | "09:00" | Morning briefing time (ET)                   |
 | `alert_cooldown_ms` | 7200000 | Cooldown between alerts per ticker (2 hours) |
-| `discord_enabled` | true | Enable Discord notifications |
-| `ai_review_enabled` | true | AI validates alerts before sending |
-| `min_conviction` | 6 | Minimum AI conviction score (1-10) |
+| `discord_enabled`   | true    | Enable Discord notifications                 |
+| `ai_review_enabled` | true    | AI validates alerts before sending           |
+| `min_conviction`    | 6       | Minimum AI conviction score (1-10)           |
 
 ## 5. Running the Agent
 
@@ -134,6 +135,7 @@ bun run analyst agent dry-run
 ```
 
 This shows:
+
 - ✅ Tickers that **would** trigger alerts (and why)
 - ❌ Tickers that were **filtered out** (with detailed rejection reasons)
 - Each criteria check (RSI, IV, cushion, grade) with ✓ or ✗
@@ -162,14 +164,14 @@ bun run analyst alerts ack <alert-id>
 
 Victor monitors for:
 
-| Alert Type | Description | Priority |
-|------------|-------------|----------|
-| `ENTRY_SIGNAL` | Grade A/B opportunity on watchlist | HIGH/MEDIUM |
-| `EXIT_SIGNAL` | Time to close position | HIGH |
-| `POSITION_RISK` | DTE < 5, cushion < 5%, etc. | HIGH |
-| `EARNINGS_WARNING` | Earnings within 7 days | MEDIUM |
-| `NEWS_EVENT` | Material news detected | MEDIUM |
-| `MACRO_EVENT` | Fed/CPI/NFP impact | MEDIUM |
+| Alert Type         | Description                        | Priority    |
+| ------------------ | ---------------------------------- | ----------- |
+| `ENTRY_SIGNAL`     | Grade A/B opportunity on watchlist | HIGH/MEDIUM |
+| `EXIT_SIGNAL`      | Time to close position             | HIGH        |
+| `POSITION_RISK`    | DTE < 5, cushion < 5%, etc.        | HIGH        |
+| `EARNINGS_WARNING` | Earnings within 7 days             | MEDIUM      |
+| `NEWS_EVENT`       | Material news detected             | MEDIUM      |
+| `MACRO_EVENT`      | Fed/CPI/NFP impact                 | MEDIUM      |
 
 ## 7. Alert Criteria
 
@@ -183,6 +185,7 @@ Entry signals are triggered when ALL conditions are met:
 - No earnings within 7 days
 
 **Note on IV:** The IV check passes if:
+
 - No IV data available (weekend/illiquid options)
 - No IV threshold configured (user doesn't care about IV)
 - IV percentile is at or below the threshold (lower IV = cheaper spreads)
@@ -191,16 +194,16 @@ Entry signals are triggered when ALL conditions are met:
 
 Thresholds automatically adjust based on market conditions:
 
-| Condition | Adjustment | Rationale |
-|-----------|------------|-----------|
-| **Bull market** (SPY uptrend) | RSI high +5 | Dips are shallow, widen range |
-| **Bear market** (SPY downtrend) | RSI high -5, low -3 | Wait for real capitulation |
-| **High VIX** (>25) | IV threshold +15% | Everything is expensive |
-| **Elevated VIX** (20-25) | IV threshold +8% | Options moderately expensive |
-| **Low VIX** (<15) | IV threshold -5% | Can be stricter on IV |
-| **Ticker pullback** (>3% drop) | RSI high +8 | Opportunity! Catch the dip |
-| **Ticker dip** (1.5-3% drop) | RSI high +4 | Minor pullback |
-| **Volatile regime** | Cushion -1% | Accept tighter cushions |
+| Condition                       | Adjustment          | Rationale                     |
+| ------------------------------- | ------------------- | ----------------------------- |
+| **Bull market** (SPY uptrend)   | RSI high +5         | Dips are shallow, widen range |
+| **Bear market** (SPY downtrend) | RSI high -5, low -3 | Wait for real capitulation    |
+| **High VIX** (>25)              | IV threshold +15%   | Everything is expensive       |
+| **Elevated VIX** (20-25)        | IV threshold +8%    | Options moderately expensive  |
+| **Low VIX** (<15)               | IV threshold -5%    | Can be stricter on IV         |
+| **Ticker pullback** (>3% drop)  | RSI high +8         | Opportunity! Catch the dip    |
+| **Ticker dip** (1.5-3% drop)    | RSI high +4         | Minor pullback                |
+| **Volatile regime**             | Cushion -1%         | Accept tighter cushions       |
 
 Run `bun run agent dry-run` to see dynamic adjustments in action:
 
@@ -231,11 +234,11 @@ Position risk alerts trigger when ANY of these occur:
 
 ## 8. Cost Estimates
 
-| Component | Frequency | Est. Cost |
-|-----------|-----------|-----------|
-| Watchlist Scan (10 tickers) | Every 30 min | ~$0.02/scan |
-| AI Alert Review | Per opportunity | ~$0.01/review |
-| Morning Briefing | Daily | ~$0.05/briefing |
+| Component                   | Frequency       | Est. Cost       |
+| --------------------------- | --------------- | --------------- |
+| Watchlist Scan (10 tickers) | Every 30 min    | ~$0.02/scan     |
+| AI Alert Review             | Per opportunity | ~$0.01/review   |
+| Morning Briefing            | Daily           | ~$0.05/briefing |
 
 **Monthly estimate:** ~$15-30 (with TOON encoding and smart caching)
 
@@ -266,6 +269,7 @@ bun run analyst agent start --debug
 ```
 
 Adjust alert criteria:
+
 - **Too many:** Increase `min_conviction`, raise grade threshold
 - **Too few:** Lower thresholds (RSI range, cushion minimum, grade)
 

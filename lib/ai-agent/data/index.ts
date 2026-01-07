@@ -1,6 +1,6 @@
 /**
  * AI Agent Data Module
- * 
+ *
  * Shared data fetching and formatting for CLI and Frontend.
  */
 
@@ -53,10 +53,7 @@ export {
 export { fetchTickerDataFromPolygon } from './polygon';
 
 // Cloudflare Worker proxy (bypasses Yahoo rate limits)
-export {
-  isProxyConfigured,
-  checkProxyHealth,
-} from './yahoo-proxy';
+export { isProxyConfigured, checkProxyHealth } from './yahoo-proxy';
 
 // Formatters
 export {
@@ -64,4 +61,3 @@ export {
   formatSearchResultsForAI,
   formatTickerSummary,
 } from './formatters';
-

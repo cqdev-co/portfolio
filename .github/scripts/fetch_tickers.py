@@ -46,6 +46,11 @@ from utils.constants import (
     RATE_LIMIT_DELAY_SECONDS,
     TICKER_MIN_PRICE,
     TICKER_MAX_PRICE,
+    TICKER_MIN_QUALITY_SCORE,
+    TICKER_MIN_HISTORY_DAYS,
+    TICKER_MIN_DATA_COMPLETENESS,
+    TICKER_MAX_GAP_RATIO,
+    TICKER_MIN_VOLUME,
     DEFAULT_MAX_TICKERS
 )
 
@@ -70,8 +75,11 @@ class TickerFetcher:
     
     def __init__(self, dry_run: bool = False, verbose: bool = False, 
                  enable_quality_filter: bool = True, us_only: bool = True,
-                 min_quality_score: float = 45.0, enable_cfd_filter: bool = True,
-                 max_tickers: int = 5000, enable_yfinance_validation: bool = True):
+                 min_quality_score: float = TICKER_MIN_QUALITY_SCORE,
+                 enable_cfd_filter: bool = True,
+                 max_tickers: int = DEFAULT_MAX_TICKERS,
+                 enable_yfinance_validation: bool = True,
+                 enable_advanced_checks: bool = False):
         self.dry_run = dry_run
         self.verbose = verbose
         self.enable_quality_filter = enable_quality_filter
@@ -80,6 +88,7 @@ class TickerFetcher:
         self.enable_cfd_filter = enable_cfd_filter
         self.max_tickers = max_tickers
         self.enable_yfinance_validation = enable_yfinance_validation
+        self.enable_advanced_checks = enable_advanced_checks
         
         self.setup_logging()
         self.setup_supabase()
@@ -135,29 +144,39 @@ class TickerFetcher:
             self.logger.info(
                 f"Efficient quality filtering enabled: US-only={self.us_only}, "
                 f"min_score={self.min_quality_score}, CFD-filter={self.enable_cfd_filter}, "
-                f"max_tickers={self.max_tickers}"
+                f"max_tickers={self.max_tickers}, "
+                f"advanced_checks={self.enable_advanced_checks}"
             )
+            
+            if self.enable_advanced_checks:
+                self.logger.info(
+                    "Advanced quality checks ENABLED: "
+                    "options eligibility, institutional ownership, "
+                    "revenue requirements, float validation"
+                )
         else:
             self.quality_filter = None
             self.logger.info("Quality filtering disabled")
     
     def setup_yfinance_validator(self) -> None:
-        """Setup YFinance data quality validator"""
+        """Setup YFinance data quality validator with stricter thresholds"""
         if self.enable_yfinance_validation:
             self.yfinance_validator = YFinanceValidator(
-                min_history_days=90,
-                min_volume=10_000,
+                min_history_days=TICKER_MIN_HISTORY_DAYS,
+                min_volume=TICKER_MIN_VOLUME,
                 min_price=TICKER_MIN_PRICE,
                 max_price=TICKER_MAX_PRICE,
-                min_data_completeness=0.85,
-                max_gap_ratio=0.10,
+                min_data_completeness=TICKER_MIN_DATA_COMPLETENESS,
+                max_gap_ratio=TICKER_MAX_GAP_RATIO,
                 recency_days=5,
                 max_workers=3,  # Reduced to avoid rate limiting
                 request_delay=0.5  # 500ms delay between requests
             )
             self.logger.info(
-                "YFinance validation enabled with conservative rate limiting "
-                "(3 workers, 0.5s delay) to avoid API errors"
+                f"YFinance validation enabled with STRICTER thresholds: "
+                f"min_price=${TICKER_MIN_PRICE}, min_volume={TICKER_MIN_VOLUME:,}, "
+                f"min_history={TICKER_MIN_HISTORY_DAYS}d, "
+                f"completeness={TICKER_MIN_DATA_COMPLETENESS*100:.0f}%"
             )
         else:
             self.yfinance_validator = None
@@ -370,12 +389,28 @@ class TickerFetcher:
             ticker_dicts.append(ticker_dict)
         
         try:
-            # Apply efficient filtering (includes US-only filtering internally)
-            high_quality_symbols, quality_metrics = self.quality_filter.filter_high_quality_tickers(
-                ticker_dicts,
-                min_quality_score=self.min_quality_score,
-                max_tickers=self.max_tickers
-            )
+            # Choose filtering method based on advanced checks setting
+            if self.enable_advanced_checks:
+                self.logger.info(
+                    "Using ADVANCED filtering (options, institutional, "
+                    "fundamentals, float) - this may take 10-15 minutes..."
+                )
+                high_quality_symbols, quality_metrics = \
+                    self.quality_filter.filter_with_advanced_checks(
+                        ticker_dicts,
+                        min_quality_score=self.min_quality_score,
+                        max_tickers=self.max_tickers,
+                        enable_advanced_checks=True,
+                        verbose=self.verbose
+                    )
+            else:
+                # Standard efficient filtering
+                high_quality_symbols, quality_metrics = \
+                    self.quality_filter.filter_high_quality_tickers(
+                        ticker_dicts,
+                        min_quality_score=self.min_quality_score,
+                        max_tickers=self.max_tickers
+                    )
             
             if not high_quality_symbols:
                 self.logger.warning("No symbols passed quality filtering")
@@ -384,30 +419,32 @@ class TickerFetcher:
             # Convert back to TickerInfo objects
             filtered_tickers = []
             symbol_set = set(high_quality_symbols)
+            metrics_dict = {m.symbol: m for m in quality_metrics}
             
             for ticker in tickers:
                 if ticker.symbol in symbol_set:
-                    # Update with metrics from efficient filter
-                    for metrics in quality_metrics:
-                        if metrics.symbol == ticker.symbol:
-                            if metrics.market_cap:
-                                ticker.market_cap = int(metrics.market_cap)
-                            if metrics.exchange:
-                                ticker.exchange = metrics.exchange
-                            if metrics.sector:
-                                ticker.sector = metrics.sector
-                            # Set country to US for filtered tickers
-                            ticker.country = 'US'
-                            break
+                    # Update with metrics from filter
+                    metrics = metrics_dict.get(ticker.symbol)
+                    if metrics:
+                        if metrics.market_cap:
+                            ticker.market_cap = int(metrics.market_cap)
+                        if metrics.exchange:
+                            ticker.exchange = metrics.exchange
+                        if metrics.sector:
+                            ticker.sector = metrics.sector
+                        # Set country to US for filtered tickers
+                        ticker.country = 'US'
                     
                     filtered_tickers.append(ticker)
             
             # Generate summary
-            summary = self.quality_filter.get_filtering_summary(high_quality_symbols, quality_metrics)
+            summary = self.quality_filter.get_filtering_summary(
+                high_quality_symbols, quality_metrics
+            )
             
             self.logger.info(
-                f"Efficient filtering complete: {len(filtered_tickers)} high-quality "
-                f"tickers selected from {len(tickers)} total "
+                f"Quality filtering complete: {len(filtered_tickers)} high-quality "
+                f"tickers from {len(tickers)} total "
                 f"({len(filtered_tickers)/len(tickers)*100:.1f}% pass rate)"
             )
             
@@ -418,14 +455,26 @@ class TickerFetcher:
                     f"avg_price=${summary.get('price_range', {}).get('avg', 0):.2f}"
                 )
             
+            # Log advanced metrics if available
+            if self.enable_advanced_checks and quality_metrics:
+                with_options = sum(1 for m in quality_metrics if m.has_options)
+                profitable = sum(1 for m in quality_metrics if m.is_profitable)
+                self.logger.info(
+                    f"Advanced metrics: {with_options} with options, "
+                    f"{profitable} profitable"
+                )
+            
             return filtered_tickers
             
         except (ValueError, KeyError) as e:
-            self.logger.error(f"Data error during efficient quality filtering: {e}")
+            self.logger.error(f"Data error during quality filtering: {e}")
             self.logger.info("Falling back to unfiltered ticker list")
             return tickers
         except Exception as e:
-            self.logger.error(f"Unexpected error during efficient quality filtering: {e}", exc_info=True)
+            self.logger.error(
+                f"Unexpected error during quality filtering: {e}", 
+                exc_info=True
+            )
             self.logger.info("Falling back to unfiltered ticker list")
             return tickers
     
@@ -620,8 +669,8 @@ def main():
     parser.add_argument(
         '--min-quality-score',
         type=float,
-        default=45.0,
-        help='Minimum quality score for filtering (0-100, default: 45.0)'
+        default=TICKER_MIN_QUALITY_SCORE,
+        help=f'Minimum quality score for filtering (0-100, default: {TICKER_MIN_QUALITY_SCORE})'
     )
     parser.add_argument(
         '--disable-cfd-filter',
@@ -639,6 +688,12 @@ def main():
         action='store_true',
         help='Disable YFinance data quality validation (not recommended)'
     )
+    parser.add_argument(
+        '--enable-advanced-checks',
+        action='store_true',
+        help='Enable advanced quality checks (options, institutional, '
+             'fundamentals, float) - adds ~10-15 min but higher quality'
+    )
     
     args = parser.parse_args()
     
@@ -651,7 +706,8 @@ def main():
             min_quality_score=args.min_quality_score,
             enable_cfd_filter=not args.disable_cfd_filter,
             max_tickers=args.max_tickers,
-            enable_yfinance_validation=not args.disable_yfinance_validation
+            enable_yfinance_validation=not args.disable_yfinance_validation,
+            enable_advanced_checks=args.enable_advanced_checks
         )
         success = fetcher.run()
         sys.exit(0 if success else 1)

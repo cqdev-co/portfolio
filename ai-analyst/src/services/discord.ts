@@ -7,16 +7,16 @@
 // TYPES
 // ============================================================================
 
-export type AlertType = 
-  | "ENTRY_SIGNAL"
-  | "EXIT_SIGNAL"
-  | "POSITION_RISK"
-  | "EARNINGS_WARNING"
-  | "NEWS_EVENT"
-  | "MACRO_EVENT"
-  | "BRIEFING";
+export type AlertType =
+  | 'ENTRY_SIGNAL'
+  | 'EXIT_SIGNAL'
+  | 'POSITION_RISK'
+  | 'EARNINGS_WARNING'
+  | 'NEWS_EVENT'
+  | 'MACRO_EVENT'
+  | 'BRIEFING';
 
-export type Priority = "HIGH" | "MEDIUM" | "LOW";
+export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export interface AlertEmbed {
   type: AlertType;
@@ -67,7 +67,9 @@ function getWebhookUrl(): string | undefined {
 }
 
 function getBriefingWebhookUrl(): string | undefined {
-  return process.env.DISCORD_BRIEFING_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+  return (
+    process.env.DISCORD_BRIEFING_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL
+  );
 }
 
 // Rate limiting: max 5 requests per minute
@@ -77,20 +79,20 @@ let requestTimestamps: number[] = [];
 
 // Color mapping by priority
 const PRIORITY_COLORS: Record<Priority, number> = {
-  HIGH: 0xED4245,    // Red
-  MEDIUM: 0xFEE75C,  // Yellow
-  LOW: 0x57F287,     // Green
+  HIGH: 0xed4245, // Red
+  MEDIUM: 0xfee75c, // Yellow
+  LOW: 0x57f287, // Green
 };
 
 // Alert type emojis
 const ALERT_EMOJIS: Record<AlertType, string> = {
-  ENTRY_SIGNAL: "🎯",
-  EXIT_SIGNAL: "🚪",
-  POSITION_RISK: "⚠️",
-  EARNINGS_WARNING: "📅",
-  NEWS_EVENT: "📰",
-  MACRO_EVENT: "🏛️",
-  BRIEFING: "☀️",
+  ENTRY_SIGNAL: '🎯',
+  EXIT_SIGNAL: '🚪',
+  POSITION_RISK: '⚠️',
+  EARNINGS_WARNING: '📅',
+  NEWS_EVENT: '📰',
+  MACRO_EVENT: '🏛️',
+  BRIEFING: '☀️',
 };
 
 // ============================================================================
@@ -111,7 +113,7 @@ function checkRateLimit(): boolean {
   const now = Date.now();
   // Remove old timestamps outside the window
   requestTimestamps = requestTimestamps.filter(
-    ts => now - ts < RATE_LIMIT_WINDOW_MS
+    (ts) => now - ts < RATE_LIMIT_WINDOW_MS
   );
   return requestTimestamps.length < RATE_LIMIT_MAX_REQUESTS;
 }
@@ -126,37 +128,44 @@ function recordRequest(): void {
 /**
  * Send webhook payload to Discord
  */
-async function sendWebhook(payload: DiscordWebhookPayload, useBriefingWebhook = false): Promise<boolean> {
-  const webhookUrl = useBriefingWebhook ? getBriefingWebhookUrl() : getWebhookUrl();
-  
+async function sendWebhook(
+  payload: DiscordWebhookPayload,
+  useBriefingWebhook = false
+): Promise<boolean> {
+  const webhookUrl = useBriefingWebhook
+    ? getBriefingWebhookUrl()
+    : getWebhookUrl();
+
   if (!webhookUrl) {
-    console.error("Discord webhook URL not configured");
+    console.error('Discord webhook URL not configured');
     return false;
   }
 
   if (!checkRateLimit()) {
-    console.warn("Discord rate limit exceeded, skipping message");
+    console.warn('Discord rate limit exceeded, skipping message');
     return false;
   }
 
   try {
     const response = await fetch(webhookUrl, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      console.error(`Discord webhook error: ${response.status} ${response.statusText}`);
+      console.error(
+        `Discord webhook error: ${response.status} ${response.statusText}`
+      );
       return false;
     }
 
     recordRequest();
     return true;
   } catch (error) {
-    console.error("Discord webhook error:", error);
+    console.error('Discord webhook error:', error);
     return false;
   }
 }
@@ -173,14 +182,14 @@ export async function sendDiscordAlert(embed: AlertEmbed): Promise<boolean> {
   const color = PRIORITY_COLORS[embed.priority];
 
   // Build title
-  let title = `${emoji} ${embed.type.replace(/_/g, " ")}`;
+  let title = `${emoji} ${embed.type.replace(/_/g, ' ')}`;
   if (embed.ticker) {
     title += `: ${embed.ticker}`;
   }
 
   // Build fields
   const fields: { name: string; value: string; inline?: boolean }[] = [];
-  
+
   // Add custom fields
   for (const field of embed.fields) {
     fields.push({
@@ -211,7 +220,7 @@ export async function sendDiscordAlert(embed: AlertEmbed): Promise<boolean> {
   };
 
   const payload: DiscordWebhookPayload = {
-    username: "Victor",
+    username: 'Victor',
     embeds: [discordEmbed],
   };
 
@@ -234,30 +243,31 @@ export async function sendEntrySignal(data: {
 }): Promise<boolean> {
   const fields: { name: string; value: string; inline?: boolean }[] = [
     {
-      name: "💰 Price",
-      value: `$${data.price.toFixed(2)} (${data.changePct >= 0 ? "+" : ""}${data.changePct.toFixed(1)}%)`,
+      name: '💰 Price',
+      value: `$${data.price.toFixed(2)} (${data.changePct >= 0 ? '+' : ''}${data.changePct.toFixed(1)}%)`,
       inline: true,
     },
     {
-      name: "📊 Grade",
+      name: '📊 Grade',
       value: data.grade,
       inline: true,
     },
   ];
 
   if (data.rsi !== undefined) {
-    const rsiStatus = data.rsi >= 35 && data.rsi <= 55 ? "✅" : "⚠️";
+    const rsiStatus = data.rsi >= 35 && data.rsi <= 55 ? '✅' : '⚠️';
     fields.push({
-      name: "📈 RSI",
+      name: '📈 RSI',
       value: `${data.rsi.toFixed(0)} ${rsiStatus}`,
       inline: true,
     });
   }
 
   if (data.iv !== undefined) {
-    const ivStatus = data.iv.level === "LOW" || data.iv.level === "NORMAL" ? "✅" : "⚠️";
+    const ivStatus =
+      data.iv.level === 'LOW' || data.iv.level === 'NORMAL' ? '✅' : '⚠️';
     fields.push({
-      name: "📉 IV",
+      name: '📉 IV',
       value: `${data.iv.current.toFixed(0)}% (${data.iv.percentile}th %ile) ${ivStatus}`,
       inline: true,
     });
@@ -265,17 +275,17 @@ export async function sendEntrySignal(data: {
 
   if (data.spread) {
     fields.push({
-      name: "📋 Spread",
+      name: '📋 Spread',
       value: `${data.spread.strikes} @ $${data.spread.debit.toFixed(2)}`,
       inline: true,
     });
     fields.push({
-      name: "🛡️ Cushion",
+      name: '🛡️ Cushion',
       value: `${data.spread.cushion.toFixed(1)}%`,
       inline: true,
     });
     fields.push({
-      name: "⏱️ DTE",
+      name: '⏱️ DTE',
       value: `${data.spread.dte}`,
       inline: true,
     });
@@ -283,15 +293,15 @@ export async function sendEntrySignal(data: {
 
   if (data.conviction !== undefined) {
     fields.push({
-      name: "🎯 Conviction",
+      name: '🎯 Conviction',
       value: `${data.conviction}/10`,
       inline: true,
     });
   }
 
   return sendDiscordAlert({
-    type: "ENTRY_SIGNAL",
-    priority: data.grade.startsWith("A") ? "HIGH" : "MEDIUM",
+    type: 'ENTRY_SIGNAL',
+    priority: data.grade.startsWith('A') ? 'HIGH' : 'MEDIUM',
     ticker: data.ticker,
     headline: `Grade ${data.grade} opportunity detected`,
     fields,
@@ -311,25 +321,25 @@ export async function sendPositionRisk(data: {
 }): Promise<boolean> {
   const fields: { name: string; value: string; inline?: boolean }[] = [
     {
-      name: "⚠️ Risk",
+      name: '⚠️ Risk',
       value: data.reason,
       inline: false,
     },
     {
-      name: "📝 Details",
+      name: '📝 Details',
       value: data.details,
       inline: false,
     },
     {
-      name: "💡 Recommended Action",
+      name: '💡 Recommended Action',
       value: data.action,
       inline: false,
     },
   ];
 
   return sendDiscordAlert({
-    type: "POSITION_RISK",
-    priority: data.priority ?? "MEDIUM",
+    type: 'POSITION_RISK',
+    priority: data.priority ?? 'MEDIUM',
     ticker: data.ticker,
     headline: `Position risk detected for ${data.ticker}`,
     fields,
@@ -343,49 +353,51 @@ export async function sendPositionRisk(data: {
 /**
  * Send morning briefing to Discord
  */
-export async function sendMorningBriefing(briefing: BriefingEmbed): Promise<boolean> {
-  const dateStr = briefing.date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+export async function sendMorningBriefing(
+  briefing: BriefingEmbed
+): Promise<boolean> {
+  const dateStr = briefing.date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   });
 
   // Market Pulse section
   const marketPulse = [
     `**SPY:** $${briefing.marketPulse.spy.price.toFixed(2)} ` +
-    `(${briefing.marketPulse.spy.changePct >= 0 ? "+" : ""}${briefing.marketPulse.spy.changePct.toFixed(1)}%)`,
+      `(${briefing.marketPulse.spy.changePct >= 0 ? '+' : ''}${briefing.marketPulse.spy.changePct.toFixed(1)}%)`,
     `**VIX:** ${briefing.marketPulse.vix.current.toFixed(1)} (${briefing.marketPulse.vix.level})`,
     `**Regime:** ${briefing.marketPulse.regime}`,
-  ].join("\n");
+  ].join('\n');
 
   // Calendar section
-  let calendarSection = "No major events today";
+  let calendarSection = 'No major events today';
   if (briefing.calendar.length > 0) {
     calendarSection = briefing.calendar
-      .map(e => `• ${e.date}: ${e.name} [${e.impact}]`)
-      .join("\n");
+      .map((e) => `• ${e.date}: ${e.name} [${e.impact}]`)
+      .join('\n');
   }
 
   // Watchlist alerts
-  let watchlistSection = "No alerts";
+  let watchlistSection = 'No alerts';
   if (briefing.watchlistAlerts.length > 0) {
     watchlistSection = briefing.watchlistAlerts
-      .map(a => `• **${a.ticker}:** ${a.reason}`)
-      .join("\n");
+      .map((a) => `• **${a.ticker}:** ${a.reason}`)
+      .join('\n');
   }
 
   // Position updates
-  let positionSection = "No updates";
+  let positionSection = 'No updates';
   if (briefing.positionUpdates.length > 0) {
     positionSection = briefing.positionUpdates
-      .map(p => `• **${p.ticker}:** ${p.status}`)
-      .join("\n");
+      .map((p) => `• **${p.ticker}:** ${p.status}`)
+      .join('\n');
   }
 
   const fields: { name: string; value: string; inline?: boolean }[] = [
     {
-      name: "📊 Market Pulse",
+      name: '📊 Market Pulse',
       value: marketPulse,
       inline: false,
     },
@@ -395,12 +407,12 @@ export async function sendMorningBriefing(briefing: BriefingEmbed): Promise<bool
       inline: false,
     },
     {
-      name: "🎯 Watchlist Alerts",
+      name: '🎯 Watchlist Alerts',
       value: watchlistSection,
       inline: false,
     },
     {
-      name: "💼 Position Check",
+      name: '💼 Position Check',
       value: positionSection,
       inline: false,
     },
@@ -409,10 +421,10 @@ export async function sendMorningBriefing(briefing: BriefingEmbed): Promise<bool
   const discordEmbed: DiscordEmbed = {
     title: `☀️ Victor's Morning Briefing`,
     description: dateStr,
-    color: 0x5865F2, // Discord blurple
+    color: 0x5865f2, // Discord blurple
     fields,
     footer: {
-      text: "Agentic Victor | Market Intelligence",
+      text: 'Agentic Victor | Market Intelligence',
     },
     timestamp: briefing.date.toISOString(),
   };
@@ -420,11 +432,11 @@ export async function sendMorningBriefing(briefing: BriefingEmbed): Promise<bool
   // Add AI commentary as a second embed
   const commentaryEmbed: DiscordEmbed = {
     description: `💭 **Victor's Take**\n\n${briefing.aiCommentary}`,
-    color: 0x5865F2,
+    color: 0x5865f2,
   };
 
   const payload: DiscordWebhookPayload = {
-    username: "Victor",
+    username: 'Victor',
     embeds: [discordEmbed, commentaryEmbed],
   };
 
@@ -435,10 +447,13 @@ export async function sendMorningBriefing(briefing: BriefingEmbed): Promise<bool
 /**
  * Send a simple text message to Discord
  */
-export async function sendDiscordMessage(message: string, useBriefingChannel = false): Promise<boolean> {
+export async function sendDiscordMessage(
+  message: string,
+  useBriefingChannel = false
+): Promise<boolean> {
   const payload: DiscordWebhookPayload = {
     content: message,
-    username: "Victor",
+    username: 'Victor',
   };
 
   return sendWebhook(payload, useBriefingChannel);
@@ -449,9 +464,11 @@ export async function sendDiscordMessage(message: string, useBriefingChannel = f
  */
 export async function testDiscordWebhook(): Promise<boolean> {
   if (!isDiscordConfigured()) {
-    console.log("Discord webhook not configured. Set DISCORD_WEBHOOK_URL in .env");
+    console.log(
+      'Discord webhook not configured. Set DISCORD_WEBHOOK_URL in .env'
+    );
     return false;
   }
 
-  return sendDiscordMessage("🤖 Victor is online and monitoring markets!");
+  return sendDiscordMessage('🤖 Victor is online and monitoring markets!');
 }

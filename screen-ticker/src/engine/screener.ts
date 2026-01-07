@@ -1,25 +1,28 @@
-import type { 
-  StockScore, 
-  ScanOptions, 
+import type {
+  StockScore,
+  ScanOptions,
   HistoricalData,
   QuarterlyPerformance,
-  QuoteSummary 
-} from "../types/index.ts";
-import { yahooProvider } from "../providers/yahoo.ts";
-import { 
-  fetchTickersFromDB, 
+  QuoteSummary,
+} from '../types/index.ts';
+import { yahooProvider } from '../providers/yahoo.ts';
+import {
+  fetchTickersFromDB,
   fetchSP500Tickers,
-  isTickerDBConfigured 
-} from "../providers/tickers.ts";
-import { calculateStockScore } from "./scorer.ts";
-import { logger } from "../utils/logger.ts";
-import { SP500_SAMPLE } from "../config/thresholds.ts";
-import { 
-  calculateMultiPeriodRS, 
-  type RelativeStrengthResult 
-} from "../utils/relative-strength.ts";
-import { analyzeQuarterlyPerformance } from "../utils/quarterly-earnings.ts";
-import { calculateSectorStrength, type SectorStrengthResult } from "../utils/sector-strength.ts";
+  isTickerDBConfigured,
+} from '../providers/tickers.ts';
+import { calculateStockScore } from './scorer.ts';
+import { logger } from '../utils/logger.ts';
+import { SP500_SAMPLE } from '../config/thresholds.ts';
+import {
+  calculateMultiPeriodRS,
+  type RelativeStrengthResult,
+} from '../utils/relative-strength.ts';
+import { analyzeQuarterlyPerformance } from '../utils/quarterly-earnings.ts';
+import {
+  calculateSectorStrength,
+  type SectorStrengthResult,
+} from '../utils/sector-strength.ts';
 
 /**
  * Options chain data
@@ -58,7 +61,7 @@ export interface AnalysisResult {
     rs20: RelativeStrengthResult | null;
     rs50: RelativeStrengthResult | null;
     rs200: RelativeStrengthResult | null;
-    overallTrend: "strong" | "moderate" | "weak" | "underperforming";
+    overallTrend: 'strong' | 'moderate' | 'weak' | 'underperforming';
   };
   options?: OptionsData | null;
   quarterlyPerformance?: QuarterlyPerformance | null;
@@ -74,30 +77,29 @@ export async function getTickersToScan(
 ): Promise<string[]> {
   // If specific tickers provided, use those
   if (options.tickers) {
-    return options.tickers.split(",").map((t) => t.trim().toUpperCase());
+    return options.tickers.split(',').map((t) => t.trim().toUpperCase());
   }
 
-  // Try to fetch from database
-  if (isTickerDBConfigured()) {
-    if (options.list === "sp500") {
-      const tickers = await fetchSP500Tickers();
-      if (tickers.length > 0) {
-        return tickers;
-      }
-    } else if (options.list === "all") {
-      const tickers = await fetchTickersFromDB({ tickerType: "stock" });
-      if (tickers.length > 0) {
-        return tickers;
-      }
+  // Try to fetch from database or Wikipedia
+  if (options.list === 'sp500') {
+    const tickers = await fetchSP500Tickers({ limit: options.top });
+    if (tickers.length > 0) {
+      return tickers;
+    }
+  } else if (isTickerDBConfigured() && options.list === 'all') {
+    const tickers = await fetchTickersFromDB({
+      tickerType: 'stock',
+      limit: options.top,
+    });
+    if (tickers.length > 0) {
+      return tickers;
     }
   }
 
   // Fallback to hardcoded sample if DB not available
-  logger.warn(
-    "Using fallback ticker list. Configure Supabase for full list."
-  );
-  
-  if (options.list === "sp500") {
+  logger.warn('Using fallback ticker list. Configure Supabase for full list.');
+
+  if (options.list === 'sp500') {
     return SP500_SAMPLE;
   }
 
@@ -109,13 +111,12 @@ export async function getTickersToScan(
  * Uses debug logging for batch scans to reduce noise
  */
 export async function scanTicker(
-  symbol: string, 
+  symbol: string,
   options: { verbose?: boolean } = {}
 ): Promise<StockScore | null> {
   try {
-    const { quote, summary, historical } = await yahooProvider.getAllData(
-      symbol
-    );
+    const { quote, summary, historical } =
+      await yahooProvider.getAllData(symbol);
 
     if (!quote || !summary) {
       // Use debug for batch scans (expected for many tickers)
@@ -151,7 +152,7 @@ export async function analyzeTicker(
     // Fetch stock data and SPY data in parallel
     const [stockData, spyData] = await Promise.all([
       yahooProvider.getAllData(symbol),
-      yahooProvider.getHistorical("SPY"),
+      yahooProvider.getHistorical('SPY'),
     ]);
 
     const { quote, summary, historical } = stockData;
@@ -162,9 +163,9 @@ export async function analyzeTicker(
     }
 
     const score = calculateStockScore(symbol, quote, summary, historical);
-    
+
     // Calculate relative strength vs SPY
-    let relativeStrength: AnalysisResult["relativeStrength"];
+    let relativeStrength: AnalysisResult['relativeStrength'];
     if (spyData && spyData.length > 0 && historical.length > 0) {
       relativeStrength = calculateMultiPeriodRS(historical, spyData);
     }
@@ -176,13 +177,15 @@ export async function analyzeTicker(
     const quarterlyPerformance = analyzeQuarterlyPerformance(summary);
 
     // v1.7.0: Calculate sector relative strength
-    const sectorStrength = await calculateSectorStrength(summary.assetProfile?.sector);
+    const sectorStrength = await calculateSectorStrength(
+      summary.assetProfile?.sector
+    );
 
-    return { 
-      score, 
-      historical, 
-      summary, 
-      relativeStrength, 
+    return {
+      score,
+      historical,
+      summary,
+      relativeStrength,
       options,
       quarterlyPerformance,
       sectorStrength,
@@ -197,6 +200,7 @@ export async function analyzeTicker(
  * Scan multiple tickers with progress logging
  * v1.4.1: Reduced verbosity for skipped tickers
  * v1.7.1: Batch concurrent scanning for 3-5x performance improvement
+ * v2.4.0: Reduced batch size to respect proxy rate limits
  */
 export async function scanTickers(
   tickers: string[],
@@ -207,16 +211,20 @@ export async function scanTickers(
   let skipped = 0;
   let processed = 0;
 
-  // Batch size: balance between speed and rate limiting
-  // 5 concurrent requests is safe for Yahoo Finance
-  const BATCH_SIZE = options.batchSize ?? 5;
+  // v2.4.1: Reduced batch size to 1 (serial) for reliability
+  // Concurrent fetches were causing connection issues on large scans
+  // Serial is slower (~1 ticker/sec) but 100% reliable
+  const BATCH_SIZE = options.batchSize ?? 1;
+
+  // Delay between tickers to prevent connection buildup
+  const BATCH_DELAY_MS = 200;
 
   logger.info(`Scanning ${total} tickers (batch size: ${BATCH_SIZE})...`);
 
   // Process tickers in batches for concurrent execution
   for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
     const batch = tickers.slice(i, i + BATCH_SIZE).filter(Boolean);
-    
+
     // Process batch concurrently
     const batchResults = await Promise.all(
       batch.map(async (ticker) => {
@@ -249,15 +257,20 @@ export async function scanTickers(
       }
     }
 
-    // Progress update every 50 tickers (or after each batch in verbose)
-    if (!options.verbose && processed % 50 < BATCH_SIZE && processed > 0) {
+    // Progress update every 20 tickers (or after each batch in verbose)
+    if (!options.verbose && processed % 20 < BATCH_SIZE && processed > 0) {
       logger.info(`Progress: ${processed}/${total} tickers scanned...`);
+    }
+
+    // v2.4.0: Delay between batches to prevent rate limit buildup
+    if (i + BATCH_SIZE < tickers.length) {
+      await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
   logger.success(
     `Scanned ${results.length}/${total} tickers successfully` +
-    (skipped > 0 ? ` (${skipped} skipped due to missing data)` : "")
+      (skipped > 0 ? ` (${skipped} skipped due to missing data)` : '')
   );
   return results;
 }
@@ -265,13 +278,11 @@ export async function scanTickers(
 /**
  * Run the full screening process
  */
-export async function runScreener(
-  options: ScanOptions
-): Promise<StockScore[]> {
+export async function runScreener(options: ScanOptions): Promise<StockScore[]> {
   const tickers = await getTickersToScan(options);
-  
+
   logger.header(`Stock Opportunity Scanner`);
-  logger.info(`List: ${options.list ?? "custom"}`);
+  logger.info(`List: ${options.list ?? 'custom'}`);
   logger.info(`Tickers to scan: ${tickers.length}`);
   logger.info(`Minimum Score: ${options.minScore}`);
   logger.info(`Dry Run: ${options.dryRun}`);

@@ -1,7 +1,7 @@
-import { RSI, SMA, MACD, OBV, ADX, BollingerBands } from "technicalindicators";
-import type { Signal, HistoricalData, QuoteData } from "../types/index.ts";
-import { defaultThresholds, defaultWeights } from "../config/thresholds.ts";
-import { isNearSupport } from "../utils/support-resistance.ts";
+import { RSI, SMA, MACD, OBV, ADX, BollingerBands } from 'technicalindicators';
+import type { Signal, HistoricalData, QuoteData } from '../types/index.ts';
+import { defaultThresholds, defaultWeights } from '../config/thresholds.ts';
+import { isNearSupport } from '../utils/support-resistance.ts';
 
 interface TechnicalResult {
   score: number;
@@ -31,8 +31,8 @@ function checkRSI(
   // Strongly oversold - full points
   if (currentRSI < 30) {
     return {
-      name: "RSI Oversold",
-      category: "technical",
+      name: 'RSI Oversold',
+      category: 'technical',
       points: defaultWeights.technical.rsiOversold,
       description: `RSI(14) = ${currentRSI.toFixed(1)} (strongly oversold)`,
       value: currentRSI,
@@ -42,8 +42,8 @@ function checkRSI(
   // Approaching oversold - partial points
   if (currentRSI < thresholds.rsiOversold) {
     return {
-      name: "RSI Approaching Oversold",
-      category: "technical",
+      name: 'RSI Approaching Oversold',
+      category: 'technical',
       points: Math.floor(defaultWeights.technical.rsiOversold * 0.6),
       description: `RSI(14) = ${currentRSI.toFixed(1)} (approaching oversold)`,
       value: currentRSI,
@@ -53,8 +53,8 @@ function checkRSI(
   // Neutral-bearish range - small bonus
   if (currentRSI < 50) {
     return {
-      name: "RSI Neutral-Bearish",
-      category: "technical",
+      name: 'RSI Neutral-Bearish',
+      category: 'technical',
       points: 3,
       description: `RSI(14) = ${currentRSI.toFixed(1)} (neutral, room to run)`,
       value: currentRSI,
@@ -90,10 +90,10 @@ function checkGoldenCross(closes: number[]): Signal | null {
   // Recent golden cross (within last few days)
   if (currentSMA50 > currentSMA200 && prevSMA50 <= prevSMA200) {
     return {
-      name: "Golden Cross",
-      category: "technical",
+      name: 'Golden Cross',
+      category: 'technical',
       points: defaultWeights.technical.goldenCross,
-      description: "50 SMA crossed above 200 SMA",
+      description: '50 SMA crossed above 200 SMA',
       value: true,
     };
   }
@@ -101,10 +101,10 @@ function checkGoldenCross(closes: number[]): Signal | null {
   // Already in golden cross territory
   if (currentSMA50 > currentSMA200) {
     return {
-      name: "Golden Cross Active",
-      category: "technical",
+      name: 'Golden Cross Active',
+      category: 'technical',
       points: Math.floor(defaultWeights.technical.goldenCross * 0.6),
-      description: "50 SMA above 200 SMA (bullish structure)",
+      description: '50 SMA above 200 SMA (bullish structure)',
       value: currentSMA200,
     };
   }
@@ -116,17 +116,14 @@ function checkGoldenCross(closes: number[]): Signal | null {
  * Check price position relative to key moving averages
  * GRADUATED scoring based on how many MAs price is above
  */
-function checkMAPosition(
-  currentPrice: number,
-  closes: number[]
-): Signal[] {
+function checkMAPosition(currentPrice: number, closes: number[]): Signal[] {
   const signals: Signal[] = [];
-  
+
   if (closes.length < 20) return signals;
 
   const sma20 = SMA.calculate({ values: closes, period: 20 });
   const currentSMA20 = sma20[sma20.length - 1];
-  
+
   let maAboveCount = 0;
   let maTotalCount = 0;
 
@@ -160,8 +157,8 @@ function checkMAPosition(
         maAboveCount++;
         // Special signal for being above MA200
         signals.push({
-          name: "Above MA200",
-          category: "technical",
+          name: 'Above MA200',
+          category: 'technical',
           points: 5,
           description: `Price above 200-day MA ($${currentSMA200.toFixed(2)})`,
           value: currentSMA200,
@@ -175,16 +172,16 @@ function checkMAPosition(
     const ratio = maAboveCount / maTotalCount;
     if (ratio >= 0.66) {
       signals.push({
-        name: "Strong MA Position",
-        category: "technical",
+        name: 'Strong MA Position',
+        category: 'technical',
         points: 5,
         description: `Price above ${maAboveCount}/${maTotalCount} key moving averages`,
         value: ratio,
       });
     } else if (ratio >= 0.5) {
       signals.push({
-        name: "Mixed MA Position",
-        category: "technical",
+        name: 'Mixed MA Position',
+        category: 'technical',
         points: 2,
         description: `Price above ${maAboveCount}/${maTotalCount} moving averages`,
         value: ratio,
@@ -215,8 +212,8 @@ function checkMAProximity(
   // Within 3% of MA50 and below it (potential bounce)
   if (distanceToMA50 < 0.03 && currentPrice <= currentSMA50) {
     return {
-      name: "Near MA50 Support",
-      category: "technical",
+      name: 'Near MA50 Support',
+      category: 'technical',
       points: 4,
       description: `Price within ${(distanceToMA50 * 100).toFixed(1)}% of 50-day MA`,
       value: currentSMA50,
@@ -229,12 +226,13 @@ function checkMAProximity(
     const currentSMA200 = sma200[sma200.length - 1];
 
     if (currentSMA200 !== undefined) {
-      const distanceToMA200 = Math.abs(currentPrice - currentSMA200) / currentPrice;
+      const distanceToMA200 =
+        Math.abs(currentPrice - currentSMA200) / currentPrice;
 
       if (distanceToMA200 < 0.03 && currentPrice <= currentSMA200) {
         return {
-          name: "Near MA200 Support",
-          category: "technical",
+          name: 'Near MA200 Support',
+          category: 'technical',
           points: 6,
           description: `Price within ${(distanceToMA200 * 100).toFixed(1)}% of 200-day MA`,
           value: currentSMA200,
@@ -262,8 +260,8 @@ function checkVolumeSurge(
 
   if (ratio >= thresholds.volumeSurgeMultiplier) {
     return {
-      name: "Volume Surge",
-      category: "technical",
+      name: 'Volume Surge',
+      category: 'technical',
       points: defaultWeights.technical.volumeSurge,
       description: `Volume ${ratio.toFixed(1)}x avg (${(
         quote.regularMarketVolume / 1_000_000
@@ -285,8 +283,8 @@ function checkNearSupport(
 ): Signal | null {
   if (isNearSupport(currentPrice, historical, thresholds.nearSupportPercent)) {
     return {
-      name: "Near Support",
-      category: "technical",
+      name: 'Near Support',
+      category: 'technical',
       points: defaultWeights.technical.nearSupport,
       description: `Price within ${(
         thresholds.nearSupportPercent * 100
@@ -301,10 +299,7 @@ function checkNearSupport(
 /**
  * Check OBV (On-Balance Volume) trend
  */
-function checkOBVTrend(
-  closes: number[],
-  volumes: number[]
-): Signal | null {
+function checkOBVTrend(closes: number[], volumes: number[]): Signal | null {
   if (closes.length < 20 || volumes.length < 20) return null;
 
   const obvResult = OBV.calculate({
@@ -323,10 +318,10 @@ function checkOBVTrend(
 
   if (recentAvg > prevAvg * 1.05) {
     return {
-      name: "OBV Uptrend",
-      category: "technical",
+      name: 'OBV Uptrend',
+      category: 'technical',
       points: defaultWeights.technical.obvTrend,
-      description: "On-Balance Volume trending higher",
+      description: 'On-Balance Volume trending higher',
       value: true,
     };
   }
@@ -366,10 +361,10 @@ function checkMACD(closes: number[]): Signal | null {
   // Bullish crossover
   if (current.MACD > current.signal && previous.MACD <= previous.signal) {
     return {
-      name: "MACD Bullish",
-      category: "technical",
+      name: 'MACD Bullish',
+      category: 'technical',
       points: 5,
-      description: "MACD crossed above signal line",
+      description: 'MACD crossed above signal line',
       value: true,
     };
   }
@@ -377,10 +372,10 @@ function checkMACD(closes: number[]): Signal | null {
   // MACD above signal (continuation)
   if (current.MACD > current.signal && current.MACD > 0) {
     return {
-      name: "MACD Positive",
-      category: "technical",
+      name: 'MACD Positive',
+      category: 'technical',
       points: 3,
-      description: "MACD above signal and positive",
+      description: 'MACD above signal and positive',
       value: current.MACD,
     };
   }
@@ -397,10 +392,10 @@ function check52WeekPosition(
 ): Signal | null {
   if (historical.length < 252) return null;
 
-  const prices = historical.slice(-252).map(d => d.close);
+  const prices = historical.slice(-252).map((d) => d.close);
   const low52 = Math.min(...prices);
   const high52 = Math.max(...prices);
-  
+
   const range = high52 - low52;
   if (range === 0) return null;
 
@@ -408,10 +403,10 @@ function check52WeekPosition(
   const pctFromLow = (currentPrice - low52) / low52;
 
   // Within 10% of 52-week low - contrarian opportunity
-  if (pctFromLow < 0.10) {
+  if (pctFromLow < 0.1) {
     return {
-      name: "Near 52-Week Low",
-      category: "technical",
+      name: 'Near 52-Week Low',
+      category: 'technical',
       points: 8,
       description: `${(pctFromLow * 100).toFixed(1)}% above 52-week low ($${low52.toFixed(2)})`,
       value: low52,
@@ -421,8 +416,8 @@ function check52WeekPosition(
   // In bottom 25% of range
   if (positionInRange < 0.25) {
     return {
-      name: "Lower 52-Week Range",
-      category: "technical",
+      name: 'Lower 52-Week Range',
+      category: 'technical',
       points: 4,
       description: `In bottom 25% of 52-week range`,
       value: positionInRange,
@@ -440,9 +435,9 @@ function check52WeekPosition(
 function checkADX(historical: HistoricalData[]): Signal | null {
   if (historical.length < 20) return null;
 
-  const highs = historical.map(d => d.high);
-  const lows = historical.map(d => d.low);
-  const closes = historical.map(d => d.close);
+  const highs = historical.map((d) => d.high);
+  const lows = historical.map((d) => d.low);
+  const closes = historical.map((d) => d.close);
 
   try {
     const adxResult = ADX.calculate({
@@ -460,8 +455,8 @@ function checkADX(historical: HistoricalData[]): Signal | null {
     // Strong trend (ADX > 30)
     if (currentADX > 30) {
       return {
-        name: "Strong Trend",
-        category: "technical",
+        name: 'Strong Trend',
+        category: 'technical',
         points: 5,
         description: `ADX ${currentADX.toFixed(0)} — strong trend in place`,
         value: currentADX,
@@ -471,8 +466,8 @@ function checkADX(historical: HistoricalData[]): Signal | null {
     // Moderate trend (ADX 25-30)
     if (currentADX > 25) {
       return {
-        name: "Trending",
-        category: "technical",
+        name: 'Trending',
+        category: 'technical',
         points: 3,
         description: `ADX ${currentADX.toFixed(0)} — trend developing`,
         value: currentADX,
@@ -482,8 +477,8 @@ function checkADX(historical: HistoricalData[]): Signal | null {
     // Weak trend (ADX < 20) - potential breakout setup
     if (currentADX < 20) {
       return {
-        name: "Consolidating",
-        category: "technical",
+        name: 'Consolidating',
+        category: 'technical',
         points: 2,
         description: `ADX ${currentADX.toFixed(0)} — ranging, watch for breakout`,
         value: currentADX,
@@ -491,6 +486,193 @@ function checkADX(historical: HistoricalData[]): Signal | null {
     }
   } catch {
     // ADX calculation failed, return null
+  }
+
+  return null;
+}
+
+/**
+ * v1.8.0: Check for RSI/Price Divergence
+ *
+ * Bullish Divergence: Price makes lower low, RSI makes higher low
+ * Bearish Divergence: Price makes higher high, RSI makes lower high
+ *
+ * This is one of the most reliable reversal signals.
+ */
+function checkRSIDivergence(
+  closes: number[],
+  lookback: number = 20
+): Signal | null {
+  if (closes.length < lookback + 14) return null;
+
+  // Calculate RSI for the lookback period
+  const rsiValues: number[] = [];
+
+  for (let i = 14; i < closes.length; i++) {
+    const slice = closes.slice(i - 14, i + 1);
+    let gains = 0;
+    let losses = 0;
+
+    for (let j = 1; j < slice.length; j++) {
+      const prev = slice[j - 1];
+      const curr = slice[j];
+      if (prev === undefined || curr === undefined) continue;
+      const change = curr - prev;
+      if (change >= 0) gains += change;
+      else losses -= change;
+    }
+
+    const avgGain = gains / 14;
+    const avgLoss = losses / 14;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsiValues.push(100 - 100 / (1 + rs));
+  }
+
+  if (rsiValues.length < lookback) return null;
+
+  // Get recent data for analysis
+  const recentCloses = closes.slice(-lookback);
+  const recentRSI = rsiValues.slice(-lookback);
+
+  // Find swing lows in price (for bullish divergence)
+  // Look for two lows where second is lower than first
+  let priceLow1 = Infinity,
+    priceLow2 = Infinity;
+  let rsiAtLow1 = 0,
+    rsiAtLow2 = 0;
+  let low1Idx = -1,
+    low2Idx = -1;
+
+  // Find swing lows (local minima)
+  for (let i = 2; i < recentCloses.length - 2; i++) {
+    const curr = recentCloses[i];
+    const prev1 = recentCloses[i - 1];
+    const prev2 = recentCloses[i - 2];
+    const next1 = recentCloses[i + 1];
+    const next2 = recentCloses[i + 2];
+    const currRSI = recentRSI[i];
+
+    if (
+      curr !== undefined &&
+      prev1 !== undefined &&
+      prev2 !== undefined &&
+      next1 !== undefined &&
+      next2 !== undefined &&
+      currRSI !== undefined &&
+      curr < prev1 &&
+      curr < prev2 &&
+      curr < next1 &&
+      curr < next2
+    ) {
+      if (low1Idx === -1) {
+        priceLow1 = curr;
+        rsiAtLow1 = currRSI;
+        low1Idx = i;
+      } else if (i - low1Idx >= 3) {
+        priceLow2 = curr;
+        rsiAtLow2 = currRSI;
+        low2Idx = i;
+      }
+    }
+  }
+
+  // Check for bullish divergence: price lower low, RSI higher low
+  if (
+    low1Idx !== -1 &&
+    low2Idx !== -1 &&
+    priceLow2 < priceLow1 * 0.99 && // Price made lower low (1%+ lower)
+    rsiAtLow2 > rsiAtLow1 + 3 // RSI made higher low (3+ pts higher)
+  ) {
+    return {
+      name: 'Bullish RSI Divergence',
+      category: 'technical',
+      points: 8,
+      description: `Price lower low but RSI higher low — reversal signal`,
+      value: rsiAtLow2,
+    };
+  }
+
+  // Note: Bearish divergence detection removed as it's not a buy signal
+  // Could be added as a warning in the bear case instead
+
+  return null;
+}
+
+/**
+ * v1.8.0: Check for MACD/Price Divergence
+ *
+ * Similar to RSI divergence but uses MACD histogram.
+ * MACD divergence often occurs before RSI divergence.
+ */
+function checkMACDDivergence(closes: number[]): Signal | null {
+  if (closes.length < 35) return null;
+
+  const macdResult = MACD.calculate({
+    values: closes,
+    fastPeriod: 12,
+    slowPeriod: 26,
+    signalPeriod: 9,
+    SimpleMAOscillator: false,
+    SimpleMASignal: false,
+  });
+
+  if (macdResult.length < 20) return null;
+
+  const recentMACD = macdResult.slice(-20);
+  const recentCloses = closes.slice(-20);
+
+  // Find troughs in MACD histogram
+  const histograms = recentMACD.map((m) => m.histogram ?? 0);
+
+  let low1Idx = -1,
+    low2Idx = -1;
+  let histLow1 = 0,
+    histLow2 = 0;
+  let priceLow1 = Infinity,
+    priceLow2 = Infinity;
+
+  // Find local minima in histogram (negative values trending toward zero)
+  for (let i = 2; i < histograms.length - 2; i++) {
+    const curr = histograms[i];
+    const prev = histograms[i - 1];
+    const next = histograms[i + 1];
+    const price = recentCloses[i];
+
+    if (
+      curr !== undefined &&
+      prev !== undefined &&
+      next !== undefined &&
+      price !== undefined &&
+      curr < 0 && // Must be in negative territory
+      curr < prev &&
+      curr < next
+    ) {
+      if (low1Idx === -1) {
+        histLow1 = curr;
+        priceLow1 = price;
+        low1Idx = i;
+      } else if (i - low1Idx >= 3) {
+        histLow2 = curr;
+        priceLow2 = price;
+        low2Idx = i;
+      }
+    }
+  }
+
+  // Bullish MACD divergence: price lower low, histogram higher low
+  if (
+    low1Idx !== -1 &&
+    low2Idx !== -1 &&
+    priceLow2 < priceLow1 * 0.99 && // Price made lower low
+    histLow2 > histLow1 // MACD histogram made higher low
+  ) {
+    return {
+      name: 'Bullish MACD Divergence',
+      category: 'technical',
+      points: 6,
+      description: `Price lower low but MACD higher low — momentum building`,
+      value: histLow2,
+    };
   }
 
   return null;
@@ -532,8 +714,8 @@ function checkBollingerBands(
     // Near lower band (%B < 0.15) - potential bounce
     if (percentB < 0.15) {
       return {
-        name: "Near Lower Bollinger",
-        category: "technical",
+        name: 'Near Lower Bollinger',
+        category: 'technical',
         points: 5,
         description: `Price near lower band — oversold bounce potential`,
         value: percentB,
@@ -543,8 +725,8 @@ function checkBollingerBands(
     // At lower half but not extreme (0.15-0.35) - favorable entry
     if (percentB < 0.35) {
       return {
-        name: "Lower Bollinger Zone",
-        category: "technical",
+        name: 'Lower Bollinger Zone',
+        category: 'technical',
         points: 3,
         description: `Price in lower band zone — favorable entry area`,
         value: percentB,
@@ -567,18 +749,21 @@ function checkBollingerBands(
  * Signal group caps to prevent excessive scoring from related signals
  * v1.7.1: Added to prevent MA-related signal stacking
  */
-const SIGNAL_GROUP_CAPS: Record<string, { keywords: string[]; maxPoints: number }> = {
+const SIGNAL_GROUP_CAPS: Record<
+  string,
+  { keywords: string[]; maxPoints: number }
+> = {
   movingAverage: {
-    keywords: ["ma", "golden", "sma", "moving average"],
-    maxPoints: 15,  // Cap MA-related signals at 15 points
+    keywords: ['ma', 'golden', 'sma', 'moving average'],
+    maxPoints: 15, // Cap MA-related signals at 15 points
   },
   momentum: {
-    keywords: ["rsi", "macd", "obv"],
-    maxPoints: 12,  // Cap momentum indicators at 12 points
+    keywords: ['rsi', 'macd', 'obv'],
+    maxPoints: 12, // Cap momentum indicators at 12 points
   },
   pricePosition: {
-    keywords: ["52-week", "support", "bollinger"],
-    maxPoints: 12,  // Cap price position signals at 12 points
+    keywords: ['52-week', 'support', 'bollinger'],
+    maxPoints: 12, // Cap price position signals at 12 points
   },
 };
 
@@ -600,8 +785,8 @@ function applySignalGroupCaps(signals: Signal[]): number {
 
     // Check which group this signal belongs to
     for (const [groupName, config] of Object.entries(SIGNAL_GROUP_CAPS)) {
-      const belongsToGroup = config.keywords.some(
-        kw => signalNameLower.includes(kw)
+      const belongsToGroup = config.keywords.some((kw) =>
+        signalNameLower.includes(kw)
       );
 
       if (belongsToGroup) {
@@ -712,12 +897,24 @@ export function calculateTechnicalSignals(
     signals.push(bbSignal);
   }
 
+  // v1.8.0: RSI Divergence (highly reliable reversal signal)
+  const rsiDivergenceSignal = checkRSIDivergence(closes);
+  if (rsiDivergenceSignal) {
+    signals.push(rsiDivergenceSignal);
+  }
+
+  // v1.8.0: MACD Divergence
+  const macdDivergenceSignal = checkMACDDivergence(closes);
+  if (macdDivergenceSignal) {
+    signals.push(macdDivergenceSignal);
+  }
+
   // v1.7.1: Apply signal group caps to prevent stacking
   const cappedScore = applySignalGroupCaps(signals);
 
   // Cap at 50 points total
-  return { 
-    score: Math.min(cappedScore, 50), 
-    signals 
+  return {
+    score: Math.min(cappedScore, 50),
+    signals,
   };
 }

@@ -9,12 +9,14 @@ Unusual options activity refers to options trading patterns that deviate signifi
 ### The Edge Theory
 
 Options provide leverage, making them attractive to traders with conviction or information:
+
 - **Risk/Reward**: Small premium outlay for potentially large gains
 - **Time Sensitivity**: Options expire, suggesting time-bound expectations
 - **Directional Betting**: Clear bullish (calls) or bearish (puts) positioning
 - **Capital Efficiency**: Control $100k of stock for $5k premium
 
 When someone deploys significant capital into options, especially aggressively, it suggests:
+
 1. **Information**: They may know something the market doesn't
 2. **Conviction**: High confidence in directional move
 3. **Urgency**: Need to position now, not wait for better prices
@@ -26,6 +28,7 @@ When someone deploys significant capital into options, especially aggressively, 
 **What**: Options contracts trading at multiples of their average volume
 
 **Example**:
+
 ```
 AAPL Jan 180 Calls
 - Average Daily Volume: 2,000 contracts
@@ -34,11 +37,13 @@ AAPL Jan 180 Calls
 ```
 
 **Interpretation**:
+
 - **3-5x**: Moderate interest, worth investigating
 - **5-10x**: Strong interest, likely informed positioning
 - **10x+**: Exceptional, potentially game-changing information
 
 **Caveats**:
+
 - Earnings week can cause natural volume spikes
 - Technical breakouts may attract retail herding
 - New product launches or FDA dates expected
@@ -48,6 +53,7 @@ AAPL Jan 180 Calls
 **What**: Significant increases in total open contracts (positions not yet closed)
 
 **Example**:
+
 ```
 NVDA Feb 200 Calls
 - Yesterday OI: 5,000
@@ -56,11 +62,13 @@ NVDA Feb 200 Calls
 ```
 
 **Interpretation**:
+
 - **20-30% increase**: Moderate new positioning
 - **30-50% increase**: Significant position building
 - **50%+ increase**: Major institutional positioning
 
 **What OI Tells You**:
+
 - **Rising OI + Rising Price**: New longs entering (bullish)
 - **Rising OI + Falling Price**: New shorts entering (bearish)
 - **Falling OI**: Position closing (profit taking or stopping out)
@@ -70,6 +78,7 @@ NVDA Feb 200 Calls
 **What**: Significant dollar amounts spent on options in short time
 
 **Example**:
+
 ```
 TSLA Mar 250 Calls
 - 1,000 contracts @ $8.50
@@ -78,11 +87,13 @@ TSLA Mar 250 Calls
 ```
 
 **Interpretation**:
+
 - **$100k-$500k**: Wealthy individual or small fund
 - **$500k-$1M**: Fund or institutional positioning
 - **$1M+**: Major institutional bet
 
 **Aggressiveness Matters**:
+
 - **At Bid**: Passive, patient (limit orders)
 - **Mid**: Normal market maker interaction
 - **At Ask**: Aggressive, urgent (market orders)
@@ -93,6 +104,7 @@ TSLA Mar 250 Calls
 **What**: Large order split across multiple exchanges, executed simultaneously
 
 **Example**:
+
 ```
 AMD Apr 150 Calls Sweep
 - Hit 4 exchanges in 2 seconds
@@ -102,12 +114,14 @@ AMD Apr 150 Calls Sweep
 ```
 
 **Why Sweeps Are Significant**:
+
 1. **Urgency**: Can't wait for limit order fills
 2. **Size**: Too large for one exchange's liquidity
 3. **Conviction**: Willing to pay market price
 4. **Information**: Often precedes news or moves
 
 **Detection Criteria**:
+
 - Multiple exchanges (3+ for high conviction)
 - Short time window (< 5 seconds)
 - All at or above ask
@@ -118,6 +132,7 @@ AMD Apr 150 Calls Sweep
 **What**: Imbalance in put vs call activity for a ticker
 
 **Example**:
+
 ```
 SPY Put/Call Ratio
 - Historical Average: 1.2 (slightly bearish)
@@ -126,12 +141,14 @@ SPY Put/Call Ratio
 ```
 
 **Interpretation**:
+
 - **Ratio < 0.7**: Extreme bullishness (too many calls)
 - **Ratio 0.7-1.3**: Normal range
 - **Ratio > 1.3**: Bearish (more puts than calls)
 - **Ratio > 2.0**: Extreme bearishness or hedging
 
 **Context Matters**:
+
 - Low ratio before earnings = bullish expectations
 - High ratio before Fed meetings = hedging, not necessarily bearish
 - Sudden spikes = fear or information
@@ -141,6 +158,7 @@ SPY Put/Call Ratio
 ### Pattern 1: The "Smart Money" Setup
 
 **Characteristics**:
+
 - Large call buying (> $500k premium)
 - 3-6 weeks to expiration
 - Strike 5-10% OTM
@@ -156,6 +174,7 @@ SPY Put/Call Ratio
 ### Pattern 2: The "Hedge Alert"
 
 **Characteristics**:
+
 - Massive put buying
 - Far OTM strikes (20%+ below)
 - Large size but lower premium (cheap puts)
@@ -170,6 +189,7 @@ SPY Put/Call Ratio
 ### Pattern 3: The "Earnings Lottery"
 
 **Characteristics**:
+
 - Options expiring day of/after earnings
 - Both calls and puts (straddles/strangles)
 - High IV (expensive)
@@ -184,6 +204,7 @@ SPY Put/Call Ratio
 ### Pattern 4: The "Insider Signal" (Potential)
 
 **Characteristics**:
+
 - Unusual call buying in illiquid name
 - Near-term expiry (1-3 weeks)
 - ATM or slightly ITM strikes
@@ -199,6 +220,7 @@ SPY Put/Call Ratio
 ### Pattern 5: The "Technical Breakout Anticipation"
 
 **Characteristics**:
+
 - Stock approaching key resistance level
 - Calls at strike just above resistance
 - Moderate size, good value (not expensive IV)
@@ -213,11 +235,13 @@ SPY Put/Call Ratio
 ### 1. Low Liquidity Stocks
 
 **Warning Signs**:
+
 - Market cap < $1B
 - Average daily volume < 500k shares
 - Options volume < 100 contracts typically
 
 **Why It's Risky**:
+
 - Easy to manipulate
 - Wide bid-ask spreads
 - May be pump attempt
@@ -228,12 +252,14 @@ SPY Put/Call Ratio
 ### 2. Meme Stock Activity
 
 **Warning Signs**:
+
 - Reddit/Twitter hype
 - Retail-heavy ticker (GME, AMC, BBBY)
 - High short interest
 - Social media campaigns
 
 **Why It's Risky**:
+
 - Coordination, not information
 - Emotional trading
 - Often bag holders recruiting
@@ -244,12 +270,14 @@ SPY Put/Call Ratio
 ### 3. Pre-Earnings Noise
 
 **Warning Signs**:
+
 - 1-2 days before earnings
 - High IV (options expensive)
 - Both calls and puts active
 - Wide array of strikes
 
 **Why It's Risky**:
+
 - May be hedging, not directional
 - IV crush after earnings destroys premium
 - Coin flip probability
@@ -260,12 +288,14 @@ SPY Put/Call Ratio
 ### 4. After Big News
 
 **Warning Signs**:
+
 - Unusual activity after news release
 - Stock already moved significantly
 - Late-day activity
 - Following news reports
 
 **Why It's Risky**:
+
 - Information already public
 - Move may be over
 - You're late to the trade
@@ -314,6 +344,7 @@ SPY Put/Call Ratio
 ### Example 1: The $1.2M NVDA Call Sweep (Hypothetical)
 
 **Signal**:
+
 ```
 Date: Oct 1, 2025
 Ticker: NVDA
@@ -324,6 +355,7 @@ Context: Stock at $125, near all-time highs
 ```
 
 **Analysis**:
+
 - **Volume**: 10x average daily volume
 - **Premium**: $1.2M (institutional size)
 - **Aggressiveness**: Sweep at ask (high urgency)
@@ -331,6 +363,7 @@ Context: Stock at $125, near all-time highs
 - **Strike**: $130 (4% OTM, reasonable target)
 
 **Validation**:
+
 - Check: GTC conference next month
 - Check: Strong technical setup, consolidating before breakout
 - Check: No immediate earnings (avoids IV crush risk)
@@ -342,6 +375,7 @@ Context: Stock at $125, near all-time highs
 ### Example 2: The Low-Float Pump (Hypothetical)
 
 **Signal**:
+
 ```
 Date: Oct 5, 2025
 Ticker: XYZBIO (fictional)
@@ -352,6 +386,7 @@ Context: Stock at $3, down 50% YTD
 ```
 
 **Analysis**:
+
 - **Volume**: 50x average (looks great!)
 - **Premium**: Only $50k (small, retail-sized)
 - **Stock**: Low float ($500M market cap), illiquid
@@ -359,6 +394,7 @@ Context: Stock at $3, down 50% YTD
 - **Social**: Reddit posts pumping FDA catalyst
 
 **Validation**:
+
 - Red flag: Low liquidity
 - Red flag: Cheap lottery tickets
 - Red flag: Social media hype
@@ -391,6 +427,7 @@ Context: Stock at $3, down 50% YTD
 ## Summary
 
 Unusual options activity is a powerful tool for finding trading opportunities, but it requires:
+
 - **Context**: Understanding the why behind the activity
 - **Validation**: Multiple confirming data points
 - **Discipline**: Following a systematic process
@@ -402,4 +439,3 @@ The scanner helps you find opportunities, but **YOU** must do the analysis, make
 
 **Next Reading**: [Signal Interpretation Guide](signal-interpretation.md)
 **Related**: [System Overview](system-overview.md)
-

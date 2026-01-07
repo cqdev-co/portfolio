@@ -5,17 +5,20 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 ## 📚 Documentation Index
 
 ### Getting Started
+
 - [System Overview](system-overview.md) - High-level architecture and concepts
 - [Installation Guide](installation-guide.md) - Setup and configuration
 - [Quick Start Tutorial](quick-start.md) - First scans and basic usage
 - [FAQ](faq.md) - Frequently asked questions and troubleshooting
 
 ### Core Concepts
+
 - [Understanding Unusual Activity](understanding-unusual-activity.md) - What makes options activity unusual
 - [Signal Grading System](signal-grading.md) - How signals are scored and classified
 - [Detection Algorithms](detection-algorithms.md) - Technical details of anomaly detection
 
 ### User Guides
+
 - [CLI Reference](cli-reference.md) - Complete command-line interface documentation
 - [Scanning Strategies](scanning-strategies.md) - How to scan effectively for different trading styles
 - [Signal Interpretation](signal-interpretation.md) - How to read and act on signals
@@ -29,6 +32,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Spread Detection Quick Start](SPREAD_DETECTION_QUICKSTART.md) - 3-step guide to see spreads
 
 ### Technical Documentation
+
 - [Architecture](architecture.md) - System design and components
 - [Database Schema](database-schema.md) - Supabase table structures and relationships
 - [Signal Expiration](signal-expiration.md) - Automated daily expiration system
@@ -37,6 +41,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Timezone Handling](../timezone-handling.md) - UTC storage and EST display strategy
 
 ### Advanced Topics
+
 - [Backtesting](backtesting.md) - Historical performance analysis
 - [Risk Management](risk-management.md) - Position sizing and risk controls
 - [Alert Configuration](alerts.md) - Setting up notifications
@@ -45,6 +50,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - [Hourly Cron Job Setup](hourly-cron-setup.md) - Automated scanning with deduplication and continuity tracking
 
 ### Research & Analysis
+
 - [Options Flow Patterns](options-flow-patterns.md) - Common patterns and their meanings
 - [Case Studies](case-studies.md) - Real-world examples and lessons learned
 - [Performance Metrics](performance-metrics.md) - Historical accuracy and statistics
@@ -54,12 +60,14 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 ## 🎯 Quick Links
 
 ### For Traders
+
 - **Day Traders**: See [Intraday Scanning](scanning-strategies.md#intraday-scanning)
 - **Swing Traders**: See [Multi-Day Signals](scanning-strategies.md#swing-trading)
 - **Options Sellers**: See [High IV Opportunities](signal-interpretation.md#selling-premium)
 - **Systematic Trading**: See [Trading Strategy Framework](trading-strategy-framework.md) - Complete playbook for signal execution
 
 ### For Automation
+
 - **GitHub Actions Workflow**: See [GitHub Actions Setup](github-actions-setup.md) - Complete automated scanning guide
 - **Fast Scanner Workflow**: Hard-coded ticker watchlist for focused scanning (see below)
 - **Signal Lifecycle**: See [Signal Lifecycle](github-actions-setup.md#signal-lifecycle) - How signals are tracked over time
@@ -68,12 +76,14 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 - **Troubleshooting**: See [Troubleshooting](github-actions-setup.md#-troubleshooting) - Common issues and solutions
 
 ### Troubleshooting
+
 - **Common Questions**: See [FAQ](faq.md) - Frequently asked questions and solutions
 - **Frontend Not Showing Signals**: See [RLS Troubleshooting](troubleshooting-rls.md) - Fix Row Level Security issues
 - **Signal Lifecycle Questions**: See [FAQ - Signal Lifecycle](faq.md#signal-lifecycle)
 - **Database Connection Issues**: Verify Supabase credentials
 
 ### For Developers
+
 - **Integration**: See [Python API](python-api.md)
 - **Contributing**: See [Development Guide](development.md)
 - **Testing**: See [Testing Guide](testing.md)
@@ -81,6 +91,7 @@ This directory contains comprehensive documentation for the Unusual Options Acti
 ## 📖 Documentation Standards
 
 All documentation follows these principles:
+
 1. **Practical Examples**: Every concept includes working examples
 2. **Risk Awareness**: Clear disclaimers and risk warnings
 3. **Progressive Detail**: Start simple, offer deep dives for advanced users
@@ -89,29 +100,35 @@ All documentation follows these principles:
 ## ⚡ Fast Scanner Workflow
 
 The portfolio includes a **fast scanner workflow** (`.github/workflows/uos-fast.yml`) that scans a hard-coded watchlist of tickers. This is ideal for:
+
 - Focused scanning on your favorite tickers
 - Faster execution times
 - Lower API usage
 - Custom watchlist monitoring
 
 ### Configured Tickers
+
 The workflow is pre-configured to scan these tickers:
+
 ```
 PLTR TSLA SPY QQQ HIMS
 ```
 
 ### How to Customize
+
 1. Open `.github/workflows/uos-fast.yml`
 2. Find the `HARDCODED_TICKERS` variable (around line 76)
 3. Edit the space-separated list of tickers (note: use spaces, not commas)
 4. Commit and push your changes
 
 **Example:**
+
 ```bash
 HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 ```
 
 ### Schedule
+
 - **Runs every 5 minutes** during US market hours (9:30 AM - 4:00 PM ET)
 - **78 scans per day** - Catches unusual activity as it happens
 - Scans only your watchlist tickers (much faster than full market scan)
@@ -119,9 +136,11 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 - Manual trigger supports custom ticker input to override hard-coded list
 
 ### Usage
+
 **Scheduled Run**: Automatically scans hard-coded tickers at scheduled times
 
 **Manual Trigger**:
+
 - Go to GitHub Actions → "Unusual Options Fast Scanner (Watchlist)"
 - Click "Run workflow"
 - Optionally provide custom tickers to override the hard-coded list
@@ -130,6 +149,7 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 ## 🔄 Recent Updates
 
 **December 2025**
+
 - **Signal Quality Improvements**: Major scoring and filtering overhaul
   - Fixed grade inflation (51% S-grade → ~5% target)
   - Added DTE filtering (removes 0-7 day noise)
@@ -156,6 +176,7 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
   - `--relaxed` flag to restore previous behavior
 
 **November 6, 2025**
+
 - **Fast Scanner Workflow**: Added hard-coded ticker watchlist for focused scanning
   - **Runs every 5 minutes** during market hours (78 scans/day)
   - Pre-configured with popular tickers (PLTR, TSLA, SPY, QQQ, HIMS)
@@ -193,6 +214,7 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
   - See [Trading Cheatsheet](trading-cheatsheet.md)
 
 **November 5, 2025**
+
 - **Signal Analysis Report**: Comprehensive analysis of 1,025 unusual options signals
   - Analyzed Nov 3-5 data with $1.9B total premium flow
   - Identified top plays: AAPL, TSM, AMD with specific strike/expiry recommendations
@@ -212,10 +234,11 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
   - Updated database function `mark_stale_signals_inactive()` and Python code
 
 **November 4, 2025**
+
 - **Price Chart Visualization**: Interactive stock price charts with option detection overlay
 - **Unified Timeline View**: Merged chart and signal details into single interactive tab
 - **Click-to-Pin Tooltips**: Click detection dots to pin tooltips in place for easy interaction
-- **Enhanced Pinned Tooltip UX**: 
+- **Enhanced Pinned Tooltip UX**:
   - Polished design with arrow pointer to detection dot
   - Pulsing ring animation on active detection
   - Semi-transparent overlay for focus
@@ -230,12 +253,14 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 - **Yahoo Finance Integration**: Real-time price data without API keys
 
 **November 3, 2025**
+
 - **GitHub Actions Fix**: Fixed `--no-root` installation issue preventing CLI from running
 - **Timezone Fix**: Resolved UTC timestamp mismatch causing false inactive signals
 - **Diagnostic Tool**: Added comprehensive diagnostics script for continuity verification
 - **Complete Documentation**: New [GitHub Actions Setup Guide](github-actions-setup.md)
 
 **November 2, 2025**
+
 - **Hourly Cron Job System**: Complete automated scanning setup
 - **Signal Deduplication**: Prevents duplicate signals on every run
 - **Continuity Tracking**: Tracks signal lifecycle (NEW → CONTINUING → INACTIVE)
@@ -243,11 +268,13 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 - **GitHub Actions Workflow**: Automated hourly execution during market hours
 
 **October 30, 2025**
+
 - Added Grouped Ticker View documentation
 - Frontend UI enhancement for signal aggregation
 - Improved user experience for multi-signal analysis
 
 **October 2025**
+
 - Initial documentation structure created
 - System overview and architecture documented
 - CLI reference completed
@@ -255,46 +282,55 @@ HARDCODED_TICKERS="AAPL TSLA NVDA AMD GOOGL MSFT"
 ## 🔔 Discord Alerts Setup
 
 ### Prerequisites
+
 1. A Discord server where you have permission to create webhooks
 2. A channel dedicated to options alerts (recommended)
 
 ### Setup Steps
 
 **1. Create Discord Webhook**
+
 ```
 Server Settings → Integrations → Webhooks → New Webhook
 ```
+
 - Name it "Options Alerts" or similar
 - Select the target channel
 - Copy the webhook URL
 
 **2. Configure Local Environment**
+
 ```bash
 # Add to unusual-options-service/.env or root .env
 DISCORD_UOS_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
 
 **3. Configure GitHub Actions (for automated alerts)**
+
 ```
 Repository Settings → Secrets → Actions → New repository secret
 ```
+
 - Name: `DISCORD_UOS_WEBHOOK_URL`
 - Value: Your webhook URL
 
 ### Alert Types
 
 **Real-time Insider Play Alerts**
+
 - Triggered after each scan (every 5 mins during market hours)
 - Shows high-conviction plays with score ≥70
 - Includes ticker, strike, expiry, premium, grade, and action recommendation
 
 **Weekly Performance Report**
+
 - Sent every Sunday at 6 PM ET
 - Summary of signal performance over the past week
 - Win rates by grade and option type
 - Hedge vs directional breakdown
 
 ### Manual Testing
+
 ```bash
 # Test alerts with signals from last day
 poetry run python scripts/discord_alerts.py --insider-plays --days 1 --min-score 60
@@ -306,6 +342,7 @@ poetry run python scripts/discord_alerts.py --performance-report --days 7
 ## 🤝 Contributing to Docs
 
 Found an error or want to improve documentation?
+
 1. Documentation lives in `/docs/unusual-options-service/`
 2. Use markdown format
 3. Include practical examples
@@ -321,4 +358,3 @@ Found an error or want to improve documentation?
 ---
 
 **Next Steps**: Start with [System Overview](system-overview.md) to understand the core concepts, then move to [Quick Start Tutorial](quick-start.md) to begin scanning.
-

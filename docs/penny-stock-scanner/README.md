@@ -30,23 +30,27 @@ penny-scanner scan-all --min-score 0.70 --output results.json
 ## 🔑 Key Features
 
 ### Volume-Driven Analysis (50% Weight)
+
 - **Relative Volume Surge**: 2x, 3x, 5x+ vs baseline
 - **Volume Acceleration**: Multi-day growth trends
 - **Volume Consistency**: Multiple high-volume days
 - **Liquidity Depth**: Dollar volume >$100k
 
 ### Price Momentum & Consolidation (30% Weight)
+
 - **Consolidation Detection**: Tight trading range (5-10 days)
 - **Breakout Identification**: Volume-confirmed breakouts
 - **Price Acceleration**: Multi-period momentum
 - **Higher Lows Pattern**: Accumulation detection
 
 ### Relative Strength (15% Weight)
+
 - **Market Outperformance**: Stock vs SPY
 - **Sector Leadership**: Relative to peers
 - **52-Week Position**: Distance from highs/lows
 
 ### Risk & Liquidity (5% Weight)
+
 - **Bid-Ask Spread**: <5% for clean entry/exit
 - **Float Analysis**: Low float (<50M shares) identification
 - **Price Stability**: Pump-and-dump detection
@@ -72,11 +76,13 @@ The ideal penny stock signal we're looking for:
 ## 🚀 Strategy Advantages
 
 ### Why Volume-Focused?
+
 - **Volume is King**: Penny stocks don't move without volume - 50% weight reflects this reality
 - **Consolidation + Breakout**: The classic "coiling spring" setup that leads to 50-200%+ moves
 - **Avoid False Signals**: Traditional indicators (RSI, MACD) are unreliable on penny stocks
 
 ### Key Differences from Traditional Analysis
+
 - ❌ **Avoid**: Heavy reliance on RSI/MACD (unreliable on pennies)
 - ❌ **Avoid**: Traditional chart patterns (pennies don't respect them consistently)
 - ✅ **Focus**: Volume as primary signal (50% vs typical 20-30%)
@@ -95,6 +101,7 @@ The ideal penny stock signal we're looking for:
 ## ⚠️ Risk Disclaimer
 
 This tool is for educational and research purposes. Trading penny stocks involves significant risk of loss. Always:
+
 - Do your own research
 - Never invest more than you can afford to lose
 - Use proper risk management (stop losses, position sizing)
@@ -104,6 +111,7 @@ This tool is for educational and research purposes. Trading penny stocks involve
 ## 🤝 Support
 
 For issues, questions, or feature requests:
+
 - Check the documentation in `docs/penny-stock-scanner/`
 - Review the README in the service directory
 - Ensure your `.env` file is properly configured
@@ -111,4 +119,3 @@ For issues, questions, or feature requests:
 ## 📄 License
 
 Proprietary software. All rights reserved.
-

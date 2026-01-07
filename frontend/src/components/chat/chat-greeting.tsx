@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 type SuggestedAction = {
   label: string;
@@ -10,20 +10,20 @@ type SuggestedAction = {
 
 const suggestedActions: SuggestedAction[] = [
   {
-    label: "Explain a complex topic",
-    prompt: "Can you explain quantum computing in simple terms?",
+    label: 'Explain a complex topic',
+    prompt: 'Can you explain quantum computing in simple terms?',
   },
   {
-    label: "Help me write code",
-    prompt: "Help me write a function to sort an array in JavaScript",
+    label: 'Help me write code',
+    prompt: 'Help me write a function to sort an array in JavaScript',
   },
   {
-    label: "Brainstorm ideas",
-    prompt: "Give me 5 creative project ideas for learning programming",
+    label: 'Brainstorm ideas',
+    prompt: 'Give me 5 creative project ideas for learning programming',
   },
   {
-    label: "Summarize something",
-    prompt: "What are the key differences between REST and GraphQL?",
+    label: 'Summarize something',
+    prompt: 'What are the key differences between REST and GraphQL?',
   },
 ];
 
@@ -55,12 +55,12 @@ export function ChatGreeting({ onSuggestionClick }: ChatGreetingProps) {
             transition={{ delay: 0.15 + index * 0.05 }}
             onClick={() => onSuggestionClick(action.prompt)}
             className={cn(
-              "h-auto w-full whitespace-normal p-3 text-left",
-              "rounded-xl border bg-background",
-              "text-xs text-muted-foreground",
-              "transition-colors duration-200",
-              "hover:bg-muted hover:text-foreground",
-              "focus:outline-none focus:ring-2 focus:ring-ring"
+              'h-auto w-full whitespace-normal p-3 text-left',
+              'rounded-xl border bg-background',
+              'text-xs text-muted-foreground',
+              'transition-colors duration-200',
+              'hover:bg-muted hover:text-foreground',
+              'focus:outline-none focus:ring-2 focus:ring-ring'
             )}
           >
             {action.label}
@@ -70,4 +70,3 @@ export function ChatGreeting({ onSuggestionClick }: ChatGreetingProps) {
     </div>
   );
 }
-

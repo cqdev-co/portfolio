@@ -1,7 +1,7 @@
 /**
  * Chat Command
  * Your AI Analyst Employee - A Financial Analyst for your Hedge Fund
- * 
+ *
  * This is your first "employee" who:
  * - Proactively finds trade opportunities
  * - Recommends specific trades with full calculations
@@ -9,37 +9,42 @@
  * - Reports to you like a real analyst would
  */
 
-import * as readline from "readline";
-import chalk from "chalk";
-import YahooFinance from "yahoo-finance2";
-import { RSI, SMA, ADX } from "technicalindicators";
-import { 
-  validateAIRequirement, 
+import * as readline from 'readline';
+import chalk from 'chalk';
+import YahooFinance from 'yahoo-finance2';
+import { RSI, SMA, ADX } from 'technicalindicators';
+import {
+  validateAIRequirement,
   chatWithTools,
   streamChatWithTools,
-  type OllamaMode, 
+  type OllamaMode,
   type AgentMessage,
   type AgentResponse,
   type ToolDefinition,
   type ToolCall,
   type StreamingAgentChunk,
   type StreamingAgentResult,
-} from "../services/ollama.ts";
-import { getAllTrades, getTradesByTicker, getPerformanceSummary, isConfigured } from "../services/supabase.ts";
-import { 
-  buildTickerHistory, 
-  detectPatterns, 
-  toonToString, 
+} from '../services/ollama.ts';
+import {
+  getAllTrades,
+  getTradesByTicker,
+  getPerformanceSummary,
+  isConfigured,
+} from '../services/supabase.ts';
+import {
+  buildTickerHistory,
+  detectPatterns,
+  toonToString,
   buildTOONContext,
   getTOONDecoderSpec,
   encodeTickerToTOON,
   summarizeConversation,
   type TickerDataInput,
   type ConversationMessage as TOONConversationMessage,
-} from "../context/toon.ts";
-import { 
-  findOptimalSpread, 
-  getEarningsInfo, 
+} from '../context/toon.ts';
+import {
+  findOptimalSpread,
+  getEarningsInfo,
   getIVAnalysis,
   calculateSupportResistance,
   getTickerNews,
@@ -48,27 +53,30 @@ import {
   type IVAnalysis,
   type SupportResistance,
   type NewsItem,
-} from "../services/yahoo.ts";
-import { getCalendarContext, formatCalendarForAI } from "../services/calendar.ts";
-import { 
-  getMarketRegime as fetchMarketRegime, 
-  getRegimeBadge, 
+} from '../services/yahoo.ts';
+import {
+  getCalendarContext,
+  formatCalendarForAI,
+} from '../services/calendar.ts';
+import {
+  getMarketRegime as fetchMarketRegime,
+  getRegimeBadge,
   formatRegimeForAI,
   type MarketRegime as MarketRegimeData,
-} from "../services/market-regime.ts";
-import { 
-  quickScan, 
-  fullScan, 
+} from '../services/market-regime.ts';
+import {
+  quickScan,
+  fullScan,
   formatScanResults,
   type ScanResult,
-} from "../services/scanner.ts";
+} from '../services/scanner.ts';
 import {
   searchWeb,
   formatSearchForAI,
   needsWebSearch,
   type WebSearchResponse,
-} from "../services/web-search.ts";
-import { 
+} from '../services/web-search.ts';
+import {
   getMarketStatus,
   findSpreadWithAlternatives,
   analyzePosition,
@@ -77,19 +85,17 @@ import {
   type SpreadAlternatives,
   type SpreadSelectionContext,
   type PositionAnalysis,
-} from "../services/yahoo.ts";
-import { 
-  performFullAnalysis, 
-  formatAnalysisForAI, 
+} from '../services/yahoo.ts';
+import {
+  performFullAnalysis,
+  formatAnalysisForAI,
   explainGradeRubric,
   GRADE_RUBRIC,
   type AdvancedAnalysis,
-} from "../engine/trade-analyzer.ts";
-import {
-  getPsychologicalFairValue,
-} from "../services/psychological-fair-value.ts";
-import type { PsychologicalFairValue } from "../../../lib/utils/ts/psychological-fair-value/types.ts";
-import type { MarketRegime, Trade } from "../types/index.ts";
+} from '../engine/trade-analyzer.ts';
+import { getPsychologicalFairValue } from '../services/psychological-fair-value.ts';
+import type { PsychologicalFairValue } from '../../../lib/utils/ts/psychological-fair-value/types.ts';
+import type { MarketRegime, Trade } from '../types/index.ts';
 
 // Shared AI Agent library (DATA PARITY: CLI uses same data as Frontend)
 import {
@@ -112,11 +118,11 @@ import {
   // Types
   type QuestionClassification as SharedQuestionClassification,
   type TickerData as SharedTickerData,
-} from "../../../lib/ai-agent/index.ts";
+} from '../../../lib/ai-agent/index.ts';
 
 // Instantiate yahoo-finance2
 const yahooFinance = new YahooFinance({
-  suppressNotices: ["yahooSurvey"],
+  suppressNotices: ['yahooSurvey'],
 });
 
 // ============================================================================
@@ -130,7 +136,7 @@ export interface ChatOptions {
 }
 
 interface ConversationMessage {
-  role: "user" | "assistant" | "system";
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
@@ -253,63 +259,68 @@ interface TickerData {
 
 const DEFAULT_ACCOUNT_SIZE = 1500;
 
-async function getMarketRegime(): Promise<{ regime: MarketRegime; spyPrice: number }> {
+async function getMarketRegime(): Promise<{
+  regime: MarketRegime;
+  spyPrice: number;
+}> {
   try {
-    const spy = await yahooFinance.quote("SPY");
+    const spy = await yahooFinance.quote('SPY');
     const spyPrice = spy?.regularMarketPrice ?? 0;
     const ma50 = spy?.fiftyDayAverage ?? spyPrice;
     const ma200 = spy?.twoHundredDayAverage ?? spyPrice;
-    
-    let regime: MarketRegime = "neutral";
+
+    let regime: MarketRegime = 'neutral';
     if (spyPrice > ma50 && spyPrice > ma200) {
-      regime = "bull";
+      regime = 'bull';
     } else if (spyPrice < ma50 && spyPrice < ma200) {
-      regime = "bear";
+      regime = 'bear';
     }
-    
+
     return { regime, spyPrice };
   } catch {
-    return { regime: "neutral", spyPrice: 0 };
+    return { regime: 'neutral', spyPrice: 0 };
   }
 }
 
 /**
  * Fetch ticker data using the SHARED LIBRARY for data parity with Frontend.
- * 
+ *
  * DATA PARITY: Both CLI and Frontend now use the same fetchTickerData from
  * lib/ai-agent, ensuring identical data, spreads, IV, and PFV calculations.
- * 
+ *
  * CLI-specific enhancements (ownership, advanced analysis) are added on top.
  */
 async function fetchTickerData(
-  ticker: string, 
+  ticker: string,
   _fetchOptions: boolean = true
 ): Promise<TickerData | null> {
   try {
     // Use SHARED library for data parity with Frontend
     const sharedData = await sharedFetchTickerData(ticker);
     if (!sharedData) return null;
-    
-    console.log(`[CLI] Using shared fetchTickerData for ${ticker} (data parity)`);
+
+    console.log(
+      `[CLI] Using shared fetchTickerData for ${ticker} (data parity)`
+    );
 
     // CLI-specific: Fetch additional ownership data (not in shared lib)
     let ownership: OwnershipData | undefined;
     try {
       const insights = await yahooFinance.quoteSummary(ticker, {
-        modules: ["majorHoldersBreakdown", "insiderTransactions"],
+        modules: ['majorHoldersBreakdown', 'insiderTransactions'],
       });
-      
+
       const holders = insights?.majorHoldersBreakdown;
       const insiderTxns = insights?.insiderTransactions?.transactions ?? [];
-      
+
       if (holders) {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
         const recentSales = insiderTxns
-          .filter(t => t.startDate && new Date(t.startDate) > sixMonthsAgo)
-          .filter(t => (t.shares ?? 0) < 0)
-          .reduce((sum, t) => sum + Math.abs((t.value ?? 0)), 0);
-        
+          .filter((t) => t.startDate && new Date(t.startDate) > sixMonthsAgo)
+          .filter((t) => (t.shares ?? 0) < 0)
+          .reduce((sum, t) => sum + Math.abs(t.value ?? 0), 0);
+
         ownership = {
           insidersPercent: (holders.insidersPercentHeld ?? 0) * 100,
           institutionsPercent: (holders.institutionsPercentHeld ?? 0) * 100,
@@ -318,8 +329,8 @@ async function fetchTickerData(
       }
     } catch {
       // Ownership data optional
-        }
-        
+    }
+
     // CLI-specific: Calculate support/resistance (for CLI display)
     const supportResistance = calculateSupportResistance({
       currentPrice: sharedData.price,
@@ -355,7 +366,7 @@ async function fetchTickerData(
       // Core data from shared library (SAME AS FRONTEND)
       ticker: sharedData.ticker,
       price: sharedData.price,
-      change: sharedData.changePct * sharedData.price / 100, // Derived
+      change: (sharedData.changePct * sharedData.price) / 100, // Derived
       changePct: sharedData.changePct,
       rsi: sharedData.rsi,
       adx: sharedData.adx,
@@ -372,7 +383,7 @@ async function fetchTickerData(
       eps: sharedData.eps,
       dividendYield: sharedData.dividendYield,
       beta: sharedData.beta,
-      
+
       // Options data from shared library (SAME AS FRONTEND)
       // Type assertions needed due to minor interface differences
       spread: sharedData.spread as SpreadRecommendation | undefined,
@@ -382,39 +393,49 @@ async function fetchTickerData(
       earningsWarning: sharedData.earningsWarning,
       iv: sharedData.iv as IVAnalysis | undefined,
       pfv: sharedData.pfv as PsychologicalFairValue | undefined,
-      
+
       // Rich data from shared library (SAME AS FRONTEND)
       analystRatings: sharedData.analystRatings,
       targetPrices: sharedData.targetPrices,
-      performance: sharedData.performance ? {
-        day5: sharedData.performance.day5 ?? 0,
-        month1: sharedData.performance.month1 ?? 0,
-        month3: sharedData.performance.month3 ?? 0,
-        ytd: sharedData.performance.ytd ?? 0,
-      } : undefined,
-      earnings: sharedData.earnings ? {
-        date: sharedData.earnings.date,
-        daysUntil: sharedData.earnings.daysUntil,
-        streak: sharedData.earnings.streak,
-        lastSurprise: sharedData.earnings.lastSurprise,
-        avgSurprise: sharedData.earnings.avgSurprise,
-      } : undefined,
+      performance: sharedData.performance
+        ? {
+            day5: sharedData.performance.day5 ?? 0,
+            month1: sharedData.performance.month1 ?? 0,
+            month3: sharedData.performance.month3 ?? 0,
+            ytd: sharedData.performance.ytd ?? 0,
+          }
+        : undefined,
+      earnings: sharedData.earnings
+        ? {
+            date: sharedData.earnings.date,
+            daysUntil: sharedData.earnings.daysUntil,
+            streak: sharedData.earnings.streak,
+            lastSurprise: sharedData.earnings.lastSurprise,
+            avgSurprise: sharedData.earnings.avgSurprise,
+          }
+        : undefined,
       sectorContext: sharedData.sectorContext,
       hv20: sharedData.hv20,
-      shortInterest: sharedData.shortInterest ? {
-        shortPct: sharedData.shortInterest.shortPct,
-        shortRatio: sharedData.shortInterest.shortRatio ?? 0,
-      } : undefined,
-      relativeStrength: sharedData.relativeStrength ? {
-        vsSPY: sharedData.relativeStrength.vsSPY,
-      } : undefined,
-      optionsFlow: sharedData.optionsFlow ? {
-        pcRatioOI: sharedData.optionsFlow.pcRatioOI,
-        pcRatioVol: sharedData.optionsFlow.pcRatioVol,
-      } : undefined,
+      shortInterest: sharedData.shortInterest
+        ? {
+            shortPct: sharedData.shortInterest.shortPct,
+            shortRatio: sharedData.shortInterest.shortRatio ?? 0,
+          }
+        : undefined,
+      relativeStrength: sharedData.relativeStrength
+        ? {
+            vsSPY: sharedData.relativeStrength.vsSPY,
+          }
+        : undefined,
+      optionsFlow: sharedData.optionsFlow
+        ? {
+            pcRatioOI: sharedData.optionsFlow.pcRatioOI,
+            pcRatioVol: sharedData.optionsFlow.pcRatioVol,
+          }
+        : undefined,
       news: sharedData.news as NewsItem[] | undefined,
       dataQuality: sharedData.dataQuality,
-      
+
       // CLI-specific additions
       ownership,
       supportResistance,
@@ -428,35 +449,51 @@ async function fetchTickerData(
 
 async function buildContextForAI(accountSize: number): Promise<string> {
   const contextParts: string[] = [];
-  
+
   // Add current date/time context
   const now = new Date();
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayNames = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
   const dayOfWeek = dayNames[now.getDay()];
-  const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  
+  const dateStr = now.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeStr = now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
   contextParts.push(`TODAY: ${dayOfWeek}, ${dateStr} at ${timeStr}`);
-  
+
   // Market status
   const hour = now.getHours();
   const isWeekend = now.getDay() === 0 || now.getDay() === 6;
   const isMarketHours = !isWeekend && hour >= 9 && hour < 16;
   const isPreMarket = !isWeekend && hour >= 4 && hour < 9;
   const isAfterHours = !isWeekend && hour >= 16 && hour < 20;
-  
-  let marketStatus = "CLOSED";
-  if (isMarketHours) marketStatus = "OPEN";
-  else if (isPreMarket) marketStatus = "PRE-MARKET";
-  else if (isAfterHours) marketStatus = "AFTER-HOURS";
-  else if (isWeekend) marketStatus = "WEEKEND (CLOSED)";
-  
+
+  let marketStatus = 'CLOSED';
+  if (isMarketHours) marketStatus = 'OPEN';
+  else if (isPreMarket) marketStatus = 'PRE-MARKET';
+  else if (isAfterHours) marketStatus = 'AFTER-HOURS';
+  else if (isWeekend) marketStatus = 'WEEKEND (CLOSED)';
+
   contextParts.push(`Market Status: ${marketStatus}`);
-  
+
   // Get market regime
   const { regime, spyPrice } = await getMarketRegime();
   contextParts.push(`Market Regime: ${regime} (SPY $${spyPrice.toFixed(2)})`);
-  
+
   // Add economic calendar
   const calendar = getCalendarContext();
   if (calendar.warnings.length > 0) {
@@ -466,7 +503,7 @@ async function buildContextForAI(accountSize: number): Promise<string> {
     }
     contextParts.push(`=== END CALENDAR ===\n`);
   }
-  
+
   // Get trade history if database is configured
   if (isConfigured()) {
     try {
@@ -475,10 +512,10 @@ async function buildContextForAI(accountSize: number): Promise<string> {
         const summary = await getPerformanceSummary();
         contextParts.push(
           `Portfolio: ${summary.totalTrades} trades, ` +
-          `${summary.winRate.toFixed(0)}% win rate, ` +
-          `$${summary.totalPnl.toFixed(0)} P&L`
+            `${summary.winRate.toFixed(0)}% win rate, ` +
+            `$${summary.totalPnl.toFixed(0)} P&L`
         );
-        
+
         // Group trades by ticker for TOON context
         const byTicker = new Map<string, Trade[]>();
         for (const trade of trades) {
@@ -486,7 +523,7 @@ async function buildContextForAI(accountSize: number): Promise<string> {
           existing.push(trade);
           byTicker.set(trade.ticker, existing);
         }
-        
+
         // Build patterns map
         const patterns = new Map<string, string>();
         for (const [ticker, tickerTrades] of byTicker) {
@@ -495,32 +532,37 @@ async function buildContextForAI(accountSize: number): Promise<string> {
             patterns.set(ticker, detected[0]);
           }
         }
-        
-        const toonContext = buildTOONContext(accountSize, byTicker, regime, patterns);
+
+        const toonContext = buildTOONContext(
+          accountSize,
+          byTicker,
+          regime,
+          patterns
+        );
         contextParts.push(`History (TOON): ${toonToString(toonContext)}`);
       } else {
-        contextParts.push("No trade history yet");
+        contextParts.push('No trade history yet');
       }
     } catch {
-      contextParts.push("Trade history unavailable");
+      contextParts.push('Trade history unavailable');
     }
   } else {
-    contextParts.push("Database not configured - no trade history");
+    contextParts.push('Database not configured - no trade history');
   }
-  
-  return contextParts.join("\n");
+
+  return contextParts.join('\n');
 }
 
 // ============================================================================
 // QUESTION CLASSIFICATION (Smart Context Loading)
 // ============================================================================
 
-export type QuestionType = 
-  | 'price_check'    // Simple price/quote questions
+export type QuestionType =
+  | 'price_check' // Simple price/quote questions
   | 'trade_analysis' // Full trade analysis with spreads
-  | 'research'       // News/why questions requiring web search
-  | 'scan'           // Market scanning requests
-  | 'general';       // General conversation
+  | 'research' // News/why questions requiring web search
+  | 'scan' // Market scanning requests
+  | 'general'; // General conversation
 
 interface QuestionClassification {
   type: QuestionType;
@@ -536,7 +578,7 @@ interface QuestionClassification {
  */
 export function classifyQuestion(message: string): QuestionClassification {
   const lower = message.toLowerCase();
-  
+
   // Scan requests - need full data
   if (/\b(scan|find|search|opportunities|setups|grade a|best)\b/.test(lower)) {
     return {
@@ -547,7 +589,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsCalendar: true,
     };
   }
-  
+
   // Research/news questions - need web search
   if (/\b(why is|what.+news|research|look up|what.+happening)\b/.test(lower)) {
     return {
@@ -558,10 +600,12 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsCalendar: false,
     };
   }
-  
+
   // Simple price check - minimal data needed
-  if (/\b(price|quote|how much|what.+at|trading at)\b/.test(lower) &&
-      !/\b(should|buy|sell|trade|analyze|entry)\b/.test(lower)) {
+  if (
+    /\b(price|quote|how much|what.+at|trading at)\b/.test(lower) &&
+    !/\b(should|buy|sell|trade|analyze|entry)\b/.test(lower)
+  ) {
     return {
       type: 'price_check',
       needsOptions: false,
@@ -570,10 +614,14 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsCalendar: false,
     };
   }
-  
+
   // Trade analysis - full context needed
   // Includes "how does X look" patterns which imply wanting analysis
-  if (/\b(analyze|should|buy|sell|entry|trade|spread|cds|setup|look|looking|opportunity|opportunities)\b/.test(lower)) {
+  if (
+    /\b(analyze|should|buy|sell|entry|trade|spread|cds|setup|look|looking|opportunity|opportunities)\b/.test(
+      lower
+    )
+  ) {
     return {
       type: 'trade_analysis',
       needsOptions: true,
@@ -582,7 +630,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsCalendar: true,
     };
   }
-  
+
   // Default: if a ticker is mentioned, treat as trade analysis
   // Check for uppercase 2-5 letter words that look like tickers
   const tickerPattern = /\b[A-Z]{2,5}\b/;
@@ -595,7 +643,7 @@ export function classifyQuestion(message: string): QuestionClassification {
       needsCalendar: true,
     };
   }
-  
+
   // Default: general question with minimal context
   return {
     type: 'general',
@@ -651,16 +699,16 @@ async function executeToolCall(
   showStatus: (msg: string) => void
 ): Promise<string> {
   const { name, arguments: args } = toolCall.function;
-  
+
   switch (name) {
-    case "web_search": {
+    case 'web_search': {
       const query = args.query as string;
       showStatus(`🌐 Searching: "${query}"`);
       const results = await searchWeb(query, 5);
       return formatSearchForAI(results);
     }
-    
-    case "get_ticker_data": {
+
+    case 'get_ticker_data': {
       const ticker = (args.ticker as string).toUpperCase();
       showStatus(`📊 Fetching ${ticker} data...`);
       try {
@@ -673,8 +721,8 @@ async function executeToolCall(
         return `Error fetching data for ${ticker}`;
       }
     }
-    
-    case "get_financials_deep": {
+
+    case 'get_financials_deep': {
       const ticker = (args.ticker as string).toUpperCase();
       showStatus(`📈 Fetching ${ticker} financials...`);
       const result = await handleGetFinancialsDeep({ ticker });
@@ -683,8 +731,8 @@ async function executeToolCall(
       }
       return result.formatted ?? 'No financial data available';
     }
-    
-    case "get_institutional_holdings": {
+
+    case 'get_institutional_holdings': {
       const ticker = (args.ticker as string).toUpperCase();
       showStatus(`🏦 Fetching ${ticker} institutional holdings...`);
       const result = await handleGetInstitutionalHoldings({ ticker });
@@ -693,12 +741,13 @@ async function executeToolCall(
       }
       return result.formatted ?? 'No holdings data available';
     }
-    
-    case "get_unusual_options_activity": {
+
+    case 'get_unusual_options_activity': {
       const ticker = args.ticker as string | undefined;
-      showStatus(ticker 
-        ? `🔥 Fetching unusual options for ${ticker}...` 
-        : `🔥 Fetching unusual options activity...`
+      showStatus(
+        ticker
+          ? `🔥 Fetching unusual options for ${ticker}...`
+          : `🔥 Fetching unusual options activity...`
       );
       const result = await handleGetUnusualOptionsActivity({
         ticker,
@@ -710,7 +759,7 @@ async function executeToolCall(
       }
       return result.formatted ?? 'No unusual options signals found';
     }
-    
+
     default:
       return `Unknown tool: ${name}`;
   }
@@ -725,10 +774,13 @@ function formatTickerDataForAI(t: TickerData): string {
   output += `RSI: ${t.rsi?.toFixed(1) ?? 'N/A'}\n`;
   if (t.ma20) output += `MA20: $${t.ma20.toFixed(2)}\n`;
   if (t.ma50) output += `MA50: $${t.ma50.toFixed(2)}\n`;
-  if (t.ma200) output += `MA200: $${t.ma200.toFixed(2)} (${t.aboveMA200 ? 'ABOVE' : 'BELOW'})\n`;
+  if (t.ma200)
+    output += `MA200: $${t.ma200.toFixed(2)} (${t.aboveMA200 ? 'ABOVE' : 'BELOW'})\n`;
   if (t.marketCap) {
-    const mcapStr = t.marketCap >= 1e12 ? `$${(t.marketCap / 1e12).toFixed(1)}T`
-      : `$${(t.marketCap / 1e9).toFixed(0)}B`;
+    const mcapStr =
+      t.marketCap >= 1e12
+        ? `$${(t.marketCap / 1e12).toFixed(1)}T`
+        : `$${(t.marketCap / 1e9).toFixed(0)}B`;
     output += `Market Cap: ${mcapStr}\n`;
   }
   if (t.peRatio) output += `P/E: ${t.peRatio.toFixed(1)}\n`;
@@ -736,7 +788,8 @@ function formatTickerDataForAI(t: TickerData): string {
     output += `IV: ${t.iv.currentIV}% (${t.iv.ivLevel}) - ${t.iv.ivPercentile}th percentile\n`;
   }
   if (t.spread) {
-    output += `Spread: $${t.spread.longStrike}/$${t.spread.shortStrike}, ` +
+    output +=
+      `Spread: $${t.spread.longStrike}/$${t.spread.shortStrike}, ` +
       `Debit: $${t.spread.estimatedDebit.toFixed(2)}, ` +
       `Cushion: ${t.spread.cushion.toFixed(1)}%\n`;
   }
@@ -773,17 +826,57 @@ function formatTickerDataForAI(t: TickerData): string {
 function extractTickers(message: string): string[] {
   // Match uppercase words that look like tickers (1-5 letters)
   const matches = message.match(/\b[A-Z]{1,5}\b/g) ?? [];
-  
+
   // Filter out common words that aren't tickers
   const commonWords = new Set([
-    "I", "A", "THE", "AND", "OR", "BUT", "IS", "IT", "TO", "FOR",
-    "IN", "ON", "AT", "BY", "UP", "IF", "SO", "NO", "YES", "OK",
-    "CDS", "PCS", "ITM", "OTM", "ATM", "RSI", "MA", "DTE", "AI",
-    "BUY", "SELL", "HOLD", "WAIT", "PASS", "NOT", "CAN", "DO",
-    "HOW", "WHAT", "WHY", "WHEN", "WHO", "MY", "PM", "AM",
+    'I',
+    'A',
+    'THE',
+    'AND',
+    'OR',
+    'BUT',
+    'IS',
+    'IT',
+    'TO',
+    'FOR',
+    'IN',
+    'ON',
+    'AT',
+    'BY',
+    'UP',
+    'IF',
+    'SO',
+    'NO',
+    'YES',
+    'OK',
+    'CDS',
+    'PCS',
+    'ITM',
+    'OTM',
+    'ATM',
+    'RSI',
+    'MA',
+    'DTE',
+    'AI',
+    'BUY',
+    'SELL',
+    'HOLD',
+    'WAIT',
+    'PASS',
+    'NOT',
+    'CAN',
+    'DO',
+    'HOW',
+    'WHAT',
+    'WHY',
+    'WHEN',
+    'WHO',
+    'MY',
+    'PM',
+    'AM',
   ]);
-  
-  return matches.filter(t => !commonWords.has(t) && t.length >= 2);
+
+  return matches.filter((t) => !commonWords.has(t) && t.length >= 2);
 }
 
 /**
@@ -812,36 +905,38 @@ async function prepareContext(
   accountSize: number,
   onStatus?: StatusCallback
 ): Promise<PreparedContext> {
-  
   // Classify the question to determine what context we need
   const classification = classifyQuestion(userMessage);
-  
+
   // Check if user wants to scan for opportunities
-  const wantsScan = classification.type === 'scan' || 
-    (classification.type === 'general' && 
-     /\b(scan|find|search|opportunities|setups|grade a|best)\b/.test(userMessage.toLowerCase()));
-  
+  const wantsScan =
+    classification.type === 'scan' ||
+    (classification.type === 'general' &&
+      /\b(scan|find|search|opportunities|setups|grade a|best)\b/.test(
+        userMessage.toLowerCase()
+      ));
+
   let scanResults: ScanResult[] = [];
-  let scanContext = "";
-  
+  let scanContext = '';
+
   if (wantsScan && !extractTickers(userMessage).length) {
     const isQuickScan = userMessage.toLowerCase().includes('quick');
-    
+
     onStatus?.(`Scanning ${isQuickScan ? '15' : '35'}+ tickers...`);
-    
+
     try {
-      scanResults = isQuickScan 
+      scanResults = isQuickScan
         ? await quickScan((curr, total, ticker) => {
             onStatus?.(`Scanning ${ticker} (${curr}/${total})...`);
           })
         : await quickScan((curr, total, ticker) => {
             onStatus?.(`Scanning ${ticker} (${curr}/${total})...`);
           });
-      
+
       if (scanResults.length > 0) {
         scanContext = `\n\n=== SCAN RESULTS ===\n`;
         scanContext += `Found ${scanResults.length} opportunities:\n\n`;
-        
+
         for (const r of scanResults.slice(0, 8)) {
           scanContext += `${r.ticker} - Grade ${r.grade.grade} | Risk ${r.risk.score}/10\n`;
           scanContext += `  Price: $${r.price.toFixed(2)} | ${r.grade.recommendation}\n`;
@@ -853,21 +948,24 @@ async function prepareContext(
         scanContext += `=== END SCAN ===\n`;
       }
     } catch {
-      scanContext = "\n(Scan failed - please try again)\n";
+      scanContext = '\n(Scan failed - please try again)\n';
     }
   }
-  
+
   // Check if user needs web search based on classification
   let webSearchResults: WebSearchResponse | undefined;
-  let webSearchContext = "";
-  
+  let webSearchContext = '';
+
   if (classification.needsWebSearch) {
     const searchCheck = needsWebSearch(userMessage);
     if (searchCheck.needed && searchCheck.query) {
       onStatus?.(`🌐 Searching web...`);
       try {
         webSearchResults = await searchWeb(searchCheck.query, 5);
-        if (webSearchResults.results.length > 0 || webSearchResults.instantAnswer) {
+        if (
+          webSearchResults.results.length > 0 ||
+          webSearchResults.instantAnswer
+        ) {
           webSearchContext = formatSearchForAI(webSearchResults);
         }
       } catch {
@@ -875,30 +973,32 @@ async function prepareContext(
       }
     }
   }
-  
+
   // Extract any tickers mentioned
   const tickers = extractTickers(userMessage);
   const tickersFetched: TickerData[] = [];
-  
+
   // Fetch data for mentioned tickers
   // Use classification to determine if we need full options data
-  let tickerContext = "";
+  let tickerContext = '';
   if (tickers.length > 0) {
     onStatus?.(`Fetching ${tickers.join(', ')}...`);
-    
+
     // Skip options data for simple price checks (faster + fewer tokens)
     const fetchOptions = classification.needsOptions;
-    const tickerDataPromises = tickers.slice(0, 3).map(t => 
-      fetchTickerData(t, fetchOptions)
-    );
+    const tickerDataPromises = tickers
+      .slice(0, 3)
+      .map((t) => fetchTickerData(t, fetchOptions));
     const tickerDataResults = await Promise.all(tickerDataPromises);
-    
-    const validData = tickerDataResults.filter((d): d is TickerData => d !== null);
+
+    const validData = tickerDataResults.filter(
+      (d): d is TickerData => d !== null
+    );
     tickersFetched.push(...validData);
-    
+
     if (validData.length > 0) {
       // Use TOON encoding for compact context (~80% token reduction)
-      const toonData: TickerDataInput[] = validData.map(d => ({
+      const toonData: TickerDataInput[] = validData.map((d) => ({
         ticker: d.ticker,
         price: d.price,
         changePct: d.changePct,
@@ -958,32 +1058,33 @@ async function prepareContext(
         vsSPY: d.relativeStrength?.vsSPY,
         pcRatioOI: d.optionsFlow?.pcRatioOI,
       }));
-      
-      tickerContext = "\n\n=== TICKER DATA (TOON) ===\n";
+
+      tickerContext = '\n\n=== TICKER DATA (TOON) ===\n';
       for (const td of toonData) {
-        tickerContext += encodeTickerToTOON(td) + "\n";
+        tickerContext += encodeTickerToTOON(td) + '\n';
       }
-      
+
       // Add earnings warning if present (important enough to keep verbose)
       for (const d of validData) {
         if (d.earningsWarning && d.earningsDays !== undefined) {
           tickerContext += `⚠️ ${d.ticker} EARNINGS in ${d.earningsDays}d - AVOID\n`;
         }
       }
-      
+
       // Add news if classification needs it (compact format)
       if (classification.needsNews) {
         for (const d of validData) {
           if (d.news && d.news.length > 0) {
             tickerContext += `\n${d.ticker} NEWS:\n`;
             for (const n of d.news.slice(0, 2)) {
-              const title = n.title.length > 60 ? n.title.slice(0, 57) + '...' : n.title;
+              const title =
+                n.title.length > 60 ? n.title.slice(0, 57) + '...' : n.title;
               tickerContext += `• ${title}\n`;
             }
           }
         }
       }
-      
+
       // Add PFV context for trade analysis
       if (classification.type === 'trade_analysis') {
         for (const d of validData) {
@@ -993,9 +1094,9 @@ async function prepareContext(
           }
         }
       }
-      
-      tickerContext += "=== END TICKER DATA ===";
-      
+
+      tickerContext += '=== END TICKER DATA ===';
+
       // Get trade history for mentioned tickers (compact format)
       if (isConfigured() && classification.type === 'trade_analysis') {
         onStatus?.(`Checking trade history...`);
@@ -1017,36 +1118,41 @@ async function prepareContext(
       }
     }
   }
-  
+
   onStatus?.(`Generating response...`);
-  
+
   // Build context
   const context = await buildContextForAI(accountSize);
   const systemPrompt = buildSystemPrompt(
-    accountSize, 
+    accountSize,
     context + tickerContext + scanContext + webSearchContext
   );
-  
+
   // Conversation history: summarize older turns, keep last 4 full
-  let conversationContext = "";
+  let conversationContext = '';
   if (conversationHistory.length > 4) {
     // Summarize older messages to save tokens
     const olderHistory = conversationHistory.slice(0, -4);
-    const toonHistory: TOONConversationMessage[] = olderHistory.map(m => ({
-      role: m.role as "user" | "assistant",
+    const toonHistory: TOONConversationMessage[] = olderHistory.map((m) => ({
+      role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
-    conversationContext = summarizeConversation(toonHistory) + "\n\n";
+    conversationContext = summarizeConversation(toonHistory) + '\n\n';
   }
-  
+
   // Keep last 4 messages in full (most relevant context)
   const recentHistory = conversationHistory.slice(-4);
-  const recentContext = recentHistory.map(m => `${m.role}: ${m.content}`).join("\n");
-  
+  const recentContext = recentHistory
+    .map((m) => `${m.role}: ${m.content}`)
+    .join('\n');
+
   // Build the user prompt with summarized + recent history
-  const userPrompt = conversationContext + recentContext + 
-    (recentContext ? "\n\n" : "") + `user: ${userMessage}`;
-  
+  const userPrompt =
+    conversationContext +
+    recentContext +
+    (recentContext ? '\n\n' : '') +
+    `user: ${userMessage}`;
+
   return {
     systemPrompt,
     userPrompt,
@@ -1062,64 +1168,100 @@ async function prepareContext(
 
 export async function startChat(options: ChatOptions): Promise<void> {
   const accountSize = options.accountSize ?? DEFAULT_ACCOUNT_SIZE;
-  
+
   // Get market regime for header
   const regime = await fetchMarketRegime().catch(() => null);
-  
+
   console.log();
-  console.log(chalk.bold.cyan("  📊 YOUR ANALYST"));
-  console.log(chalk.gray("  ════════════════════════════════════════════════════════════════════"));
+  console.log(chalk.bold.cyan('  📊 YOUR ANALYST'));
+  console.log(
+    chalk.gray(
+      '  ════════════════════════════════════════════════════════════════════'
+    )
+  );
   console.log();
-  
+
   // Check market status
   const marketStatus = getMarketStatus();
-  
+
   // Show header with market regime
   let headerInfo = `Fund Size: $${accountSize.toLocaleString()} | Strategy: Deep ITM CDS`;
-  
+
   // Add market status badge
-  const statusBadge = marketStatus.isOpen 
+  const statusBadge = marketStatus.isOpen
     ? chalk.green('🟢 OPEN')
-    : marketStatus.status === 'PRE_MARKET' ? chalk.yellow('🌅 PRE-MKT')
-    : marketStatus.status === 'AFTER_HOURS' ? chalk.yellow('🌙 AH')
-    : chalk.red('🔴 CLOSED');
+    : marketStatus.status === 'PRE_MARKET'
+      ? chalk.yellow('🌅 PRE-MKT')
+      : marketStatus.status === 'AFTER_HOURS'
+        ? chalk.yellow('🌙 AH')
+        : chalk.red('🔴 CLOSED');
   headerInfo += ` | ${statusBadge}`;
-  
+
   console.log(chalk.gray(`  ${headerInfo}`));
-  
+
   // Show market regime badge
   if (regime) {
     const regimeBadge = getRegimeBadge(regime);
-    const regimeColor = regime.regime === 'RISK_ON' ? chalk.green
-      : regime.regime === 'RISK_OFF' ? chalk.red
-      : regime.regime === 'HIGH_VOL' ? chalk.yellow
-      : chalk.white;
+    const regimeColor =
+      regime.regime === 'RISK_ON'
+        ? chalk.green
+        : regime.regime === 'RISK_OFF'
+          ? chalk.red
+          : regime.regime === 'HIGH_VOL'
+            ? chalk.yellow
+            : chalk.white;
     console.log(chalk.gray('  ') + regimeColor(regimeBadge));
   }
-  
+
   console.log(chalk.gray("  Type 'quit' to end session"));
   console.log();
-  
+
   // Show calendar warnings if any
   const calendarCtx = getCalendarContext();
   if (calendarCtx.warnings.length > 0) {
-    console.log(chalk.dim("  ┌─ Market Calendar ───────────────────────────────────────────────"));
+    console.log(
+      chalk.dim(
+        '  ┌─ Market Calendar ───────────────────────────────────────────────'
+      )
+    );
     for (const warning of calendarCtx.warnings) {
-      console.log(chalk.dim("  │ ") + chalk.yellow(warning));
+      console.log(chalk.dim('  │ ') + chalk.yellow(warning));
     }
-    console.log(chalk.dim("  └───────────────────────────────────────────────────────────────────"));
+    console.log(
+      chalk.dim(
+        '  └───────────────────────────────────────────────────────────────────'
+      )
+    );
     console.log();
   }
-  
+
   // Show market regime recommendation if notable
-  if (regime && (regime.regime === 'HIGH_VOL' || regime.regime === 'RISK_OFF')) {
-    console.log(chalk.dim("  ┌─ Market Regime Warning ────────────────────────────────────────"));
-    console.log(chalk.dim("  │ ") + chalk.yellow(`${regime.regime}: ${regime.tradingRecommendation}`));
-    console.log(chalk.dim("  └───────────────────────────────────────────────────────────────────"));
+  if (
+    regime &&
+    (regime.regime === 'HIGH_VOL' || regime.regime === 'RISK_OFF')
+  ) {
+    console.log(
+      chalk.dim(
+        '  ┌─ Market Regime Warning ────────────────────────────────────────'
+      )
+    );
+    console.log(
+      chalk.dim('  │ ') +
+        chalk.yellow(`${regime.regime}: ${regime.tradingRecommendation}`)
+    );
+    console.log(
+      chalk.dim(
+        '  └───────────────────────────────────────────────────────────────────'
+      )
+    );
     console.log();
   }
-  
-  console.log(chalk.gray("  ────────────────────────────────────────────────────────────────────"));
+
+  console.log(
+    chalk.gray(
+      '  ────────────────────────────────────────────────────────────────────'
+    )
+  );
   console.log();
 
   // Validate AI
@@ -1141,39 +1283,57 @@ export async function startChat(options: ChatOptions): Promise<void> {
   const conversationHistory: ConversationMessage[] = [];
 
   // Initial greeting - Victor Chen checking in
-  console.log(chalk.cyan("  Victor: ") + "Morning. Victor Chen here. Markets are open and I've");
-  console.log(chalk.cyan("          ") + "been watching the tape. Give me a ticker to analyze, ask me");
-  console.log(chalk.cyan("          ") + "to scan for setups, or let's review what we're holding.");
-  console.log(chalk.cyan("          ") + "What's on your mind?");
+  console.log(
+    chalk.cyan('  Victor: ') +
+      "Morning. Victor Chen here. Markets are open and I've"
+  );
+  console.log(
+    chalk.cyan('          ') +
+      'been watching the tape. Give me a ticker to analyze, ask me'
+  );
+  console.log(
+    chalk.cyan('          ') +
+      "to scan for setups, or let's review what we're holding."
+  );
+  console.log(chalk.cyan('          ') + "What's on your mind?");
   console.log();
 
   const askQuestion = (): void => {
-    rl.question(chalk.green("  You: "), async (input) => {
+    rl.question(chalk.green('  You: '), async (input) => {
       const userInput = input.trim();
-      
+
       // Check for exit commands
-      if (!userInput || ["quit", "exit", "bye", "q"].includes(userInput.toLowerCase())) {
-          console.log();
-          console.log(chalk.cyan("  Victor: ") + "Understood. I'll keep my eyes on the screens. In 45 years,");
-          console.log(chalk.cyan("          ") + "I've learned patience wins. Come back when you're ready to");
-          console.log(chalk.cyan("          ") + "make some money.");
-          console.log();
-          rl.close();
-          return;
-        }
-      
+      if (
+        !userInput ||
+        ['quit', 'exit', 'bye', 'q'].includes(userInput.toLowerCase())
+      ) {
+        console.log();
+        console.log(
+          chalk.cyan('  Victor: ') +
+            "Understood. I'll keep my eyes on the screens. In 45 years,"
+        );
+        console.log(
+          chalk.cyan('          ') +
+            "I've learned patience wins. Come back when you're ready to"
+        );
+        console.log(chalk.cyan('          ') + 'make some money.');
+        console.log();
+        rl.close();
+        return;
+      }
+
       // Add user message to history
-      conversationHistory.push({ role: "user", content: userInput });
-      
+      conversationHistory.push({ role: 'user', content: userInput });
+
       try {
         // Status update callback
         const updateStatus = (status: string) => {
-          process.stdout.write(`\r${" ".repeat(60)}\r`);
+          process.stdout.write(`\r${' '.repeat(60)}\r`);
           process.stdout.write(chalk.dim(`  ⏳ ${status}`));
         };
-        
-        updateStatus("Processing...");
-        
+
+        updateStatus('Processing...');
+
         // Prepare context (fetch tickers, build prompts)
         const prepared = await prepareContext(
           userInput,
@@ -1181,78 +1341,148 @@ export async function startChat(options: ChatOptions): Promise<void> {
           accountSize,
           updateStatus
         );
-        
+
         // Clear status line
-        process.stdout.write(`\r${" ".repeat(60)}\r`);
-        
+        process.stdout.write(`\r${' '.repeat(60)}\r`);
+
         // Show scan results if any
         if (prepared.scanResults.length > 0) {
           console.log();
-          console.log(chalk.dim("  ┌─ Scan Results ─────────────────────────────────────────────────"));
-          console.log(chalk.dim(`  │ `) + chalk.white(`Found ${prepared.scanResults.length} opportunities`));
-          
+          console.log(
+            chalk.dim(
+              '  ┌─ Scan Results ─────────────────────────────────────────────────'
+            )
+          );
+          console.log(
+            chalk.dim(`  │ `) +
+              chalk.white(`Found ${prepared.scanResults.length} opportunities`)
+          );
+
           for (const r of prepared.scanResults.slice(0, 5)) {
-            const gradeColor = r.grade.grade.startsWith('A') ? chalk.green
-              : r.grade.grade.startsWith('B') ? chalk.yellow
-              : chalk.red;
-            const riskColor = r.risk.score <= 4 ? chalk.green
-              : r.risk.score <= 6 ? chalk.yellow
-              : chalk.red;
-            
-            console.log(chalk.dim(`  │ `) + chalk.cyan(r.ticker) + ` $${r.price.toFixed(0)} ` + 
-              gradeColor(`Grade ${r.grade.grade}`) + chalk.dim(' · ') + riskColor(`Risk ${r.risk.score}/10`));
-            
+            const gradeColor = r.grade.grade.startsWith('A')
+              ? chalk.green
+              : r.grade.grade.startsWith('B')
+                ? chalk.yellow
+                : chalk.red;
+            const riskColor =
+              r.risk.score <= 4
+                ? chalk.green
+                : r.risk.score <= 6
+                  ? chalk.yellow
+                  : chalk.red;
+
+            console.log(
+              chalk.dim(`  │ `) +
+                chalk.cyan(r.ticker) +
+                ` $${r.price.toFixed(0)} ` +
+                gradeColor(`Grade ${r.grade.grade}`) +
+                chalk.dim(' · ') +
+                riskColor(`Risk ${r.risk.score}/10`)
+            );
+
             if (r.spread) {
-              console.log(chalk.dim(`  │   `) + chalk.dim(`${r.spread.strikes} · $${r.spread.debit.toFixed(2)} · ${r.spread.cushion.toFixed(0)}% cushion`));
+              console.log(
+                chalk.dim(`  │   `) +
+                  chalk.dim(
+                    `${r.spread.strikes} · $${r.spread.debit.toFixed(2)} · ${r.spread.cushion.toFixed(0)}% cushion`
+                  )
+              );
             }
           }
-          
+
           if (prepared.scanResults.length > 5) {
-            console.log(chalk.dim(`  │   ...and ${prepared.scanResults.length - 5} more`));
+            console.log(
+              chalk.dim(`  │   ...and ${prepared.scanResults.length - 5} more`)
+            );
           }
-          console.log(chalk.dim("  └───────────────────────────────────────────────────────────────────"));
+          console.log(
+            chalk.dim(
+              '  └───────────────────────────────────────────────────────────────────'
+            )
+          );
         }
-        
+
         // Show web search results if any
-        if (prepared.webSearchResults?.results?.length || prepared.webSearchResults?.instantAnswer) {
+        if (
+          prepared.webSearchResults?.results?.length ||
+          prepared.webSearchResults?.instantAnswer
+        ) {
           console.log();
-          console.log(chalk.dim("  ┌─ 🌐 Web Search ───────────────────────────────────────────────"));
+          console.log(
+            chalk.dim(
+              '  ┌─ 🌐 Web Search ───────────────────────────────────────────────'
+            )
+          );
           if (prepared.webSearchResults.instantAnswer) {
-            const summary = prepared.webSearchResults.instantAnswer.substring(0, 120);
-            console.log(chalk.dim(`  │ `) + chalk.white(summary + (prepared.webSearchResults.instantAnswer.length > 120 ? '...' : '')));
+            const summary = prepared.webSearchResults.instantAnswer.substring(
+              0,
+              120
+            );
+            console.log(
+              chalk.dim(`  │ `) +
+                chalk.white(
+                  summary +
+                    (prepared.webSearchResults.instantAnswer.length > 120
+                      ? '...'
+                      : '')
+                )
+            );
           }
           for (const r of prepared.webSearchResults.results.slice(0, 2)) {
-            const title = r.title.length > 55 ? r.title.substring(0, 52) + '...' : r.title;
+            const title =
+              r.title.length > 55 ? r.title.substring(0, 52) + '...' : r.title;
             console.log(chalk.dim(`  │ • `) + chalk.cyan(title));
           }
-          console.log(chalk.dim("  └───────────────────────────────────────────────────────────────"));
+          console.log(
+            chalk.dim(
+              '  └───────────────────────────────────────────────────────────────'
+            )
+          );
         }
-        
+
         // Show tool calls if any tickers were fetched
         if (prepared.tickersFetched.length > 0) {
           console.log();
-          
+
           // Show data staleness warning if applicable
-          const staleData = prepared.tickersFetched.find(t => t.dataQuality?.isStale);
+          const staleData = prepared.tickersFetched.find(
+            (t) => t.dataQuality?.isStale
+          );
           if (staleData?.dataQuality?.warning) {
             console.log(chalk.yellow(`  ${staleData.dataQuality.warning}`));
           }
-          
-          console.log(chalk.dim("  ┌─ Yahoo Finance ─────────────────────────────────────────────"));
+
+          console.log(
+            chalk.dim(
+              '  ┌─ Yahoo Finance ─────────────────────────────────────────────'
+            )
+          );
           for (const t of prepared.tickersFetched) {
             const changeStr = `${t.changePct >= 0 ? '+' : ''}${t.changePct.toFixed(1)}%`;
             const rsiStr = t.rsi !== undefined ? `RSI ${t.rsi.toFixed(0)}` : '';
-            const maStr = t.aboveMA200 !== undefined 
-              ? (t.aboveMA200 ? chalk.green('↑MA200') : chalk.red('↓MA200'))
-              : '';
+            const maStr =
+              t.aboveMA200 !== undefined
+                ? t.aboveMA200
+                  ? chalk.green('↑MA200')
+                  : chalk.red('↓MA200')
+                : '';
             // Add trend strength indicator
-            const trendStr = t.trendStrength 
-              ? (t.trendStrength === 'STRONG' ? chalk.green(`📈${t.adx?.toFixed(0)}`) 
-                : t.trendStrength === 'MODERATE' ? chalk.yellow(`→${t.adx?.toFixed(0)}`)
-                : chalk.dim(`↔${t.adx?.toFixed(0)}`))
+            const trendStr = t.trendStrength
+              ? t.trendStrength === 'STRONG'
+                ? chalk.green(`📈${t.adx?.toFixed(0)}`)
+                : t.trendStrength === 'MODERATE'
+                  ? chalk.yellow(`→${t.adx?.toFixed(0)}`)
+                  : chalk.dim(`↔${t.adx?.toFixed(0)}`)
               : '';
-            console.log(chalk.dim(`  │ `) + chalk.white(t.ticker) + chalk.dim(` $${t.price.toFixed(2)} ${changeStr} ${rsiStr} `) + maStr + ' ' + trendStr);
-            
+            console.log(
+              chalk.dim(`  │ `) +
+                chalk.white(t.ticker) +
+                chalk.dim(` $${t.price.toFixed(2)} ${changeStr} ${rsiStr} `) +
+                maStr +
+                ' ' +
+                trendStr
+            );
+
             // Show MA levels
             if (t.ma20 || t.ma50 || t.ma200) {
               const maLevels = [];
@@ -1261,340 +1491,515 @@ export async function startChat(options: ChatOptions): Promise<void> {
               if (t.ma200) maLevels.push(`MA200 $${t.ma200.toFixed(0)}`);
               console.log(chalk.dim(`  │   ${maLevels.join(' · ')}`));
             }
-            
+
             // Show fundamentals (compact)
             if (t.marketCap || t.peRatio) {
               const fundParts = [];
               if (t.marketCap) {
-                const mcapStr = t.marketCap >= 1e12 ? `${(t.marketCap / 1e12).toFixed(1)}T`
-                  : t.marketCap >= 1e9 ? `${(t.marketCap / 1e9).toFixed(0)}B`
-                  : `${(t.marketCap / 1e6).toFixed(0)}M`;
+                const mcapStr =
+                  t.marketCap >= 1e12
+                    ? `${(t.marketCap / 1e12).toFixed(1)}T`
+                    : t.marketCap >= 1e9
+                      ? `${(t.marketCap / 1e9).toFixed(0)}B`
+                      : `${(t.marketCap / 1e6).toFixed(0)}M`;
                 fundParts.push(`MCap $${mcapStr}`);
               }
-              if (t.peRatio !== undefined) fundParts.push(`P/E ${t.peRatio.toFixed(1)}`);
+              if (t.peRatio !== undefined)
+                fundParts.push(`P/E ${t.peRatio.toFixed(1)}`);
               if (t.beta !== undefined) fundParts.push(`β${t.beta.toFixed(1)}`);
               // Show sector vs avg P/E
               if (t.sectorContext?.vsAvg !== undefined) {
-                const sectorStr = t.sectorContext.vsAvg > 0 
-                  ? chalk.red(`+${t.sectorContext.vsAvg}% vs sector`)
-                  : chalk.green(`${t.sectorContext.vsAvg}% vs sector`);
+                const sectorStr =
+                  t.sectorContext.vsAvg > 0
+                    ? chalk.red(`+${t.sectorContext.vsAvg}% vs sector`)
+                    : chalk.green(`${t.sectorContext.vsAvg}% vs sector`);
                 fundParts.push(sectorStr);
               }
               if (fundParts.length > 0) {
                 console.log(chalk.dim(`  │   ${fundParts.join(' · ')}`));
               }
             }
-            
+
             // Show target prices and performance
             if (t.targetPrices) {
-              const upsideColor = t.targetPrices.upside > 20 ? chalk.green
-                : t.targetPrices.upside > 0 ? chalk.yellow
-                : chalk.red;
-              console.log(chalk.dim(`  │   `) + 
-                chalk.cyan(`🎯 Target: $${t.targetPrices.low.toFixed(0)}-$${t.targetPrices.mean.toFixed(0)}-$${t.targetPrices.high.toFixed(0)}`) +
-                chalk.dim(` (`) + upsideColor(`${t.targetPrices.upside > 0 ? '+' : ''}${t.targetPrices.upside.toFixed(0)}%`) + chalk.dim(`)`));
+              const upsideColor =
+                t.targetPrices.upside > 20
+                  ? chalk.green
+                  : t.targetPrices.upside > 0
+                    ? chalk.yellow
+                    : chalk.red;
+              console.log(
+                chalk.dim(`  │   `) +
+                  chalk.cyan(
+                    `🎯 Target: $${t.targetPrices.low.toFixed(0)}-$${t.targetPrices.mean.toFixed(0)}-$${t.targetPrices.high.toFixed(0)}`
+                  ) +
+                  chalk.dim(` (`) +
+                  upsideColor(
+                    `${t.targetPrices.upside > 0 ? '+' : ''}${t.targetPrices.upside.toFixed(0)}%`
+                  ) +
+                  chalk.dim(`)`)
+              );
             }
-            
+
             // Show price performance
             if (t.performance) {
               const perfParts = [];
-              const colorPerf = (val: number) => val > 0 ? chalk.green(`+${val}%`) : chalk.red(`${val}%`);
+              const colorPerf = (val: number) =>
+                val > 0 ? chalk.green(`+${val}%`) : chalk.red(`${val}%`);
               perfParts.push(`5d: ${colorPerf(t.performance.day5)}`);
               perfParts.push(`1m: ${colorPerf(t.performance.month1)}`);
               perfParts.push(`YTD: ${colorPerf(t.performance.ytd)}`);
-              console.log(chalk.dim(`  │   📊 Perf: `) + perfParts.join(chalk.dim(' · ')));
+              console.log(
+                chalk.dim(`  │   📊 Perf: `) + perfParts.join(chalk.dim(' · '))
+              );
             }
-            
+
             // Show analyst ratings
             if (t.analystRatings) {
               const bullish = t.analystRatings.bullishPercent;
-              const bullishColor = bullish >= 80 ? chalk.green : bullish >= 60 ? chalk.yellow : chalk.red;
-              console.log(chalk.dim(`  │   `) + 
-                bullishColor(`👥 ${bullish}% Bullish`) + 
-                chalk.dim(` (${t.analystRatings.strongBuy}SB ${t.analystRatings.buy}B ${t.analystRatings.hold}H ${t.analystRatings.sell}S)`));
+              const bullishColor =
+                bullish >= 80
+                  ? chalk.green
+                  : bullish >= 60
+                    ? chalk.yellow
+                    : chalk.red;
+              console.log(
+                chalk.dim(`  │   `) +
+                  bullishColor(`👥 ${bullish}% Bullish`) +
+                  chalk.dim(
+                    ` (${t.analystRatings.strongBuy}SB ${t.analystRatings.buy}B ${t.analystRatings.hold}H ${t.analystRatings.sell}S)`
+                  )
+              );
             }
-            
+
             // Show earnings info with beat/miss history
-            if (t.earnings?.daysUntil !== undefined && t.earnings.daysUntil > 0) {
+            if (
+              t.earnings?.daysUntil !== undefined &&
+              t.earnings.daysUntil > 0
+            ) {
               const earnParts = [];
-              
+
               // Days until earnings
               if (t.earningsWarning) {
-                earnParts.push(chalk.red(`⚠️ ${t.earnings.daysUntil}d - AVOID`));
+                earnParts.push(
+                  chalk.red(`⚠️ ${t.earnings.daysUntil}d - AVOID`)
+                );
               } else if (t.earnings.daysUntil <= 30) {
-                earnParts.push(chalk.yellow(`${t.earnings.date ?? t.earnings.daysUntil + 'd'}`));
+                earnParts.push(
+                  chalk.yellow(
+                    `${t.earnings.date ?? t.earnings.daysUntil + 'd'}`
+                  )
+                );
               } else {
-                earnParts.push(chalk.green(`${t.earnings.date ?? t.earnings.daysUntil + 'd'} (safe)`));
+                earnParts.push(
+                  chalk.green(
+                    `${t.earnings.date ?? t.earnings.daysUntil + 'd'} (safe)`
+                  )
+                );
               }
-              
+
               // Beat/miss streak
               if (t.earnings.streak !== undefined && t.earnings.streak !== 0) {
-                const streakStr = t.earnings.streak > 0 
-                  ? chalk.green(`${t.earnings.streak} beats`)
-                  : chalk.red(`${Math.abs(t.earnings.streak)} misses`);
+                const streakStr =
+                  t.earnings.streak > 0
+                    ? chalk.green(`${t.earnings.streak} beats`)
+                    : chalk.red(`${Math.abs(t.earnings.streak)} misses`);
                 earnParts.push(streakStr);
               }
-              
+
               // Last surprise
               if (t.earnings.lastSurprise !== undefined) {
-                const surpriseColor = t.earnings.lastSurprise > 0 ? chalk.green : chalk.red;
-                earnParts.push(surpriseColor(`${t.earnings.lastSurprise > 0 ? '+' : ''}${t.earnings.lastSurprise}% last`));
+                const surpriseColor =
+                  t.earnings.lastSurprise > 0 ? chalk.green : chalk.red;
+                earnParts.push(
+                  surpriseColor(
+                    `${t.earnings.lastSurprise > 0 ? '+' : ''}${t.earnings.lastSurprise}% last`
+                  )
+                );
               }
-              
-              console.log(chalk.dim(`  │   📅 Earnings: `) + earnParts.join(chalk.dim(' · ')));
-            } else if (t.earningsDays !== null && t.earningsDays !== undefined && t.earningsDays > 0) {
+
+              console.log(
+                chalk.dim(`  │   📅 Earnings: `) +
+                  earnParts.join(chalk.dim(' · '))
+              );
+            } else if (
+              t.earningsDays !== null &&
+              t.earningsDays !== undefined &&
+              t.earningsDays > 0
+            ) {
               // Fallback to old format
               if (t.earningsWarning) {
-                console.log(chalk.dim(`  │   `) + chalk.red(`⚠️ EARNINGS ${t.earningsDays}d - AVOID (within 14d)`));
+                console.log(
+                  chalk.dim(`  │   `) +
+                    chalk.red(
+                      `⚠️ EARNINGS ${t.earningsDays}d - AVOID (within 14d)`
+                    )
+                );
               } else if (t.earningsDays <= 30) {
-                console.log(chalk.dim(`  │   `) + chalk.yellow(`📅 Earnings: ${t.earningsDays} days`));
+                console.log(
+                  chalk.dim(`  │   `) +
+                    chalk.yellow(`📅 Earnings: ${t.earningsDays} days`)
+                );
               } else {
-                console.log(chalk.dim(`  │   `) + chalk.green(`📅 Earnings: ${t.earningsDays}d (safe)`));
+                console.log(
+                  chalk.dim(`  │   `) +
+                    chalk.green(`📅 Earnings: ${t.earningsDays}d (safe)`)
+                );
               }
             } else {
               console.log(chalk.dim(`  │   📅 Earnings: Not available`));
             }
-            
+
             // Show IV vs HV analysis
             if (t.iv || t.hv20) {
               const parts = [];
-              
+
               // IV part
               if (t.iv) {
-                const ivColor = t.iv.ivLevel === 'LOW' ? chalk.green
-                  : t.iv.ivLevel === 'NORMAL' ? chalk.white
-                  : t.iv.ivLevel === 'ELEVATED' ? chalk.yellow
-                  : chalk.red;
+                const ivColor =
+                  t.iv.ivLevel === 'LOW'
+                    ? chalk.green
+                    : t.iv.ivLevel === 'NORMAL'
+                      ? chalk.white
+                      : t.iv.ivLevel === 'ELEVATED'
+                        ? chalk.yellow
+                        : chalk.red;
                 parts.push(ivColor(`IV: ${t.iv.currentIV}%`));
               }
-              
+
               // HV part
               if (t.hv20) {
                 parts.push(chalk.dim(`HV20: ${t.hv20.toFixed(1)}%`));
               }
-              
+
               // Premium comparison (IV vs HV)
               if (t.iv && t.hv20) {
                 const ratio = t.iv.currentIV / t.hv20;
-                const premium = ratio > 1.15 ? 'expensive' : ratio < 0.85 ? 'cheap' : 'fair';
-                const premiumColor = premium === 'cheap' ? chalk.green
-                  : premium === 'fair' ? chalk.white
-                  : chalk.red;
+                const premium =
+                  ratio > 1.15 ? 'expensive' : ratio < 0.85 ? 'cheap' : 'fair';
+                const premiumColor =
+                  premium === 'cheap'
+                    ? chalk.green
+                    : premium === 'fair'
+                      ? chalk.white
+                      : chalk.red;
                 parts.push(premiumColor(`Options ${premium}`));
               } else if (t.iv) {
                 parts.push(chalk.dim(`${t.iv.ivPercentile}th pctl`));
               }
-              
-              console.log(chalk.dim(`  │   📈 `) + parts.join(chalk.dim(' · ')));
+
+              console.log(
+                chalk.dim(`  │   📈 `) + parts.join(chalk.dim(' · '))
+              );
             }
-            
+
             // Show short interest, relative strength, options flow
             const extraParts: string[] = [];
-            
+
             // Short interest
             if (t.shortInterest && t.shortInterest.shortPct > 0) {
-              const shortColor = t.shortInterest.shortPct > 10 ? chalk.yellow
-                : t.shortInterest.shortPct > 20 ? chalk.red
-                : chalk.dim;
-              extraParts.push(shortColor(`Short ${t.shortInterest.shortPct}% (${t.shortInterest.shortRatio}d)`));
+              const shortColor =
+                t.shortInterest.shortPct > 10
+                  ? chalk.yellow
+                  : t.shortInterest.shortPct > 20
+                    ? chalk.red
+                    : chalk.dim;
+              extraParts.push(
+                shortColor(
+                  `Short ${t.shortInterest.shortPct}% (${t.shortInterest.shortRatio}d)`
+                )
+              );
             }
-            
+
             // Relative strength
             if (t.relativeStrength) {
-              const rsColor = t.relativeStrength.vsSPY > 5 ? chalk.green
-                : t.relativeStrength.vsSPY < -5 ? chalk.red
-                : chalk.white;
-              extraParts.push(rsColor(`vs SPY ${t.relativeStrength.vsSPY > 0 ? '+' : ''}${t.relativeStrength.vsSPY}%`));
+              const rsColor =
+                t.relativeStrength.vsSPY > 5
+                  ? chalk.green
+                  : t.relativeStrength.vsSPY < -5
+                    ? chalk.red
+                    : chalk.white;
+              extraParts.push(
+                rsColor(
+                  `vs SPY ${t.relativeStrength.vsSPY > 0 ? '+' : ''}${t.relativeStrength.vsSPY}%`
+                )
+              );
             }
-            
+
             // Options flow (put/call ratio)
             if (t.optionsFlow) {
-              const flowColor = t.optionsFlow.pcRatioOI < 0.7 ? chalk.green
-                : t.optionsFlow.pcRatioOI > 1.0 ? chalk.red
-                : chalk.white;
-              const sentiment = t.optionsFlow.pcRatioOI < 0.7 ? 'bullish'
-                : t.optionsFlow.pcRatioOI > 1.0 ? 'bearish'
-                : 'neutral';
-              extraParts.push(flowColor(`P/C ${t.optionsFlow.pcRatioOI} (${sentiment})`));
+              const flowColor =
+                t.optionsFlow.pcRatioOI < 0.7
+                  ? chalk.green
+                  : t.optionsFlow.pcRatioOI > 1.0
+                    ? chalk.red
+                    : chalk.white;
+              const sentiment =
+                t.optionsFlow.pcRatioOI < 0.7
+                  ? 'bullish'
+                  : t.optionsFlow.pcRatioOI > 1.0
+                    ? 'bearish'
+                    : 'neutral';
+              extraParts.push(
+                flowColor(`P/C ${t.optionsFlow.pcRatioOI} (${sentiment})`)
+              );
             }
-            
+
             if (extraParts.length > 0) {
-              console.log(chalk.dim(`  │   🔍 `) + extraParts.join(chalk.dim(' · ')));
+              console.log(
+                chalk.dim(`  │   🔍 `) + extraParts.join(chalk.dim(' · '))
+              );
             }
-            
+
             // Show support/resistance
             if (t.supportResistance) {
               const parts = [];
               if (t.supportResistance.nearestSupport) {
-                parts.push(chalk.green(`S: $${t.supportResistance.nearestSupport.price.toFixed(0)}`));
+                parts.push(
+                  chalk.green(
+                    `S: $${t.supportResistance.nearestSupport.price.toFixed(0)}`
+                  )
+                );
               }
               if (t.supportResistance.nearestResistance) {
-                parts.push(chalk.red(`R: $${t.supportResistance.nearestResistance.price.toFixed(0)}`));
+                parts.push(
+                  chalk.red(
+                    `R: $${t.supportResistance.nearestResistance.price.toFixed(0)}`
+                  )
+                );
               }
               if (parts.length > 0) {
                 console.log(chalk.dim(`  │   `) + parts.join(chalk.dim(' · ')));
               }
             }
-            
+
             // Show options spread if available
             if (t.spread) {
               const debitDollars = (t.spread.estimatedDebit * 100).toFixed(0);
               const maxProfitDollars = (t.spread.maxProfit * 100).toFixed(0);
-              const rrRatio = (t.spread.maxProfit / t.spread.estimatedDebit).toFixed(1);
+              const rrRatio = (
+                t.spread.maxProfit / t.spread.estimatedDebit
+              ).toFixed(1);
               const popStr = t.spread.pop ? `${t.spread.pop}% PoP` : '';
-              console.log(chalk.dim(`  │   `) + chalk.cyan(`📈 $${t.spread.longStrike}/$${t.spread.shortStrike} · $${debitDollars} debit · ${t.spread.cushion.toFixed(1)}% cushion`));
-              console.log(chalk.dim(`  │   `) + chalk.blue(`💰 R/R: $${maxProfitDollars}/$${debitDollars} (1:${rrRatio}) · ${t.spread.returnOnRisk.toFixed(1)}% return`) + (popStr ? chalk.dim(` · `) + chalk.green(popStr) : ''));
-              
+              console.log(
+                chalk.dim(`  │   `) +
+                  chalk.cyan(
+                    `📈 $${t.spread.longStrike}/$${t.spread.shortStrike} · $${debitDollars} debit · ${t.spread.cushion.toFixed(1)}% cushion`
+                  )
+              );
+              console.log(
+                chalk.dim(`  │   `) +
+                  chalk.blue(
+                    `💰 R/R: $${maxProfitDollars}/$${debitDollars} (1:${rrRatio}) · ${t.spread.returnOnRisk.toFixed(1)}% return`
+                  ) +
+                  (popStr ? chalk.dim(` · `) + chalk.green(popStr) : '')
+              );
+
               // Only show alternatives if there's a specific reason (e.g., budget constraint)
               if (t.spreadReason) {
-                console.log(chalk.dim(`  │   `) + chalk.yellow(`⚠️ ${t.spreadReason}`));
+                console.log(
+                  chalk.dim(`  │   `) + chalk.yellow(`⚠️ ${t.spreadReason}`)
+                );
                 if (t.spreadAlternatives && t.spreadAlternatives.length > 0) {
                   console.log(chalk.dim(`  │   `) + chalk.dim(`Alternatives:`));
                   for (const alt of t.spreadAlternatives.slice(0, 2)) {
                     const altDebit = (alt.estimatedDebit * 100).toFixed(0);
-                    console.log(chalk.dim(`  │      • $${alt.longStrike}/$${alt.shortStrike} ($${alt.spreadWidth}w) · $${altDebit} · ${alt.cushion.toFixed(1)}% cushion`));
+                    console.log(
+                      chalk.dim(
+                        `  │      • $${alt.longStrike}/$${alt.shortStrike} ($${alt.spreadWidth}w) · $${altDebit} · ${alt.cushion.toFixed(1)}% cushion`
+                      )
+                    );
                   }
                 }
               }
-              
+
               // Show trade grade if analysis available
               if (t.analysis) {
-                const gradeColor = t.analysis.grade.grade.startsWith('A') ? chalk.green
-                  : t.analysis.grade.grade.startsWith('B') ? chalk.yellow
-                  : t.analysis.grade.grade.startsWith('C') ? chalk.hex('#FFA500')
-                  : chalk.red;
-                const riskColor = t.analysis.risk.level === 'LOW' ? chalk.green
-                  : t.analysis.risk.level === 'MODERATE' ? chalk.yellow
-                  : chalk.red;
-                console.log(chalk.dim(`  │   `) + gradeColor(`Grade: ${t.analysis.grade.grade}`) + chalk.dim(` · `) + riskColor(`Risk: ${t.analysis.risk.score}/10`) + chalk.dim(` · ${t.analysis.grade.recommendation}`));
+                const gradeColor = t.analysis.grade.grade.startsWith('A')
+                  ? chalk.green
+                  : t.analysis.grade.grade.startsWith('B')
+                    ? chalk.yellow
+                    : t.analysis.grade.grade.startsWith('C')
+                      ? chalk.hex('#FFA500')
+                      : chalk.red;
+                const riskColor =
+                  t.analysis.risk.level === 'LOW'
+                    ? chalk.green
+                    : t.analysis.risk.level === 'MODERATE'
+                      ? chalk.yellow
+                      : chalk.red;
+                console.log(
+                  chalk.dim(`  │   `) +
+                    gradeColor(`Grade: ${t.analysis.grade.grade}`) +
+                    chalk.dim(` · `) +
+                    riskColor(`Risk: ${t.analysis.risk.score}/10`) +
+                    chalk.dim(` · ${t.analysis.grade.recommendation}`)
+                );
               }
             }
-            
+
             // Show recent news headlines
             if (t.news && t.news.length > 0) {
-              console.log(chalk.dim(`  │   `) + chalk.magenta(`📰 Recent news:`));
+              console.log(
+                chalk.dim(`  │   `) + chalk.magenta(`📰 Recent news:`)
+              );
               for (const n of t.news.slice(0, 2)) {
-                const title = n.title.length > 50 ? n.title.substring(0, 47) + '...' : n.title;
+                const title =
+                  n.title.length > 50
+                    ? n.title.substring(0, 47) + '...'
+                    : n.title;
                 console.log(chalk.dim(`  │      • ${title}`));
               }
             }
-            
+
             // Show Psychological Fair Value
             if (t.pfv) {
-              const biasColor = t.pfv.bias === 'BULLISH' ? chalk.green
-                : t.pfv.bias === 'BEARISH' ? chalk.red
-                : chalk.yellow;
-              const confColor = t.pfv.confidence === 'HIGH' ? chalk.green
-                : t.pfv.confidence === 'MEDIUM' ? chalk.yellow
-                : chalk.dim;
-              const deviationStr = t.pfv.deviationPercent >= 0 
-                ? `+${t.pfv.deviationPercent.toFixed(1)}%` 
-                : `${t.pfv.deviationPercent.toFixed(1)}%`;
-              
-              console.log(chalk.dim(`  │   `) + chalk.magenta(`🧠 PFV: $${t.pfv.fairValue.toFixed(2)}`) + 
-                chalk.dim(` (${deviationStr}) `) + biasColor(t.pfv.bias) + chalk.dim(' · ') + confColor(t.pfv.confidence));
-              
+              const biasColor =
+                t.pfv.bias === 'BULLISH'
+                  ? chalk.green
+                  : t.pfv.bias === 'BEARISH'
+                    ? chalk.red
+                    : chalk.yellow;
+              const confColor =
+                t.pfv.confidence === 'HIGH'
+                  ? chalk.green
+                  : t.pfv.confidence === 'MEDIUM'
+                    ? chalk.yellow
+                    : chalk.dim;
+              const deviationStr =
+                t.pfv.deviationPercent >= 0
+                  ? `+${t.pfv.deviationPercent.toFixed(1)}%`
+                  : `${t.pfv.deviationPercent.toFixed(1)}%`;
+
+              console.log(
+                chalk.dim(`  │   `) +
+                  chalk.magenta(`🧠 PFV: $${t.pfv.fairValue.toFixed(2)}`) +
+                  chalk.dim(` (${deviationStr}) `) +
+                  biasColor(t.pfv.bias) +
+                  chalk.dim(' · ') +
+                  confColor(t.pfv.confidence)
+              );
+
               // Show key magnetic levels if available (full PFV type only)
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const pfvFull = t.pfv as any;
               if (pfvFull.magneticLevels) {
-                const supports = pfvFull.magneticLevels.filter((l: { distance?: number }) => 
-                  (l.distance ?? 0) < 0
-                ).slice(0, 2);
-                const resistances = pfvFull.magneticLevels.filter((l: { distance?: number }) => 
-                  (l.distance ?? 0) > 0
-                ).slice(0, 2);
-              
-              if (supports.length > 0 || resistances.length > 0) {
-                const levelParts: string[] = [];
-                if (supports.length > 0) {
-                    levelParts.push(chalk.green(
-                      `S: $${supports[0].price.toFixed(0)} (${supports[0].type.replace('_', ' ')})`
-                    ));
+                const supports = pfvFull.magneticLevels
+                  .filter((l: { distance?: number }) => (l.distance ?? 0) < 0)
+                  .slice(0, 2);
+                const resistances = pfvFull.magneticLevels
+                  .filter((l: { distance?: number }) => (l.distance ?? 0) > 0)
+                  .slice(0, 2);
+
+                if (supports.length > 0 || resistances.length > 0) {
+                  const levelParts: string[] = [];
+                  if (supports.length > 0) {
+                    levelParts.push(
+                      chalk.green(
+                        `S: $${supports[0].price.toFixed(0)} (${supports[0].type.replace('_', ' ')})`
+                      )
+                    );
+                  }
+                  if (resistances.length > 0) {
+                    levelParts.push(
+                      chalk.red(
+                        `R: $${resistances[0].price.toFixed(0)} (${resistances[0].type.replace('_', ' ')})`
+                      )
+                    );
+                  }
+                  console.log(
+                    chalk.dim(`  │      `) + levelParts.join(chalk.dim(' · '))
+                  );
                 }
-                if (resistances.length > 0) {
-                    levelParts.push(chalk.red(
-                      `R: $${resistances[0].price.toFixed(0)} (${resistances[0].type.replace('_', ' ')})`
-                    ));
-                }
-                console.log(chalk.dim(`  │      `) + levelParts.join(chalk.dim(' · ')));
-              }
-              
-              // Show mean reversion signal if present
+
+                // Show mean reversion signal if present
                 if (pfvFull.meanReversionSignal?.signal) {
-                  const sigColor = pfvFull.meanReversionSignal.direction === 'LONG' 
-                    ? chalk.green 
-                    : chalk.red;
-                  console.log(chalk.dim(`  │      `) + 
-                    sigColor(`⚡ ${pfvFull.meanReversionSignal.direction} signal`) + 
-                    chalk.dim(` (${pfvFull.meanReversionSignal.strength}% strength)`));
+                  const sigColor =
+                    pfvFull.meanReversionSignal.direction === 'LONG'
+                      ? chalk.green
+                      : chalk.red;
+                  console.log(
+                    chalk.dim(`  │      `) +
+                      sigColor(
+                        `⚡ ${pfvFull.meanReversionSignal.direction} signal`
+                      ) +
+                      chalk.dim(
+                        ` (${pfvFull.meanReversionSignal.strength}% strength)`
+                      )
+                  );
                 }
               }
             }
           }
-          console.log(chalk.dim("  └───────────────────────────────────────────────────────────────"));
+          console.log(
+            chalk.dim(
+              '  └───────────────────────────────────────────────────────────────'
+            )
+          );
         }
-        
+
         // Run agent loop with tool calling
         console.log();
-        
+
         // Build messages for agent
         const agentMessages: AgentMessage[] = [
-          { role: "system", content: prepared.systemPrompt },
-          ...conversationHistory.map(m => ({
-            role: m.role as "user" | "assistant",
+          { role: 'system', content: prepared.systemPrompt },
+          ...conversationHistory.map((m) => ({
+            role: m.role as 'user' | 'assistant',
             content: m.content,
           })),
-          { role: "user", content: prepared.userPrompt },
+          { role: 'user', content: prepared.userPrompt },
         ];
-        
+
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
         let totalDuration = 0;
-        let finalContent = "";
-        let finalThinking = "";
-        let modelName = "";
-        
+        let finalContent = '';
+        let finalThinking = '';
+        let modelName = '';
+
         // Status display function
         const showStatus = (msg: string) => {
-          process.stdout.write(`\r  ${chalk.yellow('⏳')} ${chalk.dim(msg)}`.padEnd(70) + '\r');
+          process.stdout.write(
+            `\r  ${chalk.yellow('⏳')} ${chalk.dim(msg)}`.padEnd(70) + '\r'
+          );
         };
-        
+
         // Agent loop - continues until no tool calls
         // All iterations use non-streaming with tools (thinking disabled for tool compatibility)
         let iteration = 0;
-        const maxIterations = 3;  // Reduced from 5 - prevent over-researching
-        
+        const maxIterations = 3; // Reduced from 5 - prevent over-researching
+
         while (iteration < maxIterations) {
           iteration++;
-          
+
           // On final iteration, disable tools to force synthesis
           const isLastIteration = iteration === maxIterations;
-          
-          let currentThinking = "";
-          let currentContent = "";
+
+          let currentThinking = '';
+          let currentContent = '';
           const currentToolCalls: ToolCall[] = [];
-          
+
           // FIRST ITERATION: Non-streaming with tools (no thinking - it blocks tool calls)
           if (iteration === 1) {
             showStatus('Victor is analyzing...');
-            
+
             // Use non-streaming call WITH tools (disabled on last iteration to force synthesis)
             const response: AgentResponse = await chatWithTools(
               { mode: options.aiMode, model: options.aiModel },
               agentMessages,
-              isLastIteration ? undefined : AVAILABLE_TOOLS,  // Disable tools on last iteration
-              false  // Disable thinking (conflicts with tool calling in DeepSeek)
+              isLastIteration ? undefined : AVAILABLE_TOOLS, // Disable tools on last iteration
+              false // Disable thinking (conflicts with tool calling in DeepSeek)
             );
-            
+
             // Clear status
             process.stdout.write('\r'.padEnd(70) + '\r');
-            
+
             // Display content with proper word wrapping
             const cleanedContent = cleanToolTokens(response.content);
-            const coloredPrefix = chalk.cyan("  Victor: ");
-            const plainPrefix = "  Victor: ";
-            const indent = "          ";
+            const coloredPrefix = chalk.cyan('  Victor: ');
+            const plainPrefix = '  Victor: ';
+            const indent = '          ';
             const lines = wrapText(cleanedContent, 65, plainPrefix, indent);
             for (let i = 0; i < lines.length; i++) {
               if (i === 0) {
@@ -1604,183 +2009,206 @@ export async function startChat(options: ChatOptions): Promise<void> {
                 console.log(formatWithStyles(lines[i]));
               }
             }
-            
-            currentThinking = response.thinking ?? "";
-            currentContent = cleanToolTokens(response.content);  // Clean raw tool tokens
-            
+
+            currentThinking = response.thinking ?? '';
+            currentContent = cleanToolTokens(response.content); // Clean raw tool tokens
+
             // IMPORTANT: On last iteration, ignore any tool calls
             // (model may still output them from context, but we force synthesis)
             if (response.toolCalls && !isLastIteration) {
               currentToolCalls.push(...response.toolCalls);
             }
-            
+
             // Store token stats
             totalPromptTokens += response.promptTokens;
             totalCompletionTokens += response.completionTokens;
             totalDuration += response.duration;
             modelName = response.model;
-            
           } else {
             // SUBSEQUENT ITERATIONS: Non-streaming for clean output
             // On last iteration, disable tools to force final synthesis
-            showStatus(isLastIteration ? 'Victor is synthesizing...' : 'Processing tool results...');
-            
+            showStatus(
+              isLastIteration
+                ? 'Victor is synthesizing...'
+                : 'Processing tool results...'
+            );
+
             const response: AgentResponse = await chatWithTools(
               { mode: options.aiMode, model: options.aiModel },
               agentMessages,
-              isLastIteration ? undefined : AVAILABLE_TOOLS,  // Disable tools on last iteration
-              false  // No thinking
+              isLastIteration ? undefined : AVAILABLE_TOOLS, // Disable tools on last iteration
+              false // No thinking
             );
-            
+
             // Clear status
             process.stdout.write('\r'.padEnd(70) + '\r');
-            
+
             // Display content with proper word wrapping
             const cleanedContent = cleanToolTokens(response.content);
-            const prefix = chalk.cyan("  Victor: ");
-            const indent = "          ";
-            const lines = wrapText(cleanedContent, 65, "  Victor: ", indent);
+            const prefix = chalk.cyan('  Victor: ');
+            const indent = '          ';
+            const lines = wrapText(cleanedContent, 65, '  Victor: ', indent);
             for (let i = 0; i < lines.length; i++) {
               if (i === 0) {
                 // First line: replace plain prefix with chalk-colored one
-                console.log(lines[i].replace("  Victor: ", prefix));
+                console.log(lines[i].replace('  Victor: ', prefix));
               } else {
                 console.log(formatWithStyles(lines[i]));
               }
             }
-            
-            currentContent = cleanToolTokens(response.content);  // Clean raw tool tokens
-            
+
+            currentContent = cleanToolTokens(response.content); // Clean raw tool tokens
+
             // IMPORTANT: On last iteration, ignore any tool calls
             // (model may still output them from context, but we force synthesis)
             if (response.toolCalls && !isLastIteration) {
               currentToolCalls.push(...response.toolCalls);
             }
-            
+
             // Store results
             totalPromptTokens += response.promptTokens;
             totalCompletionTokens += response.completionTokens;
             totalDuration += response.duration;
             modelName = response.model;
           }
-          
+
           finalContent += currentContent;
           finalThinking += currentThinking;
-          
+
           // Add assistant message to conversation
           agentMessages.push({
-            role: "assistant",
+            role: 'assistant',
             content: currentContent,
             thinking: currentThinking,
-            tool_calls: currentToolCalls.length > 0 ? currentToolCalls : undefined,
+            tool_calls:
+              currentToolCalls.length > 0 ? currentToolCalls : undefined,
           });
-          
+
           // If no tool calls, we're done
           if (currentToolCalls.length === 0) {
             break;
           }
-          
+
           // Execute tool calls
-          console.log();  // New line after content
+          console.log(); // New line after content
           console.log();
-          console.log(chalk.dim("  ┌─ Tool Calls ────────────────────────────────────────────────"));
-          
+          console.log(
+            chalk.dim(
+              '  ┌─ Tool Calls ────────────────────────────────────────────────'
+            )
+          );
+
           for (const toolCall of currentToolCalls) {
             const toolName = toolCall.function.name;
             const toolArgs = toolCall.function.arguments;
-            
+
             // Show tool being called
-            console.log(chalk.dim(`  │ `) + chalk.yellow(`🔧 ${toolName}`) + chalk.dim(`: ${JSON.stringify(toolArgs)}`));
-            
+            console.log(
+              chalk.dim(`  │ `) +
+                chalk.yellow(`🔧 ${toolName}`) +
+                chalk.dim(`: ${JSON.stringify(toolArgs)}`)
+            );
+
             // Execute the tool
             const result = await executeToolCall(toolCall, (msg) => {
               console.log(chalk.dim(`  │ `) + chalk.dim(`   ${msg}`));
             });
-            
+
             // Show full result data for transparency
             const resultLines = result.split('\n');
-            console.log(chalk.dim(`  │ `) + chalk.green(`   ✓ Got ${resultLines.length} lines of data:`));
+            console.log(
+              chalk.dim(`  │ `) +
+                chalk.green(`   ✓ Got ${resultLines.length} lines of data:`)
+            );
             for (const line of resultLines) {
               if (line.trim()) {
                 // Truncate very long lines
-                const displayLine = line.length > 70 ? line.substring(0, 67) + '...' : line;
+                const displayLine =
+                  line.length > 70 ? line.substring(0, 67) + '...' : line;
                 console.log(chalk.dim(`  │      ${displayLine}`));
               }
             }
-            
+
             // Add tool result to messages
             agentMessages.push({
-              role: "tool",
+              role: 'tool',
               content: result,
               tool_name: toolName,
             });
           }
-          
-          console.log(chalk.dim("  └───────────────────────────────────────────────────────────────"));
+
+          console.log(
+            chalk.dim(
+              '  └───────────────────────────────────────────────────────────────'
+            )
+          );
           console.log();
         }
-        
-        // CRITICAL: If we hit max iterations with tool results pending, 
+
+        // CRITICAL: If we hit max iterations with tool results pending,
         // we need one final synthesis call
         const lastMessage = agentMessages[agentMessages.length - 1];
-        if (iteration >= maxIterations && lastMessage?.role === "tool") {
+        if (iteration >= maxIterations && lastMessage?.role === 'tool') {
           showStatus('Victor is synthesizing results...');
-          
+
           // Final synthesis call - explicitly disable tools
           const synthesisResponse: AgentResponse = await chatWithTools(
             { mode: options.aiMode, model: options.aiModel },
             agentMessages,
-            undefined,  // No tools
-            false       // No thinking
+            undefined, // No tools
+            false // No thinking
           );
-          
+
           // Clear status
           process.stdout.write('\r'.padEnd(70) + '\r');
-          
+
           // Display synthesis
           const synthesisContent = cleanToolTokens(synthesisResponse.content);
           if (synthesisContent.trim()) {
-            const prefix = chalk.cyan("  Victor: ");
-            const indent = "          ";
-            const lines = wrapText(synthesisContent, 65, "  Victor: ", indent);
+            const prefix = chalk.cyan('  Victor: ');
+            const indent = '          ';
+            const lines = wrapText(synthesisContent, 65, '  Victor: ', indent);
             for (let i = 0; i < lines.length; i++) {
               if (i === 0) {
-                console.log(lines[i].replace("  Victor: ", prefix));
+                console.log(lines[i].replace('  Victor: ', prefix));
               } else {
                 console.log(formatWithStyles(lines[i]));
               }
             }
             finalContent += synthesisContent;
           }
-          
+
           // Update token stats
           totalPromptTokens += synthesisResponse.promptTokens;
           totalCompletionTokens += synthesisResponse.completionTokens;
           totalDuration += synthesisResponse.duration;
         }
-        
+
         // Ensure we end with a newline
         if (finalContent) {
           console.log();
         }
-        
+
         // Add final response to conversation history
-        conversationHistory.push({ role: "assistant", content: finalContent });
-        
+        conversationHistory.push({ role: 'assistant', content: finalContent });
+
         // Show token usage and timing
         if (totalPromptTokens > 0 || totalCompletionTokens > 0) {
           console.log();
-          console.log(chalk.dim(`  ─ ${modelName} · ${totalPromptTokens}→${totalCompletionTokens} tokens · ${(totalDuration / 1000).toFixed(1)}s`));
+          console.log(
+            chalk.dim(
+              `  ─ ${modelName} · ${totalPromptTokens}→${totalCompletionTokens} tokens · ${(totalDuration / 1000).toFixed(1)}s`
+            )
+          );
         }
         console.log();
-        
       } catch (err) {
-        process.stdout.write(`\r${" ".repeat(60)}\r`);
+        process.stdout.write(`\r${' '.repeat(60)}\r`);
         const msg = err instanceof Error ? err.message : String(err);
         console.log(chalk.red(`  ✗ Error: ${msg}`));
         console.log();
       }
-      
+
       // Continue conversation
       askQuestion();
     });
@@ -1801,8 +2229,8 @@ function cleanToolTokens(text: string): string {
     .replace(/<｜tool▁call▁end｜>/g, '')
     .replace(/<｜tool▁calls▁end｜>/g, '')
     .replace(/<｜tool▁sep｜>/g, '')
-    .replace(/\{"query":[^}]+\}/g, '')  // Remove orphaned JSON queries
-    .replace(/[ \t]+/g, ' ')  // Collapse multiple spaces (but not newlines)
+    .replace(/\{"query":[^}]+\}/g, '') // Remove orphaned JSON queries
+    .replace(/[ \t]+/g, ' ') // Collapse multiple spaces (but not newlines)
     .trim();
 }
 
@@ -1812,28 +2240,55 @@ function cleanToolTokens(text: string): string {
  */
 function formatWithStyles(text: string): string {
   let formatted = text;
-  
+
   // Convert **text** to bold
   formatted = formatted.replace(/\*\*([^*]+)\*\*/g, (_, content) => {
     return chalk.bold(content);
   });
-  
+
   // Convert *text* to italic (dim in terminal)
   formatted = formatted.replace(/\*([^*]+)\*/g, (_, content) => {
     return chalk.italic(content);
   });
-  
+
   // Highlight ticker symbols (all caps 2-5 letters)
   formatted = formatted.replace(/\b([A-Z]{2,5})\b/g, (match) => {
     // Don't highlight common words
-    const skipWords = ['RSI', 'ITM', 'OTM', 'ATM', 'DTE', 'MA', 'THE', 'AND', 
-      'FOR', 'NOT', 'YOU', 'ARE', 'BUT', 'CAN', 'HAS', 'HAD', 'WAS', 'ALL',
-      'ENTER', 'WAIT', 'PASS', 'BUY', 'SELL', 'CALL', 'PUT', 'WHY', 'MAX',
-      'ABOVE', 'BELOW'];
+    const skipWords = [
+      'RSI',
+      'ITM',
+      'OTM',
+      'ATM',
+      'DTE',
+      'MA',
+      'THE',
+      'AND',
+      'FOR',
+      'NOT',
+      'YOU',
+      'ARE',
+      'BUT',
+      'CAN',
+      'HAS',
+      'HAD',
+      'WAS',
+      'ALL',
+      'ENTER',
+      'WAIT',
+      'PASS',
+      'BUY',
+      'SELL',
+      'CALL',
+      'PUT',
+      'WHY',
+      'MAX',
+      'ABOVE',
+      'BELOW',
+    ];
     if (skipWords.includes(match)) return match;
     return chalk.yellow(match);
   });
-  
+
   return formatted;
 }
 
@@ -1845,32 +2300,32 @@ function formatWithStyles(text: string): string {
  * @param contIndent - Indent for continuation lines (e.g., "          ")
  */
 function wrapText(
-  text: string, 
-  maxWidth: number = 65, 
-  firstPrefix: string = "", 
-  contIndent: string = ""
+  text: string,
+  maxWidth: number = 65,
+  firstPrefix: string = '',
+  contIndent: string = ''
 ): string[] {
   const paragraphs = text.split(/\n/);
   const allLines: string[] = [];
   let isFirstLine = true;
-  
+
   for (const paragraph of paragraphs) {
     if (paragraph.trim() === '') {
       allLines.push('');
       continue;
     }
-    
-    const words = paragraph.split(/\s+/).filter(w => w.length > 0);
+
+    const words = paragraph.split(/\s+/).filter((w) => w.length > 0);
     let currentLine = isFirstLine ? firstPrefix : contIndent;
-    
+
     for (const word of words) {
       const prefix = isFirstLine ? firstPrefix : contIndent;
       const maxLineLen = maxWidth + prefix.length;
       const testLength = currentLine.length + 1 + word.length;
-      
+
       if (testLength <= maxLineLen) {
         // Word fits on current line
-        const separator = (currentLine === prefix) ? '' : ' ';
+        const separator = currentLine === prefix ? '' : ' ';
         currentLine += separator + word;
       } else {
         // Word doesn't fit - push current line and start new one
@@ -1881,14 +2336,13 @@ function wrapText(
         currentLine = contIndent + word;
       }
     }
-    
+
     // Push remaining content
     if (currentLine.trim().length > 0) {
       allLines.push(currentLine);
       isFirstLine = false;
     }
   }
-  
+
   return allLines;
 }
-

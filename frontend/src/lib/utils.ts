@@ -1,7 +1,7 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import { DATA } from "@/data/resume";
-import { Metadata } from "next";
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { DATA } from '@/data/resume';
+import { Metadata } from 'next';
 
 // Better typing for blog posts
 export interface BlogPost {
@@ -26,21 +26,21 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(date: string) {
   const currentDate = new Date().getTime();
-  if (!date.includes("T")) {
+  if (!date.includes('T')) {
     date = `${date}T00:00:00`;
   }
   const targetDate = new Date(date).getTime();
   const timeDifference = Math.abs(currentDate - targetDate);
   const daysAgo = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
 
-  const fullDate = new Date(date).toLocaleString("en-us", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+  const fullDate = new Date(date).toLocaleString('en-us', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   });
 
   if (daysAgo < 1) {
-    return "Today";
+    return 'Today';
   } else if (daysAgo < 7) {
     return `${fullDate} (${daysAgo}d ago)`;
   } else if (daysAgo < 30) {
@@ -58,10 +58,16 @@ export function formatDate(date: string) {
 /**
  * Sort blog posts by date (newest first)
  */
-export function sortPostsByDate<T extends { metadata: { publishedAt?: string } }>(posts: T[]): T[] {
+export function sortPostsByDate<
+  T extends { metadata: { publishedAt?: string } },
+>(posts: T[]): T[] {
   return [...posts].sort((a, b) => {
-    const dateA = a.metadata.publishedAt ? new Date(a.metadata.publishedAt).getTime() : 0;
-    const dateB = b.metadata.publishedAt ? new Date(b.metadata.publishedAt).getTime() : 0;
+    const dateA = a.metadata.publishedAt
+      ? new Date(a.metadata.publishedAt).getTime()
+      : 0;
+    const dateB = b.metadata.publishedAt
+      ? new Date(b.metadata.publishedAt).getTime()
+      : 0;
     return dateB - dateA; // Sort in descending order (newest first)
   });
 }
@@ -69,10 +75,13 @@ export function sortPostsByDate<T extends { metadata: { publishedAt?: string } }
 /**
  * Filter blog posts by tags
  */
-export function filterPostsByTag<T extends { metadata: { tags?: string[] } }>(posts: T[], tag: string): T[] {
+export function filterPostsByTag<T extends { metadata: { tags?: string[] } }>(
+  posts: T[],
+  tag: string
+): T[] {
   if (!tag) return posts;
-  return posts.filter(post => 
-    post.metadata.tags?.some(postTag => 
+  return posts.filter((post) =>
+    post.metadata.tags?.some((postTag) =>
       postTag.toLowerCase().includes(tag.toLowerCase())
     )
   );
@@ -81,8 +90,10 @@ export function filterPostsByTag<T extends { metadata: { tags?: string[] } }>(po
 /**
  * Get all unique tags from blog posts
  */
-export function getAllTags<T extends { metadata: { tags?: string[] } }>(posts: T[]): string[] {
-  const allTags = posts.flatMap(post => post.metadata.tags || []);
+export function getAllTags<T extends { metadata: { tags?: string[] } }>(
+  posts: T[]
+): string[] {
+  const allTags = posts.flatMap((post) => post.metadata.tags || []);
   return [...new Set(allTags)].sort();
 }
 
@@ -93,34 +104,34 @@ export function createMetadata({
   title,
   description,
   pageUrl,
-  type = "website",
-  imagePath = "/logos/cgq.png",
+  type = 'website',
+  imagePath = '/logos/cgq.png',
   keywords = [],
   imageAlt,
 }: {
   title: string;
   description: string;
   pageUrl?: string;
-  type?: "website" | "article" | "profile";
+  type?: 'website' | 'article' | 'profile';
   imagePath?: string;
   keywords?: string[];
   imageAlt?: string;
 }): Metadata {
   const url = pageUrl ? `${DATA.url}${pageUrl}` : DATA.url;
   const defaultImageAlt = imageAlt || "Conor Quinlan's Portfolio";
-  
+
   return {
     title,
     description,
-    keywords: keywords.length > 0 ? keywords.join(", ") : undefined,
+    keywords: keywords.length > 0 ? keywords.join(', ') : undefined,
     authors: [
       {
-        name: "Conor Quinlan",
-        url: DATA.url || "https://conorq.com",
+        name: 'Conor Quinlan',
+        url: DATA.url || 'https://conorq.com',
       },
     ],
-    creator: "Conor Quinlan",
-    publisher: "Conor Quinlan",
+    creator: 'Conor Quinlan',
+    publisher: 'Conor Quinlan',
     robots: {
       index: true,
       follow: true,
@@ -137,7 +148,7 @@ export function createMetadata({
       description,
       url,
       siteName: "Conor Quinlan's Portfolio",
-      locale: "en_US",
+      locale: 'en_US',
       type,
       images: [
         {
@@ -149,11 +160,11 @@ export function createMetadata({
       ],
     },
     twitter: {
-      card: "summary_large_image",
+      card: 'summary_large_image',
       title,
       description,
       images: [imagePath],
-      creator: "@cqdev_co",
+      creator: '@cqdev_co',
     },
     alternates: {
       canonical: url,

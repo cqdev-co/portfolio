@@ -1,16 +1,12 @@
 /**
  * Max Pain Calculation
- * 
+ *
  * Max Pain is the strike price where the most options
  * expire worthless, maximizing pain for option buyers
  * and profit for market makers.
  */
 
-import type { 
-  OptionsExpiration, 
-  MaxPainResult,
-  OptionContract,
-} from './types';
+import type { OptionsExpiration, MaxPainResult, OptionContract } from './types';
 
 // ============================================================================
 // MAX PAIN CALCULATION
@@ -18,9 +14,9 @@ import type {
 
 /**
  * Calculate max pain for a single expiration
- * 
+ *
  * Algorithm:
- * 1. For each strike price, calculate total "pain" 
+ * 1. For each strike price, calculate total "pain"
  *    (intrinsic value) for all options if stock closes there
  * 2. Max pain = strike with minimum total pain
  */
@@ -29,26 +25,26 @@ export function calculateMaxPain(
   currentPrice: number
 ): MaxPainResult {
   const { calls, puts, dte } = expiration;
-  
+
   // Filter strikes to reasonable range (40% below to 40% above)
   // This prevents pre-split strikes and LEAPS from skewing results
-  const minStrike = currentPrice * 0.60;
-  const maxStrike = currentPrice * 1.40;
-  
-  const filteredCalls = calls.filter(c => 
-    c.strike >= minStrike && c.strike <= maxStrike && c.openInterest > 0
+  const minStrike = currentPrice * 0.6;
+  const maxStrike = currentPrice * 1.4;
+
+  const filteredCalls = calls.filter(
+    (c) => c.strike >= minStrike && c.strike <= maxStrike && c.openInterest > 0
   );
-  const filteredPuts = puts.filter(p => 
-    p.strike >= minStrike && p.strike <= maxStrike && p.openInterest > 0
+  const filteredPuts = puts.filter(
+    (p) => p.strike >= minStrike && p.strike <= maxStrike && p.openInterest > 0
   );
-  
+
   // Get all unique strikes from filtered data
   const allStrikes = new Set<number>();
-  filteredCalls.forEach(c => allStrikes.add(c.strike));
-  filteredPuts.forEach(p => allStrikes.add(p.strike));
-  
+  filteredCalls.forEach((c) => allStrikes.add(c.strike));
+  filteredPuts.forEach((p) => allStrikes.add(p.strike));
+
   const strikes = Array.from(allStrikes).sort((a, b) => a - b);
-  
+
   if (strikes.length === 0) {
     return {
       price: currentPrice,
@@ -64,12 +60,12 @@ export function calculateMaxPain(
   // Create lookup maps for OI (using filtered data)
   const callOI = new Map<number, number>();
   const putOI = new Map<number, number>();
-  
-  filteredCalls.forEach(c => {
+
+  filteredCalls.forEach((c) => {
     callOI.set(c.strike, (callOI.get(c.strike) || 0) + c.openInterest);
   });
-  
-  filteredPuts.forEach(p => {
+
+  filteredPuts.forEach((p) => {
     putOI.set(p.strike, (putOI.get(p.strike) || 0) + p.openInterest);
   });
 
@@ -110,10 +106,16 @@ export function calculateMaxPain(
   }
 
   // Calculate confidence based on OI concentration (using filtered data)
-  const filteredCallOI = filteredCalls.reduce((sum, c) => sum + c.openInterest, 0);
-  const filteredPutOI = filteredPuts.reduce((sum, p) => sum + p.openInterest, 0);
+  const filteredCallOI = filteredCalls.reduce(
+    (sum, c) => sum + c.openInterest,
+    0
+  );
+  const filteredPutOI = filteredPuts.reduce(
+    (sum, p) => sum + p.openInterest,
+    0
+  );
   const totalOI = filteredCallOI + filteredPutOI;
-  
+
   const confidence = calculateMaxPainConfidence(
     strikes,
     callOI,
@@ -135,7 +137,7 @@ export function calculateMaxPain(
 
 /**
  * Calculate confidence in max pain prediction
- * 
+ *
  * Higher confidence when:
  * - High total OI (more hedging activity)
  * - Clear minimum (not flat pain curve)
@@ -190,40 +192,42 @@ function calculateMaxPainConfidence(
 export function calculateWeightedMaxPain(
   expirations: OptionsExpiration[],
   currentPrice: number
-): { 
-  weightedPrice: number; 
+): {
+  weightedPrice: number;
   results: MaxPainResult[];
   weights: number[];
 } {
   const results: MaxPainResult[] = [];
   const weights: number[] = [];
-  
+
   for (const exp of expirations) {
     const result = calculateMaxPain(exp, currentPrice);
     results.push(result);
-    
+
     // Weight calculation:
     // - Closer expirations have more immediate gravity
     // - Higher OI has more influence
     const totalOI = exp.totalCallOI + exp.totalPutOI;
-    const timeWeight = Math.max(0.1, 1 - (exp.dte / 60));
+    const timeWeight = Math.max(0.1, 1 - exp.dte / 60);
     const oiWeight = Math.log10(Math.max(1, totalOI)) / 6; // Normalize
-    
+
     // Monthly OPEX gets a boost (3rd Friday effect)
     const opexBoost = isMonthlyOpex(exp.expiration) ? 1.3 : 1.0;
-    
+
     weights.push(timeWeight * oiWeight * opexBoost);
   }
 
   // Normalize weights
   const totalWeight = weights.reduce((a, b) => a + b, 0);
-  const normalizedWeights = totalWeight > 0 
-    ? weights.map(w => w / totalWeight)
-    : weights.map(() => 1 / weights.length);
+  const normalizedWeights =
+    totalWeight > 0
+      ? weights.map((w) => w / totalWeight)
+      : weights.map(() => 1 / weights.length);
 
   // Calculate weighted average
-  const weightedPrice = results.reduce((sum, result, i) => 
-    sum + result.price * normalizedWeights[i], 0
+  const weightedPrice = results.reduce(
+    (sum, result, i) => sum + result.price * normalizedWeights[i],
+    0
   );
 
   return {
@@ -239,10 +243,10 @@ export function calculateWeightedMaxPain(
 export function isMonthlyOpex(date: Date | undefined): boolean {
   // Guard against undefined date
   if (!date || !(date instanceof Date)) return false;
-  
+
   // Must be a Friday
   if (date.getDay() !== 5) return false;
-  
+
   // Must be between 15th and 21st (3rd week)
   const dayOfMonth = date.getDate();
   return dayOfMonth >= 15 && dayOfMonth <= 21;
@@ -254,7 +258,7 @@ export function isMonthlyOpex(date: Date | undefined): boolean {
 export function isWeeklyOpex(date: Date | undefined): boolean {
   // Guard against undefined date
   if (!date || !(date instanceof Date)) return false;
-  
+
   return date.getDay() === 5 && !isMonthlyOpex(date);
 }
 
@@ -262,9 +266,12 @@ export function isWeeklyOpex(date: Date | undefined): boolean {
  * Format max pain result for display
  */
 export function formatMaxPainResult(result: MaxPainResult): string {
-  const confidenceLabel = 
-    result.confidence > 0.7 ? 'HIGH' :
-    result.confidence > 0.4 ? 'MEDIUM' : 'LOW';
+  const confidenceLabel =
+    result.confidence > 0.7
+      ? 'HIGH'
+      : result.confidence > 0.4
+        ? 'MEDIUM'
+        : 'LOW';
 
   return [
     `Max Pain: $${result.price.toFixed(2)}`,
@@ -275,4 +282,3 @@ export function formatMaxPainResult(result: MaxPainResult): string {
     `Put Pain at MP: $${(result.putPain / 1000000).toFixed(2)}M`,
   ].join('\n');
 }
-

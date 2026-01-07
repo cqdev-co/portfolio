@@ -4,34 +4,49 @@
  */
 
 // ============================================================================
+// POSITION TYPE (for active positions)
+// ============================================================================
+
+export interface Position {
+  ticker: string;
+  positionType: TradeType;
+  longStrike: number;
+  shortStrike: number;
+  dte: number;
+  expiration?: Date;
+  costBasis?: number;
+  currentValue?: number;
+}
+
+// ============================================================================
 // TRADE TYPES
 // ============================================================================
 
-export type TradeType = 
-  | "call_debit" 
-  | "put_credit" 
-  | "call_credit" 
-  | "put_debit";
+export type TradeType =
+  | 'call_debit'
+  | 'put_credit'
+  | 'call_credit'
+  | 'put_debit';
 
-export type TradeDirection = "bullish" | "bearish";
+export type TradeDirection = 'bullish' | 'bearish';
 
-export type TradeStatus = "open" | "closed" | "expired" | "assigned";
+export type TradeStatus = 'open' | 'closed' | 'expired' | 'assigned';
 
-export type TradeOutcome = 
-  | "win" 
-  | "loss" 
-  | "breakeven" 
-  | "max_profit" 
-  | "max_loss";
+export type TradeOutcome =
+  | 'win'
+  | 'loss'
+  | 'breakeven'
+  | 'max_profit'
+  | 'max_loss';
 
-export type CloseReason = 
-  | "manual" 
-  | "expiration" 
-  | "assignment" 
-  | "stop_loss" 
-  | "target_hit";
+export type CloseReason =
+  | 'manual'
+  | 'expiration'
+  | 'assignment'
+  | 'stop_loss'
+  | 'target_hit';
 
-export type MarketRegime = "bull" | "neutral" | "bear";
+export type MarketRegime = 'bull' | 'neutral' | 'bear';
 
 export interface Trade {
   id: string;
@@ -73,42 +88,42 @@ export interface Trade {
  * Uses abbreviated keys to minimize tokens
  */
 export interface TOONTrade {
-  ty: string;      // trade type: cd, pc, cc, pd
-  d: string;       // direction: b, br
-  ls: number;      // long strike
-  ss: number;      // short strike
-  o: string;       // outcome: w, l, be, mp, ml
-  pnl: number;     // realized P&L
-  dh?: number;     // days held
-  rsi?: number;    // entry RSI
+  ty: string; // trade type: cd, pc, cc, pd
+  d: string; // direction: b, br
+  ls: number; // long strike
+  ss: number; // short strike
+  o: string; // outcome: w, l, be, mp, ml
+  pnl: number; // realized P&L
+  dh?: number; // days held
+  rsi?: number; // entry RSI
 }
 
 /**
  * Compressed ticker history for AI context
  */
 export interface TOONTickerContext {
-  t: string;                // ticker
-  n: number;                // number of trades
-  wr: number;               // win rate (0-100)
-  pnl: number;              // total P&L
-  h: TOONTrade[];           // trade history (last 5)
-  p?: string;               // pattern observed
+  t: string; // ticker
+  n: number; // number of trades
+  wr: number; // win rate (0-100)
+  pnl: number; // total P&L
+  h: TOONTrade[]; // trade history (last 5)
+  p?: string; // pattern observed
 }
 
 /**
  * Full TOON context for AI
  */
 export interface TOONContext {
-  acct: number;             // account size
+  acct: number; // account size
   tickers: TOONTickerContext[];
-  mkt: string;              // market regime: b, n, br
+  mkt: string; // market regime: b, n, br
 }
 
 // ============================================================================
 // FAIR VALUE TYPES
 // ============================================================================
 
-export type ValueVerdict = "undervalued" | "fair" | "overvalued";
+export type ValueVerdict = 'undervalued' | 'fair' | 'overvalued';
 
 export interface FairValueResult {
   ticker: string;
@@ -125,12 +140,12 @@ export interface FairValueResult {
 // STRATEGY TYPES
 // ============================================================================
 
-export type StrategyType = 
-  | "deep_itm_cds"      // Deep ITM Call Debit Spread
-  | "put_credit_spread" // Put Credit Spread
-  | "cash_secured_put"  // Cash Secured Put
-  | "stock_purchase"    // Direct stock purchase
-  | "wait";             // No action recommended
+export type StrategyType =
+  | 'deep_itm_cds' // Deep ITM Call Debit Spread
+  | 'put_credit_spread' // Put Credit Spread
+  | 'cash_secured_put' // Cash Secured Put
+  | 'stock_purchase' // Direct stock purchase
+  | 'wait'; // No action recommended
 
 export interface StrategyRecommendation {
   type: StrategyType;
@@ -146,9 +161,9 @@ export interface StrategyRecommendation {
     breakeven: number;
     cushionPct: number;
   };
-  confidence: number;    // 0-100
-  riskAmount: number;    // $ at risk
-  positionSize: number;  // % of account
+  confidence: number; // 0-100
+  riskAmount: number; // $ at risk
+  positionSize: number; // % of account
 }
 
 // ============================================================================
@@ -181,7 +196,7 @@ export interface AnalysisResult {
   alternatives: StrategyRecommendation[];
   aiAnalysis: string;
   entryDecision: {
-    action: "ENTER" | "WAIT" | "PASS" | "ENTER_WITH_CAUTION";
+    action: 'ENTER' | 'WAIT' | 'PASS' | 'ENTER_WITH_CAUTION';
     confidence: number;
     reasoning: string[];
     positionSize: string;
@@ -216,4 +231,3 @@ export interface ParsedSpread {
   openPremium: number;
   transactions: RobinhoodTransaction[];
 }
-

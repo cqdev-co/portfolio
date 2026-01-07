@@ -7,9 +7,11 @@ The signal expiration system has been successfully implemented to automatically 
 ## 📁 Files Created
 
 ### 1. Expiration Script
+
 **Location:** `unusual-options-service/scripts/expire_signals.py`
 
 **Features:**
+
 - Queries all active signals where `expiry <= today`
 - Marks them as `is_active = false` in batches of 500
 - Provides detailed statistics grouped by:
@@ -20,6 +22,7 @@ The signal expiration system has been successfully implemented to automatically 
 - Comprehensive logging with loguru
 
 **Usage:**
+
 ```bash
 # Mark expired signals as inactive
 cd unusual-options-service
@@ -30,27 +33,33 @@ poetry run python scripts/expire_signals.py --dry-run
 ```
 
 ### 2. GitHub Actions Workflow
+
 **Location:** `.github/workflows/uos-expire-signals.yml`
 
 **Schedule:**
+
 - Runs Mon-Fri at 4:30 PM ET (20:30 UTC during EDT)
 - 30 minutes after market close to capture after-hours activity
 - Manual trigger available with dry-run option
 
 **Features:**
+
 - Automatic Poetry dependency caching
 - 10-minute timeout (plenty for the operation)
 - Job summary in GitHub Actions UI
 - Supports manual dry-run testing
 
 ### 3. Documentation
+
 Created comprehensive documentation:
 
 **Main Documentation:**
+
 - `docs/unusual-options-service/signal-expiration.md` - Complete system documentation
 - `docs/unusual-options-service/signal-expiration-implementation.md` - This file
 
 **Updated Documentation:**
+
 - `docs/unusual-options-service/README.md` - Added signal expiration links
 - `unusual-options-service/scripts/README.md` - Added expire_signals.py documentation
 - `unusual-options-service/README.md` - Added automated expiration section
@@ -58,12 +67,14 @@ Created comprehensive documentation:
 ## 🎯 What Problem Does This Solve?
 
 ### Before Implementation
+
 - 1,767+ signals with expiry date of 2025-11-07 were still marked as `is_active = true`
 - Expired options appeared in active signal queries
 - Frontend showed outdated signals
 - Manual database cleanup required
 
 ### After Implementation
+
 - ✅ Expired signals automatically marked inactive daily
 - ✅ Only valid signals shown in frontend
 - ✅ Database maintains accurate state
@@ -121,6 +132,7 @@ Dry run: false
 ## 🔄 Daily Workflow
 
 ### Automated Execution
+
 1. **4:00 PM ET**: Market closes
 2. **4:30 PM ET**: GitHub Actions workflow triggers
 3. Script queries for expired signals
@@ -129,6 +141,7 @@ Dry run: false
 6. Job summary displayed in UI
 
 ### Manual Execution
+
 1. Go to GitHub Actions tab
 2. Select "Expire Unusual Options Signals" workflow
 3. Click "Run workflow"
@@ -138,6 +151,7 @@ Dry run: false
 ## 🧪 Testing
 
 ### Test the Script Locally
+
 ```bash
 cd unusual-options-service
 
@@ -153,6 +167,7 @@ poetry run python scripts/expire_signals.py
 ```
 
 ### Test GitHub Actions Workflow
+
 1. Push code to GitHub
 2. Go to Actions tab
 3. Select "Expire Unusual Options Signals"
@@ -164,25 +179,30 @@ poetry run python scripts/expire_signals.py
 ## 🔐 Required Permissions
 
 ### GitHub Secrets
+
 The workflow requires these secrets:
+
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` (preferred)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (fallback)
 
 ### Database Permissions
+
 - Service key must have UPDATE permission on `unusual_options_signals` table
 - RLS policies must allow updates to `is_active` field
 
 ## 📈 Monitoring & Maintenance
 
 ### Success Indicators
+
 ✅ Workflow completes successfully  
 ✅ "Successfully expired X signals" message in logs  
 ✅ Active signal count decreases appropriately  
 ✅ Frontend shows only non-expired signals  
-✅ `updated_at` timestamps are recent  
+✅ `updated_at` timestamps are recent
 
 ### Health Checks
+
 ```bash
 # Check for expired signals that should be inactive
 cd unusual-options-service
@@ -195,21 +215,25 @@ poetry run python scripts/expire_signals.py --dry-run
 ### Troubleshooting
 
 **Issue: Workflow doesn't run automatically**
+
 - Check cron schedule in `.github/workflows/uos-expire-signals.yml`
 - Verify workflow is enabled in GitHub Actions
 - Check that repository has Actions enabled
 
 **Issue: Permission denied**
+
 - Verify `SUPABASE_SERVICE_KEY` secret is set correctly
 - Check Supabase RLS policies allow updates
 - Ensure service key has proper permissions
 
 **Issue: No signals found but some should expire**
+
 - Verify signals have `is_active = true`
 - Check expiry dates are in correct format (YYYY-MM-DD)
 - Confirm database connection is working
 
 **Issue: Timeout**
+
 - Increase timeout in workflow file (default: 10 minutes)
 - Check batch size in script (default: 500)
 - Verify database is not under heavy load
@@ -241,12 +265,14 @@ Potential improvements to consider:
 ## 📚 Related Systems
 
 ### Integration Points
+
 - **Continuity Service**: Respects `is_active = false` automatically
 - **Frontend Queries**: Filters by `is_active = true` by default
 - **Performance Tracking**: Can include expired signals for historical analysis
 - **Alert System**: Should filter by active signals only
 
 ### Data Flow
+
 ```
 Market Close (4:00 PM ET)
     ↓
@@ -303,4 +329,3 @@ The implementation is successful if:
 - [System Overview](./system-overview.md)
 - [Database Schema](./database-schema.md)
 - [GitHub Actions Setup](./github-actions-setup.md)
-

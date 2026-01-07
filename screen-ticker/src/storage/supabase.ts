@@ -1,6 +1,6 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { StockScore, StockOpportunityRecord } from "../types/index.ts";
-import { logger } from "../utils/logger.ts";
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { StockScore, StockOpportunityRecord } from '../types/index.ts';
+import { logger } from '../utils/logger.ts';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -8,10 +8,7 @@ let supabaseClient: SupabaseClient | null = null;
  * Get Supabase URL from env (supports multiple variable names)
  */
 function getSupabaseUrl(): string | undefined {
-  return (
-    process.env.SUPABASE_URL ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL
-  );
+  return process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 }
 
 /**
@@ -35,8 +32,8 @@ function getClient(): SupabaseClient {
 
   if (!url || !key) {
     throw new Error(
-      "Missing Supabase credentials. Set SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL " +
-      "and SUPABASE_SERVICE_KEY/NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY"
+      'Missing Supabase credentials. Set SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL ' +
+        'and SUPABASE_SERVICE_KEY/NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY'
     );
   }
 
@@ -57,25 +54,21 @@ function toRecord(score: StockScore): StockOpportunityRecord {
     total_score: score.totalScore,
     upside_potential: score.upsidePotential,
     signals: score.signals,
-    scan_date: score.scanDate.toISOString().split("T")[0] ?? "",
+    scan_date: score.scanDate.toISOString().split('T')[0] ?? '',
   };
 }
 
 /**
  * Upsert a single stock opportunity
  */
-export async function upsertOpportunity(
-  score: StockScore
-): Promise<boolean> {
+export async function upsertOpportunity(score: StockScore): Promise<boolean> {
   try {
     const client = getClient();
     const record = toRecord(score);
 
-    const { error } = await client
-      .from("stock_opportunities")
-      .upsert(record, {
-        onConflict: "ticker,scan_date",
-      });
+    const { error } = await client.from('stock_opportunities').upsert(record, {
+      onConflict: 'ticker,scan_date',
+    });
 
     if (error) {
       logger.error(`Failed to upsert ${score.ticker}: ${error.message}`);
@@ -104,9 +97,9 @@ export async function upsertOpportunities(
     const records = scores.map(toRecord);
 
     const { error, data } = await client
-      .from("stock_opportunities")
+      .from('stock_opportunities')
       .upsert(records, {
-        onConflict: "ticker,scan_date",
+        onConflict: 'ticker,scan_date',
       })
       .select();
 
@@ -141,11 +134,11 @@ export async function getTickerHistory(
     cutoff.setDate(cutoff.getDate() - days);
 
     const { data, error } = await client
-      .from("stock_opportunities")
-      .select("*")
-      .eq("ticker", ticker)
-      .gte("scan_date", cutoff.toISOString().split("T")[0])
-      .order("scan_date", { ascending: false });
+      .from('stock_opportunities')
+      .select('*')
+      .eq('ticker', ticker)
+      .gte('scan_date', cutoff.toISOString().split('T')[0])
+      .order('scan_date', { ascending: false });
 
     if (error) {
       logger.error(`Failed to fetch history for ${ticker}: ${error.message}`);
@@ -175,16 +168,16 @@ export async function getScoreTrends(
 > {
   try {
     const client = getClient();
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0];
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - days);
-    const pastDateStr = pastDate.toISOString().split("T")[0];
+    const pastDateStr = pastDate.toISOString().split('T')[0];
 
     // Get today's scores
     const { data: todayData, error: todayError } = await client
-      .from("stock_opportunities")
-      .select("ticker, total_score")
-      .eq("scan_date", today);
+      .from('stock_opportunities')
+      .select('ticker, total_score')
+      .eq('scan_date', today);
 
     if (todayError || !todayData) {
       return [];
@@ -192,9 +185,9 @@ export async function getScoreTrends(
 
     // Get past scores
     const { data: pastData, error: pastError } = await client
-      .from("stock_opportunities")
-      .select("ticker, total_score")
-      .eq("scan_date", pastDateStr);
+      .from('stock_opportunities')
+      .select('ticker, total_score')
+      .eq('scan_date', pastDateStr);
 
     if (pastError) {
       return [];
@@ -218,7 +211,9 @@ export async function getScoreTrends(
           delta,
         };
       })
-      .filter((t): t is NonNullable<typeof t> => t !== null && t.delta >= minDelta)
+      .filter(
+        (t): t is NonNullable<typeof t> => t !== null && t.delta >= minDelta
+      )
       .sort((a, b) => b.delta - a.delta);
 
     return trends;
@@ -236,13 +231,13 @@ export async function getTodayTopOpportunities(
 ): Promise<StockOpportunityRecord[]> {
   try {
     const client = getClient();
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0];
 
     const { data, error } = await client
-      .from("stock_opportunities")
-      .select("*")
-      .eq("scan_date", today)
-      .order("total_score", { ascending: false })
+      .from('stock_opportunities')
+      .select('*')
+      .eq('scan_date', today)
+      .order('total_score', { ascending: false })
       .limit(limit);
 
     if (error) {
@@ -263,4 +258,3 @@ export async function getTodayTopOpportunities(
 export function isConfigured(): boolean {
   return !!(getSupabaseUrl() && getSupabaseKey());
 }
-

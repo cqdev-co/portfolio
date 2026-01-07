@@ -5,6 +5,7 @@ Complete guide to using the penny stock scanner CLI.
 ## Installation
 
 ### Prerequisites
+
 - Python 3.11 or higher
 - Poetry package manager
 - Supabase account (for signal storage)
@@ -28,6 +29,7 @@ nano .env  # or your preferred editor
 ### Environment Configuration
 
 Required variables in `.env`:
+
 ```bash
 # Supabase (for ticker database and signal storage)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -49,6 +51,7 @@ penny-scanner analyze AEMD
 ```
 
 **Output**:
+
 ```
 ✅ Ticker service ready (2000 penny stocks)
 ✅ Database service ready for signal storage
@@ -79,6 +82,7 @@ Fetching data for AEMD... ━━━━━━━━━━━━━━━━━━
 ```
 
 **Save to file**:
+
 ```bash
 penny-scanner analyze AEMD --output aemd_analysis.json
 ```
@@ -92,11 +96,13 @@ penny-scanner batch AEMD,NUAI,TSLA,AAPL --min-score 0.60
 ```
 
 **Options**:
+
 - `--min-score`: Minimum score threshold (default: 0.60)
 - `--output`: Save results to JSON file
 - `--no-store`: Skip database storage
 
 **Example with options**:
+
 ```bash
 penny-scanner batch AEMD,NUAI,MNMD,SAVA \
   --min-score 0.70 \
@@ -105,6 +111,7 @@ penny-scanner batch AEMD,NUAI,MNMD,SAVA \
 ```
 
 **Output**:
+
 ```
 🔥 Penny Stock Explosion Setups (Score ≥ 0.70)
 ┏━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┓
@@ -128,12 +135,14 @@ penny-scanner scan-all --min-score 0.70
 ```
 
 **Options**:
+
 - `--min-score`: Minimum score threshold (default: 0.70)
 - `--max-symbols`: Limit number of symbols scanned
 - `--output`: Save results to JSON file
 - `--no-store`: Skip database storage
 
 **Full example**:
+
 ```bash
 penny-scanner scan-all \
   --min-score 0.75 \
@@ -143,6 +152,7 @@ penny-scanner scan-all \
 ```
 
 **Output**:
+
 ```
 📊 Fetching penny stock symbols...
 ✅ Ticker service ready (2000 penny stocks)
@@ -181,6 +191,7 @@ Analyzing... ━━━━━━━━━━━━━━━━━━━━━━ 
 ```
 
 **Setup Status Indicators**:
+
 - 📦 **Consol**: Currently consolidating
 - 🚀 **Break**: Breaking out of consolidation
 - 📈 **HLs**: Higher lows detected (accumulation)
@@ -204,6 +215,7 @@ penny-scanner query --date 2024-11-09 --limit 100
 ```
 
 **Output**:
+
 ```
 📊 Latest 50 signals
 
@@ -228,6 +240,7 @@ penny-scanner version
 ```
 
 **Output**:
+
 ```
 Penny Stock Scanner
 Version: 0.1.0
@@ -257,12 +270,12 @@ Overall Score: 0.812/1.0
 
 ### Opportunity Ranks
 
-| Rank | Emoji | Score | Interpretation |
-|------|-------|-------|----------------|
-| S-Tier | 🏆 | ≥0.90 | Exceptional - Highest conviction |
-| A-Tier | 🥇 | ≥0.80 | Excellent - Strong buy signal |
-| B-Tier | 🥈 | ≥0.70 | Solid - Good opportunity |
-| C-Tier | 🥉 | ≥0.60 | Fair - Watch list |
+| Rank   | Emoji | Score | Interpretation                   |
+| ------ | ----- | ----- | -------------------------------- |
+| S-Tier | 🏆    | ≥0.90 | Exceptional - Highest conviction |
+| A-Tier | 🥇    | ≥0.80 | Excellent - Strong buy signal    |
+| B-Tier | 🥈    | ≥0.70 | Solid - Good opportunity         |
+| C-Tier | 🥉    | ≥0.60 | Fair - Watch list                |
 
 ### Recommendations
 
@@ -274,6 +287,7 @@ Overall Score: 0.812/1.0
 ## Common Use Cases
 
 ### Daily Morning Scan
+
 ```bash
 # Quick scan to find today's opportunities
 penny-scanner scan-all \
@@ -282,6 +296,7 @@ penny-scanner scan-all \
 ```
 
 ### Watch List Analysis
+
 ```bash
 # Check specific stocks you're tracking
 penny-scanner batch AEMD,NUAI,MNMD,SAVA \
@@ -290,18 +305,21 @@ penny-scanner batch AEMD,NUAI,MNMD,SAVA \
 ```
 
 ### High-Quality Signals Only
+
 ```bash
 # Only S-Tier and A-Tier setups
 penny-scanner scan-all --min-score 0.80 --max-symbols 1000
 ```
 
 ### Quick Symbol Check
+
 ```bash
 # Quick analysis of a single symbol
 penny-scanner analyze AEMD
 ```
 
 ### Review Yesterday's Signals
+
 ```bash
 # Check signals from a specific date
 penny-scanner query --date 2024-11-08 --min-score 0.70
@@ -310,27 +328,32 @@ penny-scanner query --date 2024-11-08 --min-score 0.70
 ## Tips for Effective Usage
 
 ### 1. Start with High Thresholds
+
 - Begin with `--min-score 0.75` or higher
 - Focus on S-Tier and A-Tier signals
 - Lower threshold as you gain experience
 
 ### 2. Regular Scanning
+
 - Run daily scans before market open
 - Store results with date-stamped filenames
 - Track which signals perform best
 
 ### 3. Combine with Research
+
 - Scanner identifies setups, not guarantees
 - Research company fundamentals
 - Check news and catalysts manually
 - Verify volume and price action
 
 ### 4. Position Sizing
+
 - Use recommended position sizes from output
 - Never exceed 8% of capital per position
 - Adjust based on your risk tolerance
 
 ### 5. Risk Management
+
 - Always use the calculated stop loss
 - Set stops immediately after entry
 - Don't hold through stop loss hoping for recovery
@@ -342,6 +365,7 @@ penny-scanner query --date 2024-11-08 --min-score 0.70
 **Problem**: Scan returns 0 signals
 
 **Solutions**:
+
 ```bash
 # Lower the score threshold
 penny-scanner scan-all --min-score 0.60
@@ -358,6 +382,7 @@ penny-scanner version
 **Problem**: Scanning takes too long
 
 **Solutions**:
+
 ```bash
 # Limit number of symbols
 penny-scanner scan-all --max-symbols 500
@@ -374,6 +399,7 @@ penny-scanner batch SYMBOL1,SYMBOL2,SYMBOL3
 **Problem**: Signals not storing in database
 
 **Solutions**:
+
 1. Check `.env` file has correct Supabase credentials
 2. Verify `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` is set
 3. Ensure `penny_stock_signals` table exists in Supabase
@@ -384,6 +410,7 @@ penny-scanner batch SYMBOL1,SYMBOL2,SYMBOL3
 **Problem**: "No data available for SYMBOL"
 
 **Solutions**:
+
 - Verify symbol is correct (check Yahoo Finance)
 - Ensure symbol is a penny stock ($0.10-$5.00)
 - Some symbols may not have sufficient historical data
@@ -405,13 +432,13 @@ async def analyze_symbol(symbol: str):
     settings = get_settings()
     data_service = DataService(settings)
     analysis_service = AnalysisService(settings)
-    
+
     # Fetch data
     market_data = await data_service.get_market_data(symbol, "6mo")
-    
+
     # Analyze
     result = await analysis_service.analyze_symbol(market_data)
-    
+
     if result:
         print(f"{symbol}: {result.overall_score:.3f}")
         return result
@@ -424,6 +451,7 @@ asyncio.run(analyze_symbol("AEMD"))
 ### Custom Filters
 
 Modify `settings.py` to adjust filters:
+
 ```python
 # Adjust price range
 penny_min_price=0.50  # Only $0.50-$5.00
@@ -456,4 +484,3 @@ python process_results.py results.json
 - Start with paper trading to validate signals
 - Track performance and refine your criteria
 - Join the community for strategy discussions
-

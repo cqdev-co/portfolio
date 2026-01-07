@@ -1,19 +1,19 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/components/auth/auth-provider'
-import { SettingsClient } from './settings-client'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/auth-provider';
+import { SettingsClient } from './settings-client';
 
 export function SettingsPageClient() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/')
+      router.push('/');
     }
-  }, [user, loading, router])
+  }, [user, loading, router]);
 
   // Show loading state while checking auth
   if (loading) {
@@ -24,12 +24,12 @@ export function SettingsPageClient() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Don't render anything if no user (redirect will happen)
   if (!user) {
-    return null
+    return null;
   }
 
   return (
@@ -40,8 +40,8 @@ export function SettingsPageClient() {
           Manage your account information, billing, and security preferences
         </p>
       </div>
-      
+
       <SettingsClient user={user} />
     </div>
-  )
+  );
 }
