@@ -41,9 +41,11 @@ TICKER_MIN_DOLLAR_VOLUME = 500_000
 TICKER_MIN_QUALITY_SCORE = 60.0
 
 # Data quality thresholds
-TICKER_MIN_HISTORY_DAYS = 180  # 6 months of history required
-TICKER_MIN_DATA_COMPLETENESS = 0.90  # 90% data completeness
-TICKER_MAX_GAP_RATIO = 0.05  # Max 5% gaps allowed
+# Note: YFinance returns TRADING days, not calendar days
+# 3 months = ~63 trading days, 6 months = ~126 trading days
+TICKER_MIN_HISTORY_DAYS = 60   # ~3 months of trading days
+TICKER_MIN_DATA_COMPLETENESS = 0.80  # 80% data completeness
+TICKER_MAX_GAP_RATIO = 0.15  # Max 15% gaps allowed
 
 # =============================================================================
 # API limits

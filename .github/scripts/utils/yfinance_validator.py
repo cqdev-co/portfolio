@@ -57,15 +57,15 @@ class YFinanceValidator:
 
     def __init__(
         self,
-        min_history_days: int = 180,  # 6 months history (was 90)
-        min_volume: float = 100_000,  # 100K shares/day (was 10K)
-        min_price: float = 2.00,  # $2 minimum (was $0.50)
+        min_history_days: int = 60,   # ~3 months trading days (YF returns trading days)
+        min_volume: float = 100_000,  # 100K shares/day
+        min_price: float = 2.00,      # $2 minimum
         max_price: float = 10_000,
-        min_data_completeness: float = 0.90,  # 90% completeness (was 85%)
-        max_gap_ratio: float = 0.05,  # Max 5% gaps (was 10%)
-        recency_days: int = 5,  # Must have data within 5 days
-        max_workers: int = 3,  # Reduced to avoid rate limiting
-        request_delay: float = 0.5,  # Delay between requests
+        min_data_completeness: float = 0.80,  # 80% completeness
+        max_gap_ratio: float = 0.15,  # Max 15% gaps
+        recency_days: int = 5,        # Must have data within 5 days
+        max_workers: int = 3,         # Reduced to avoid rate limiting
+        request_delay: float = 0.5,   # Delay between requests
     ):
         self.min_history_days = min_history_days
         self.min_volume = min_volume
