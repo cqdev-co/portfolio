@@ -15,17 +15,15 @@ from penny_scanner.models.analysis import (
     TrendDirection,
     OpportunityRank,
     RiskLevel,
-    SignalStatus
+    SignalStatus,
 )
-from penny_scanner.utils.technical_indicators import (
-    TechnicalIndicatorCalculator
-)
+from penny_scanner.utils.technical_indicators import TechnicalIndicatorCalculator
 from penny_scanner.utils.helpers import safe_divide, normalize_score, clamp
 from penny_scanner.core.exceptions import AnalysisError
 from penny_scanner.config.settings import Settings
 from penny_scanner.services.market_comparison_service import (
     get_market_comparison_service,
-    MarketComparisonService
+    MarketComparisonService,
 )
 
 
@@ -39,42 +37,39 @@ class AnalysisService:
     Implements penny-optimized strategy: Volume (50%), Momentum (30%),
     Relative Strength (15%), Risk (5%).
     """
-    
+
     def __init__(self, settings: Settings):
         """Initialize analysis service."""
         self.settings = settings
         self.indicator_calculator = TechnicalIndicatorCalculator(settings)
         self.market_comparison = get_market_comparison_service(settings)
-    
+
     def _get_country(self, symbol: str) -> Optional[str]:
         """
         Get country of origin for a stock symbol.
         Uses cache to avoid repeated yfinance API calls.
         """
         global _country_cache
-        
+
         if symbol in _country_cache:
             return _country_cache[symbol]
-        
+
         try:
             info = yf.Ticker(symbol).info
-            country = info.get('country')
+            country = info.get("country")
             _country_cache[symbol] = country
             return country
         except Exception as e:
             logger.debug(f"Could not fetch country for {symbol}: {e}")
             _country_cache[symbol] = None
             return None
-    
+
     def _check_pump_dump_warning(
-        self,
-        signal: ExplosionSignal,
-        score: float,
-        country: Optional[str]
+        self, signal: ExplosionSignal, score: float, country: Optional[str]
     ) -> bool:
         """
         Check if signal shows pump-and-dump warning signs.
-        
+
         Triggers on:
         - Extreme volume (10x+) AND
         - High score (0.75+) AND
@@ -83,123 +78,132 @@ class AnalysisService:
         extreme_volume = signal.volume_spike_factor >= self.settings.volume_ceiling
         high_score = score >= 0.75
         low_price = signal.close_price < 0.50
-        high_risk_country = country in self.settings.high_risk_countries if country else False
-        
+        high_risk_country = (
+            country in self.settings.high_risk_countries if country else False
+        )
+
         return extreme_volume and high_score and (high_risk_country or low_price)
-    
+
     async def analyze_symbol(
-        self,
-        market_data: MarketData,
-        include_ai_analysis: bool = False
+        self, market_data: MarketData, include_ai_analysis: bool = False
     ) -> Optional[AnalysisResult]:
         """
         Analyze a symbol for penny stock explosion signals.
-        
+
         Args:
             market_data: Market data with OHLCV
             include_ai_analysis: Whether to include AI analysis
-            
+
         Returns:
             AnalysisResult if signal detected, None otherwise
         """
         try:
             start_time = datetime.now(timezone.utc)
-            
+
             # Calculate indicators if not present
             if not market_data.indicators:
                 market_data = self.indicator_calculator.calculate_all_indicators(
                     market_data
                 )
-            
+
             # Pre-filter: Check price range
             latest_price = market_data.get_latest_price()
             if not latest_price:
                 return None
-            
-            if not (self.settings.penny_min_price <= 
-                   latest_price <= 
-                   self.settings.penny_max_price):
+
+            if not (
+                self.settings.penny_min_price
+                <= latest_price
+                <= self.settings.penny_max_price
+            ):
                 logger.debug(
                     f"{market_data.symbol}: Price ${latest_price:.2f} "
                     f"outside penny range"
                 )
                 return None
-            
+
             # Pre-filter: Check minimum volume
             latest_volume = market_data.get_latest_volume()
             if not latest_volume or latest_volume < self.settings.penny_min_volume:
                 logger.debug(
-                    f"{market_data.symbol}: Volume {latest_volume} "
-                    f"below minimum"
+                    f"{market_data.symbol}: Volume {latest_volume} below minimum"
                 )
                 return None
-            
+
             # Detect explosion signal
             explosion_signal = self._detect_explosion_signal(market_data)
-            
+
             if not explosion_signal:
                 return None
-            
+
             # Pre-filter: Check dollar volume
-            if (explosion_signal.dollar_volume < 
-                self.settings.penny_min_dollar_volume):
+            if explosion_signal.dollar_volume < self.settings.penny_min_dollar_volume:
                 logger.debug(
                     f"{market_data.symbol}: Dollar volume "
                     f"${explosion_signal.dollar_volume:,.0f} below minimum"
                 )
                 return None
-            
+
             # Calculate overall score
             overall_score = self._calculate_overall_score(explosion_signal)
-            
+
             # Pre-filter: Check minimum score
             if overall_score < self.settings.min_score_threshold:
                 return None
-            
+
             # Get country info for risk assessment
             country = self._get_country(market_data.symbol)
-            is_high_risk = country in self.settings.high_risk_countries if country else False
-            is_moderate_risk = country in self.settings.moderate_risk_countries if country else False
-            
+            is_high_risk = (
+                country in self.settings.high_risk_countries if country else False
+            )
+            is_moderate_risk = (
+                country in self.settings.moderate_risk_countries if country else False
+            )
+
             # Update explosion signal with country info
             explosion_signal.country = country
             explosion_signal.is_high_risk_country = is_high_risk
-            
+
             # Check for pump-and-dump warning
             explosion_signal.pump_dump_warning = self._check_pump_dump_warning(
                 explosion_signal, overall_score, country
             )
-            
+
             # Calculate opportunity rank
             opportunity_rank = self._calculate_opportunity_rank(overall_score)
-            
+
             # RANK ADJUSTMENTS based on data insights
             # 1. Demote rank for high-risk countries (0-18% WR)
             if is_high_risk and opportunity_rank != OpportunityRank.D_TIER:
-                logger.debug(f"{market_data.symbol}: Demoting from {opportunity_rank.value} due to high-risk country ({country})")
+                logger.debug(
+                    f"{market_data.symbol}: Demoting from {opportunity_rank.value} due to high-risk country ({country})"
+                )
                 opportunity_rank = self._demote_rank(opportunity_rank)
-            
+
             # 2. Require breakout for B/C tier (non-breakout = 20.4% WR)
-            if (not explosion_signal.is_breakout and 
-                opportunity_rank in (OpportunityRank.B_TIER, OpportunityRank.C_TIER)):
-                logger.debug(f"{market_data.symbol}: Demoting from {opportunity_rank.value} - no breakout detected")
+            if not explosion_signal.is_breakout and opportunity_rank in (
+                OpportunityRank.B_TIER,
+                OpportunityRank.C_TIER,
+            ):
+                logger.debug(
+                    f"{market_data.symbol}: Demoting from {opportunity_rank.value} - no breakout detected"
+                )
                 opportunity_rank = self._demote_rank(opportunity_rank)
-            
+
             # Generate recommendation
             recommendation = self._generate_recommendation(
-                explosion_signal,
-                overall_score
+                explosion_signal, overall_score
             )
-            
+
             # Calculate risk management parameters
             stop_loss = self._calculate_stop_loss(explosion_signal)
             position_size = self._calculate_position_size(overall_score)
-            
+
             # Create analysis result
             analysis_id = str(uuid.uuid4())
             end_time = datetime.now(timezone.utc)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
-            
+
             analysis_result = AnalysisResult(
                 analysis_id=analysis_id,
                 symbol=market_data.symbol,
@@ -212,18 +216,17 @@ class AnalysisService:
                 stop_loss_level=stop_loss,
                 position_size_pct=position_size,
                 analysis_duration_ms=duration_ms,
-                data_quality_score=self._assess_data_quality(market_data)
+                data_quality_score=self._assess_data_quality(market_data),
             )
-            
+
             return analysis_result
-            
+
         except Exception as e:
             logger.error(f"Analysis error for {market_data.symbol}: {e}")
             raise AnalysisError(f"Failed to analyze {market_data.symbol}: {e}")
-    
+
     def _detect_explosion_signal(
-        self,
-        market_data: MarketData
+        self, market_data: MarketData
     ) -> Optional[ExplosionSignal]:
         """
         Detect penny stock explosion setup signal.
@@ -231,123 +234,104 @@ class AnalysisService:
         """
         if len(market_data.ohlcv_data) < 50:
             return None
-        
+
         latest_ohlcv = market_data.ohlcv_data[-1]
         latest_indicators = market_data.indicators[-1]
-        
+
         # Volume Analysis (50% weight) - THE DOMINANT SIGNAL
         volume_metrics = self._calculate_volume_metrics(
-            market_data,
-            latest_ohlcv,
-            latest_indicators
+            market_data, latest_ohlcv, latest_indicators
         )
-        
+
         # Price Momentum & Consolidation (30% weight)
         momentum_metrics = self._calculate_momentum_metrics(
-            market_data,
-            latest_ohlcv,
-            latest_indicators
+            market_data, latest_ohlcv, latest_indicators
         )
-        
+
         # Relative Strength (15% weight)
         strength_metrics = self._calculate_relative_strength(
-            market_data,
-            latest_ohlcv,
-            latest_indicators
+            market_data, latest_ohlcv, latest_indicators
         )
-        
+
         # Risk & Liquidity (5% weight)
         risk_metrics = self._calculate_risk_metrics(
-            market_data,
-            latest_ohlcv,
-            latest_indicators
+            market_data, latest_ohlcv, latest_indicators
         )
-        
+
         # Calculate component scores
         volume_score = self._score_volume_analysis(volume_metrics)
         momentum_score = self._score_momentum(momentum_metrics)
         strength_score = self._score_relative_strength(strength_metrics)
         risk_score = self._score_risk_liquidity(risk_metrics)
-        
+
         # Determine trend direction
         trend = self._determine_trend(latest_indicators)
-        
+
         # Create explosion signal
         explosion_signal = ExplosionSignal(
             timestamp=latest_ohlcv.timestamp,
             symbol=market_data.symbol,
             close_price=latest_ohlcv.close,
-            
             # Volume metrics
             volume=latest_ohlcv.volume,
             avg_volume_20d=latest_indicators.volume_sma_20 or 0,
-            volume_ratio=volume_metrics['volume_ratio'],
-            volume_spike_factor=volume_metrics['spike_factor'],
-            volume_acceleration_2d=volume_metrics['acceleration_2d'],
-            volume_acceleration_5d=volume_metrics['acceleration_5d'],
-            volume_consistency_score=volume_metrics['consistency'],
-            dollar_volume=volume_metrics['dollar_volume'],
-            
+            volume_ratio=volume_metrics["volume_ratio"],
+            volume_spike_factor=volume_metrics["spike_factor"],
+            volume_acceleration_2d=volume_metrics["acceleration_2d"],
+            volume_acceleration_5d=volume_metrics["acceleration_5d"],
+            volume_consistency_score=volume_metrics["consistency"],
+            dollar_volume=volume_metrics["dollar_volume"],
             # Momentum metrics
-            is_consolidating=momentum_metrics['is_consolidating'],
-            consolidation_days=momentum_metrics['consolidation_days'],
-            consolidation_range_pct=momentum_metrics['consolidation_range'],
-            is_breakout=momentum_metrics['is_breakout'],
-            price_change_5d=momentum_metrics['price_change_5d'],
-            price_change_10d=momentum_metrics['price_change_10d'],
-            price_change_20d=momentum_metrics['price_change_20d'],
-            higher_lows_detected=momentum_metrics['higher_lows'],
-            consecutive_green_days=momentum_metrics['green_days'],
-            
+            is_consolidating=momentum_metrics["is_consolidating"],
+            consolidation_days=momentum_metrics["consolidation_days"],
+            consolidation_range_pct=momentum_metrics["consolidation_range"],
+            is_breakout=momentum_metrics["is_breakout"],
+            price_change_5d=momentum_metrics["price_change_5d"],
+            price_change_10d=momentum_metrics["price_change_10d"],
+            price_change_20d=momentum_metrics["price_change_20d"],
+            higher_lows_detected=momentum_metrics["higher_lows"],
+            consecutive_green_days=momentum_metrics["green_days"],
             # Moving averages
             ema_20=latest_indicators.ema_20 or 0,
             ema_50=latest_indicators.ema_50 or 0,
-            price_vs_ema20=momentum_metrics['price_vs_ema20'],
-            price_vs_ema50=momentum_metrics['price_vs_ema50'],
-            ema_crossover_signal=momentum_metrics['ema_crossover'],
-            
+            price_vs_ema20=momentum_metrics["price_vs_ema20"],
+            price_vs_ema50=momentum_metrics["price_vs_ema50"],
+            ema_crossover_signal=momentum_metrics["ema_crossover"],
             # Relative strength
-            market_outperformance=strength_metrics.get('market_outperformance'),
-            sector_outperformance=strength_metrics.get('sector_outperformance'),
-            distance_from_52w_low=strength_metrics['dist_from_52w_low'],
-            distance_from_52w_high=strength_metrics['dist_from_52w_high'],
-            breaking_resistance=strength_metrics['breaking_resistance'],
-            
+            market_outperformance=strength_metrics.get("market_outperformance"),
+            sector_outperformance=strength_metrics.get("sector_outperformance"),
+            distance_from_52w_low=strength_metrics["dist_from_52w_low"],
+            distance_from_52w_high=strength_metrics["dist_from_52w_high"],
+            breaking_resistance=strength_metrics["breaking_resistance"],
             # Risk metrics
-            bid_ask_spread_pct=risk_metrics.get('spread_pct'),
-            avg_spread_5d=risk_metrics.get('avg_spread_5d'),
+            bid_ask_spread_pct=risk_metrics.get("spread_pct"),
+            avg_spread_5d=risk_metrics.get("avg_spread_5d"),
             float_shares=market_data.float_shares,
-            is_low_float=risk_metrics['is_low_float'],
-            daily_volatility=risk_metrics['volatility'],
+            is_low_float=risk_metrics["is_low_float"],
+            daily_volatility=risk_metrics["volatility"],
             atr_20=latest_indicators.atr_20 or 0,
-            pump_dump_risk=risk_metrics['pump_risk'],
-            
+            pump_dump_risk=risk_metrics["pump_risk"],
             # Country risk (will be populated in analyze_symbol)
             country=None,
             is_high_risk_country=False,
             pump_dump_warning=False,
-            
             # Trend
             trend_direction=trend,
-            
             # Component scores
             volume_score=volume_score,
             momentum_score=momentum_score,
             relative_strength_score=strength_score,
-            risk_score=risk_score
+            risk_score=risk_score,
         )
-        
+
         return explosion_signal
-    
+
     def _calculate_volume_metrics(
-        self,
-        market_data: MarketData,
-        latest_ohlcv,
-        latest_indicators
+        self, market_data: MarketData, latest_ohlcv, latest_indicators
     ) -> dict:
         """Calculate volume analysis metrics (50% weight)."""
         volume_ratio = latest_indicators.volume_ratio or 1.0
-        
+
         # Determine spike factor
         spike_factor = volume_ratio
         if volume_ratio >= self.settings.volume_spike_5x:
@@ -356,219 +340,222 @@ class AnalysisService:
             spike_factor = 3.0
         elif volume_ratio >= self.settings.volume_spike_2x:
             spike_factor = 2.0
-        
+
         # Volume acceleration
         acceleration = self.indicator_calculator.calculate_volume_acceleration(
-            market_data.ohlcv_data,
-            periods=[2, 5]
+            market_data.ohlcv_data, periods=[2, 5]
         )
-        
+
         # Volume consistency
         consistency = self.indicator_calculator.calculate_volume_consistency(
-            market_data.ohlcv_data,
-            lookback_days=5
+            market_data.ohlcv_data, lookback_days=5
         )
-        
+
         # Dollar volume
         dollar_volume = latest_ohlcv.close * latest_ohlcv.volume
-        
+
         return {
-            'volume_ratio': volume_ratio,
-            'spike_factor': spike_factor,
-            'acceleration_2d': acceleration.get('2d', 0.0),
-            'acceleration_5d': acceleration.get('5d', 0.0),
-            'consistency': consistency,
-            'dollar_volume': dollar_volume
+            "volume_ratio": volume_ratio,
+            "spike_factor": spike_factor,
+            "acceleration_2d": acceleration.get("2d", 0.0),
+            "acceleration_5d": acceleration.get("5d", 0.0),
+            "consistency": consistency,
+            "dollar_volume": dollar_volume,
         }
-    
+
     def _calculate_momentum_metrics(
-        self,
-        market_data: MarketData,
-        latest_ohlcv,
-        latest_indicators
+        self, market_data: MarketData, latest_ohlcv, latest_indicators
     ) -> dict:
         """Calculate price momentum & consolidation metrics (30% weight)."""
         # Consolidation detection
         is_consolidating, consol_days, consol_range = (
-            self.indicator_calculator.detect_consolidation(
-                market_data.ohlcv_data
-            )
+            self.indicator_calculator.detect_consolidation(market_data.ohlcv_data)
         )
-        
+
         # Breakout detection - IMPROVED
         # Previous logic was too strict (required consolidation + up day + volume)
         # Only 5.2% of signals were marked as breakouts
         # New logic: Multiple ways to qualify as a breakout
-        
-        prev_close = market_data.ohlcv_data[-2].close if len(market_data.ohlcv_data) > 1 else latest_ohlcv.close
+
+        prev_close = (
+            market_data.ohlcv_data[-2].close
+            if len(market_data.ohlcv_data) > 1
+            else latest_ohlcv.close
+        )
         price_up_today = latest_ohlcv.close > prev_close
-        volume_surge = latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 2.0  # 2x volume
-        strong_volume_surge = latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 3.0  # 3x volume
-        
+        volume_surge = (
+            latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 2.0
+        )  # 2x volume
+        strong_volume_surge = (
+            latest_ohlcv.volume > (latest_indicators.volume_sma_20 or 0) * 3.0
+        )  # 3x volume
+
         # Calculate price move percentage
-        price_move_pct = ((latest_ohlcv.close - prev_close) / prev_close * 100) if prev_close > 0 else 0
+        price_move_pct = (
+            ((latest_ohlcv.close - prev_close) / prev_close * 100)
+            if prev_close > 0
+            else 0
+        )
         significant_move = price_move_pct >= 5.0  # 5%+ move
-        
+
         # Multiple breakout scenarios:
         # 1. Classic: Consolidation + price up + volume surge
         classic_breakout = is_consolidating and price_up_today and volume_surge
-        
+
         # 2. Volume explosion: 3x+ volume with price up (even without consolidation)
         volume_explosion_breakout = strong_volume_surge and price_up_today
-        
+
         # 3. Significant move: 5%+ price move with 2x+ volume
         momentum_breakout = significant_move and volume_surge
-        
+
         is_breakout = classic_breakout or volume_explosion_breakout or momentum_breakout
-        
+
         # Price changes
         prices = [d.close for d in market_data.ohlcv_data]
-        price_change_5d = safe_divide(
-            prices[-1] - prices[-6] if len(prices) > 5 else 0,
-            prices[-6] if len(prices) > 5 else 1,
-            0
-        ) * 100
-        
-        price_change_10d = safe_divide(
-            prices[-1] - prices[-11] if len(prices) > 10 else 0,
-            prices[-11] if len(prices) > 10 else 1,
-            0
-        ) * 100
-        
-        price_change_20d = safe_divide(
-            prices[-1] - prices[-21] if len(prices) > 20 else 0,
-            prices[-21] if len(prices) > 20 else 1,
-            0
-        ) * 100
-        
+        price_change_5d = (
+            safe_divide(
+                prices[-1] - prices[-6] if len(prices) > 5 else 0,
+                prices[-6] if len(prices) > 5 else 1,
+                0,
+            )
+            * 100
+        )
+
+        price_change_10d = (
+            safe_divide(
+                prices[-1] - prices[-11] if len(prices) > 10 else 0,
+                prices[-11] if len(prices) > 10 else 1,
+                0,
+            )
+            * 100
+        )
+
+        price_change_20d = (
+            safe_divide(
+                prices[-1] - prices[-21] if len(prices) > 20 else 0,
+                prices[-21] if len(prices) > 20 else 1,
+                0,
+            )
+            * 100
+        )
+
         # Higher lows
         higher_lows = self.indicator_calculator.detect_higher_lows(
             market_data.ohlcv_data
         )
-        
+
         # Green days
         green_days = self.indicator_calculator.count_consecutive_green_days(
             market_data.ohlcv_data
         )
-        
+
         # EMA positioning
-        price_vs_ema20 = safe_divide(
-            latest_ohlcv.close - (latest_indicators.ema_20 or 0),
-            latest_indicators.ema_20 or 1,
-            0
-        ) * 100
-        
-        price_vs_ema50 = safe_divide(
-            latest_ohlcv.close - (latest_indicators.ema_50 or 0),
-            latest_indicators.ema_50 or 1,
-            0
-        ) * 100
-        
+        price_vs_ema20 = (
+            safe_divide(
+                latest_ohlcv.close - (latest_indicators.ema_20 or 0),
+                latest_indicators.ema_20 or 1,
+                0,
+            )
+            * 100
+        )
+
+        price_vs_ema50 = (
+            safe_divide(
+                latest_ohlcv.close - (latest_indicators.ema_50 or 0),
+                latest_indicators.ema_50 or 1,
+                0,
+            )
+            * 100
+        )
+
         # EMA crossover
         ema_crossover = (
-            (latest_indicators.ema_20 or 0) > (latest_indicators.ema_50 or 0) and
-            len(market_data.indicators) > 1 and
-            (market_data.indicators[-2].ema_20 or 0) <= 
-            (market_data.indicators[-2].ema_50 or 0)
+            (latest_indicators.ema_20 or 0) > (latest_indicators.ema_50 or 0)
+            and len(market_data.indicators) > 1
+            and (market_data.indicators[-2].ema_20 or 0)
+            <= (market_data.indicators[-2].ema_50 or 0)
         )
-        
+
         return {
-            'is_consolidating': is_consolidating,
-            'consolidation_days': consol_days,
-            'consolidation_range': consol_range,
-            'is_breakout': is_breakout,
-            'price_change_5d': price_change_5d,
-            'price_change_10d': price_change_10d,
-            'price_change_20d': price_change_20d,
-            'higher_lows': higher_lows,
-            'green_days': green_days,
-            'price_vs_ema20': price_vs_ema20,
-            'price_vs_ema50': price_vs_ema50,
-            'ema_crossover': ema_crossover
+            "is_consolidating": is_consolidating,
+            "consolidation_days": consol_days,
+            "consolidation_range": consol_range,
+            "is_breakout": is_breakout,
+            "price_change_5d": price_change_5d,
+            "price_change_10d": price_change_10d,
+            "price_change_20d": price_change_20d,
+            "higher_lows": higher_lows,
+            "green_days": green_days,
+            "price_vs_ema20": price_vs_ema20,
+            "price_vs_ema50": price_vs_ema50,
+            "ema_crossover": ema_crossover,
         }
-    
+
     def _calculate_relative_strength(
-        self,
-        market_data: MarketData,
-        latest_ohlcv,
-        latest_indicators
+        self, market_data: MarketData, latest_ohlcv, latest_indicators
     ) -> dict:
         """Calculate relative strength metrics (15% weight)."""
         # 52-week position
         dist_from_52w_low = latest_indicators.distance_from_52w_low or 0
         dist_from_52w_high = latest_indicators.distance_from_52w_high or 0
-        
+
         # Breaking resistance (near 52w high)
         breaking_resistance = dist_from_52w_high > -10  # Within 10% of high
-        
+
         # Calculate market outperformance using SPY comparison
         # This is now properly implemented via MarketComparisonService
         rs_metrics = self.market_comparison.calculate_relative_strength(market_data)
-        
+
         # Use 20-day outperformance as the primary metric
-        market_outperformance = rs_metrics.get('market_outperformance_20d')
-        
+        market_outperformance = rs_metrics.get("market_outperformance_20d")
+
         # Sector outperformance still not implemented - would need sector ETF data
         sector_outperformance = None
-        
+
         return {
-            'market_outperformance': market_outperformance,
-            'sector_outperformance': sector_outperformance,
-            'dist_from_52w_low': dist_from_52w_low,
-            'dist_from_52w_high': dist_from_52w_high,
-            'breaking_resistance': breaking_resistance
+            "market_outperformance": market_outperformance,
+            "sector_outperformance": sector_outperformance,
+            "dist_from_52w_low": dist_from_52w_low,
+            "dist_from_52w_high": dist_from_52w_high,
+            "breaking_resistance": breaking_resistance,
         }
-    
+
     def _calculate_risk_metrics(
-        self,
-        market_data: MarketData,
-        latest_ohlcv,
-        latest_indicators
+        self, market_data: MarketData, latest_ohlcv, latest_indicators
     ) -> dict:
         """Calculate risk & liquidity metrics (5% weight)."""
         # Low float detection
         is_low_float = (
-            market_data.float_shares is not None and
-            market_data.float_shares < 50_000_000
+            market_data.float_shares is not None
+            and market_data.float_shares < 50_000_000
         )
-        
+
         # Volatility (ATR-based)
         atr = latest_indicators.atr_20 or 0
         volatility = safe_divide(atr, latest_ohlcv.close, 0) * 100
-        
+
         # Pump-and-dump risk assessment
-        pump_risk = self._assess_pump_dump_risk(
-            market_data,
-            latest_ohlcv,
-            volatility
-        )
-        
+        pump_risk = self._assess_pump_dump_risk(market_data, latest_ohlcv, volatility)
+
         return {
-            'spread_pct': None,  # TODO: Requires bid/ask data
-            'avg_spread_5d': None,
-            'is_low_float': is_low_float,
-            'volatility': volatility,
-            'pump_risk': pump_risk
+            "spread_pct": None,  # TODO: Requires bid/ask data
+            "avg_spread_5d": None,
+            "is_low_float": is_low_float,
+            "volatility": volatility,
+            "pump_risk": pump_risk,
         }
-    
+
     def _assess_pump_dump_risk(
-        self,
-        market_data: MarketData,
-        latest_ohlcv,
-        volatility: float
+        self, market_data: MarketData, latest_ohlcv, volatility: float
     ) -> RiskLevel:
         """Assess pump-and-dump risk."""
         # Check for extreme single-day moves
         if len(market_data.ohlcv_data) < 2:
             return RiskLevel.MEDIUM
-        
+
         prev_close = market_data.ohlcv_data[-2].close
-        day_change = safe_divide(
-            latest_ohlcv.close - prev_close,
-            prev_close,
-            0
-        ) * 100
-        
+        day_change = safe_divide(latest_ohlcv.close - prev_close, prev_close, 0) * 100
+
         # High risk signals
         if abs(day_change) > 50:  # 50%+ move in one day
             return RiskLevel.EXTREME
@@ -580,25 +567,25 @@ class AnalysisService:
             return RiskLevel.MEDIUM
         else:
             return RiskLevel.LOW
-    
+
     def _score_volume_analysis(self, metrics: dict) -> float:
         """
         Score volume analysis (50% of total score).
-        
+
         Breakdown:
         - Volume surge: 20%
         - Volume acceleration: 15%
         - Volume consistency: 10%
         - Liquidity depth: 5%
-        
+
         UPDATED Dec 2024: Added volume ceiling to penalize extreme spikes.
         Data shows 10x+ volume = 34% WR, -3.16% vs 2-5x = 50% WR, +1.9%
         """
         score = 0.0
-        
+
         # Volume surge (20%) - with ceiling for pump-and-dump protection
-        volume_ratio = metrics['volume_ratio']
-        
+        volume_ratio = metrics["volume_ratio"]
+
         # Sweet spot is 2-5x volume (best performance)
         if volume_ratio >= self.settings.volume_ceiling:
             # 10x+ volume is a WARNING sign - likely pump-and-dump
@@ -614,18 +601,18 @@ class AnalysisService:
         else:
             surge_score = normalize_score(volume_ratio, 1.0, 1.5)
         score += surge_score * self.settings.weight_volume_surge
-        
+
         # Volume acceleration (15%)
-        accel_5d = metrics['acceleration_5d']
+        accel_5d = metrics["acceleration_5d"]
         accel_score = normalize_score(accel_5d, 0, 200)  # 0-200% growth
         score += accel_score * self.settings.weight_volume_acceleration
-        
+
         # Volume consistency (10%)
-        consistency = metrics['consistency']
+        consistency = metrics["consistency"]
         score += consistency * self.settings.weight_volume_consistency
-        
+
         # Liquidity depth (5%)
-        dollar_vol = metrics['dollar_volume']
+        dollar_vol = metrics["dollar_volume"]
         if dollar_vol >= 1_000_000:
             liquidity_score = 1.0
         elif dollar_vol >= 500_000:
@@ -635,13 +622,13 @@ class AnalysisService:
         else:
             liquidity_score = normalize_score(dollar_vol, 100_000, 200_000)
         score += liquidity_score * self.settings.weight_liquidity_depth
-        
+
         return score
-    
+
     def _score_momentum(self, metrics: dict) -> float:
         """
         Score price momentum & consolidation (30% of total score).
-        
+
         Breakdown:
         - Consolidation detection: 12%
         - Price acceleration: 10%
@@ -649,30 +636,30 @@ class AnalysisService:
         - MA position: 3%
         """
         score = 0.0
-        
+
         # Consolidation + breakout (12%)
-        if metrics['is_breakout']:
+        if metrics["is_breakout"]:
             consol_score = 1.0
-        elif metrics['is_consolidating']:
+        elif metrics["is_consolidating"]:
             consol_score = 0.7
         else:
             consol_score = 0.3
         score += consol_score * self.settings.weight_consolidation
-        
+
         # Price acceleration (10%)
-        price_20d = metrics['price_change_20d']
+        price_20d = metrics["price_change_20d"]
         if price_20d > 0:
             accel_score = normalize_score(price_20d, 0, 50)  # 0-50% gain
         else:
             accel_score = 0.2
         score += accel_score * self.settings.weight_price_acceleration
-        
+
         # Higher lows (5%)
-        higher_lows_score = 1.0 if metrics['higher_lows'] else 0.3
+        higher_lows_score = 1.0 if metrics["higher_lows"] else 0.3
         score += higher_lows_score * self.settings.weight_higher_lows
-        
+
         # MA position (3%)
-        price_vs_ema20 = metrics['price_vs_ema20']
+        price_vs_ema20 = metrics["price_vs_ema20"]
         if price_vs_ema20 > 5:  # Above EMA20
             ma_score = 1.0
         elif price_vs_ema20 > 0:
@@ -680,28 +667,28 @@ class AnalysisService:
         else:
             ma_score = 0.3
         score += ma_score * self.settings.weight_ma_position
-        
+
         return score
-    
+
     def _score_relative_strength(self, metrics: dict) -> float:
         """
         Score relative strength (15% of total score).
-        
+
         Breakdown:
         - Market outperformance: 8%
         - Sector leadership: 4%
         - 52-week position: 3%
-        
+
         NOTE: Market/sector comparison not yet implemented.
         Previous approach gave 50% partial credit which inflated scores.
         Now using 0 until properly implemented to avoid false confidence.
         """
         score = 0.0
-        
+
         # Market outperformance (8%) - NOT IMPLEMENTED
         # Previously gave 50% partial credit which inflated scores
         # Set to 0 until SPY comparison is implemented
-        market_outperf = metrics.get('market_outperformance')
+        market_outperf = metrics.get("market_outperformance")
         if market_outperf is not None:
             # When implemented, score based on actual outperformance
             if market_outperf > 10:
@@ -712,10 +699,10 @@ class AnalysisService:
                 score += 0.5 * self.settings.weight_market_outperformance
             # else: underperforming, no credit
         # else: no credit until implemented
-        
+
         # Sector leadership (4%) - NOT IMPLEMENTED
         # Set to 0 until sector comparison is implemented
-        sector_outperf = metrics.get('sector_outperformance')
+        sector_outperf = metrics.get("sector_outperformance")
         if sector_outperf is not None:
             if sector_outperf > 10:
                 score += 1.0 * self.settings.weight_sector_leadership
@@ -724,9 +711,9 @@ class AnalysisService:
             elif sector_outperf > 0:
                 score += 0.5 * self.settings.weight_sector_leadership
         # else: no credit until implemented
-        
+
         # 52-week position (3%) - This IS implemented
-        dist_from_low = metrics['dist_from_52w_low']
+        dist_from_low = metrics["dist_from_52w_low"]
         if dist_from_low > 100:  # 2x from lows
             pos_score = 1.0
         elif dist_from_low > 50:
@@ -736,26 +723,26 @@ class AnalysisService:
         else:
             pos_score = normalize_score(dist_from_low, 0, 20)
         score += pos_score * self.settings.weight_52w_position
-        
+
         return score
-    
+
     def _score_risk_liquidity(self, metrics: dict) -> float:
         """
         Score risk & liquidity (5% of total score).
-        
+
         Breakdown:
         - Bid-ask spread: 2%
         - Float analysis: 2%
         - Price stability: 1%
-        
+
         NOTE: Bid-ask spread not available from yfinance.
         Previous approach gave 50% partial credit which inflated scores.
         """
         score = 0.0
-        
+
         # Bid-ask spread (2%) - NOT AVAILABLE from yfinance
         # Previously gave 50% partial credit - now set to 0
-        spread_pct = metrics.get('spread_pct')
+        spread_pct = metrics.get("spread_pct")
         if spread_pct is not None:
             # When available, score based on actual spread
             if spread_pct < 1.0:
@@ -766,13 +753,13 @@ class AnalysisService:
                 score += 0.5 * self.settings.weight_bid_ask_spread
             # else: wide spread, no credit
         # else: no credit until we have spread data
-        
+
         # Float analysis (2%) - This IS available
-        float_score = 0.8 if metrics['is_low_float'] else 0.5
+        float_score = 0.8 if metrics["is_low_float"] else 0.5
         score += float_score * self.settings.weight_float_analysis
-        
+
         # Price stability (1%) - inverse of pump risk
-        pump_risk = metrics['pump_risk']
+        pump_risk = metrics["pump_risk"]
         if pump_risk == RiskLevel.LOW:
             stability_score = 1.0
         elif pump_risk == RiskLevel.MEDIUM:
@@ -782,23 +769,20 @@ class AnalysisService:
         else:  # EXTREME
             stability_score = 0.0
         score += stability_score * self.settings.weight_price_stability
-        
+
         return score
-    
-    def _calculate_overall_score(
-        self,
-        explosion_signal: ExplosionSignal
-    ) -> float:
+
+    def _calculate_overall_score(self, explosion_signal: ExplosionSignal) -> float:
         """Calculate overall signal score (0-1.0)."""
         total_score = (
-            explosion_signal.volume_score +
-            explosion_signal.momentum_score +
-            explosion_signal.relative_strength_score +
-            explosion_signal.risk_score
+            explosion_signal.volume_score
+            + explosion_signal.momentum_score
+            + explosion_signal.relative_strength_score
+            + explosion_signal.risk_score
         )
-        
+
         return clamp(total_score, 0.0, 1.0)
-    
+
     def _calculate_opportunity_rank(self, score: float) -> OpportunityRank:
         """Calculate opportunity tier ranking."""
         if score >= self.settings.s_tier_threshold:
@@ -811,7 +795,7 @@ class AnalysisService:
             return OpportunityRank.C_TIER
         else:
             return OpportunityRank.D_TIER
-    
+
     def _demote_rank(self, rank: OpportunityRank) -> OpportunityRank:
         """Demote a rank by one tier."""
         demotion_map = {
@@ -822,23 +806,19 @@ class AnalysisService:
             OpportunityRank.D_TIER: OpportunityRank.D_TIER,
         }
         return demotion_map.get(rank, rank)
-    
-    def _generate_recommendation(
-        self,
-        signal: ExplosionSignal,
-        score: float
-    ) -> str:
+
+    def _generate_recommendation(self, signal: ExplosionSignal, score: float) -> str:
         """
         Generate trading recommendation based on score and signal characteristics.
-        
+
         UPDATED Dec 2024: Fixed BUY criteria - was 25.5% WR vs STRONG_BUY 61.5%
         Data shows: BUY was too loose, HOLD actually performed better!
-        
+
         New criteria requires:
         - Market outperformance (63.6% WR when outperforming SPY)
         - Breakout confirmation (48.7% WR vs 20.4% without)
         - Volume in sweet spot (2-5x optimal, 10x+ penalized)
-        
+
         STRONG_BUY: High score + breakout + outperforming + good volume
         BUY: Good score + breakout + outperforming
         WATCH: Breakout OR outperforming (one of the key signals)
@@ -847,52 +827,58 @@ class AnalysisService:
         # Check for concerning risk factors
         high_risk = signal.pump_dump_risk in (RiskLevel.HIGH, RiskLevel.EXTREME)
         extreme_volume = signal.volume_spike_factor >= self.settings.volume_ceiling
-        
+
         # Check if outperforming market (strongest predictor!)
         outperforming_market = (
-            signal.market_outperformance is not None and 
-            signal.market_outperformance > 0
+            signal.market_outperformance is not None
+            and signal.market_outperformance > 0
         )
-        
+
         # Check volume is in sweet spot (not extreme pump)
         volume_in_sweet_spot = (
-            self.settings.volume_sweet_spot_min <= 
-            signal.volume_spike_factor <= 
-            self.settings.volume_sweet_spot_max
+            self.settings.volume_sweet_spot_min
+            <= signal.volume_spike_factor
+            <= self.settings.volume_sweet_spot_max
         )
-        
+
         # Strong buy requires ALL key confirmations
-        if (score >= 0.80 and 
-            signal.is_breakout and 
-            outperforming_market and
-            signal.volume_spike_factor >= 3.0 and
-            not extreme_volume and
-            not high_risk):
+        if (
+            score >= 0.80
+            and signal.is_breakout
+            and outperforming_market
+            and signal.volume_spike_factor >= 3.0
+            and not extreme_volume
+            and not high_risk
+        ):
             return "STRONG_BUY"
-        
+
         # Buy requires breakout + outperforming (the two best predictors)
-        elif (score >= 0.72 and 
-              signal.is_breakout and 
-              outperforming_market and
-              signal.volume_spike_factor >= 2.0 and
-              not extreme_volume and
-              not high_risk):
+        elif (
+            score >= 0.72
+            and signal.is_breakout
+            and outperforming_market
+            and signal.volume_spike_factor >= 2.0
+            and not extreme_volume
+            and not high_risk
+        ):
             return "BUY"
-        
+
         # Watch: Has at least one strong predictor
-        elif (score >= 0.62 and 
-              (signal.is_breakout or outperforming_market) and
-              not high_risk):
+        elif (
+            score >= 0.62
+            and (signal.is_breakout or outperforming_market)
+            and not high_risk
+        ):
             return "WATCH"
-        
+
         # Hold: Missing key predictors or high risk
         else:
             return "HOLD"
-    
+
     def _calculate_stop_loss(self, signal: ExplosionSignal) -> float:
         """
         Calculate recommended stop loss level.
-        
+
         Penny stocks are highly volatile - the previous 15% max stop was too tight
         and resulted in 60% of trades hitting stop loss. Now using:
         - ATR-based calculation with 2.5x multiplier (up from 2.0x)
@@ -903,22 +889,22 @@ class AnalysisService:
         atr_multiplier = 2.5
         stop_distance = signal.atr_20 * atr_multiplier
         atr_stop = signal.close_price - stop_distance
-        
+
         # Define boundaries
         min_stop_price = signal.close_price * 0.90  # 10% max loss minimum
         max_stop_price = signal.close_price * 0.75  # 25% max loss maximum
-        
+
         # Clamp the ATR-based stop within reasonable bounds
         # Stop should be between 75% and 90% of entry price
         stop_loss = max(max_stop_price, min(atr_stop, min_stop_price))
-        
+
         return stop_loss
-    
+
     def _calculate_position_size(self, score: float) -> float:
         """Calculate recommended position size (% of capital)."""
         # Scale position size with score
         base_size = self.settings.max_position_size_pct
-        
+
         if score >= 0.90:
             return base_size
         elif score >= 0.80:
@@ -927,23 +913,23 @@ class AnalysisService:
             return base_size * 0.70
         else:
             return base_size * 0.50
-    
+
     def _determine_trend(self, indicators) -> TrendDirection:
         """Determine current trend direction."""
         ema_20 = indicators.ema_20 or 0
         ema_50 = indicators.ema_50 or 0
-        
+
         if ema_20 > ema_50 * 1.02:  # 2% above
             return TrendDirection.BULLISH
         elif ema_20 < ema_50 * 0.98:  # 2% below
             return TrendDirection.BEARISH
         else:
             return TrendDirection.NEUTRAL
-    
+
     def _assess_data_quality(self, market_data: MarketData) -> float:
         """Assess quality of input data (0-1)."""
         score = 0.0
-        
+
         # Data completeness
         if len(market_data.ohlcv_data) >= 100:
             score += 0.4
@@ -951,11 +937,11 @@ class AnalysisService:
             score += 0.3
         else:
             score += 0.2
-        
+
         # Indicator availability
         if market_data.indicators:
             score += 0.3
-        
+
         # Recent data
         if market_data.ohlcv_data:
             latest = market_data.ohlcv_data[-1].timestamp
@@ -971,6 +957,5 @@ class AnalysisService:
                 score += 0.2
             else:
                 score += 0.1
-        
-        return clamp(score, 0.0, 1.0)
 
+        return clamp(score, 0.0, 1.0)

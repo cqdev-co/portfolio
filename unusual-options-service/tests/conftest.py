@@ -25,4 +25,3 @@ def mock_config() -> Dict[str, Any]:
 def sample_ticker() -> str:
     """Sample ticker for testing."""
     return "AAPL"
-

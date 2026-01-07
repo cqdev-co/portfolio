@@ -12,4 +12,3 @@ __author__ = "Your Name"
 from .config import load_config
 
 __all__ = ["load_config", "__version__"]
-

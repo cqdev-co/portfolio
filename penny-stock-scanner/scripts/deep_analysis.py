@@ -9,7 +9,8 @@ load_dotenv()
 
 client = create_client(
     os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY")
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY"),
 )
 
 perf = client.table("penny_signal_performance").select("*").execute().data
@@ -44,7 +45,7 @@ for p in perf:
             bucket = "5-10x"
         else:
             bucket = "10x+"
-        
+
         vol_buckets[bucket]["count"] += 1
         if p.get("is_winner"):
             vol_buckets[bucket]["wins"] += 1
@@ -57,7 +58,9 @@ for bucket in ["1-2x", "2-3x", "3-5x", "5-10x", "10x+"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {bucket}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {bucket}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 2. Combination analysis: Breakout + Higher Lows
 print("\n=== BREAKOUT + HIGHER LOWS COMBINATION ===")
@@ -76,7 +79,7 @@ for p in perf:
     if sig:
         is_breakout = sig.get("is_breakout", False)
         has_hl = sig.get("higher_lows_detected", False)
-        
+
         if is_breakout and has_hl:
             bucket = "both"
         elif is_breakout:
@@ -85,7 +88,7 @@ for p in perf:
             bucket = "hl_only"
         else:
             bucket = "neither"
-        
+
         combo_perf[bucket]["count"] += 1
         if p.get("is_winner"):
             combo_perf[bucket]["wins"] += 1
@@ -96,7 +99,7 @@ labels = {
     "both": "Breakout + Higher Lows",
     "breakout_only": "Breakout Only",
     "hl_only": "Higher Lows Only",
-    "neither": "Neither"
+    "neither": "Neither",
 }
 for name in ["both", "breakout_only", "hl_only", "neither"]:
     d = combo_perf[name]
@@ -104,11 +107,15 @@ for name in ["both", "breakout_only", "hl_only", "neither"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {labels[name]}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {labels[name]}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 3. Look at worst losses to identify patterns
 print("\n=== WORST LOSSES (>20% loss) ===")
-big_losses = [p for p in perf if p.get("status") == "CLOSED" and (p.get("return_pct") or 0) < -20]
+big_losses = [
+    p for p in perf if p.get("status") == "CLOSED" and (p.get("return_pct") or 0) < -20
+]
 for p in sorted(big_losses, key=lambda x: x.get("return_pct", 0)):
     key = (p["symbol"], p.get("entry_date"))
     sig = symbol_signals.get(key)
@@ -116,7 +123,9 @@ for p in sorted(big_losses, key=lambda x: x.get("return_pct", 0)):
     score = sig.get("overall_score", 0) if sig else 0
     vol = sig.get("volume_ratio", 0) if sig else 0
     breakout = sig.get("is_breakout", False) if sig else False
-    print(f"  {p['symbol']}: {p.get('return_pct', 0):.1f}%, Rank: {rank}, Score: {score:.2f}, Vol: {vol:.1f}x, Breakout: {breakout}")
+    print(
+        f"  {p['symbol']}: {p.get('return_pct', 0):.1f}%, Rank: {rank}, Score: {score:.2f}, Vol: {vol:.1f}x, Breakout: {breakout}"
+    )
 
 # 4. Price range analysis
 print("\n=== PERFORMANCE BY PRICE RANGE ===")
@@ -139,7 +148,7 @@ for p in perf:
         bucket = "2to3"
     else:
         bucket = "3to5"
-    
+
     price_buckets[bucket]["count"] += 1
     if p.get("is_winner"):
         price_buckets[bucket]["wins"] += 1
@@ -152,7 +161,9 @@ for bucket in ["sub1", "1to2", "2to3", "3to5"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {d['label']}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {d['label']}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 5. Recommendation performance
 print("\n=== PERFORMANCE BY RECOMMENDATION ===")
@@ -179,7 +190,9 @@ for rec in ["STRONG_BUY", "BUY", "WATCH", "HOLD"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {rec}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {rec}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 6. Score bucket analysis
 print("\n=== PERFORMANCE BY SCORE ===")
@@ -205,7 +218,7 @@ for p in perf:
             bucket = "0.72-0.82"
         else:
             bucket = "0.82+"
-        
+
         score_buckets[bucket]["count"] += 1
         if p.get("is_winner"):
             score_buckets[bucket]["wins"] += 1
@@ -218,7 +231,9 @@ for bucket in ["0.55-0.62", "0.62-0.72", "0.72-0.82", "0.82+"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {bucket}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {bucket}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 7. Market outperformance analysis
 print("\n=== MARKET OUTPERFORMANCE ANALYSIS ===")
@@ -247,7 +262,9 @@ for name in ["outperforming", "underperforming"]:
         continue
     wr = d["wins"] / d["count"] * 100
     avg_ret = sum(d["returns"]) / len(d["returns"]) if d["returns"] else 0
-    print(f"  {name.title()}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%")
+    print(
+        f"  {name.title()}: {d['count']} trades, Win Rate: {wr:.1f}%, Avg Return: {avg_ret:.2f}%"
+    )
 
 # 8. Check for stocks that hit stop loss quickly
 print("\n=== STOP LOSS HITS BY TIME ===")
@@ -257,4 +274,6 @@ for p in stop_loss_trades[:10]:
     key = (p["symbol"], p.get("entry_date"))
     sig = symbol_signals.get(key)
     rank = sig.get("opportunity_rank", "?") if sig else "?"
-    print(f"  {p['symbol']}: {p.get('return_pct', 0):.1f}%, Rank: {rank}, {p.get('entry_date')} -> {p.get('exit_date')}")
+    print(
+        f"  {p['symbol']}: {p.get('return_pct', 0):.1f}%, Rank: {rank}, {p.get('entry_date')} -> {p.get('exit_date')}"
+    )

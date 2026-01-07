@@ -52,7 +52,9 @@ def get_country(symbol: str) -> str | None:
         info = ticker.info
         return info.get("country")
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not get country for {symbol}: {e}[/yellow]")
+        console.print(
+            f"[yellow]Warning: Could not get country for {symbol}: {e}[/yellow]"
+        )
         return None
 
 

@@ -142,8 +142,10 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
       pendingMessageRef.current = initialPrompt;
       clearInitialPrompt();
       // Reset chat - this creates a fresh instance
-
-      setChatKey((prev) => prev + 1);
+      // Use queueMicrotask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setChatKey((prev) => prev + 1);
+      });
     }
   }, [isOpen, initialPrompt, clearInitialPrompt]);
 

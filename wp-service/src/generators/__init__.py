@@ -10,24 +10,24 @@ from .wave import (
     WaveGradientGenerator,
     InterferencePatternGenerator,
     SpiralWaveGenerator,
-    CylindricalWaveGenerator
+    CylindricalWaveGenerator,
 )
 from .organic import (
     OrganicGradientGenerator,
     GlassGradientGenerator,
-    FluidGradientGenerator
+    FluidGradientGenerator,
 )
 
 __all__ = [
-    'LinearGradientGenerator',
-    'RadialGradientGenerator', 
-    'PerlinNoiseGenerator',
-    'FractalGenerator',
-    'WaveGradientGenerator',
-    'InterferencePatternGenerator',
-    'SpiralWaveGenerator',
-    'CylindricalWaveGenerator',
-    'OrganicGradientGenerator',
-    'GlassGradientGenerator',
-    'FluidGradientGenerator'
+    "LinearGradientGenerator",
+    "RadialGradientGenerator",
+    "PerlinNoiseGenerator",
+    "FractalGenerator",
+    "WaveGradientGenerator",
+    "InterferencePatternGenerator",
+    "SpiralWaveGenerator",
+    "CylindricalWaveGenerator",
+    "OrganicGradientGenerator",
+    "GlassGradientGenerator",
+    "FluidGradientGenerator",
 ]
