@@ -13,7 +13,7 @@ apply these filters automatically.
 import os
 import sys
 from pathlib import Path
-from datetime import datetime, date, timezone
+
 from loguru import logger
 
 # Add parent directory to path for imports
@@ -170,7 +170,7 @@ def cleanup_noise(dry_run: bool = False, hard_delete: bool = False) -> dict:
     logger.info(f"\nTotal active signals:     {len(all_signals):,}")
     logger.info(f"Signals to clean up:      {len(all_noise):,}")
     logger.info(f"Signals to keep:          {len(all_signals) - len(all_noise):,}")
-    logger.info(f"\nBreakdown:")
+    logger.info("\nBreakdown:")
     logger.info(f"  - Short DTE (<{MIN_DTE} days):           {len(noise_dte):,}")
     logger.info(f"  - Low premium high-vol (<$3M):   {len(noise_premium_high_vol):,}")
     logger.info(f"  - Low premium normal (<$500K):   {len(noise_premium_normal):,}")
@@ -274,7 +274,7 @@ def main():
     logger.info("=" * 60)
     logger.info("UNUSUAL OPTIONS NOISE CLEANUP")
     logger.info("=" * 60)
-    logger.info(f"\nThresholds:")
+    logger.info("\nThresholds:")
     logger.info(f"  - Minimum DTE: {MIN_DTE} days")
     logger.info(f"  - Min premium (normal): ${PREMIUM_THRESHOLD_NORMAL:,}")
     logger.info(f"  - Min premium (high-vol): ${PREMIUM_THRESHOLD_HIGH_VOL:,}")

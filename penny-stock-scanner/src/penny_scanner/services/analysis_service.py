@@ -1,34 +1,29 @@
 """Analysis service for penny stock explosion signal detection."""
 
 import uuid
-import asyncio
-from datetime import datetime, timezone
-from typing import List, Optional, Dict
-from loguru import logger
-import numpy as np
-import yfinance as yf
+from datetime import UTC, datetime
 
-from penny_scanner.models.market_data import MarketData
+import yfinance as yf
+from loguru import logger
+
+from penny_scanner.config.settings import Settings
+from penny_scanner.core.exceptions import AnalysisError
 from penny_scanner.models.analysis import (
-    ExplosionSignal,
     AnalysisResult,
-    TrendDirection,
+    ExplosionSignal,
     OpportunityRank,
     RiskLevel,
-    SignalStatus,
+    TrendDirection,
 )
-from penny_scanner.utils.technical_indicators import TechnicalIndicatorCalculator
-from penny_scanner.utils.helpers import safe_divide, normalize_score, clamp
-from penny_scanner.core.exceptions import AnalysisError
-from penny_scanner.config.settings import Settings
+from penny_scanner.models.market_data import MarketData
 from penny_scanner.services.market_comparison_service import (
     get_market_comparison_service,
-    MarketComparisonService,
 )
-
+from penny_scanner.utils.helpers import clamp, normalize_score, safe_divide
+from penny_scanner.utils.technical_indicators import TechnicalIndicatorCalculator
 
 # Country info cache to avoid repeated API calls
-_country_cache: Dict[str, Optional[str]] = {}
+_country_cache: dict[str, str | None] = {}
 
 
 class AnalysisService:
@@ -44,7 +39,7 @@ class AnalysisService:
         self.indicator_calculator = TechnicalIndicatorCalculator(settings)
         self.market_comparison = get_market_comparison_service(settings)
 
-    def _get_country(self, symbol: str) -> Optional[str]:
+    def _get_country(self, symbol: str) -> str | None:
         """
         Get country of origin for a stock symbol.
         Uses cache to avoid repeated yfinance API calls.
@@ -65,7 +60,7 @@ class AnalysisService:
             return None
 
     def _check_pump_dump_warning(
-        self, signal: ExplosionSignal, score: float, country: Optional[str]
+        self, signal: ExplosionSignal, score: float, country: str | None
     ) -> bool:
         """
         Check if signal shows pump-and-dump warning signs.
@@ -86,7 +81,7 @@ class AnalysisService:
 
     async def analyze_symbol(
         self, market_data: MarketData, include_ai_analysis: bool = False
-    ) -> Optional[AnalysisResult]:
+    ) -> AnalysisResult | None:
         """
         Analyze a symbol for penny stock explosion signals.
 
@@ -98,7 +93,7 @@ class AnalysisService:
             AnalysisResult if signal detected, None otherwise
         """
         try:
-            start_time = datetime.now(timezone.utc)
+            start_time = datetime.now(UTC)
 
             # Calculate indicators if not present
             if not market_data.indicators:
@@ -156,9 +151,6 @@ class AnalysisService:
             is_high_risk = (
                 country in self.settings.high_risk_countries if country else False
             )
-            is_moderate_risk = (
-                country in self.settings.moderate_risk_countries if country else False
-            )
 
             # Update explosion signal with country info
             explosion_signal.country = country
@@ -201,7 +193,7 @@ class AnalysisService:
 
             # Create analysis result
             analysis_id = str(uuid.uuid4())
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             analysis_result = AnalysisResult(
@@ -223,11 +215,11 @@ class AnalysisService:
 
         except Exception as e:
             logger.error(f"Analysis error for {market_data.symbol}: {e}")
-            raise AnalysisError(f"Failed to analyze {market_data.symbol}: {e}")
+            raise AnalysisError(f"Failed to analyze {market_data.symbol}: {e}") from e
 
     def _detect_explosion_signal(
         self, market_data: MarketData
-    ) -> Optional[ExplosionSignal]:
+    ) -> ExplosionSignal | None:
         """
         Detect penny stock explosion setup signal.
         Focus on volume-driven breakouts from consolidation.
@@ -835,11 +827,6 @@ class AnalysisService:
         )
 
         # Check volume is in sweet spot (not extreme pump)
-        volume_in_sweet_spot = (
-            self.settings.volume_sweet_spot_min
-            <= signal.volume_spike_factor
-            <= self.settings.volume_sweet_spot_max
-        )
 
         # Strong buy requires ALL key confirmations
         if (
@@ -946,7 +933,7 @@ class AnalysisService:
         if market_data.ohlcv_data:
             latest = market_data.ohlcv_data[-1].timestamp
             # Handle timezone-aware/naive datetime comparison
-            current_time = datetime.now(timezone.utc)
+            current_time = datetime.now(UTC)
             if latest.tzinfo is None:
                 # If latest is naive, make current_time naive too
                 current_time = datetime.now()

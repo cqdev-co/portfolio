@@ -8,11 +8,10 @@ Sends formatted alerts for:
 """
 
 import os
-import json
-import asyncio
-from typing import List, Dict, Any, Optional
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
 import aiohttp
 from loguru import logger
 
@@ -24,11 +23,11 @@ class DiscordEmbed:
     title: str
     description: str = ""
     color: int = 0x5865F2  # Discord blurple
-    fields: List[Dict[str, Any]] = None
+    fields: list[dict[str, Any]] = None
     footer: str = ""
     timestamp: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         embed = {
             "title": self.title,
             "color": self.color,
@@ -59,13 +58,13 @@ class DiscordNotifier:
     COLOR_BLUE = 0x3498DB  # Info
     COLOR_PURPLE = 0x9B59B6  # Performance report
 
-    def __init__(self, webhook_url: Optional[str] = None):
+    def __init__(self, webhook_url: str | None = None):
         self.webhook_url = (
             webhook_url
             or os.getenv("DISCORD_UOS_WEBHOOK_URL", "")
             or os.getenv("DISCORD_WEBHOOK_URL", "")
         )
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     @property
     def is_configured(self) -> bool:
@@ -86,7 +85,7 @@ class DiscordNotifier:
     async def send_message(
         self,
         content: str = "",
-        embeds: List[DiscordEmbed] = None,
+        embeds: list[DiscordEmbed] = None,
         username: str = "Options Scanner",
     ) -> bool:
         """
@@ -140,7 +139,7 @@ class DiscordNotifier:
         strike: float,
         dte: int,
         suspicion_score: float,
-        patterns: List[str],
+        patterns: list[str],
         grade: str = "S",
     ) -> bool:
         """
@@ -201,7 +200,7 @@ class DiscordNotifier:
         calls_win_rate: float,
         puts_win_rate: float,
         hedge_pct: float,
-        top_winners: List[Dict[str, Any]] = None,
+        top_winners: list[dict[str, Any]] = None,
     ) -> bool:
         """
         Send weekly performance report.
@@ -275,7 +274,7 @@ class DiscordNotifier:
         new_signals: int,
         high_conviction: int,
         total_premium: float,
-        top_plays: List[Dict[str, Any]] = None,
+        top_plays: list[dict[str, Any]] = None,
     ) -> bool:
         """
         Send end-of-day summary.
@@ -330,7 +329,7 @@ class DiscordNotifier:
 
 
 # Convenience function for quick alerts
-async def send_discord_alert(message: str, webhook_url: Optional[str] = None) -> bool:
+async def send_discord_alert(message: str, webhook_url: str | None = None) -> bool:
     """Quick function to send a simple Discord message."""
     notifier = DiscordNotifier(webhook_url)
     try:

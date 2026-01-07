@@ -1,21 +1,20 @@
 """Main scanner orchestrator for coordinating scans."""
 
 import asyncio
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import Any
+
 from loguru import logger
 
 from ..data.providers.yfinance_provider import get_provider_with_fallback
-from ..data.models import OptionsChain
-from .detector import AnomalyDetector
 from ..scoring.grader import SignalGrader
 from ..storage.models import UnusualOptionsSignal
 from ..utils.tickers import (
     get_liquid_tickers,
-    validate_ticker_symbols,
-    should_block_ticker,
     should_apply_strict_dte_filtering,
+    should_block_ticker,
+    validate_ticker_symbols,
 )
+from .detector import AnomalyDetector
 
 
 class ScanOrchestrator:
@@ -24,7 +23,7 @@ class ScanOrchestrator:
     Manages data fetching, detection, scoring, and result aggregation.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.detector = AnomalyDetector(config)
         self.grader = SignalGrader(config)
@@ -38,7 +37,7 @@ class ScanOrchestrator:
 
     async def scan_ticker(
         self, ticker: str, skip_blocking: bool = False
-    ) -> List[UnusualOptionsSignal]:
+    ) -> list[UnusualOptionsSignal]:
         """
         Scan a single ticker for unusual options activity.
 
@@ -135,8 +134,8 @@ class ScanOrchestrator:
             return []
 
     async def scan_multiple(
-        self, tickers: List[str], max_concurrent: int = 5, skip_blocking: bool = False
-    ) -> List[UnusualOptionsSignal]:
+        self, tickers: list[str], max_concurrent: int = 5, skip_blocking: bool = False
+    ) -> list[UnusualOptionsSignal]:
         """
         Scan multiple tickers with concurrency control.
 
@@ -167,7 +166,7 @@ class ScanOrchestrator:
         # Process in batches to respect rate limits
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def scan_with_semaphore(ticker: str) -> List[UnusualOptionsSignal]:
+        async def scan_with_semaphore(ticker: str) -> list[UnusualOptionsSignal]:
             nonlocal rate_limit_count
             async with semaphore:
                 try:
@@ -228,8 +227,8 @@ class ScanOrchestrator:
         return capped_signals
 
     async def scan_all_tickers(
-        self, min_grade: str = "C", limit: Optional[int] = None
-    ) -> List[UnusualOptionsSignal]:
+        self, min_grade: str = "C", limit: int | None = None
+    ) -> list[UnusualOptionsSignal]:
         """
         Scan all liquid tickers from the database.
 
@@ -266,7 +265,7 @@ class ScanOrchestrator:
         )
         return filtered_signals
 
-    def _group_detections_by_contract(self, detections: List) -> Dict[str, List]:
+    def _group_detections_by_contract(self, detections: list) -> dict[str, list]:
         """Group detections by contract symbol."""
         groups = {}
 
@@ -279,8 +278,8 @@ class ScanOrchestrator:
         return groups
 
     def _apply_ticker_cap(
-        self, signals: List[UnusualOptionsSignal], max_per_ticker: int
-    ) -> List[UnusualOptionsSignal]:
+        self, signals: list[UnusualOptionsSignal], max_per_ticker: int
+    ) -> list[UnusualOptionsSignal]:
         """
         Cap signals per ticker to prevent any single ticker from dominating.
 
@@ -293,7 +292,7 @@ class ScanOrchestrator:
         Returns:
             Filtered list with ticker caps applied
         """
-        ticker_counts: Dict[str, int] = {}
+        ticker_counts: dict[str, int] = {}
         capped_signals = []
 
         for signal in signals:
@@ -312,7 +311,7 @@ class ScanOrchestrator:
         return capped_signals
 
     def _should_process_detections(
-        self, detections: List, underlying_price: float, ticker: str
+        self, detections: list, underlying_price: float, ticker: str
     ) -> bool:
         """
         Pre-filter detections to avoid processing obviously poor signals.
@@ -421,7 +420,7 @@ class ScanOrchestrator:
 
         return True
 
-    async def get_provider_status(self) -> Dict[str, Any]:
+    async def get_provider_status(self) -> dict[str, Any]:
         """Get status information about the data provider."""
         try:
             provider = await self._get_provider()
@@ -440,7 +439,7 @@ class ScanOrchestrator:
 
 
 # Convenience function for simple scans
-async def quick_scan(ticker: str, config: Dict[str, Any]) -> List[UnusualOptionsSignal]:
+async def quick_scan(ticker: str, config: dict[str, Any]) -> list[UnusualOptionsSignal]:
     """
     Quick scan of a single ticker.
 

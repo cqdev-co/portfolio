@@ -1,14 +1,13 @@
 """Data service for fetching market data."""
 
 import asyncio
+
 import yfinance as yf
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 from loguru import logger
 
-from penny_scanner.models.market_data import MarketData, OHLCVData
 from penny_scanner.config.settings import Settings
 from penny_scanner.core.exceptions import DataServiceError
+from penny_scanner.models.market_data import MarketData, OHLCVData
 
 
 class DataService:
@@ -69,11 +68,11 @@ class DataService:
 
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {e}")
-            raise DataServiceError(f"Failed to fetch data for {symbol}: {e}")
+            raise DataServiceError(f"Failed to fetch data for {symbol}: {e}") from e
 
     async def get_multiple_symbols(
-        self, symbols: List[str], period: str = "6mo"
-    ) -> Dict[str, MarketData]:
+        self, symbols: list[str], period: str = "6mo"
+    ) -> dict[str, MarketData]:
         """
         Fetch market data for multiple symbols concurrently.
 
@@ -96,7 +95,7 @@ class DataService:
 
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for symbol, result in zip(batch, batch_results):
+            for symbol, result in zip(batch, batch_results, strict=False):
                 if isinstance(result, Exception):
                     logger.warning(f"Failed to fetch {symbol}: {result}")
                     continue

@@ -66,8 +66,7 @@ def find_config_path() -> Path:
             return p
 
     raise FileNotFoundError(
-        "strategy.config.yaml not found. "
-        "Create it in the repository root."
+        "strategy.config.yaml not found. Create it in the repository root."
     )
 
 
@@ -139,14 +138,10 @@ def validate_entry(
     # --- Momentum ---
     if rsi is not None:
         if rsi < entry["momentum"]["rsi_min"]:
-            failures.append(
-                f"RSI {rsi:.1f} below min {entry['momentum']['rsi_min']}"
-            )
+            failures.append(f"RSI {rsi:.1f} below min {entry['momentum']['rsi_min']}")
             score -= 15
         if rsi > entry["momentum"]["rsi_max"]:
-            failures.append(
-                f"RSI {rsi:.1f} above max {entry['momentum']['rsi_max']}"
-            )
+            failures.append(f"RSI {rsi:.1f} above max {entry['momentum']['rsi_max']}")
             score -= 20
         if (
             entry["momentum"]["rsi_ideal_min"]
@@ -178,8 +173,7 @@ def validate_entry(
             score -= 25
         elif iv > entry["volatility"]["iv_max_pct"]:
             warnings.append(
-                f"IV {iv:.0f}% above preferred max "
-                f"{entry['volatility']['iv_max_pct']}%"
+                f"IV {iv:.0f}% above preferred max {entry['volatility']['iv_max_pct']}%"
             )
             score -= 10
         elif iv <= entry["volatility"]["iv_preferred_max_pct"]:
@@ -204,10 +198,7 @@ def validate_entry(
                 f"{entry['sentiment']['analyst_bullish_min_pct']}%"
             )
             score -= 15
-        elif (
-            analyst_bullish_pct
-            >= entry["sentiment"]["analyst_bullish_preferred"]
-        ):
+        elif analyst_bullish_pct >= entry["sentiment"]["analyst_bullish_preferred"]:
             score += 5  # Strong analyst support
 
     # --- Return on Risk ---
@@ -364,15 +355,16 @@ if __name__ == "__main__":
 
     # Example: Get position sizing
     sizing = get_position_sizing(5000)
-    print(f"\nPosition Sizing for $5,000 account:")
-    print(f"  Max per position: ${sizing.max_position_dollars:.0f} "
-          f"({sizing.max_position_pct}%)")
+    print("\nPosition Sizing for $5,000 account:")
+    print(
+        f"  Max per position: ${sizing.max_position_dollars:.0f} "
+        f"({sizing.max_position_pct}%)"
+    )
     print(f"  Max positions: {sizing.max_positions}")
     print(f"  Max deployed: ${sizing.max_deployed:.0f}")
 
     # Example: Get spread width
     width = get_spread_width(5000)
-    print(f"\nSpread Width for $5,000 account:")
+    print("\nSpread Width for $5,000 account:")
     print(f"  Width: ${width.width}")
     print(f"  Typical debit: ${width.typical_debit}")
-

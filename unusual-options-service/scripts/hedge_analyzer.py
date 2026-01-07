@@ -16,25 +16,23 @@ Usage:
     poetry run python scripts/hedge_analyzer.py --days 7 --exclude-hedges
 """
 
+import asyncio
 import os
 import sys
-import asyncio
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
 from collections import defaultdict
-import statistics
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
 
 console = Console()
 
@@ -108,13 +106,13 @@ class HedgeAnalysis:
     signal: UnusualOptionsSignal
     is_likely_hedge: bool
     hedge_confidence: float
-    hedge_type: Optional[str]
-    hedge_indicators: List[str]
+    hedge_type: str | None
+    hedge_indicators: list[str]
     reasoning: str
 
     # Correlation data
-    correlated_signals: List[UnusualOptionsSignal] = field(default_factory=list)
-    correlation_type: Optional[str] = None
+    correlated_signals: list[UnusualOptionsSignal] = field(default_factory=list)
+    correlation_type: str | None = None
 
 
 class HedgeAnalyzer:
@@ -123,8 +121,8 @@ class HedgeAnalyzer:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
-        self.analyses: Dict[str, HedgeAnalysis] = {}
+        self.signals: list[UnusualOptionsSignal] = []
+        self.analyses: dict[str, HedgeAnalysis] = {}
 
     async def fetch_signals(self, days: int = 7, min_grade: str = "A") -> None:
         """Fetch recent signals from database."""
@@ -143,7 +141,7 @@ class HedgeAnalyzer:
 
     def _is_protective_put(
         self, signal: UnusualOptionsSignal
-    ) -> Tuple[bool, float, List[str], str]:
+    ) -> tuple[bool, float, list[str], str]:
         """
         Detect protective put pattern.
 
@@ -201,7 +199,7 @@ class HedgeAnalyzer:
 
     def _is_index_hedge(
         self, signal: UnusualOptionsSignal
-    ) -> Tuple[bool, float, List[str], str]:
+    ) -> tuple[bool, float, list[str], str]:
         """
         Detect index-level hedging.
 
@@ -247,7 +245,7 @@ class HedgeAnalyzer:
 
     def _is_sector_hedge(
         self, signal: UnusualOptionsSignal
-    ) -> Tuple[bool, float, List[str], str]:
+    ) -> tuple[bool, float, list[str], str]:
         """
         Detect sector-level hedging.
 
@@ -289,7 +287,7 @@ class HedgeAnalyzer:
 
     def _is_far_dated_mega_cap(
         self, signal: UnusualOptionsSignal
-    ) -> Tuple[bool, float, List[str], str]:
+    ) -> tuple[bool, float, list[str], str]:
         """
         Detect far-dated positions in mega-caps.
 
@@ -329,7 +327,7 @@ class HedgeAnalyzer:
 
         return is_hedge, confidence, indicators, reasoning
 
-    def _detect_paired_activity(self) -> Dict[str, List[UnusualOptionsSignal]]:
+    def _detect_paired_activity(self) -> dict[str, list[UnusualOptionsSignal]]:
         """
         Detect paired call/put activity on same ticker.
 
@@ -355,7 +353,7 @@ class HedgeAnalyzer:
 
     def _detect_collar_patterns(
         self,
-    ) -> List[Tuple[UnusualOptionsSignal, UnusualOptionsSignal, float]]:
+    ) -> list[tuple[UnusualOptionsSignal, UnusualOptionsSignal, float]]:
         """
         Detect potential collar patterns (call sell + put buy).
 
@@ -368,7 +366,7 @@ class HedgeAnalyzer:
         for signal in self.signals:
             by_ticker[signal.ticker].append(signal)
 
-        for ticker, signals in by_ticker.items():
+        for _ticker, signals in by_ticker.items():
             calls = [s for s in signals if s.option_type == "call"]
             puts = [s for s in signals if s.option_type == "put"]
 
@@ -429,7 +427,7 @@ class HedgeAnalyzer:
             )
 
             # Mark paired signals
-            for ticker, signals in paired.items():
+            for _ticker, signals in paired.items():
                 for signal in signals:
                     if signal.signal_id in self.analyses:
                         analysis = self.analyses[signal.signal_id]
@@ -493,7 +491,7 @@ class HedgeAnalyzer:
             reasoning=reasoning,
         )
 
-    def get_hedges(self) -> List[HedgeAnalysis]:
+    def get_hedges(self) -> list[HedgeAnalysis]:
         """Get all signals identified as likely hedges."""
         return [
             a
@@ -501,7 +499,7 @@ class HedgeAnalyzer:
             if a.is_likely_hedge or a.hedge_confidence >= 0.5
         ]
 
-    def get_directional(self) -> List[HedgeAnalysis]:
+    def get_directional(self) -> list[HedgeAnalysis]:
         """Get all signals likely to be directional bets."""
         return [
             a

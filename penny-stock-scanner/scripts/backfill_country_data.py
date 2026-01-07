@@ -12,16 +12,15 @@ This script:
 
 import os
 import sys
-from datetime import datetime
 
 # Add parent to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import yfinance as yf
-from supabase import create_client
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
+from supabase import create_client
 
 console = Console()
 
@@ -169,7 +168,7 @@ def main():
     # Country breakdown
     console.print("\n[bold]Country Distribution:[/bold]")
     country_counts: dict[str, int] = {}
-    for symbol, country in country_cache.items():
+    for _symbol, country in country_cache.items():
         key = country or "Unknown"
         country_counts[key] = country_counts.get(key, 0) + 1
 

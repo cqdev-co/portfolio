@@ -12,34 +12,35 @@ Example: $6.5M in ORCL calls 4 days before OpenAI partnership announcement
 Goal: Find these plays BEFORE the news drops, so we can follow the smart money
 """
 
-import os
-import sys
 import asyncio
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Optional, Set
-from dataclasses import dataclass, field
-from collections import defaultdict
+import os
 import statistics
+import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+from typing import Any
+
 import yfinance as yf
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
 
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
-
 console = Console()
 
 # Cache for earnings dates to avoid repeated API calls
-EARNINGS_CACHE: Dict[str, Optional[date]] = {}
+EARNINGS_CACHE: dict[str, date | None] = {}
 
 
-def get_earnings_date(ticker: str) -> Optional[date]:
+def get_earnings_date(ticker: str) -> date | None:
     """Get next earnings date for a ticker using yfinance (with caching)"""
     if ticker in EARNINGS_CACHE:
         return EARNINGS_CACHE[ticker]
@@ -58,7 +59,7 @@ def get_earnings_date(ticker: str) -> Optional[date]:
             elif isinstance(earnings_dates, date):
                 EARNINGS_CACHE[ticker] = earnings_dates
                 return earnings_dates
-    except Exception as e:
+    except Exception:
         # Silently fail - not all tickers have earnings data
         pass
 
@@ -66,7 +67,7 @@ def get_earnings_date(ticker: str) -> Optional[date]:
     return None
 
 
-def days_to_earnings(ticker: str, reference_date: date = None) -> Optional[int]:
+def days_to_earnings(ticker: str, reference_date: date = None) -> int | None:
     """Calculate days until next earnings date"""
     if reference_date is None:
         reference_date = date.today()
@@ -169,13 +170,13 @@ class InsiderPlay:
     """Represents a potential insider-type play with all matched patterns"""
 
     signal: UnusualOptionsSignal
-    play_types: Set[str] = field(
+    play_types: set[str] = field(
         default_factory=set
     )  # All patterns this signal matches
     suspicion_score: float = 0.0  # 0-100, composite from all patterns
     surprise_factor: float = 0.0  # Relative to ticker's normal volume
-    key_metrics: Dict[str, Any] = field(default_factory=dict)
-    why_interesting: List[str] = field(default_factory=list)  # All reasons
+    key_metrics: dict[str, Any] = field(default_factory=dict)
+    why_interesting: list[str] = field(default_factory=list)  # All reasons
     action_recommendation: str = ""
 
     def add_pattern(self, play_type: str, suspicion: float, reason: str):
@@ -190,8 +191,8 @@ class InsiderPlayDetector:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
-        self.plays_by_signal_id: Dict[str, InsiderPlay] = {}  # Deduplicated plays
+        self.signals: list[UnusualOptionsSignal] = []
+        self.plays_by_signal_id: dict[str, InsiderPlay] = {}  # Deduplicated plays
         self.exclude_hedges: bool = False
 
     def _is_likely_hedge(self, signal: UnusualOptionsSignal) -> bool:
@@ -407,7 +408,7 @@ class InsiderPlayDetector:
                         signal.surprise_factor = max(0, min(z_score, 10.0))
                     else:
                         signal.surprise_factor = 1.0
-                except:
+                except Exception:
                     signal.surprise_factor = 1.0
 
     def _get_or_create_play(self, signal: UnusualOptionsSignal) -> InsiderPlay:
@@ -419,7 +420,7 @@ class InsiderPlayDetector:
             self.plays_by_signal_id[signal.signal_id] = play
         return self.plays_by_signal_id[signal.signal_id]
 
-    def detect_large_concentrated_bets(self) -> List[InsiderPlay]:
+    def detect_large_concentrated_bets(self) -> list[InsiderPlay]:
         """
         Detect: Someone puts a LOT of money into a SPECIFIC strike
 
@@ -469,7 +470,7 @@ class InsiderPlayDetector:
 
         return list(self.plays_by_signal_id.values())
 
-    def detect_unusual_dte_premium_combo(self) -> List[InsiderPlay]:
+    def detect_unusual_dte_premium_combo(self) -> list[InsiderPlay]:
         """
         Detect: Large premium + Short DTE = Someone knows something is happening SOON
 
@@ -511,7 +512,7 @@ class InsiderPlayDetector:
 
         return list(self.plays_by_signal_id.values())
 
-    def detect_volume_to_oi_anomalies(self) -> List[InsiderPlay]:
+    def detect_volume_to_oi_anomalies(self) -> list[InsiderPlay]:
         """
         Detect: Volume >> Open Interest = Fresh new positioning (not existing positions trading)
 
@@ -559,7 +560,7 @@ class InsiderPlayDetector:
 
         return list(self.plays_by_signal_id.values())
 
-    def detect_aggressive_buyer_patterns(self) -> List[InsiderPlay]:
+    def detect_aggressive_buyer_patterns(self) -> list[InsiderPlay]:
         """
         Detect: High percentage of aggressive orders (buying the ask, not waiting)
 
@@ -602,7 +603,7 @@ class InsiderPlayDetector:
 
         return list(self.plays_by_signal_id.values())
 
-    def detect_multi_strike_building(self) -> List[InsiderPlay]:
+    def detect_multi_strike_building(self) -> list[InsiderPlay]:
         """
         Detect: Multiple large positions at different strikes in same ticker/direction
         BUT: Filter out mega-caps where this is normal flow
@@ -628,7 +629,7 @@ class InsiderPlayDetector:
 
         # Look for tickers with multiple large positions
         for ticker, positions in ticker_positions.items():
-            for option_type, signals in positions.items():
+            for _option_type, signals in positions.items():
                 if len(signals) < 2:  # Need at least 2 positions
                     continue
 
@@ -666,7 +667,7 @@ class InsiderPlayDetector:
 
         return list(self.plays_by_signal_id.values())
 
-    def detect_earnings_plays(self) -> List[InsiderPlay]:
+    def detect_earnings_plays(self) -> list[InsiderPlay]:
         """
         Detect: Large positioning before earnings
 
@@ -737,7 +738,7 @@ class InsiderPlayDetector:
 
         return f"{action}: {signal.ticker} looking {direction}. Strike ${signal.strike:.0f}, expires {signal.days_to_expiry}d. Premium ${signal.premium_flow / 1_000_000:.1f}M.{surprise_context}"
 
-    def get_filtered_plays(self) -> List[InsiderPlay]:
+    def get_filtered_plays(self) -> list[InsiderPlay]:
         """Get all plays, filtered and sorted by suspicion + surprise factor"""
         plays = list(self.plays_by_signal_id.values())
 
@@ -766,7 +767,7 @@ class InsiderPlayDetector:
         return sorted(plays, key=lambda x: x.composite_score, reverse=True)
 
     def display_insider_plays(
-        self, plays: List[InsiderPlay], title: str, max_rows: int = 20
+        self, plays: list[InsiderPlay], title: str, max_rows: int = 20
     ) -> None:
         """Display insider-type plays (deduplicated)"""
         if not plays:
@@ -823,7 +824,7 @@ class InsiderPlayDetector:
             days_until_earnings = days_to_earnings(play.signal.ticker)
             if days_until_earnings is not None and 0 <= days_until_earnings <= 30:
                 if days_until_earnings == 0:
-                    metrics_items.append(f"📊 Earnings: TODAY")
+                    metrics_items.append("📊 Earnings: TODAY")
                 elif days_until_earnings <= 7:
                     metrics_items.append(f"📊 Earnings: {days_until_earnings}d")
                 else:

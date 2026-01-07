@@ -1,12 +1,11 @@
 """Command-line interface for unusual options scanner."""
 
 import asyncio
-from typing import Optional
 from datetime import date
+
 import click
 from rich.console import Console
 from rich.table import Table
-from loguru import logger
 
 from .config import load_config, setup_logging
 
@@ -16,7 +15,7 @@ console = Console()
 _earnings_cache = {}
 
 
-def get_earnings_date(ticker: str) -> Optional[date]:
+def get_earnings_date(ticker: str) -> date | None:
     """Get next earnings date for a ticker using yfinance (with caching)"""
     if ticker in _earnings_cache:
         return _earnings_cache[ticker]
@@ -44,7 +43,7 @@ def get_earnings_date(ticker: str) -> Optional[date]:
     return None
 
 
-def days_to_earnings(ticker: str, reference_date: date = None) -> Optional[int]:
+def days_to_earnings(ticker: str, reference_date: date = None) -> int | None:
     """Calculate days until next earnings date"""
     if reference_date is None:
         reference_date = date.today()
@@ -104,7 +103,6 @@ def scan(
       unusual-options scan TSLA --min-grade A --store  # High-grade only, save to DB
     """
     import asyncio
-    from .scanner.orchestrator import ScanOrchestrator
 
     config = ctx.obj["config"]
 
@@ -138,7 +136,7 @@ def scan(
 @click.option("--store", is_flag=True, help="Store signals in database")
 @click.pass_context
 def scan_all(
-    ctx: click.Context, limit: Optional[int], min_grade: str, output: str, store: bool
+    ctx: click.Context, limit: int | None, min_grade: str, output: str, store: bool
 ) -> None:
     """Scan entire market for suspicious options activity
 
@@ -153,7 +151,6 @@ def scan_all(
       unusual-options scan-all --limit 500        # Scan first 500 tickers (faster)
     """
     import asyncio
-    from .scanner.orchestrator import ScanOrchestrator
 
     config = ctx.obj["config"]
 
@@ -217,7 +214,7 @@ def status(ctx: click.Context) -> None:
         console.print("✗ Data Provider: [red]Not configured[/red]")
 
     # Check detection thresholds
-    console.print(f"\n[bold]Detection Thresholds:[/bold]")
+    console.print("\n[bold]Detection Thresholds:[/bold]")
     console.print(f"  Volume Multiplier: {config.get('VOLUME_MULTIPLIER_THRESHOLD')}x")
     console.print(f"  OI Change: {config.get('OI_CHANGE_THRESHOLD'):.0%}")
     console.print(f"  Min Premium Flow: ${config.get('MIN_PREMIUM_FLOW'):,.0f}")
@@ -300,8 +297,9 @@ async def _run_scan(
     config: dict, tickers: list, min_grade: str, output: str, store: bool = False
 ) -> None:
     """Execute a scan operation."""
-    from .scanner.orchestrator import ScanOrchestrator
     from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    from .scanner.orchestrator import ScanOrchestrator
 
     orchestrator = ScanOrchestrator(config)
 
@@ -350,17 +348,18 @@ async def _run_scan(
 
 
 async def _run_scan_all(
-    config: dict, limit: Optional[int], min_grade: str, output: str, store: bool = False
+    config: dict, limit: int | None, min_grade: str, output: str, store: bool = False
 ) -> None:
     """Execute a scan-all operation."""
-    from .scanner.orchestrator import ScanOrchestrator
     from rich.progress import (
+        BarColumn,
         Progress,
         SpinnerColumn,
-        TextColumn,
-        BarColumn,
         TaskProgressColumn,
+        TextColumn,
     )
+
+    from .scanner.orchestrator import ScanOrchestrator
 
     orchestrator = ScanOrchestrator(config)
 
@@ -540,7 +539,7 @@ def _display_results_table(signals: list) -> None:
     ]
 
     console.print()
-    console.print(f"[bold]Summary:[/bold]")
+    console.print("[bold]Summary:[/bold]")
     console.print(f"• Total signals: {len(signals)}")
     console.print(f"• Large bets (>$3M): [bold yellow]{len(large_plays)}[/bold yellow]")
     console.print(f"• Urgent plays (≤7 days): [bold red]{len(urgent_plays)}[/bold red]")

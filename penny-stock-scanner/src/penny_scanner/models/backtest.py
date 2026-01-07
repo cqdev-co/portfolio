@@ -1,7 +1,7 @@
 """Backtesting models for penny stock scanner."""
 
 from datetime import datetime
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -10,7 +10,7 @@ class BacktestConfig(BaseModel):
 
     start_date: datetime = Field(description="Backtest start date")
     end_date: datetime = Field(description="Backtest end date")
-    symbols: List[str] = Field(description="Symbols to backtest")
+    symbols: list[str] = Field(description="Symbols to backtest")
     initial_capital: float = Field(default=100000.0, description="Starting capital")
     max_position_size: float = Field(
         default=0.08, description="Max position size as % of capital"
@@ -31,17 +31,17 @@ class Trade(BaseModel):
     symbol: str = Field(description="Stock symbol")
     entry_date: datetime = Field(description="Entry date")
     entry_price: float = Field(description="Entry price")
-    exit_date: Optional[datetime] = Field(None, description="Exit date")
-    exit_price: Optional[float] = Field(None, description="Exit price")
+    exit_date: datetime | None = Field(None, description="Exit date")
+    exit_price: float | None = Field(None, description="Exit price")
     shares: int = Field(description="Number of shares")
     position_size: float = Field(description="Position size ($)")
     signal_score: float = Field(description="Signal score at entry")
     stop_loss: float = Field(description="Stop loss price")
     profit_target: float = Field(description="Profit target price")
-    exit_reason: Optional[str] = Field(None, description="Exit reason")
-    pnl: Optional[float] = Field(None, description="Profit/loss ($)")
-    pnl_pct: Optional[float] = Field(None, description="Profit/loss (%)")
-    days_held: Optional[int] = Field(None, description="Days held")
+    exit_reason: str | None = Field(None, description="Exit reason")
+    pnl: float | None = Field(None, description="Profit/loss ($)")
+    pnl_pct: float | None = Field(None, description="Profit/loss (%)")
+    days_held: int | None = Field(None, description="Days held")
 
 
 class BacktestPerformance(BaseModel):
@@ -58,7 +58,7 @@ class BacktestPerformance(BaseModel):
     worst_trade: float = Field(description="Worst trade return (%)")
 
     profit_factor: float = Field(description="Gross profit / gross loss")
-    sharpe_ratio: Optional[float] = Field(None, description="Sharpe ratio")
+    sharpe_ratio: float | None = Field(None, description="Sharpe ratio")
     max_drawdown: float = Field(description="Maximum drawdown (%)")
 
     average_trade_duration: float = Field(description="Average days per trade")
@@ -72,7 +72,7 @@ class BacktestResult(BaseModel):
 
     backtest_id: str = Field(description="Unique backtest identifier")
     config: BacktestConfig = Field(description="Backtest configuration")
-    trades: List[Trade] = Field(description="All trades executed")
+    trades: list[Trade] = Field(description="All trades executed")
     performance: BacktestPerformance = Field(description="Performance metrics")
     execution_time: float = Field(description="Execution time (seconds)")
     timestamp: datetime = Field(description="Backtest timestamp")

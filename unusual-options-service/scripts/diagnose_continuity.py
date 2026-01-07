@@ -16,17 +16,17 @@ Usage:
 """
 
 import sys
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
 from collections import defaultdict
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 import click
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
 from loguru import logger
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -40,12 +40,12 @@ console = Console()
 class ContinuityDiagnostics:
     """Diagnostic tool for signal continuity tracking."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize diagnostics with config."""
         self.config = config
         self.storage = SupabaseStorage(config)
 
-    def check_duplicates(self) -> Dict[str, Any]:
+    def check_duplicates(self) -> dict[str, Any]:
         """
         Check for duplicate signals that should have been deduplicated.
 
@@ -126,7 +126,7 @@ class ContinuityDiagnostics:
             console.print(f"[red]✗ Error checking duplicates: {e}[/red]")
             return {"duplicates": [], "count": 0, "error": str(e)}
 
-    def check_detection_counts(self) -> Dict[str, Any]:
+    def check_detection_counts(self) -> dict[str, Any]:
         """
         Check if detection counts are incrementing properly.
 
@@ -201,7 +201,7 @@ class ContinuityDiagnostics:
             console.print(f"[red]✗ Error checking detection counts: {e}[/red]")
             return {"re_detected": [], "count": 0, "error": str(e)}
 
-    def check_timestamp_consistency(self) -> Dict[str, Any]:
+    def check_timestamp_consistency(self) -> dict[str, Any]:
         """
         Check for timestamp inconsistencies.
 
@@ -307,7 +307,7 @@ class ContinuityDiagnostics:
             console.print(f"[red]✗ Error checking timestamps: {e}[/red]")
             return {"issues": [], "count": 0, "error": str(e)}
 
-    def check_active_status(self) -> Dict[str, Any]:
+    def check_active_status(self) -> dict[str, Any]:
         """
         Check active vs inactive signal distribution.
 
@@ -414,7 +414,7 @@ class ContinuityDiagnostics:
             console.print(f"[red]✗ Error checking active status: {e}[/red]")
             return {"active_count": 0, "inactive_count": 0, "total": 0, "error": str(e)}
 
-    def check_continuity_history(self, ticker: str = None) -> Dict[str, Any]:
+    def check_continuity_history(self, ticker: str = None) -> dict[str, Any]:
         """
         Check continuity tracking history.
 
@@ -496,7 +496,7 @@ class ContinuityDiagnostics:
             console.print(f"[red]✗ Error checking continuity history: {e}[/red]")
             return {"continuity_records": 0, "error": str(e)}
 
-    def run_full_diagnostics(self, ticker: str = None) -> Dict[str, Any]:
+    def run_full_diagnostics(self, ticker: str = None) -> dict[str, Any]:
         """Run all diagnostic checks."""
         console.print(
             Panel(

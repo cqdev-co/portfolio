@@ -1,10 +1,11 @@
 """Signal grading and scoring system."""
 
-from typing import Dict, List, Any
+from typing import Any
+
 from loguru import logger
 
-from ..storage.models import UnusualOptionsSignal
 from ..scanner.detector import Detection
+from ..storage.models import UnusualOptionsSignal
 
 
 class SignalGrader:
@@ -53,11 +54,11 @@ class SignalGrader:
     HIGH_CONVICTION_PREMIUM = 10_000_000  # $10M = high conviction
     MEDIUM_CONVICTION_PREMIUM = 5_000_000  # $5M = medium conviction
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
 
     def create_signal_from_detections(
-        self, ticker: str, underlying_price: float, detections: List[Detection]
+        self, ticker: str, underlying_price: float, detections: list[Detection]
     ) -> UnusualOptionsSignal:
         """
         Create a signal from multiple detections.
@@ -250,7 +251,7 @@ class SignalGrader:
             else:  # ITM puts
                 return "NEUTRAL"  # Could be protective put
 
-    def _calculate_overall_score(self, detection_metrics: Dict[str, float]) -> float:
+    def _calculate_overall_score(self, detection_metrics: dict[str, float]) -> float:
         """
         Calculate weighted overall score from detection confidences.
 
@@ -334,7 +335,7 @@ class SignalGrader:
         else:
             return "F"
 
-    def _calculate_confidence(self, detections: List[Detection]) -> float:
+    def _calculate_confidence(self, detections: list[Detection]) -> float:
         """Calculate overall confidence from detections."""
         if not detections:
             return 0.0
@@ -372,7 +373,7 @@ class SignalGrader:
         else:  # put
             return "ITM" if strike > underlying_price else "OTM"
 
-    def _assess_basic_risk(self, signal: UnusualOptionsSignal) -> tuple[str, List[str]]:
+    def _assess_basic_risk(self, signal: UnusualOptionsSignal) -> tuple[str, list[str]]:
         """
         Perform basic risk assessment.
 
@@ -442,7 +443,7 @@ class SignalGrader:
         return risk_level, risk_factors
 
     def _apply_risk_adjustment(
-        self, score: float, risk_level: str, risk_factors: List[str]
+        self, score: float, risk_level: str, risk_factors: list[str]
     ) -> float:
         """
         Apply risk-based adjustments to the overall score.
@@ -493,12 +494,12 @@ class SignalGrader:
 class PerformanceTracker:
     """Track signal performance over time."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
 
     def calculate_forward_returns(
         self, entry_price: float, current_price: float, days_elapsed: int
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Calculate forward returns for performance tracking.
 

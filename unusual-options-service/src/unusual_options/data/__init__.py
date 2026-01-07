@@ -1,6 +1,6 @@
 """Data acquisition and management for unusual options scanner."""
 
-from .models import OptionsChain, OptionsContract, HistoricalData
+from .models import HistoricalData, OptionsChain, OptionsContract
 
 __all__ = [
     "OptionsChain",

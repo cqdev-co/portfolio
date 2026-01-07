@@ -14,8 +14,6 @@ import argparse
 import csv
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
 
 
 class SignalAnalyzer:
@@ -27,7 +25,7 @@ class SignalAnalyzer:
         min_confidence: float = 0.70,
         min_days_expiry: int = 10,
         min_premium: float = 500000,
-        grades: List[str] = None,
+        grades: list[str] = None,
     ):
         self.min_score = min_score
         self.min_confidence = min_confidence
@@ -35,13 +33,13 @@ class SignalAnalyzer:
         self.min_premium = min_premium
         self.grades = grades or ["S", "A"]
 
-    def load_signals(self, filepath: str) -> List[Dict]:
+    def load_signals(self, filepath: str) -> list[dict]:
         """Load signals from CSV file."""
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             reader = csv.DictReader(f)
             return list(reader)
 
-    def apply_quality_filter(self, signals: List[Dict]) -> List[Dict]:
+    def apply_quality_filter(self, signals: list[dict]) -> list[dict]:
         """Filter 1: Quality Score."""
         filtered = []
         for signal in signals:
@@ -58,7 +56,7 @@ class SignalAnalyzer:
 
         return filtered
 
-    def apply_time_decay_filter(self, signals: List[Dict]) -> List[Dict]:
+    def apply_time_decay_filter(self, signals: list[dict]) -> list[dict]:
         """Filter 2: Time Decay Protection."""
         filtered = []
         for signal in signals:
@@ -68,7 +66,7 @@ class SignalAnalyzer:
 
         return filtered
 
-    def apply_premium_filter(self, signals: List[Dict]) -> List[Dict]:
+    def apply_premium_filter(self, signals: list[dict]) -> list[dict]:
         """Filter 3: Premium Flow Significance."""
         filtered = []
         for signal in signals:
@@ -80,7 +78,7 @@ class SignalAnalyzer:
 
         return filtered
 
-    def apply_moneyness_filter(self, signals: List[Dict]) -> List[Dict]:
+    def apply_moneyness_filter(self, signals: list[dict]) -> list[dict]:
         """Filter 4: Moneyness Sweet Spot."""
         filtered = []
         acceptable_moneyness = ["ITM", "ATM"]
@@ -92,7 +90,7 @@ class SignalAnalyzer:
 
         return filtered
 
-    def calculate_consistency_score(self, signals: List[Dict]) -> Dict[str, Dict]:
+    def calculate_consistency_score(self, signals: list[dict]) -> dict[str, dict]:
         """Calculate consistency metrics per ticker."""
         ticker_data = defaultdict(
             lambda: {
@@ -124,8 +122,8 @@ class SignalAnalyzer:
         return dict(ticker_data)
 
     def apply_consistency_filter(
-        self, signals: List[Dict]
-    ) -> Tuple[List[Dict], Dict[str, int]]:
+        self, signals: list[dict]
+    ) -> tuple[list[dict], dict[str, int]]:
         """Filter 5: Ticker Consistency."""
         ticker_data = self.calculate_consistency_score(signals)
 
@@ -167,7 +165,7 @@ class SignalAnalyzer:
 
         return filtered, consistency_scores
 
-    def rank_signals(self, signals: List[Dict]) -> List[Tuple[Dict, float]]:
+    def rank_signals(self, signals: list[dict]) -> list[tuple[dict, float]]:
         """Rank signals by composite score."""
         ranked = []
 
@@ -209,7 +207,7 @@ class SignalAnalyzer:
 
         return ranked
 
-    def analyze(self, filepath: str) -> Dict:
+    def analyze(self, filepath: str) -> dict:
         """Run full analysis pipeline."""
         print("=" * 80)
         print("UNUSUAL OPTIONS SIGNAL ANALYSIS - 5-FILTER SYSTEM")
@@ -261,7 +259,7 @@ class SignalAnalyzer:
         }
 
 
-def print_top_plays(results: Dict, top_n: int = 10):
+def print_top_plays(results: dict, top_n: int = 10):
     """Print top N plays in formatted output."""
     signals = results["signals"][:top_n]
     consistency = results["consistency_scores"]
@@ -313,7 +311,7 @@ def print_top_plays(results: Dict, top_n: int = 10):
                     print(f"   📉 Needs {abs(distance):.1f}% move to ${strike}")
 
 
-def print_ticker_summary(results: Dict):
+def print_ticker_summary(results: dict):
     """Print summary by ticker."""
     consistency = results["consistency_scores"]
     signals = results["signals"]
@@ -323,7 +321,7 @@ def print_ticker_summary(results: Dict):
     for signal, rank in signals:
         ticker_groups[signal["ticker"]].append((signal, rank))
 
-    print(f"\n📊 TICKER SUMMARY (Sorted by Consistency)")
+    print("\n📊 TICKER SUMMARY (Sorted by Consistency)")
     print("=" * 80)
 
     # Sort by consistency score
@@ -355,7 +353,7 @@ def print_ticker_summary(results: Dict):
         )
 
         # Show top 2 strikes
-        for signal, rank in signals_list[:2]:
+        for signal, _rank in signals_list[:2]:
             strike = float(signal["strike"])
             exp = signal["expiry"][:10]
             opt_type = signal["option_type"].upper()
@@ -363,13 +361,13 @@ def print_ticker_summary(results: Dict):
             print(f"    → ${strike} {opt_type} exp {exp} (Score: {score:.2f})")
 
 
-def print_strategy_recommendations(results: Dict):
+def print_strategy_recommendations(results: dict):
     """Print strategic recommendations."""
     print("\n💡 STRATEGY RECOMMENDATIONS")
     print("=" * 80)
 
     signals = results["signals"]
-    consistency = results["consistency_scores"]
+    results["consistency_scores"]
 
     # Categorize into tiers
     tier1 = [s for s, r in signals if r >= 80]

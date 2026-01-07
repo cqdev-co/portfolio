@@ -1,8 +1,9 @@
 """Detailed price range analysis and user trade verification."""
 
-from supabase import create_client
 import os
+
 from dotenv import load_dotenv
+from supabase import create_client
 
 load_dotenv()
 client = create_client(
@@ -28,7 +29,7 @@ price_buckets = {
 
 for p in closed:
     price = p.get("entry_price", 0)
-    for bucket, data in price_buckets.items():
+    for _bucket, data in price_buckets.items():
         low, high = data["range"]
         if low <= price < high:
             data["trades"].append(p)

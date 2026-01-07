@@ -11,9 +11,10 @@ Usage:
 
 import os
 import sys
-from datetime import datetime, timezone, timedelta
-from supabase import create_client
+from datetime import UTC, datetime, timedelta
+
 from dotenv import load_dotenv
+from supabase import create_client
 
 # Load environment
 load_dotenv()
@@ -53,12 +54,12 @@ def main():
         print(f"\n📊 Analyzing {len(signals)} recent signals:\n")
 
         issues_found = False
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         for signal in signals:
             ticker = signal["ticker"]
             timestamp_str = signal["detection_timestamp"]
-            signal_id = signal["signal_id"]
+            signal["signal_id"]
 
             # Parse timestamp
             timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))

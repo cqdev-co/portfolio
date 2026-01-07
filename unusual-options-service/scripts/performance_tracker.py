@@ -21,27 +21,28 @@ Usage:
 This creates a feedback loop to understand which signals actually work.
 """
 
-import os
-import sys
 import asyncio
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict
+import os
 import statistics
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from typing import Any
+
 import yfinance as yf
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich import box
 
 console = Console()
 
@@ -50,7 +51,7 @@ WIN_THRESHOLD_1D = 0.01  # 1% for 1-day
 WIN_THRESHOLD_5D = 0.02  # 2% for 5-day
 
 # Cache for price data to avoid repeated API calls
-PRICE_CACHE: Dict[str, Dict[str, float]] = {}
+PRICE_CACHE: dict[str, dict[str, float]] = {}
 
 
 @dataclass
@@ -60,29 +61,29 @@ class SignalPerformance:
     signal: UnusualOptionsSignal
 
     # Prices
-    price_at_detection: Optional[float] = None
-    price_1d_later: Optional[float] = None
-    price_5d_later: Optional[float] = None
-    current_price: Optional[float] = None
+    price_at_detection: float | None = None
+    price_1d_later: float | None = None
+    price_5d_later: float | None = None
+    current_price: float | None = None
 
     # Returns
-    return_1d: Optional[float] = None
-    return_5d: Optional[float] = None
-    return_current: Optional[float] = None
+    return_1d: float | None = None
+    return_5d: float | None = None
+    return_current: float | None = None
 
     # Win/Loss classification
-    win_1d: Optional[bool] = None
-    win_5d: Optional[bool] = None
+    win_1d: bool | None = None
+    win_5d: bool | None = None
 
     # Metadata
     days_since_detection: int = 0
     data_available: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 def get_historical_prices(
     ticker: str, start_date: date, end_date: date
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Get historical prices for a ticker.
 
@@ -115,8 +116,8 @@ def get_historical_prices(
 
 
 def get_trading_day_offset(
-    base_date: date, offset_days: int, prices: Dict[str, float]
-) -> Optional[str]:
+    base_date: date, offset_days: int, prices: dict[str, float]
+) -> str | None:
     """
     Find the trading day that is approximately offset_days after base_date.
 
@@ -140,7 +141,7 @@ def get_trading_day_offset(
 
 
 def calculate_signal_performance(
-    signal: UnusualOptionsSignal, prices: Dict[str, float]
+    signal: UnusualOptionsSignal, prices: dict[str, float]
 ) -> SignalPerformance:
     """Calculate performance metrics for a single signal."""
 
@@ -209,8 +210,8 @@ class PerformanceTracker:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
-        self.performances: List[SignalPerformance] = []
+        self.signals: list[UnusualOptionsSignal] = []
+        self.performances: list[SignalPerformance] = []
 
     async def fetch_signals(self, days: int = 30, min_grade: str = "A") -> None:
         """Fetch signals for performance tracking."""
@@ -270,7 +271,7 @@ class PerformanceTracker:
 
                 progress.advance(task)
 
-    def get_stats_by_grade(self) -> Dict[str, Dict[str, Any]]:
+    def get_stats_by_grade(self) -> dict[str, dict[str, Any]]:
         """Calculate performance statistics by grade."""
 
         by_grade = defaultdict(list)
@@ -300,7 +301,7 @@ class PerformanceTracker:
 
         return stats
 
-    def get_stats_by_type(self) -> Dict[str, Dict[str, Any]]:
+    def get_stats_by_type(self) -> dict[str, dict[str, Any]]:
         """Calculate performance statistics by option type."""
 
         calls = [p for p in self.performances if p.signal.option_type == "call"]
@@ -328,7 +329,7 @@ class PerformanceTracker:
 
         return stats
 
-    def get_top_performers(self, n: int = 10) -> List[SignalPerformance]:
+    def get_top_performers(self, n: int = 10) -> list[SignalPerformance]:
         """Get top N performing signals by 5d return."""
 
         valid = [p for p in self.performances if p.return_5d is not None]
@@ -358,7 +359,7 @@ class PerformanceTracker:
 
         return result[:n]
 
-    def get_worst_performers(self, n: int = 10) -> List[SignalPerformance]:
+    def get_worst_performers(self, n: int = 10) -> list[SignalPerformance]:
         """Get worst N performing signals by 5d return."""
 
         valid = [p for p in self.performances if p.return_5d is not None]

@@ -10,31 +10,29 @@ This script helps identify:
 5. Clustering of similar signals for diversification
 """
 
-import os
-import sys
 import asyncio
-import json
 import math
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple, Set
-from dataclasses import dataclass
-from collections import defaultdict, Counter
+import os
 import statistics
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from unusual_options.config import load_config
-from unusual_options.storage.database import get_storage
-from unusual_options.storage.models import UnusualOptionsSignal
+from rich import box
 
 # Rich for beautiful terminal output
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.text import Text
-from rich import box
+from rich.table import Table
+
+from unusual_options.config import load_config
+from unusual_options.storage.database import get_storage
+from unusual_options.storage.models import UnusualOptionsSignal
 
 console = Console()
 
@@ -56,8 +54,8 @@ class SignalCluster:
     """Cluster of similar signals"""
 
     cluster_id: int
-    signals: List[UnusualOptionsSignal]
-    center_characteristics: Dict[str, Any]
+    signals: list[UnusualOptionsSignal]
+    center_characteristics: dict[str, Any]
     cluster_type: str  # SECTOR, PREMIUM_FLOW, EXPIRY, etc.
     risk_level: str
     recommendation: str
@@ -67,7 +65,7 @@ class SignalCorrelationAnalyzer:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
+        self.signals: list[UnusualOptionsSignal] = []
 
         # Sector mappings (simplified - in production use proper sector data)
         self.sector_map = {
@@ -151,7 +149,7 @@ class SignalCorrelationAnalyzer:
 
         console.print(f"[green]✓ Loaded {len(self.signals)} signals[/green]")
 
-    def calculate_ticker_correlations(self) -> List[CorrelationPair]:
+    def calculate_ticker_correlations(self) -> list[CorrelationPair]:
         """Calculate correlations between tickers based on signal patterns"""
 
         # Group signals by ticker and time windows
@@ -181,11 +179,11 @@ class SignalCorrelationAnalyzer:
 
     def _calculate_pair_correlation(
         self,
-        signals1: List[UnusualOptionsSignal],
-        signals2: List[UnusualOptionsSignal],
+        signals1: list[UnusualOptionsSignal],
+        signals2: list[UnusualOptionsSignal],
         ticker1: str,
         ticker2: str,
-    ) -> Optional[CorrelationPair]:
+    ) -> CorrelationPair | None:
         """Calculate correlation between two tickers' signal patterns"""
 
         # Create time-based signal intensity vectors
@@ -220,7 +218,7 @@ class SignalCorrelationAnalyzer:
 
         try:
             correlation = self._pearson_correlation(values1, values2)
-        except:
+        except Exception:
             return None
 
         # Determine correlation type
@@ -238,7 +236,7 @@ class SignalCorrelationAnalyzer:
             correlation_type=correlation_type,
         )
 
-    def _pearson_correlation(self, x: List[float], y: List[float]) -> float:
+    def _pearson_correlation(self, x: list[float], y: list[float]) -> float:
         """Calculate Pearson correlation coefficient"""
         n = len(x)
         if n < 2:
@@ -248,7 +246,7 @@ class SignalCorrelationAnalyzer:
         sum_y = sum(y)
         sum_x2 = sum(xi * xi for xi in x)
         sum_y2 = sum(yi * yi for yi in y)
-        sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+        sum_xy = sum(xi * yi for xi, yi in zip(x, y, strict=False))
 
         numerator = n * sum_xy - sum_x * sum_y
         denominator = math.sqrt(
@@ -277,7 +275,7 @@ class SignalCorrelationAnalyzer:
         return "GENERAL_MARKET"
 
     def _count_shared_characteristics(
-        self, signals1: List[UnusualOptionsSignal], signals2: List[UnusualOptionsSignal]
+        self, signals1: list[UnusualOptionsSignal], signals2: list[UnusualOptionsSignal]
     ) -> int:
         """Count signals with shared characteristics"""
         shared = 0
@@ -300,7 +298,7 @@ class SignalCorrelationAnalyzer:
 
         return shared
 
-    def identify_signal_clusters(self) -> List[SignalCluster]:
+    def identify_signal_clusters(self) -> list[SignalCluster]:
         """Identify clusters of similar signals"""
 
         clusters = []
@@ -319,7 +317,7 @@ class SignalCorrelationAnalyzer:
 
         return clusters
 
-    def _cluster_by_sector(self) -> List[SignalCluster]:
+    def _cluster_by_sector(self) -> list[SignalCluster]:
         """Cluster signals by sector"""
         sector_signals = defaultdict(list)
 
@@ -375,7 +373,7 @@ class SignalCorrelationAnalyzer:
 
         return clusters
 
-    def _cluster_by_premium_flow(self) -> List[SignalCluster]:
+    def _cluster_by_premium_flow(self) -> list[SignalCluster]:
         """Cluster signals by premium flow size"""
         # Define premium flow tiers
         premium_signals = [
@@ -443,7 +441,7 @@ class SignalCorrelationAnalyzer:
 
         return clusters
 
-    def _cluster_by_expiry_moneyness(self) -> List[SignalCluster]:
+    def _cluster_by_expiry_moneyness(self) -> list[SignalCluster]:
         """Cluster signals by expiry and moneyness patterns"""
         # Group by expiry buckets and moneyness
         expiry_moneyness_signals = defaultdict(list)
@@ -503,7 +501,7 @@ class SignalCorrelationAnalyzer:
 
         return clusters
 
-    def analyze_market_regime(self) -> Dict[str, Any]:
+    def analyze_market_regime(self) -> dict[str, Any]:
         """Analyze current market regime based on options flow patterns"""
 
         # Calculate various regime indicators
@@ -560,7 +558,7 @@ class SignalCorrelationAnalyzer:
             "total_signals": total_signals,
         }
 
-    def display_correlations(self, correlations: List[CorrelationPair]) -> None:
+    def display_correlations(self, correlations: list[CorrelationPair]) -> None:
         """Display ticker correlations"""
 
         table = Table(title="🔗 Ticker Signal Correlations", box=box.ROUNDED)
@@ -594,7 +592,7 @@ class SignalCorrelationAnalyzer:
 
         console.print(table)
 
-    def display_clusters(self, clusters: List[SignalCluster]) -> None:
+    def display_clusters(self, clusters: list[SignalCluster]) -> None:
         """Display signal clusters"""
 
         # Group clusters by type
@@ -640,7 +638,7 @@ class SignalCorrelationAnalyzer:
             console.print(table)
             console.print()
 
-    def display_market_regime(self, regime_analysis: Dict[str, Any]) -> None:
+    def display_market_regime(self, regime_analysis: dict[str, Any]) -> None:
         """Display market regime analysis"""
 
         regime = regime_analysis["regime"]

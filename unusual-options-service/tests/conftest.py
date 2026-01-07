@@ -1,11 +1,12 @@
 """Pytest configuration and fixtures."""
 
+from typing import Any
+
 import pytest
-from typing import Dict, Any
 
 
 @pytest.fixture
-def mock_config() -> Dict[str, Any]:
+def mock_config() -> dict[str, Any]:
     """Mock configuration for testing."""
     return {
         "SUPABASE_URL": "https://test.supabase.co",

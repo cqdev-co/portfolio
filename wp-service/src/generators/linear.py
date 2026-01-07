@@ -3,7 +3,7 @@ Linear gradient generator.
 """
 
 import numpy as np
-from typing import List, Tuple
+
 from ..core.base import BaseGenerator
 
 

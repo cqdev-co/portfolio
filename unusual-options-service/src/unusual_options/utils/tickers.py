@@ -1,9 +1,9 @@
 """Ticker utilities for unusual options scanner."""
 
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 # Add the lib directory to the path so we can import get_tickers
 lib_path = Path(__file__).parent.parent.parent.parent.parent / "lib"
@@ -27,18 +27,18 @@ except ImportError:
 try:
     from utils.get_tickers import (
         get_all_tickers,
+        get_sp500_tickers,
+        get_tech_tickers,
         get_ticker_by_symbol,
         get_tickers_by_exchange,
         get_tickers_by_sector,
         search_tickers,
-        get_sp500_tickers,
-        get_tech_tickers,
     )
-except ImportError as e:
+except ImportError:
     # Fallback if the lib utils are not available
     def get_all_tickers(
-        active_only: bool = True, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        active_only: bool = True, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """Fallback ticker list if database is not available."""
         return [
             {"symbol": "AAPL", "name": "Apple Inc.", "exchange": "NASDAQ"},
@@ -55,7 +55,7 @@ except ImportError as e:
             },
         ]
 
-    def get_ticker_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    def get_ticker_by_symbol(symbol: str) -> dict[str, Any] | None:
         """Fallback single ticker lookup."""
         tickers = get_all_tickers()
         for ticker in tickers:
@@ -64,19 +64,19 @@ except ImportError as e:
         return None
 
     def get_tickers_by_exchange(
-        exchange: str, active_only: bool = True, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        exchange: str, active_only: bool = True, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """Fallback exchange filter."""
         tickers = get_all_tickers()
         return [t for t in tickers if t.get("exchange", "").upper() == exchange.upper()]
 
     def get_tickers_by_sector(
-        sector: str, active_only: bool = True, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        sector: str, active_only: bool = True, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """Fallback sector filter."""
         return get_all_tickers()[:limit] if limit else get_all_tickers()
 
-    def search_tickers(query: str, **kwargs) -> List[Dict[str, Any]]:
+    def search_tickers(query: str, **kwargs) -> list[dict[str, Any]]:
         """Fallback search."""
         tickers = get_all_tickers()
         return [
@@ -86,11 +86,11 @@ except ImportError as e:
             or query.upper() in t["name"].upper()
         ]
 
-    def get_sp500_tickers() -> List[Dict[str, Any]]:
+    def get_sp500_tickers() -> list[dict[str, Any]]:
         """Fallback S&P 500 list."""
         return get_all_tickers()
 
-    def get_tech_tickers(limit: int = 100) -> List[Dict[str, Any]]:
+    def get_tech_tickers(limit: int = 100) -> list[dict[str, Any]]:
         """Fallback tech tickers."""
         return get_all_tickers()
 
@@ -98,8 +98,8 @@ except ImportError as e:
 def get_liquid_tickers(
     min_market_cap: float = 1_000_000_000,
     min_avg_volume: int = 1_000_000,
-    limit: Optional[int] = None,
-) -> List[str]:
+    limit: int | None = None,
+) -> list[str]:
     """
     Get list of liquid, optionable tickers for scanning.
 
@@ -177,7 +177,7 @@ def get_liquid_tickers(
         ]
 
 
-def validate_ticker_symbols(symbols: List[str]) -> List[str]:
+def validate_ticker_symbols(symbols: list[str]) -> list[str]:
     """
     Validate ticker symbols against database.
 
@@ -291,7 +291,7 @@ WATCHLISTS = {
 }
 
 
-def get_watchlist(name: str) -> List[str]:
+def get_watchlist(name: str) -> list[str]:
     """
     Get predefined watchlist by name.
 
@@ -304,7 +304,7 @@ def get_watchlist(name: str) -> List[str]:
     return WATCHLISTS.get(name.lower(), [])
 
 
-def get_available_watchlists() -> List[str]:
+def get_available_watchlists() -> list[str]:
     """Get list of available watchlist names."""
     return list(WATCHLISTS.keys())
 
@@ -322,7 +322,7 @@ def is_meme_stock(ticker: str) -> bool:
     return ticker.upper() in [t.upper() for t in WATCHLISTS.get("meme", [])]
 
 
-def get_high_0dte_activity_tickers() -> List[str]:
+def get_high_0dte_activity_tickers() -> list[str]:
     """
     Get list of tickers known for high 0DTE activity.
 

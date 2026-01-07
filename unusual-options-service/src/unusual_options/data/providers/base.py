@@ -1,19 +1,20 @@
 """Abstract base class for data providers."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
-from ..models import OptionsChain, HistoricalData
+from typing import Any
+
+from ..models import HistoricalData, OptionsChain
 
 
 class DataProvider(ABC):
     """Abstract base class for market data providers."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.name = self.__class__.__name__
 
     @abstractmethod
-    async def get_options_chain(self, ticker: str) -> Optional[OptionsChain]:
+    async def get_options_chain(self, ticker: str) -> OptionsChain | None:
         """
         Get current options chain for ticker.
 
@@ -28,7 +29,7 @@ class DataProvider(ABC):
     @abstractmethod
     async def get_historical_options(
         self, ticker: str, days: int = 20
-    ) -> Optional[HistoricalData]:
+    ) -> HistoricalData | None:
         """
         Get historical options data for lookback analysis.
 
@@ -52,7 +53,7 @@ class DataProvider(ABC):
         pass
 
     @abstractmethod
-    def get_rate_limit_info(self) -> Dict[str, Any]:
+    def get_rate_limit_info(self) -> dict[str, Any]:
         """
         Get rate limit information for this provider.
 

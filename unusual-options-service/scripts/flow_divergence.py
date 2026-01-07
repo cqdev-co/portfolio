@@ -11,25 +11,25 @@ Identifies divergences between:
 These divergences often signal important market turning points or hedging activity.
 """
 
-import os
-import sys
 import asyncio
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple
-from dataclasses import dataclass
-from collections import defaultdict
+import os
 import statistics
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
 
 console = Console()
 
@@ -41,8 +41,8 @@ class FlowDivergence:
     ticker: str
     divergence_type: str
     strength: float  # 0-1 scale
-    call_signals: List[UnusualOptionsSignal]
-    put_signals: List[UnusualOptionsSignal]
+    call_signals: list[UnusualOptionsSignal]
+    put_signals: list[UnusualOptionsSignal]
     call_premium: float
     put_premium: float
     interpretation: str
@@ -53,7 +53,7 @@ class FlowDivergenceAnalyzer:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
+        self.signals: list[UnusualOptionsSignal] = []
 
     async def fetch_signals(self, days: int = 3, min_grade: str = "B") -> None:
         """Fetch recent signals"""
@@ -70,7 +70,7 @@ class FlowDivergenceAnalyzer:
 
         console.print(f"[green]✓ Loaded {len(self.signals)} signals[/green]")
 
-    def analyze_call_put_divergence(self) -> List[FlowDivergence]:
+    def analyze_call_put_divergence(self) -> list[FlowDivergence]:
         """Identify divergence between call and put flow"""
         divergences = []
 
@@ -132,7 +132,7 @@ class FlowDivergenceAnalyzer:
             divergences, key=lambda x: x.strength * x.confidence, reverse=True
         )
 
-    def analyze_size_divergence(self) -> List[Dict[str, Any]]:
+    def analyze_size_divergence(self) -> list[dict[str, Any]]:
         """Identify divergence between large and small premium flows"""
         ticker_flows = defaultdict(lambda: {"large": [], "small": []})
 
@@ -216,7 +216,7 @@ class FlowDivergenceAnalyzer:
             return "SMART MONEY BEARISH vs RETAIL BULLISH - Institutions selling while retail buys (contrarian bearish)"
         return "MIXED"
 
-    def analyze_time_divergence(self) -> List[Dict[str, Any]]:
+    def analyze_time_divergence(self) -> list[dict[str, Any]]:
         """Identify divergence between near-dated and far-dated options"""
         ticker_times = defaultdict(lambda: {"near": [], "far": []})
 
@@ -305,7 +305,7 @@ class FlowDivergenceAnalyzer:
             return "SHORT-TERM BEARISH, LONG-TERM BULLISH - Possible near-term pullback with longer-term optimism"
         return "MIXED"
 
-    def analyze_moneyness_divergence(self) -> List[Dict[str, Any]]:
+    def analyze_moneyness_divergence(self) -> list[dict[str, Any]]:
         """Identify divergence between ITM and OTM positioning"""
         ticker_moneyness = defaultdict(lambda: {"itm": [], "otm": []})
 
@@ -359,7 +359,7 @@ class FlowDivergenceAnalyzer:
         else:
             return "SPECULATIVE POSITIONING - Heavy OTM flow suggests lottery-ticket speculation or cheap hedges"
 
-    def display_call_put_divergence(self, divergences: List[FlowDivergence]) -> None:
+    def display_call_put_divergence(self, divergences: list[FlowDivergence]) -> None:
         """Display call/put divergence analysis"""
         if not divergences:
             console.print("[yellow]No significant call/put divergences found.[/yellow]")
@@ -389,7 +389,7 @@ class FlowDivergenceAnalyzer:
 
         console.print(table)
 
-    def display_size_divergence(self, divergences: List[Dict[str, Any]]) -> None:
+    def display_size_divergence(self, divergences: list[dict[str, Any]]) -> None:
         """Display smart money vs retail divergence"""
         if not divergences:
             console.print("[yellow]No significant size divergences found.[/yellow]")
@@ -418,7 +418,7 @@ class FlowDivergenceAnalyzer:
 
         console.print(table)
 
-    def display_time_divergence(self, divergences: List[Dict[str, Any]]) -> None:
+    def display_time_divergence(self, divergences: list[dict[str, Any]]) -> None:
         """Display near-term vs far-term divergence"""
         if not divergences:
             console.print("[yellow]No significant time divergences found.[/yellow]")
@@ -445,7 +445,7 @@ class FlowDivergenceAnalyzer:
 
         console.print(table)
 
-    def display_moneyness_divergence(self, divergences: List[Dict[str, Any]]) -> None:
+    def display_moneyness_divergence(self, divergences: list[dict[str, Any]]) -> None:
         """Display ITM vs OTM positioning"""
         if not divergences:
             console.print(
@@ -479,7 +479,7 @@ class FlowDivergenceAnalyzer:
         console.print(
             Panel.fit(
                 "[bold blue]🔍 Options Flow Divergence Analysis[/bold blue]\n"
-                f"Identifying unusual patterns in options positioning",
+                "Identifying unusual patterns in options positioning",
                 border_style="blue",
             )
         )

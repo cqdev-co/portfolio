@@ -1,21 +1,21 @@
 """Database storage service for unusual options signals."""
 
-import asyncio
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
-from loguru import logger
 import json
+from datetime import date, datetime, timedelta
+from typing import Any
 
-from supabase import create_client, Client
-from .models import UnusualOptionsSignal, SignalPerformance
+from loguru import logger
+from supabase import Client, create_client
+
+from .models import UnusualOptionsSignal
 
 
 class SupabaseStorage:
     """Supabase storage service for unusual options signals."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
-        self._client: Optional[Client] = None
+        self._client: Client | None = None
 
     def _get_client(self) -> Client:
         """Get or create Supabase client."""
@@ -48,11 +48,11 @@ class SupabaseStorage:
                     logger.info("Connected to Supabase (fallback)")
                 except Exception as e2:
                     logger.error(f"Fallback also failed: {e2}")
-                    raise e
+                    raise e from e2
 
         return self._client
 
-    async def store_signals(self, signals: List[UnusualOptionsSignal]) -> bool:
+    async def store_signals(self, signals: list[UnusualOptionsSignal]) -> bool:
         """
         Store unusual options signals in the database.
 
@@ -160,12 +160,12 @@ class SupabaseStorage:
 
     async def get_signals(
         self,
-        ticker: Optional[str] = None,
-        min_grade: Optional[str] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        ticker: str | None = None,
+        min_grade: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 100,
-    ) -> List[UnusualOptionsSignal]:
+    ) -> list[UnusualOptionsSignal]:
         """
         Retrieve signals from the database.
 
@@ -277,7 +277,7 @@ class SupabaseStorage:
             client = self._get_client()
 
             # Simple query to test connection
-            result = (
+            (
                 client.table("unusual_options_signals")
                 .select("signal_id")
                 .limit(1)
@@ -291,7 +291,7 @@ class SupabaseStorage:
             logger.error(f"Database connection test failed: {e}")
             return False
 
-    async def get_signal_count(self, ticker: Optional[str] = None) -> int:
+    async def get_signal_count(self, ticker: str | None = None) -> int:
         """Get count of signals in database."""
         try:
             client = self._get_client()
@@ -344,6 +344,6 @@ class SupabaseStorage:
 
 
 # Convenience function for getting storage instance
-def get_storage(config: Dict[str, Any]) -> SupabaseStorage:
+def get_storage(config: dict[str, Any]) -> SupabaseStorage:
     """Get storage instance."""
     return SupabaseStorage(config)

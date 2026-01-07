@@ -1,13 +1,13 @@
 """Database service for storing and retrieving penny stock signals."""
 
-from datetime import date, datetime
-from typing import List, Optional, Dict, Any
-from loguru import logger
-from supabase import create_client, Client
+from datetime import date
+from typing import Any
 
-from penny_scanner.models.analysis import AnalysisResult
+from loguru import logger
+from supabase import Client, create_client
+
 from penny_scanner.config.settings import Settings
-from penny_scanner.core.exceptions import DatabaseError
+from penny_scanner.models.analysis import AnalysisResult
 
 
 class DatabaseService:
@@ -16,7 +16,7 @@ class DatabaseService:
     def __init__(self, settings: Settings):
         """Initialize database service."""
         self.settings = settings
-        self.client: Optional[Client] = None
+        self.client: Client | None = None
 
         if settings.is_database_enabled():
             try:
@@ -50,7 +50,7 @@ class DatabaseService:
             signal_data = self._convert_to_db_format(result, scan_date)
 
             # Upsert (insert or update if exists)
-            response = (
+            (
                 self.client.table("penny_stock_signals")
                 .upsert(signal_data, on_conflict="symbol,scan_date")
                 .execute()
@@ -64,7 +64,7 @@ class DatabaseService:
             return False
 
     async def store_signals_batch(
-        self, results: List[AnalysisResult], scan_date: date
+        self, results: list[AnalysisResult], scan_date: date
     ) -> int:
         """
         Store multiple signals in batch.
@@ -104,7 +104,7 @@ class DatabaseService:
             logger.error(f"Error storing signals batch: {e}")
             return 0
 
-    async def get_signals_by_date(self, scan_date: date) -> List[Dict[str, Any]]:
+    async def get_signals_by_date(self, scan_date: date) -> list[dict[str, Any]]:
         """
         Get all signals for a specific date.
 
@@ -135,9 +135,9 @@ class DatabaseService:
     async def get_latest_signals(
         self,
         limit: int = 50,
-        min_score: Optional[float] = None,
-        recommendation: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        min_score: float | None = None,
+        recommendation: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get latest signals with optional filters.
 
@@ -177,7 +177,7 @@ class DatabaseService:
 
     async def get_signal_by_symbol_date(
         self, symbol: str, scan_date: date
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get signal for a specific symbol and date.
 
@@ -208,7 +208,7 @@ class DatabaseService:
             logger.error(f"Error fetching signal for {symbol} on {scan_date}: {e}")
             return None
 
-    async def get_actionable_signals(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_actionable_signals(self, limit: int = 50) -> list[dict[str, Any]]:
         """
         Get actionable signals (high quality, recent).
 
@@ -238,7 +238,7 @@ class DatabaseService:
 
     def _convert_to_db_format(
         self, result: AnalysisResult, scan_date: date
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convert AnalysisResult to database format."""
         signal = result.explosion_signal
 

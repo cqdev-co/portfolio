@@ -1,29 +1,27 @@
 """Command-line interface for the penny stock scanner."""
 
 import asyncio
-from datetime import datetime, date
-from typing import List, Optional
 import json
+from datetime import date, datetime
 
 import typer
-from typer import Typer
-from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
 from loguru import logger
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 from penny_scanner.config.settings import get_settings
-from penny_scanner.services.data_service import DataService
+from penny_scanner.models.analysis import OpportunityRank
 from penny_scanner.services.analysis_service import AnalysisService
-from penny_scanner.services.ticker_service import TickerService
+from penny_scanner.services.data_service import DataService
 from penny_scanner.services.database_service import DatabaseService
-from penny_scanner.services.signal_continuity_service import SignalContinuityService
+from penny_scanner.services.discord_service import PennyDiscordNotifier
 from penny_scanner.services.performance_tracking_service import (
     PerformanceTrackingService,
 )
-from penny_scanner.services.discord_service import PennyDiscordNotifier
-from penny_scanner.models.analysis import OpportunityRank
+from penny_scanner.services.signal_continuity_service import SignalContinuityService
+from penny_scanner.services.ticker_service import TickerService
 
 # Initialize console
 console = Console()
@@ -111,7 +109,7 @@ def get_services():
 @app.command()
 def analyze(
     symbol: str = typer.Argument(..., help="Stock symbol to analyze"),
-    output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)"),
+    output: str | None = typer.Option(None, "--output", help="Output file (JSON)"),
 ) -> None:
     """Analyze a single penny stock for explosion setup signals."""
 
@@ -160,7 +158,7 @@ def batch(
     min_score: float = typer.Option(
         0.60, "--min-score", help="Minimum signal score threshold"
     ),
-    output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)"),
+    output: str | None = typer.Option(None, "--output", help="Output file (JSON)"),
     store: bool = typer.Option(
         True, "--store/--no-store", help="Store results in database"
     ),
@@ -280,10 +278,10 @@ def scan_all(
     min_score: float = typer.Option(
         0.70, "--min-score", help="Minimum signal score threshold"
     ),
-    max_symbols: Optional[int] = typer.Option(
+    max_symbols: int | None = typer.Option(
         None, "--max-symbols", help="Maximum symbols to scan"
     ),
-    output: Optional[str] = typer.Option(None, "--output", help="Output file (JSON)"),
+    output: str | None = typer.Option(None, "--output", help="Output file (JSON)"),
     store: bool = typer.Option(
         True, "--store/--no-store", help="Store results in database"
     ),
@@ -340,9 +338,7 @@ def scan_all(
             )
 
             # Analyze symbols
-            console.print(
-                f"[bold blue]🔬 Analyzing for explosion setups...[/bold blue]"
-            )
+            console.print("[bold blue]🔬 Analyzing for explosion setups...[/bold blue]")
 
             signals = []
             with Progress(
@@ -444,7 +440,7 @@ def scan_all(
 
                     if new_high_quality:
                         console.print(
-                            f"[bold blue]📢 Sending Discord alerts...[/bold blue]"
+                            "[bold blue]📢 Sending Discord alerts...[/bold blue]"
                         )
                         alert_count = await discord_notifier.send_batch_alerts(
                             new_high_quality, min_rank=min_rank
@@ -502,7 +498,7 @@ def scan_all(
                 console.print("[dim]Try lowering the --min-score threshold[/dim]")
 
             # Summary stats
-            console.print(f"\n[bold]📊 Scan Summary:[/bold]")
+            console.print("\n[bold]📊 Scan Summary:[/bold]")
             console.print(f"   Symbols scanned: {len(all_symbols)}")
             console.print(f"   Data retrieved: {len(symbol_data)}")
             console.print(f"   Signals found: {len(signals)}")
@@ -512,7 +508,7 @@ def scan_all(
 
         except Exception as e:
             console.print(f"[red]❌ Error during scan: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
     asyncio.run(_scan_all())
 
@@ -520,13 +516,13 @@ def scan_all(
 @app.command()
 def query(
     limit: int = typer.Option(50, "--limit", help="Maximum signals to return"),
-    min_score: Optional[float] = typer.Option(
+    min_score: float | None = typer.Option(
         None, "--min-score", help="Minimum score filter"
     ),
-    recommendation: Optional[str] = typer.Option(
+    recommendation: str | None = typer.Option(
         None, "--recommendation", help="Filter by recommendation"
     ),
-    scan_date: Optional[str] = typer.Option(
+    scan_date: str | None = typer.Option(
         None, "--date", help="Filter by date (YYYY-MM-DD)"
     ),
 ) -> None:

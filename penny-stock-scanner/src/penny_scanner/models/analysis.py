@@ -1,8 +1,8 @@
 """Analysis models for penny stock scanner - explosion setup detection."""
 
-from datetime import datetime, date
+from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any
+
 from pydantic import BaseModel, Field
 
 
@@ -71,10 +71,8 @@ class ExplosionSignal(BaseModel):
 
     # Price Momentum & Consolidation (30% weight)
     is_consolidating: bool = Field(description="Stock in consolidation phase")
-    consolidation_days: Optional[int] = Field(
-        None, description="Days spent consolidating"
-    )
-    consolidation_range_pct: Optional[float] = Field(
+    consolidation_days: int | None = Field(None, description="Days spent consolidating")
+    consolidation_range_pct: float | None = Field(
         None, description="Price range % during consolidation"
     )
     is_breakout: bool = Field(description="Breaking out of consolidation")
@@ -94,10 +92,10 @@ class ExplosionSignal(BaseModel):
     ema_crossover_signal: bool = Field(description="EMA 20 crossed above EMA 50")
 
     # Relative Strength (15% weight)
-    market_outperformance: Optional[float] = Field(
+    market_outperformance: float | None = Field(
         None, description="Performance vs SPY (%)"
     )
-    sector_outperformance: Optional[float] = Field(
+    sector_outperformance: float | None = Field(
         None, description="Performance vs sector (%)"
     )
     distance_from_52w_low: float = Field(description="% distance from 52-week low")
@@ -105,18 +103,18 @@ class ExplosionSignal(BaseModel):
     breaking_resistance: bool = Field(description="Breaking above key resistance level")
 
     # Risk & Liquidity (5% weight)
-    bid_ask_spread_pct: Optional[float] = Field(
+    bid_ask_spread_pct: float | None = Field(
         None, description="Bid-ask spread as % of price"
     )
-    avg_spread_5d: Optional[float] = Field(None, description="5-day average spread %")
-    float_shares: Optional[int] = Field(None, description="Float shares")
+    avg_spread_5d: float | None = Field(None, description="5-day average spread %")
+    float_shares: int | None = Field(None, description="Float shares")
     is_low_float: bool = Field(default=False, description="Float < 50M shares")
     daily_volatility: float = Field(description="Daily price volatility (ATR-based)")
     atr_20: float = Field(description="20-period ATR")
     pump_dump_risk: RiskLevel = Field(description="Pump-and-dump risk level")
 
     # Country risk (added Dec 2024)
-    country: Optional[str] = Field(None, description="Company country of origin")
+    country: str | None = Field(None, description="Company country of origin")
     is_high_risk_country: bool = Field(
         default=False,
         description="Company from high-risk country (Israel, Malaysia, etc.)",
@@ -169,10 +167,10 @@ class AIAnalysis(BaseModel):
     key_factors: list[str] = Field(description="Key factors identified")
     risk_assessment: str = Field(description="AI risk assessment")
     suggested_action: str = Field(description="Suggested trading action")
-    invalidation_level: Optional[float] = Field(
+    invalidation_level: float | None = Field(
         None, description="Price level that invalidates signal"
     )
-    target_levels: Optional[list[float]] = Field(
+    target_levels: list[float] | None = Field(
         None, description="Potential price targets"
     )
 
@@ -188,7 +186,7 @@ class AnalysisResult(BaseModel):
     explosion_signal: ExplosionSignal = Field(description="Explosion setup signal")
 
     # Optional AI analysis
-    ai_analysis: Optional[AIAnalysis] = Field(None, description="AI-powered analysis")
+    ai_analysis: AIAnalysis | None = Field(None, description="AI-powered analysis")
 
     # Overall assessment
     overall_score: float = Field(description="Overall signal score (0-1.0)")
@@ -196,11 +194,11 @@ class AnalysisResult(BaseModel):
     recommendation: str = Field(description="Trading recommendation")
 
     # Risk management
-    stop_loss_level: Optional[float] = Field(
+    stop_loss_level: float | None = Field(
         None, description="Recommended stop loss price"
     )
     position_size_pct: float = Field(description="Recommended position size (%)")
-    risk_reward_ratio: Optional[float] = Field(
+    risk_reward_ratio: float | None = Field(
         None, description="Estimated risk/reward ratio"
     )
 

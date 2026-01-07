@@ -2,11 +2,10 @@
 
 import numpy as np
 import pandas as pd
-from typing import List, Optional, Tuple
 from loguru import logger
 
-from penny_scanner.models.market_data import MarketData, OHLCVData, TechnicalIndicators
 from penny_scanner.config.settings import Settings
+from penny_scanner.models.market_data import MarketData, OHLCVData, TechnicalIndicators
 from penny_scanner.utils.helpers import safe_divide
 
 
@@ -51,7 +50,7 @@ class TechnicalIndicatorCalculator:
 
         return market_data
 
-    def _to_dataframe(self, ohlcv_data: List[OHLCVData]) -> pd.DataFrame:
+    def _to_dataframe(self, ohlcv_data: list[OHLCVData]) -> pd.DataFrame:
         """Convert OHLCV data to pandas DataFrame."""
         data = {
             "timestamp": [d.timestamp for d in ohlcv_data],
@@ -158,7 +157,7 @@ class TechnicalIndicatorCalculator:
 
         return df
 
-    def _from_dataframe(self, df: pd.DataFrame) -> List[TechnicalIndicators]:
+    def _from_dataframe(self, df: pd.DataFrame) -> list[TechnicalIndicators]:
         """Convert DataFrame back to TechnicalIndicators objects."""
         indicators = []
 
@@ -187,8 +186,8 @@ class TechnicalIndicatorCalculator:
     # Advanced Penny Stock Specific Calculations
 
     def detect_consolidation(
-        self, ohlcv_data: List[OHLCVData], lookback_days: Optional[int] = None
-    ) -> Tuple[bool, int, float]:
+        self, ohlcv_data: list[OHLCVData], lookback_days: int | None = None
+    ) -> tuple[bool, int, float]:
         """
         Detect if stock is in consolidation phase.
 
@@ -223,7 +222,7 @@ class TechnicalIndicatorCalculator:
         return is_consolidating, len(recent_data), range_pct
 
     def detect_higher_lows(
-        self, ohlcv_data: List[OHLCVData], lookback_days: int = 10
+        self, ohlcv_data: list[OHLCVData], lookback_days: int = 10
     ) -> bool:
         """
         Detect if stock is forming higher lows (accumulation pattern).
@@ -259,7 +258,7 @@ class TechnicalIndicatorCalculator:
         return True
 
     def calculate_volume_acceleration(
-        self, ohlcv_data: List[OHLCVData], periods: List[int] = [2, 5]
+        self, ohlcv_data: list[OHLCVData], periods: list[int] = None
     ) -> dict:
         """
         Calculate volume acceleration over different periods.
@@ -271,6 +270,8 @@ class TechnicalIndicatorCalculator:
         Returns:
             Dict with acceleration values for each period
         """
+        if periods is None:
+            periods = [2, 5]
         result = {}
 
         for period in periods:
@@ -297,7 +298,7 @@ class TechnicalIndicatorCalculator:
         return result
 
     def count_consecutive_green_days(
-        self, ohlcv_data: List[OHLCVData], max_lookback: int = 10
+        self, ohlcv_data: list[OHLCVData], max_lookback: int = 10
     ) -> int:
         """
         Count consecutive days where close > open.
@@ -323,7 +324,7 @@ class TechnicalIndicatorCalculator:
 
     def calculate_volume_consistency(
         self,
-        ohlcv_data: List[OHLCVData],
+        ohlcv_data: list[OHLCVData],
         lookback_days: int = 5,
         threshold_multiplier: float = 1.5,
     ) -> float:

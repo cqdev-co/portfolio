@@ -11,26 +11,25 @@ Tracks changes in unusual options activity over time to identify:
 Useful for timing entries and exits based on flow patterns.
 """
 
-import os
-import sys
 import asyncio
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Tuple
-from dataclasses import dataclass
-from collections import defaultdict
+import os
 import statistics
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
-from rich.progress import track
 
 console = Console()
 
@@ -54,7 +53,7 @@ class MomentumTracker:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals_by_day: Dict[date, List[UnusualOptionsSignal]] = {}
+        self.signals_by_day: dict[date, list[UnusualOptionsSignal]] = {}
 
     async def fetch_multi_day_signals(
         self, days: int = 7, min_grade: str = "C"
@@ -80,7 +79,7 @@ class MomentumTracker:
             f"[green]✓ Loaded {len(all_signals)} signals across {len(self.signals_by_day)} days[/green]"
         )
 
-    def calculate_daily_scores(self) -> Dict[str, Dict[date, float]]:
+    def calculate_daily_scores(self) -> dict[str, dict[date, float]]:
         """Calculate daily activity scores for each ticker"""
         ticker_daily_scores = defaultdict(dict)
 
@@ -105,8 +104,8 @@ class MomentumTracker:
         return ticker_daily_scores
 
     def identify_momentum_patterns(
-        self, ticker_daily_scores: Dict[str, Dict[date, float]]
-    ) -> List[MomentumPattern]:
+        self, ticker_daily_scores: dict[str, dict[date, float]]
+    ) -> list[MomentumPattern]:
         """Identify momentum and reversal patterns"""
         patterns = []
 
@@ -177,10 +176,10 @@ class MomentumTracker:
     def _classify_momentum(
         self,
         ticker: str,
-        ticker_days: List[date],
-        daily_scores: Dict[date, float],
+        ticker_days: list[date],
+        daily_scores: dict[date, float],
         momentum_change: float,
-    ) -> Tuple[str, str, float]:
+    ) -> tuple[str, str, float]:
         """Classify the momentum pattern"""
 
         scores = [daily_scores[day] for day in ticker_days]
@@ -224,7 +223,7 @@ class MomentumTracker:
 
         return (None, None, 0)
 
-    def identify_reversals(self) -> List[Dict[str, Any]]:
+    def identify_reversals(self) -> list[dict[str, Any]]:
         """Identify directional reversals (calls to puts or vice versa)"""
         reversals = []
 
@@ -307,7 +306,7 @@ class MomentumTracker:
 
         return sorted(reversals, key=lambda x: x["shift_magnitude"], reverse=True)
 
-    def display_momentum_patterns(self, patterns: List[MomentumPattern]) -> None:
+    def display_momentum_patterns(self, patterns: list[MomentumPattern]) -> None:
         """Display momentum patterns"""
         if not patterns:
             console.print("[yellow]No significant momentum patterns found.[/yellow]")
@@ -330,7 +329,7 @@ class MomentumTracker:
                 "DECREASING": "yellow",
                 "SUSTAINED": "blue",
             }
-            color = type_colors.get(pattern_type, "white")
+            type_colors.get(pattern_type, "white")
 
             table = Table(title=f"📈 {pattern_type} Momentum", box=box.ROUNDED)
             table.add_column("Ticker", style="cyan")
@@ -355,7 +354,7 @@ class MomentumTracker:
             console.print(table)
             console.print()
 
-    def display_reversals(self, reversals: List[Dict[str, Any]]) -> None:
+    def display_reversals(self, reversals: list[dict[str, Any]]) -> None:
         """Display directional reversals"""
         if not reversals:
             console.print("[yellow]No significant reversals found.[/yellow]")

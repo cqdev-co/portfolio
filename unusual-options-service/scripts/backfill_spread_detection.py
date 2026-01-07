@@ -9,15 +9,15 @@ Usage:
     poetry run python scripts/backfill_spread_detection.py [--dry-run] [--limit N]
 """
 
-import asyncio
 import argparse
-from collections import defaultdict
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Tuple, Optional
+import asyncio
 import os
 import sys
-from loguru import logger
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 from dotenv import load_dotenv
+from loguru import logger
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,8 +25,9 @@ load_dotenv()
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from supabase import create_client
-from src.unusual_options.scanner.spread_detector import SpreadDetector
+from supabase import create_client  # noqa: E402
+
+from src.unusual_options.scanner.spread_detector import SpreadDetector  # noqa: E402
 
 
 class SimpleContract:
@@ -64,7 +65,7 @@ class SimpleDetection:
 
 
 async def backfill_spread_detection(
-    dry_run: bool = False, limit: Optional[int] = None, days_back: int = 30
+    dry_run: bool = False, limit: int | None = None, days_back: int = 30
 ):
     """
     Backfill spread detection for existing signals.

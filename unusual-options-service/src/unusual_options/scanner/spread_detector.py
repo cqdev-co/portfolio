@@ -5,9 +5,9 @@ Detects vertical spreads, calendar spreads, and other multi-leg strategies
 with conservative confidence thresholds to minimize false positives.
 """
 
-from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass
 from datetime import date, datetime
+
 from loguru import logger
 
 from ..data.models import OptionsContract
@@ -19,12 +19,12 @@ class SpreadAnalysis:
 
     is_likely_spread: bool
     spread_confidence: float
-    spread_type: Optional[str]
-    matched_contracts: List[str]  # Contract symbols
-    strike_width: Optional[float]
-    net_premium: Optional[float]
+    spread_type: str | None
+    matched_contracts: list[str]  # Contract symbols
+    strike_width: float | None
+    net_premium: float | None
     reasoning: str
-    detection_indicators: List[str]
+    detection_indicators: list[str]
 
 
 @dataclass
@@ -33,7 +33,7 @@ class Detection:
 
     detection_type: str
     contract: OptionsContract
-    metrics: Dict
+    metrics: dict
     confidence: float
     timestamp: datetime
 
@@ -54,7 +54,7 @@ class SpreadDetector:
     - Validate over time before using for filtering
     """
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: dict | None = None):
         """Initialize spread detector with conservative config."""
         self.config = config or {}
 
@@ -73,8 +73,8 @@ class SpreadDetector:
         self.moderate_oi_ratio = (0.50, 2.00)
 
     def analyze_all_signals(
-        self, detections: List[Detection]
-    ) -> Dict[str, SpreadAnalysis]:
+        self, detections: list[Detection]
+    ) -> dict[str, SpreadAnalysis]:
         """
         Analyze all signals for spread patterns.
 
@@ -84,7 +84,7 @@ class SpreadDetector:
         analyses = {}
 
         # Group by ticker and expiry for vertical spread detection
-        by_ticker_expiry = self._group_by_ticker_expiry(detections)
+        self._group_by_ticker_expiry(detections)
 
         # Check each signal against others for patterns
         for detection in detections:
@@ -127,8 +127,8 @@ class SpreadDetector:
         return analyses
 
     def _find_matching_contracts(
-        self, contract: OptionsContract, all_detections: List[Detection]
-    ) -> List[OptionsContract]:
+        self, contract: OptionsContract, all_detections: list[Detection]
+    ) -> list[OptionsContract]:
         """
         Find contracts that could form a spread with given contract.
 
@@ -175,7 +175,7 @@ class SpreadDetector:
         return matches
 
     def _calculate_spread_confidence(
-        self, contract: OptionsContract, matches: List[OptionsContract]
+        self, contract: OptionsContract, matches: list[OptionsContract]
     ) -> SpreadAnalysis:
         """
         Calculate confidence that this contract is part of a spread.
@@ -322,8 +322,8 @@ class SpreadDetector:
         )
 
     def _group_by_ticker_expiry(
-        self, detections: List[Detection]
-    ) -> Dict[Tuple[str, date, str], List[Detection]]:
+        self, detections: list[Detection]
+    ) -> dict[tuple[str, date, str], list[Detection]]:
         """Group detections by ticker, expiry, and option type."""
         grouped = {}
 
@@ -342,15 +342,15 @@ class SpreadDetector:
 
         return grouped
 
-    def _in_range(self, value: float, bounds: Tuple[float, float]) -> bool:
+    def _in_range(self, value: float, bounds: tuple[float, float]) -> bool:
         """Check if value is within bounds."""
         return bounds[0] <= value <= bounds[1]
 
 
 # Helper function for integration
 def enrich_detections_with_spread_analysis(
-    detections: List[Detection], config: Optional[Dict] = None
-) -> Tuple[List[Detection], Dict[str, SpreadAnalysis]]:
+    detections: list[Detection], config: dict | None = None
+) -> tuple[list[Detection], dict[str, SpreadAnalysis]]:
     """
     Convenience function to analyze detections for spreads.
 

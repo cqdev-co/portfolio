@@ -7,10 +7,10 @@ model training, and backtesting.
 """
 
 from .common_filters import is_cfd_ticker
-from .constants import *
+from .constants import *  # noqa: F403
 from .db_utils import store_tickers
 
 __all__ = [
-    'is_cfd_ticker',
-    'store_tickers',
+    "is_cfd_ticker",
+    "store_tickers",
 ]

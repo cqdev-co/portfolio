@@ -1,15 +1,15 @@
 """Anomaly detection algorithms for unusual options activity."""
 
-from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 from loguru import logger
 
-from ..data.models import OptionsChain, OptionsContract, HistoricalData
+from ..data.models import HistoricalData, OptionsChain, OptionsContract
 from .spread_detector import (
-    SpreadDetector,
     SpreadAnalysis,
-    enrich_detections_with_spread_analysis,
+    SpreadDetector,
 )
 
 
@@ -19,12 +19,12 @@ class Detection:
 
     detection_type: str  # VOLUME_ANOMALY, OI_SPIKE, PREMIUM_FLOW, etc.
     contract: OptionsContract
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     confidence: float
     timestamp: datetime
 
     # Spread detection metadata (added in Phase 1)
-    spread_analysis: Optional[SpreadAnalysis] = field(default=None)
+    spread_analysis: SpreadAnalysis | None = field(default=None)
 
 
 class AnomalyDetector:
@@ -63,7 +63,7 @@ class AnomalyDetector:
     PREMIUM_THRESHOLD_HIGH_VOL = 5_000_000  # $5M for high-volume tickers
     PREMIUM_THRESHOLD_NORMAL = 1_000_000  # $1M for normal tickers
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.volume_threshold = config.get("VOLUME_MULTIPLIER_THRESHOLD", 5.0)
         self.oi_change_threshold = config.get("OI_CHANGE_THRESHOLD", 0.30)
@@ -90,8 +90,8 @@ class AnomalyDetector:
     def detect_anomalies(
         self,
         options_chain: OptionsChain,
-        historical_data: Optional[HistoricalData] = None,
-    ) -> List[Detection]:
+        historical_data: HistoricalData | None = None,
+    ) -> list[Detection]:
         """
         Run all detection algorithms on options chain.
 
@@ -149,8 +149,8 @@ class AnomalyDetector:
         return detections
 
     def _enrich_with_spread_analysis(
-        self, detections: List[Detection]
-    ) -> List[Detection]:
+        self, detections: list[Detection]
+    ) -> list[Detection]:
         """
         Analyze detections for spread patterns and enrich with metadata.
 
@@ -176,8 +176,8 @@ class AnomalyDetector:
         return detections
 
     def _detect_volume_anomaly(
-        self, contract: OptionsContract, historical: Optional[HistoricalData]
-    ) -> Optional[Detection]:
+        self, contract: OptionsContract, historical: HistoricalData | None
+    ) -> Detection | None:
         """Detect unusual volume vs historical average."""
 
         current_volume = contract.volume
@@ -202,7 +202,7 @@ class AnomalyDetector:
                         "heuristic": True,
                     },
                     confidence=confidence,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
             return None
 
@@ -228,14 +228,14 @@ class AnomalyDetector:
                     "heuristic": False,
                 },
                 confidence=confidence,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
         return None
 
     def _detect_oi_spike(
-        self, contract: OptionsContract, historical: Optional[HistoricalData]
-    ) -> Optional[Detection]:
+        self, contract: OptionsContract, historical: HistoricalData | None
+    ) -> Detection | None:
         """Detect significant open interest changes."""
 
         current_oi = contract.open_interest
@@ -258,7 +258,7 @@ class AnomalyDetector:
                         "heuristic": True,
                     },
                     confidence=confidence,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
             return None
 
@@ -284,14 +284,14 @@ class AnomalyDetector:
                     "heuristic": False,
                 },
                 confidence=confidence,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
         return None
 
     def _detect_premium_flow(
         self, contract: OptionsContract, ticker: str = ""
-    ) -> Optional[Detection]:
+    ) -> Detection | None:
         """
         Detect large premium expenditures.
 
@@ -349,10 +349,10 @@ class AnomalyDetector:
                 "is_high_volume_ticker": ticker.upper() in self.HIGH_VOLUME_TICKERS,
             },
             confidence=confidence,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
-    def _detect_unusual_spread(self, contract: OptionsContract) -> Optional[Detection]:
+    def _detect_unusual_spread(self, contract: OptionsContract) -> Detection | None:
         """Detect unusual bid-ask spread activity."""
 
         if contract.bid <= 0 or contract.ask <= 0:
@@ -382,14 +382,12 @@ class AnomalyDetector:
                     "mid_price": mid_price,
                 },
                 confidence=confidence,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
         return None
 
-    def _detect_pc_ratio_anomaly(
-        self, options_chain: OptionsChain
-    ) -> Optional[Detection]:
+    def _detect_pc_ratio_anomaly(self, options_chain: OptionsChain) -> Detection | None:
         """Detect unusual put/call ratio for the entire chain."""
 
         calls = options_chain.get_calls()
@@ -430,5 +428,5 @@ class AnomalyDetector:
                 "total_volume": call_volume + put_volume,
             },
             confidence=confidence,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )

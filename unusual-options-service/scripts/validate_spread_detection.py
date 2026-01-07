@@ -17,22 +17,22 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from loguru import logger
+
 import yfinance as yf
 from dotenv import load_dotenv
+from loguru import logger
 
 # Load environment variables from .env file
 load_dotenv()
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from supabase import create_client
+from supabase import create_client  # noqa: E402
 
 
 def get_price_change(
     ticker: str, start_date: datetime, days_forward: int = 5
-) -> Optional[float]:
+) -> float | None:
     """Get price change percentage over period."""
     try:
         end_date = start_date + timedelta(days=days_forward + 2)
@@ -97,7 +97,7 @@ async def validate_spread_detection(days_back: int = 14):
         return
 
     # Categorize signals
-    high_conf_spreads = [s for s in signals if s.get("is_likely_spread") == True]
+    high_conf_spreads = [s for s in signals if s.get("is_likely_spread")]
     medium_conf_spreads = [
         s
         for s in signals
@@ -115,7 +115,7 @@ async def validate_spread_detection(days_back: int = 14):
     # Analyze price movements
     logger.info("\nAnalyzing price movements...")
 
-    def analyze_category(signals_list: List, category_name: str):
+    def analyze_category(signals_list: list, category_name: str):
         """Analyze price movements for a category."""
         movements = []
 
@@ -157,9 +157,7 @@ async def validate_spread_detection(days_back: int = 14):
     high_conf_stats = analyze_category(
         high_conf_spreads, "High-Confidence Spreads (≥80%)"
     )
-    medium_conf_stats = analyze_category(
-        medium_conf_spreads, "Medium-Confidence Spreads (60-79%)"
-    )
+    analyze_category(medium_conf_spreads, "Medium-Confidence Spreads (60-79%)")
     directional_stats = analyze_category(
         directional_signals, "Directional Signals (<60%)"
     )

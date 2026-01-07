@@ -11,38 +11,35 @@ based on:
 5. Monte Carlo simulations for risk assessment
 """
 
-import os
-import sys
 import asyncio
-import json
-import math
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass
-from collections import defaultdict
-import statistics
+import os
 import random
+import statistics
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from unusual_options.config import load_config
-from unusual_options.storage.database import get_storage
-from unusual_options.storage.models import UnusualOptionsSignal
+from rich import box
 
 # Rich for beautiful terminal output
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
-    BarColumn,
-    MofNCompleteColumn,
 )
-from rich.text import Text
-from rich import box
+from rich.table import Table
+
+from unusual_options.config import load_config
+from unusual_options.storage.database import get_storage
+from unusual_options.storage.models import UnusualOptionsSignal
 
 console = Console()
 
@@ -72,7 +69,7 @@ class PositionSizing:
     risk_adjusted_size: float
     confidence_score: float
     rationale: str
-    warnings: List[str]
+    warnings: list[str]
 
 
 class TradeSizingCalculator:
@@ -80,7 +77,7 @@ class TradeSizingCalculator:
         self.config = load_config()
         self.storage = get_storage(self.config)
         self.params = trading_params
-        self.signals: List[UnusualOptionsSignal] = []
+        self.signals: list[UnusualOptionsSignal] = []
 
         # Historical performance data (would be loaded from database in production)
         self.historical_performance = {
@@ -177,7 +174,7 @@ class TradeSizingCalculator:
 
     def estimate_option_pricing(
         self, signal: UnusualOptionsSignal
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Estimate option entry price and potential target"""
         # Simplified option pricing estimation
         # In production, use Black-Scholes or market data
@@ -297,8 +294,8 @@ class TradeSizingCalculator:
         )
 
     def run_monte_carlo_simulation(
-        self, positions: List[PositionSizing], num_simulations: int = 1000
-    ) -> Dict[str, Any]:
+        self, positions: list[PositionSizing], num_simulations: int = 1000
+    ) -> dict[str, Any]:
         """Run Monte Carlo simulation on portfolio of positions"""
 
         console.print(
@@ -316,7 +313,7 @@ class TradeSizingCalculator:
         ) as progress:
             task = progress.add_task("Simulating...", total=num_simulations)
 
-            for i in range(num_simulations):
+            for _i in range(num_simulations):
                 portfolio_return = 0
 
                 for position in positions:
@@ -364,7 +361,7 @@ class TradeSizingCalculator:
             else 0,
         }
 
-    def display_position_recommendations(self, positions: List[PositionSizing]) -> None:
+    def display_position_recommendations(self, positions: list[PositionSizing]) -> None:
         """Display position sizing recommendations"""
 
         table = Table(title="📊 Position Sizing Recommendations", box=box.ROUNDED)
@@ -428,7 +425,7 @@ class TradeSizingCalculator:
             )
         )
 
-    def display_monte_carlo_results(self, mc_results: Dict[str, Any]) -> None:
+    def display_monte_carlo_results(self, mc_results: dict[str, Any]) -> None:
         """Display Monte Carlo simulation results"""
 
         table = Table(title="🎲 Monte Carlo Simulation Results", box=box.ROUNDED)

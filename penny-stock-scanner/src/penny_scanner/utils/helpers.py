@@ -1,7 +1,5 @@
 """Helper utility functions for penny stock scanner."""
 
-from typing import Optional
-
 
 def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
     """

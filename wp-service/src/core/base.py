@@ -2,9 +2,9 @@
 Base classes and enums for the gradient generator.
 """
 
-from enum import Enum
-from typing import List, Tuple, Dict
 from abc import ABC, abstractmethod
+from enum import Enum
+
 import numpy as np
 from PIL import Image
 
@@ -41,19 +41,19 @@ class Resolution:
     }
 
     @classmethod
-    def get_all(cls) -> Dict[str, Tuple[int, int]]:
+    def get_all(cls) -> dict[str, tuple[int, int]]:
         """Get all available resolutions."""
         return cls._RESOLUTIONS.copy()
 
     @classmethod
-    def get(cls, name: str) -> Tuple[int, int]:
+    def get(cls, name: str) -> tuple[int, int]:
         """Get resolution by name."""
         if name not in cls._RESOLUTIONS:
             raise ValueError(f"Unknown resolution: {name}")
         return cls._RESOLUTIONS[name]
 
     @classmethod
-    def list_names(cls) -> List[str]:
+    def list_names(cls) -> list[str]:
         """List all resolution names."""
         return list(cls._RESOLUTIONS.keys())
 
@@ -62,7 +62,7 @@ class BaseGenerator(ABC):
     """Base class for all gradient generators."""
 
     def __init__(
-        self, width: int, height: int, colors: List[Tuple[int, int, int]], **params
+        self, width: int, height: int, colors: list[tuple[int, int, int]], **params
     ):
         """
         Initialize the generator.
@@ -130,7 +130,7 @@ class BaseGenerator(ABC):
         gradient_array = np.clip(gradient_array, 0, 255).astype(np.uint8)
         return Image.fromarray(gradient_array, "RGB")
 
-    def interpolate_colors(self, t: float) -> Tuple[int, int, int]:
+    def interpolate_colors(self, t: float) -> tuple[int, int, int]:
         """
         Interpolate between colors based on parameter t.
 
@@ -182,7 +182,7 @@ class BaseGenerator(ABC):
 
         return smoothed
 
-    def gamma_correct_interpolate(self, t: float) -> Tuple[int, int, int]:
+    def gamma_correct_interpolate(self, t: float) -> tuple[int, int, int]:
         """
         Gamma-correct color interpolation for professional quality.
 

@@ -2,8 +2,8 @@
 Color utilities and palette definitions.
 """
 
-from typing import List, Tuple, Dict
 import colorsys
+
 import numpy as np
 
 
@@ -99,29 +99,29 @@ class ColorPalette:
     }
 
     @classmethod
-    def get_palette(cls, name: str) -> List[Tuple[int, int, int]]:
+    def get_palette(cls, name: str) -> list[tuple[int, int, int]]:
         """Get a color palette by name."""
         if name not in cls._PALETTES:
             raise ValueError(f"Unknown palette: {name}")
         return cls._PALETTES[name].copy()
 
     @classmethod
-    def list_palettes(cls) -> List[str]:
+    def list_palettes(cls) -> list[str]:
         """List all available palette names."""
         return list(cls._PALETTES.keys())
 
     @classmethod
-    def add_palette(cls, name: str, colors: List[Tuple[int, int, int]]) -> None:
+    def add_palette(cls, name: str, colors: list[tuple[int, int, int]]) -> None:
         """Add a custom palette."""
         cls._PALETTES[name] = colors
 
     @classmethod
     def create_gradient_palette(
         cls,
-        start_color: Tuple[int, int, int],
-        end_color: Tuple[int, int, int],
+        start_color: tuple[int, int, int],
+        end_color: tuple[int, int, int],
         steps: int = 5,
-    ) -> List[Tuple[int, int, int]]:
+    ) -> list[tuple[int, int, int]]:
         """Create a gradient palette between two colors."""
         colors = []
         start = np.array(start_color)
@@ -136,8 +136,8 @@ class ColorPalette:
 
     @classmethod
     def create_analogous_palette(
-        cls, base_color: Tuple[int, int, int], count: int = 5, spread: float = 30.0
-    ) -> List[Tuple[int, int, int]]:
+        cls, base_color: tuple[int, int, int], count: int = 5, spread: float = 30.0
+    ) -> list[tuple[int, int, int]]:
         """Create an analogous color palette from a base color."""
         # Convert RGB to HSV
         r, g, b = [c / 255.0 for c in base_color]
@@ -160,8 +160,8 @@ class ColorPalette:
 
     @classmethod
     def create_complementary_palette(
-        cls, base_color: Tuple[int, int, int]
-    ) -> List[Tuple[int, int, int]]:
+        cls, base_color: tuple[int, int, int]
+    ) -> list[tuple[int, int, int]]:
         """Create a complementary color palette."""
         r, g, b = [c / 255.0 for c in base_color]
         h, s, v = colorsys.rgb_to_hsv(r, g, b)
@@ -184,7 +184,7 @@ class ColorPalette:
         return colors
 
     @classmethod
-    def hex_to_rgb(cls, hex_color: str) -> Tuple[int, int, int]:
+    def hex_to_rgb(cls, hex_color: str) -> tuple[int, int, int]:
         """Convert hex color to RGB tuple."""
         hex_color = hex_color.lstrip("#")
         if len(hex_color) != 6:
@@ -192,10 +192,10 @@ class ColorPalette:
 
         try:
             return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
-        except ValueError:
-            raise ValueError("Invalid hex color format")
+        except ValueError as e:
+            raise ValueError("Invalid hex color format") from e
 
     @classmethod
-    def rgb_to_hex(cls, rgb_color: Tuple[int, int, int]) -> str:
+    def rgb_to_hex(cls, rgb_color: tuple[int, int, int]) -> str:
         """Convert RGB tuple to hex color."""
         return "#{:02x}{:02x}{:02x}".format(*rgb_color)

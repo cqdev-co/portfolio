@@ -1,8 +1,7 @@
 """Configuration settings for penny stock scanner."""
 
-import os
 from pathlib import Path
-from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -56,10 +55,10 @@ class Settings(BaseSettings):
     )
 
     # AI Integration (Optional)
-    openai_api_key: Optional[str] = Field(
+    openai_api_key: str | None = Field(
         default=None, description="OpenAI API key for AI analysis"
     )
-    anthropic_api_key: Optional[str] = Field(
+    anthropic_api_key: str | None = Field(
         default=None, description="Anthropic API key for AI analysis"
     )
 
@@ -296,7 +295,7 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

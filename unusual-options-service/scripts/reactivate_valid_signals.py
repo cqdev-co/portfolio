@@ -19,25 +19,25 @@ Options:
     --verbose    Show detailed information about each signal
 """
 
+import argparse
 import os
 import sys
-from datetime import datetime, timezone, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any
-import argparse
+from typing import Any
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from supabase import create_client, Client
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
+from supabase import Client, create_client
 
 console = Console()
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     """Load Supabase configuration from environment."""
     from dotenv import load_dotenv
 
@@ -55,7 +55,7 @@ def load_config() -> Dict[str, Any]:
 
 def get_falsely_inactive_signals(
     client: Client, days_back: int = 7
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Find signals that were incorrectly marked inactive.
 
@@ -64,10 +64,10 @@ def get_falsely_inactive_signals(
     - expiry >= CURRENT_DATE (option not expired)
     - last_detected_at within days_back (recently seen)
     """
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
+    cutoff_date = datetime.now(UTC) - timedelta(days=days_back)
     today = date.today()
 
-    console.print(f"\n[cyan]Searching for falsely inactive signals...[/cyan]")
+    console.print("\n[cyan]Searching for falsely inactive signals...[/cyan]")
     console.print(f"  • Option expiry: >= {today}")
     console.print(f"  • Last detected: >= {cutoff_date.strftime('%Y-%m-%d')}")
 
@@ -84,7 +84,7 @@ def get_falsely_inactive_signals(
     return result.data if result.data else []
 
 
-def display_signal_summary(signals: List[Dict[str, Any]]) -> None:
+def display_signal_summary(signals: list[dict[str, Any]]) -> None:
     """Display summary table of signals to reactivate."""
     if not signals:
         console.print("[green]✓ No falsely inactive signals found![/green]")
@@ -128,7 +128,7 @@ def display_signal_summary(signals: List[Dict[str, Any]]) -> None:
     console.print(table)
 
 
-def display_detailed_info(signals: List[Dict[str, Any]]) -> None:
+def display_detailed_info(signals: list[dict[str, Any]]) -> None:
     """Display detailed information about signals."""
     by_ticker = {}
     for signal in signals:
@@ -145,7 +145,7 @@ def display_detailed_info(signals: List[Dict[str, Any]]) -> None:
 
 
 def reactivate_signals(
-    client: Client, signals: List[Dict[str, Any]], dry_run: bool = False
+    client: Client, signals: list[dict[str, Any]], dry_run: bool = False
 ) -> int:
     """
     Reactivate the falsely inactive signals.
@@ -168,9 +168,7 @@ def reactivate_signals(
     # Batch update
     result = (
         client.table("unusual_options_signals")
-        .update(
-            {"is_active": True, "updated_at": datetime.now(timezone.utc).isoformat()}
-        )
+        .update({"is_active": True, "updated_at": datetime.now(UTC).isoformat()})
         .in_("signal_id", signal_ids)
         .execute()
     )
@@ -198,7 +196,7 @@ def verify_reactivation(client: Client, days_back: int = 7) -> None:
         )
 
 
-def get_stats(client: Client) -> Dict[str, int]:
+def get_stats(client: Client) -> dict[str, int]:
     """Get current signal statistics."""
     # Active signals
     active_result = (

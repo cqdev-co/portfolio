@@ -1,8 +1,7 @@
 """Ticker service for querying penny stocks from Supabase."""
 
-from typing import List, Optional
 from loguru import logger
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from penny_scanner.config.settings import Settings
 from penny_scanner.core.exceptions import DatabaseError
@@ -14,7 +13,7 @@ class TickerService:
     def __init__(self, settings: Settings):
         """Initialize ticker service."""
         self.settings = settings
-        self.client: Optional[Client] = None
+        self.client: Client | None = None
 
         if settings.is_database_enabled():
             try:
@@ -29,7 +28,7 @@ class TickerService:
         """Check if ticker service is available."""
         return self.client is not None
 
-    def get_all_symbols(self, limit: Optional[int] = None) -> List[str]:
+    def get_all_symbols(self, limit: int | None = None) -> list[str]:
         """
         Get all active penny ticker symbols.
 
@@ -94,11 +93,11 @@ class TickerService:
 
         except Exception as e:
             logger.error(f"Error fetching symbols: {e}")
-            raise DatabaseError(f"Failed to fetch symbols: {e}")
+            raise DatabaseError(f"Failed to fetch symbols: {e}") from e
 
     def get_symbols_by_exchange(
-        self, exchange: str, limit: Optional[int] = None
-    ) -> List[str]:
+        self, exchange: str, limit: int | None = None
+    ) -> list[str]:
         """
         Get penny ticker symbols from a specific exchange.
 
@@ -156,11 +155,9 @@ class TickerService:
 
         except Exception as e:
             logger.error(f"Error fetching symbols by exchange: {e}")
-            raise DatabaseError(f"Failed to fetch symbols from {exchange}: {e}")
+            raise DatabaseError(f"Failed to fetch symbols from {exchange}: {e}") from e
 
-    def get_symbols_by_sector(
-        self, sector: str, limit: Optional[int] = None
-    ) -> List[str]:
+    def get_symbols_by_sector(self, sector: str, limit: int | None = None) -> list[str]:
         """
         Get penny ticker symbols from a specific sector.
 
@@ -218,9 +215,9 @@ class TickerService:
 
         except Exception as e:
             logger.error(f"Error fetching symbols by sector: {e}")
-            raise DatabaseError(f"Failed to fetch symbols from {sector}: {e}")
+            raise DatabaseError(f"Failed to fetch symbols from {sector}: {e}") from e
 
-    def search_symbols(self, search_term: str, limit: int = 50) -> List[str]:
+    def search_symbols(self, search_term: str, limit: int = 50) -> list[str]:
         """
         Search for ticker symbols by name or symbol.
 
@@ -254,7 +251,7 @@ class TickerService:
 
         except Exception as e:
             logger.error(f"Error searching symbols: {e}")
-            raise DatabaseError(f"Failed to search symbols: {e}")
+            raise DatabaseError(f"Failed to search symbols: {e}") from e
 
     def get_ticker_count(self) -> int:
         """
@@ -280,7 +277,7 @@ class TickerService:
             logger.error(f"Error getting ticker count: {e}")
             return 0
 
-    def get_available_exchanges(self) -> List[str]:
+    def get_available_exchanges(self) -> list[str]:
         """
         Get list of available exchanges.
 
@@ -309,7 +306,7 @@ class TickerService:
             logger.error(f"Error getting exchanges: {e}")
             return []
 
-    def get_available_sectors(self) -> List[str]:
+    def get_available_sectors(self) -> list[str]:
         """
         Get list of available sectors.
 

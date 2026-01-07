@@ -15,16 +15,16 @@ Usage:
 import asyncio
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from unusual_options.config import load_config
-from supabase import create_client
 from rich.console import Console
 from rich.prompt import Confirm
 from rich.table import Table
+from supabase import create_client
+
+from unusual_options.config import load_config
 
 console = Console()
 
@@ -81,12 +81,7 @@ async def cleanup_table(supabase, table_name: str, dry_run: bool = False) -> int
 
         # Delete all records
         # Supabase requires a filter, so we use a condition that matches all
-        delete_result = (
-            supabase.table(table_name)
-            .delete()
-            .neq("created_at", "1900-01-01")
-            .execute()
-        )
+        (supabase.table(table_name).delete().neq("created_at", "1900-01-01").execute())
 
         console.print(f"[green]✓ Deleted {count} records from {table_name}[/green]")
         return count
@@ -107,16 +102,16 @@ async def main():
 Examples:
   # Interactive cleanup (with confirmation)
   python scripts/cleanup_database.py
-  
+
   # Auto-confirm (no prompt)
   python scripts/cleanup_database.py --yes
-  
+
   # Clean specific table only
   python scripts/cleanup_database.py --table signals
-  
+
   # Dry run (see what would be deleted)
   python scripts/cleanup_database.py --dry-run
-  
+
   # Clean all performance tracking data
   python scripts/cleanup_database.py --table performance --yes
 
@@ -210,7 +205,7 @@ Tables:
 
     # Confirmation
     if args.dry_run:
-        console.print(f"[yellow]DRY RUN - No data will be deleted[/yellow]\n")
+        console.print("[yellow]DRY RUN - No data will be deleted[/yellow]\n")
     elif not args.yes:
         console.print(
             f"[bold red]WARNING: This will DELETE {action_description}![/bold red]"

@@ -1,9 +1,9 @@
 """Service for checking if profit targets were hit during trade lifecycle."""
 
-from datetime import date, timedelta
-from typing import Optional, Dict, Any, List
+from datetime import date
+from typing import Any
+
 from loguru import logger
-from decimal import Decimal
 
 from penny_scanner.services.database_service import DatabaseService
 
@@ -29,8 +29,8 @@ class ProfitTargetChecker:
         entry_date: date,
         exit_date: date,
         entry_price: float,
-        targets: Dict[str, float] = None,
-    ) -> Dict[str, Any]:
+        targets: dict[str, float] = None,
+    ) -> dict[str, Any]:
         """
         Check if profit targets were hit during the trade period.
 
@@ -119,8 +119,8 @@ class ProfitTargetChecker:
             return result
 
     async def update_performance_with_targets(
-        self, performance_record: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, performance_record: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update a performance record with profit target information.
 
@@ -224,7 +224,7 @@ class DynamicProfitTargetCalculator:
         opportunity_rank: str,
         volume_spike_factor: float,
         is_breakout: bool,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Calculate profit targets based on signal quality.
 

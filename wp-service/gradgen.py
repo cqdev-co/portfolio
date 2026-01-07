@@ -1,19 +1,31 @@
-import sys
-import click
 import json
 import random
+import sys
 from pathlib import Path
-from typing import Optional, List, Tuple
+
+import click
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.core.base import GradientType, Resolution
-from src.generators import *
-from src.utils.color_utils import ColorPalette
-from src.utils.ai_color_gen import AIColorGenerator
 from src.config.presets import GradientPreset
-from src.config.settings import load_config, save_config, create_default_config
+from src.config.settings import create_default_config, load_config, save_config
+from src.core.base import GradientType, Resolution
+from src.generators import (
+    CylindricalWaveGenerator,
+    FluidGradientGenerator,
+    FractalGenerator,
+    GlassGradientGenerator,
+    InterferencePatternGenerator,
+    LinearGradientGenerator,
+    OrganicGradientGenerator,
+    PerlinNoiseGenerator,
+    RadialGradientGenerator,
+    SpiralWaveGenerator,
+    WaveGradientGenerator,
+)
+from src.utils.ai_color_gen import AIColorGenerator
+from src.utils.color_utils import ColorPalette
 
 
 class GradientGeneratorCLI:
@@ -35,11 +47,11 @@ class GradientGeneratorCLI:
 
     def generate_gradient(
         self,
-        preset_name: Optional[str] = None,
-        gradient_type: Optional[str] = None,
-        colors: Optional[List[Tuple[int, int, int]]] = None,
+        preset_name: str | None = None,
+        gradient_type: str | None = None,
+        colors: list[tuple[int, int, int]] | None = None,
         resolution: str = "1080p",
-        output_name: Optional[str] = None,
+        output_name: str | None = None,
         output_format: str = "png",
         **params,
     ) -> bool:
@@ -128,7 +140,7 @@ class GradientGeneratorCLI:
         grad_type: GradientType,
         width: int,
         height: int,
-        colors: List[Tuple[int, int, int]],
+        colors: list[tuple[int, int, int]],
         params: dict,
     ):
         """Create appropriate generator based on type."""
@@ -219,7 +231,7 @@ def custom(type, colors, resolution, output, param):
             for color_str in color_strs:
                 r, g, b = map(int, color_str.split(","))
                 color_list.append((r, g, b))
-        except:
+        except (ValueError, TypeError):
             print(f"Invalid colors: {colors}")
             print("Use a palette name or RGB format: '255,0,0 0,255,0 0,0,255'")
             return
@@ -235,7 +247,7 @@ def custom(type, colors, resolution, output, param):
                     params[key] = float(value)
                 else:
                     params[key] = int(value)
-            except:
+            except (ValueError, TypeError):
                 params[key] = value
 
     success = generator.generate_gradient(
@@ -253,7 +265,7 @@ def custom(type, colors, resolution, output, param):
 @cli.command(name="list-presets")
 def list_presets():
     """List all available gradient presets."""
-    presets = GradientPreset.list_presets()
+    GradientPreset.list_presets()
 
     print("📋 Available Gradient Presets:")
     print("=" * 40)
@@ -386,7 +398,7 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     generator = GradientGeneratorCLI()
     ai_gen = AIColorGenerator(seed=int(seed) if seed else None)
 
-    print(f"🌟 Generating STOCK-QUALITY gradient with all professional enhancements...")
+    print("🌟 Generating STOCK-QUALITY gradient with all professional enhancements...")
     print(f"✨ Style: {style} | Type: {type} | Complexity: {complexity}")
 
     # Always use professional palette generation
@@ -451,15 +463,15 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     )
 
     if success:
-        print(f"✅ Stock-quality gradient generated successfully!")
+        print("✅ Stock-quality gradient generated successfully!")
         print(f"📁 Output: {output_name}")
         print(
-            f"💎 Features: Professional grain, Gamma correction, Anti-banding, Enhanced colors"
+            "💎 Features: Professional grain, Gamma correction, Anti-banding, Enhanced colors"
         )
         if type == "glass" and params.get("holographic"):
-            print(f"🌈 Holographic effects enabled!")
+            print("🌈 Holographic effects enabled!")
     else:
-        print(f"❌ Failed to generate gradient")
+        print("❌ Failed to generate gradient")
 
 
 @cli.command(name="ai-generate")
@@ -515,6 +527,9 @@ def ai_generate(
     """Generate a gradient using AI-powered color generation."""
     generator = GradientGeneratorCLI()
     ai_gen = AIColorGenerator(seed=int(seed) if seed else None, use_openai=use_openai)
+
+    # Handle output format early since it's used in params
+    file_extension = "jpg" if format.lower() in ["jpg", "jpeg"] else "png"
 
     # Generate AI colors - OpenAI or local AI-inspired
     if use_openai and prompt:
@@ -603,8 +618,6 @@ def ai_generate(
             "output_format": file_extension,
         }
 
-    # Handle output format
-    file_extension = "jpg" if format.lower() in ["jpg", "jpeg"] else "png"
     output_name = output or f"ai_{style}_{type}_{random.randint(1000, 9999)}"
 
     print(f"🤖 Generating AI-powered gradient: {style_name}")
@@ -689,7 +702,7 @@ def ai_enhanced(
     generator = GradientGeneratorCLI()
     ai_gen = AIColorGenerator(use_openai=use_openai)
 
-    print(f"🤖 AI Enhanced Generation")
+    print("🤖 AI Enhanced Generation")
     print(f"💭 Prompt: {prompt or 'Auto-generated based on parameters'}")
     print(f"🎭 Mood: {mood} | 💡 Lighting: {lighting} | 🎨 Composition: {composition}")
     print(
@@ -1397,13 +1410,13 @@ def _create_enhanced_color_prompt(
 
     enhanced_prompt = f"""
     {prompt}
-    
+
     Color requirements:
     - Mood: {mood} feeling and energy
     - Lighting: {lighting} lighting style
     - Atmosphere: {atmosphere} atmospheric quality
     - Color temperature: {temp_desc}
-    
+
     Generate gradient colors that capture this specific combination of mood, lighting, and atmosphere.
     """
 

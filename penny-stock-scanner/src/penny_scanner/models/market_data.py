@@ -1,7 +1,7 @@
 """Market data models for penny stock scanner."""
 
 from datetime import datetime
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -34,34 +34,34 @@ class TechnicalIndicators(BaseModel):
     timestamp: datetime = Field(description="Indicator timestamp")
 
     # Moving averages
-    ema_20: Optional[float] = Field(None, description="20-period EMA")
-    ema_50: Optional[float] = Field(None, description="50-period EMA")
-    sma_20: Optional[float] = Field(None, description="20-period SMA")
+    ema_20: float | None = Field(None, description="20-period EMA")
+    ema_50: float | None = Field(None, description="50-period EMA")
+    sma_20: float | None = Field(None, description="20-period SMA")
 
     # Volume metrics
-    volume_sma_20: Optional[float] = Field(None, description="20-day average volume")
-    volume_ratio: Optional[float] = Field(
+    volume_sma_20: float | None = Field(None, description="20-day average volume")
+    volume_ratio: float | None = Field(
         None, description="Current volume vs 20-day average"
     )
-    dollar_volume: Optional[float] = Field(
+    dollar_volume: float | None = Field(
         None, description="Dollar volume (price * volume)"
     )
 
     # Volatility
-    atr_20: Optional[float] = Field(None, description="20-period ATR")
-    true_range: Optional[float] = Field(None, description="True range")
+    atr_20: float | None = Field(None, description="20-period ATR")
+    true_range: float | None = Field(None, description="True range")
 
     # Momentum indicators (lighter weight for pennies)
-    rsi_14: Optional[float] = Field(None, description="14-period RSI")
-    macd: Optional[float] = Field(None, description="MACD line")
-    macd_signal: Optional[float] = Field(None, description="MACD signal line")
-    macd_histogram: Optional[float] = Field(None, description="MACD histogram")
+    rsi_14: float | None = Field(None, description="14-period RSI")
+    macd: float | None = Field(None, description="MACD line")
+    macd_signal: float | None = Field(None, description="MACD signal line")
+    macd_histogram: float | None = Field(None, description="MACD histogram")
 
     # Price metrics
-    distance_from_52w_high: Optional[float] = Field(
+    distance_from_52w_high: float | None = Field(
         None, description="% distance from 52-week high"
     )
-    distance_from_52w_low: Optional[float] = Field(
+    distance_from_52w_low: float | None = Field(
         None, description="% distance from 52-week low"
     )
 
@@ -71,16 +71,16 @@ class MarketData(BaseModel):
 
     symbol: str = Field(description="Stock symbol")
     timeframe: str = Field(default="1d", description="Data timeframe (1d, 1h, etc.)")
-    ohlcv_data: List[OHLCVData] = Field(description="OHLCV data points")
-    indicators: List[TechnicalIndicators] = Field(
+    ohlcv_data: list[OHLCVData] = Field(description="OHLCV data points")
+    indicators: list[TechnicalIndicators] = Field(
         default_factory=list, description="Technical indicators"
     )
 
     # Additional metadata
-    sector: Optional[str] = Field(None, description="Stock sector")
-    industry: Optional[str] = Field(None, description="Stock industry")
-    market_cap: Optional[int] = Field(None, description="Market capitalization")
-    float_shares: Optional[int] = Field(None, description="Float shares")
+    sector: str | None = Field(None, description="Stock sector")
+    industry: str | None = Field(None, description="Stock industry")
+    market_cap: int | None = Field(None, description="Market capitalization")
+    float_shares: int | None = Field(None, description="Float shares")
 
     class Config:
         json_schema_extra = {
@@ -94,13 +94,13 @@ class MarketData(BaseModel):
             }
         }
 
-    def get_latest_price(self) -> Optional[float]:
+    def get_latest_price(self) -> float | None:
         """Get the most recent closing price."""
         if self.ohlcv_data:
             return self.ohlcv_data[-1].close
         return None
 
-    def get_latest_volume(self) -> Optional[int]:
+    def get_latest_volume(self) -> int | None:
         """Get the most recent volume."""
         if self.ohlcv_data:
             return self.ohlcv_data[-1].volume

@@ -2,7 +2,8 @@
 Gradient preset definitions.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from ..utils.color_utils import ColorPalette
 
 
@@ -446,19 +447,19 @@ class GradientPreset:
     }
 
     @classmethod
-    def get_preset(cls, name: str) -> Dict[str, Any]:
+    def get_preset(cls, name: str) -> dict[str, Any]:
         """Get a preset by name."""
         if name not in cls._PRESETS:
             raise ValueError(f"Unknown preset: {name}")
         return cls._PRESETS[name].copy()
 
     @classmethod
-    def list_presets(cls) -> List[str]:
+    def list_presets(cls) -> list[str]:
         """List all preset names."""
         return list(cls._PRESETS.keys())
 
     @classmethod
-    def get_preset_by_category(cls, category: str) -> List[str]:
+    def get_preset_by_category(cls, category: str) -> list[str]:
         """Get presets by category."""
         return [
             name
@@ -467,12 +468,12 @@ class GradientPreset:
         ]
 
     @classmethod
-    def add_preset(cls, name: str, preset_data: Dict[str, Any]) -> None:
+    def add_preset(cls, name: str, preset_data: dict[str, Any]) -> None:
         """Add a custom preset."""
         cls._PRESETS[name] = preset_data
 
     @classmethod
-    def get_categories(cls) -> List[str]:
+    def get_categories(cls) -> list[str]:
         """Get all available categories."""
         categories = set()
         for preset in cls._PRESETS.values():

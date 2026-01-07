@@ -3,9 +3,8 @@ Configuration settings management.
 """
 
 import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import Optional
 
 
 @dataclass
@@ -31,7 +30,7 @@ def load_config(config_path: str = "config.json") -> Config:
 
     if config_file.exists():
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 config_data = json.load(f)
 
             settings = AppSettings(**config_data.get("settings", {}))

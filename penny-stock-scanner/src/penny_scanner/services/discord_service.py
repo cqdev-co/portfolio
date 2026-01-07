@@ -7,11 +7,12 @@ Sends formatted alerts for:
 - Performance reports
 """
 
-import os
 import asyncio
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
+import os
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import aiohttp
 from loguru import logger
 
@@ -25,12 +26,12 @@ class DiscordEmbed:
     title: str
     description: str = ""
     color: int = 0x5865F2  # Discord blurple
-    fields: List[Dict[str, Any]] = field(default_factory=list)
+    fields: list[dict[str, Any]] = field(default_factory=list)
     footer: str = ""
     timestamp: str = ""
     thumbnail_url: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         embed = {
             "title": self.title,
             "color": self.color,
@@ -65,13 +66,13 @@ class PennyDiscordNotifier:
     COLOR_RED = 0xE74C3C  # Losers / Warnings
     COLOR_PURPLE = 0x9B59B6  # Performance report
 
-    def __init__(self, webhook_url: Optional[str] = None):
+    def __init__(self, webhook_url: str | None = None):
         self.webhook_url = (
             webhook_url
             or os.getenv("DISCORD_PENNY_WEBHOOK_URL", "")
             or os.getenv("DISCORD_WEBHOOK_URL", "")
         )
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     @property
     def is_configured(self) -> bool:
@@ -92,7 +93,7 @@ class PennyDiscordNotifier:
     async def send_message(
         self,
         content: str = "",
-        embeds: List[DiscordEmbed] = None,
+        embeds: list[DiscordEmbed] = None,
         username: str = "Penny Scanner 🚀",
     ) -> bool:
         """
@@ -248,14 +249,14 @@ class PennyDiscordNotifier:
                 },
             ],
             footer="Penny Stock Scanner",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         return await self.send_message(embeds=[embed])
 
     async def send_batch_alerts(
         self,
-        results: List[AnalysisResult],
+        results: list[AnalysisResult],
         min_rank: OpportunityRank = OpportunityRank.A_TIER,
     ) -> int:
         """
@@ -304,7 +305,7 @@ class PennyDiscordNotifier:
         s_tier_count: int,
         a_tier_count: int,
         avg_score: float,
-        top_signals: List[AnalysisResult] = None,
+        top_signals: list[AnalysisResult] = None,
     ) -> bool:
         """
         Send end-of-day summary.
@@ -341,7 +342,7 @@ class PennyDiscordNotifier:
                 {"name": "🥇 A-Tier", "value": f"**{a_tier_count}**", "inline": True},
             ],
             footer="Penny Stock Scanner",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         embeds = [embed]
@@ -374,9 +375,9 @@ class PennyDiscordNotifier:
         avg_winner: float,
         avg_loser: float,
         stop_loss_pct: float,
-        by_rank: Dict[str, Dict] = None,
-        top_winners: List[Dict] = None,
-        top_losers: List[Dict] = None,
+        by_rank: dict[str, dict] = None,
+        top_winners: list[dict] = None,
+        top_losers: list[dict] = None,
     ) -> bool:
         """
         Send performance report.
@@ -435,7 +436,7 @@ class PennyDiscordNotifier:
                 {"name": "❌ Avg Loser", "value": f"{avg_loser:.2f}%", "inline": True},
             ],
             footer="Penny Stock Scanner",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         embeds = [embed]
@@ -481,7 +482,7 @@ class PennyDiscordNotifier:
 
 # Convenience function for quick alerts
 async def send_penny_discord_alert(
-    message: str, webhook_url: Optional[str] = None
+    message: str, webhook_url: str | None = None
 ) -> bool:
     """Quick function to send a simple Discord message."""
     notifier = PennyDiscordNotifier(webhook_url)

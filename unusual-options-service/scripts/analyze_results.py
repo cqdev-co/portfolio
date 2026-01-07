@@ -17,35 +17,30 @@ This script analyzes unusual options signals from the database to answer key que
 12. Which signals should I care about the most?
 """
 
-import os
-import sys
 import asyncio
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+import os
 import statistics
-from collections import defaultdict, Counter
+import sys
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
+from typing import Any
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from unusual_options.config import load_config
-from unusual_options.storage.database import get_storage
-from unusual_options.storage.models import UnusualOptionsSignal
+# OpenAI for intelligent analysis
+from openai import OpenAI
+from rich import box
 
 # Rich for beautiful terminal output
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
-from rich.columns import Columns
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.text import Text
-from rich.layout import Layout
-from rich.align import Align
-from rich import box
+from rich.table import Table
 
-# OpenAI for intelligent analysis
-import openai
-from openai import OpenAI
+from unusual_options.config import load_config
+from unusual_options.storage.database import get_storage
+from unusual_options.storage.models import UnusualOptionsSignal
 
 console = Console()
 
@@ -54,7 +49,7 @@ class SignalAnalyzer:
     def __init__(self):
         self.config = load_config()
         self.storage = get_storage(self.config)
-        self.signals: List[UnusualOptionsSignal] = []
+        self.signals: list[UnusualOptionsSignal] = []
 
         # Initialize OpenAI client if API key is available
         self.openai_client = None
@@ -63,7 +58,7 @@ class SignalAnalyzer:
 
     async def fetch_signals(
         self, days: int = 7, min_grade: str = "B"
-    ) -> List[UnusualOptionsSignal]:
+    ) -> list[UnusualOptionsSignal]:
         """Fetch signals from the database"""
         console.print(
             f"[blue]Fetching signals from the last {days} days (grade {min_grade}+)...[/blue]"
@@ -95,7 +90,7 @@ class SignalAnalyzer:
                 console.print(f"[red]Error fetching signals: {e}[/red]")
                 return []
 
-    def calculate_basic_stats(self) -> Dict[str, Any]:
+    def calculate_basic_stats(self) -> dict[str, Any]:
         """Calculate basic statistical metrics"""
         if not self.signals:
             return {}
@@ -136,7 +131,7 @@ class SignalAnalyzer:
             else 0,
         }
 
-    def analyze_by_grade(self) -> Dict[str, Dict[str, Any]]:
+    def analyze_by_grade(self) -> dict[str, dict[str, Any]]:
         """Analyze signals grouped by grade"""
         grade_groups = defaultdict(list)
         for signal in self.signals:
@@ -162,7 +157,7 @@ class SignalAnalyzer:
 
         return grade_analysis
 
-    def analyze_by_ticker(self, top_n: int = 20) -> Dict[str, Dict[str, Any]]:
+    def analyze_by_ticker(self, top_n: int = 20) -> dict[str, dict[str, Any]]:
         """Analyze signals grouped by ticker"""
         ticker_groups = defaultdict(list)
         for signal in self.signals:
@@ -196,7 +191,7 @@ class SignalAnalyzer:
 
         return dict(sorted_tickers[:top_n])
 
-    def analyze_risk_patterns(self) -> Dict[str, Any]:
+    def analyze_risk_patterns(self) -> dict[str, Any]:
         """Analyze risk patterns in the signals"""
         risk_levels = defaultdict(list)
         risk_factors = defaultdict(int)
@@ -218,7 +213,7 @@ class SignalAnalyzer:
 
     def get_top_signals(
         self, n: int = 10, criteria: str = "score"
-    ) -> List[UnusualOptionsSignal]:
+    ) -> list[UnusualOptionsSignal]:
         """Get top N signals based on specified criteria"""
         if criteria == "score":
             return sorted(self.signals, key=lambda x: x.overall_score, reverse=True)[:n]
@@ -235,10 +230,10 @@ class SignalAnalyzer:
 
     async def get_ai_insights(
         self,
-        stats: Dict[str, Any],
-        grade_analysis: Dict[str, Any],
-        ticker_analysis: Dict[str, Any],
-    ) -> Optional[str]:
+        stats: dict[str, Any],
+        grade_analysis: dict[str, Any],
+        ticker_analysis: dict[str, Any],
+    ) -> str | None:
         """Get AI-powered insights using OpenAI"""
         if not self.openai_client:
             return None
@@ -252,10 +247,10 @@ class SignalAnalyzer:
             - Total Premium Flow: ${stats["total_premium_flow"]:,.0f}
             - Average Volume: {stats["avg_volume"]:,.0f}
             - Average Score: {stats["avg_score"]:.3f}
-            
+
             Grade Distribution:
             {grade_analysis}
-            
+
             Top Tickers by Premium Flow:
             {dict(list(ticker_analysis.items())[:5])}
             """
@@ -272,16 +267,16 @@ class SignalAnalyzer:
                         "role": "user",
                         "content": f"""
                         Analyze this unusual options activity data and answer these key questions:
-                        
+
                         1. What patterns do you see in the data?
                         2. Which signals represent the most interesting opportunities?
                         3. What risk factors should traders be aware of?
                         4. What market sentiment does this activity suggest?
                         5. Which tickers deserve the most attention and why?
-                        
+
                         Data:
                         {data_summary}
-                        
+
                         Provide a concise but comprehensive analysis focusing on actionable insights for options traders.
                         """,
                     },
@@ -295,7 +290,7 @@ class SignalAnalyzer:
             console.print(f"[yellow]Warning: Could not get AI insights: {e}[/yellow]")
             return None
 
-    def display_overview(self, stats: Dict[str, Any]):
+    def display_overview(self, stats: dict[str, Any]):
         """Display overview statistics"""
         overview_table = Table(title="📊 Signal Overview", box=box.ROUNDED)
         overview_table.add_column("Metric", style="cyan", no_wrap=True)
@@ -318,7 +313,7 @@ class SignalAnalyzer:
 
         console.print(overview_table)
 
-    def display_grade_analysis(self, grade_analysis: Dict[str, Any]):
+    def display_grade_analysis(self, grade_analysis: dict[str, Any]):
         """Display grade-based analysis"""
         grade_table = Table(title="🎯 Analysis by Grade", box=box.ROUNDED)
         grade_table.add_column("Grade", style="bold")
@@ -351,7 +346,7 @@ class SignalAnalyzer:
 
         console.print(grade_table)
 
-    def display_ticker_analysis(self, ticker_analysis: Dict[str, Any]):
+    def display_ticker_analysis(self, ticker_analysis: dict[str, Any]):
         """Display top tickers analysis"""
         ticker_table = Table(title="🏆 Top Tickers by Premium Flow", box=box.ROUNDED)
         ticker_table.add_column("Ticker", style="bold cyan")
@@ -373,7 +368,7 @@ class SignalAnalyzer:
 
         console.print(ticker_table)
 
-    def display_top_signals(self, signals: List[UnusualOptionsSignal], title: str):
+    def display_top_signals(self, signals: list[UnusualOptionsSignal], title: str):
         """Display top signals table"""
         signals_table = Table(title=title, box=box.ROUNDED)
         signals_table.add_column("Ticker", style="bold cyan")
@@ -409,7 +404,7 @@ class SignalAnalyzer:
 
         console.print(signals_table)
 
-    def display_risk_analysis(self, risk_analysis: Dict[str, Any]):
+    def display_risk_analysis(self, risk_analysis: dict[str, Any]):
         """Display risk analysis"""
         risk_table = Table(title="⚠️ Risk Analysis", box=box.ROUNDED)
         risk_table.add_column("Risk Level", style="bold")
@@ -526,9 +521,9 @@ class SignalAnalyzer:
 
     def generate_summary_recommendations(
         self,
-        stats: Dict[str, Any],
-        grade_analysis: Dict[str, Any],
-        ticker_analysis: Dict[str, Any],
+        stats: dict[str, Any],
+        grade_analysis: dict[str, Any],
+        ticker_analysis: dict[str, Any],
     ) -> str:
         """Generate summary recommendations"""
         recommendations = []

@@ -20,22 +20,19 @@ Usage:
 Requires DISCORD_WEBHOOK_URL environment variable.
 """
 
+import asyncio
 import os
 import sys
-import asyncio
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
-from collections import defaultdict
-import statistics
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from rich.console import Console
+
+from unusual_options.alerts.discord import DiscordNotifier
 from unusual_options.config import load_config
 from unusual_options.storage.database import get_storage
 from unusual_options.storage.models import UnusualOptionsSignal
-from unusual_options.alerts.discord import DiscordNotifier
-
-from rich.console import Console
 
 console = Console()
 
@@ -170,7 +167,7 @@ def calculate_suspicion_score(signal: UnusualOptionsSignal) -> float:
     return min(score, 100)
 
 
-def get_patterns(signal: UnusualOptionsSignal) -> List[str]:
+def get_patterns(signal: UnusualOptionsSignal) -> list[str]:
     """Determine which patterns a signal matches."""
     patterns = []
 
@@ -259,7 +256,6 @@ async def send_insider_play_alerts(days: int = 1, min_score: float = 60):
 
 async def send_performance_report_alert():
     """Send weekly performance report to Discord."""
-    import yfinance as yf
 
     config = load_config()
     storage = get_storage(config)
@@ -284,12 +280,9 @@ async def send_performance_report_alert():
         return
 
     # Calculate win rates (simplified - using price data)
-    wins_5d = 0
-    total_5d = 0
-    returns_5d = []
 
-    calls = [s for s in signals if s.option_type == "call"]
-    puts = [s for s in signals if s.option_type == "put"]
+    [s for s in signals if s.option_type == "call"]
+    [s for s in signals if s.option_type == "put"]
 
     # Estimate hedge percentage
     hedge_signals = [

@@ -3,10 +3,10 @@ Organic gradient generators for smooth, glass-like effects.
 """
 
 import numpy as np
-from typing import List, Tuple
-from ..core.base import BaseGenerator
-from scipy.ndimage import gaussian_filter
 from scipy import ndimage
+from scipy.ndimage import gaussian_filter
+
+from ..core.base import BaseGenerator
 
 
 class OrganicGradientGenerator(BaseGenerator):
@@ -19,7 +19,7 @@ class OrganicGradientGenerator(BaseGenerator):
         smoothness = self.params.get("smoothness", 3.0)
         flow_strength = self.params.get("flow_strength", 0.3)
         grain_intensity = self.params.get("grain_intensity", 0.05)
-        blend_mode = self.params.get("blend_mode", "soft")
+        self.params.get("blend_mode", "soft")
 
         # Create base flow field using multiple octaves of noise
         flow_field = self._create_flow_field(flow_strength)
@@ -236,7 +236,7 @@ class OrganicGradientGenerator(BaseGenerator):
         frequencies = [1.0, 2.0, 4.0, 8.0, 16.0]
         amplitudes = [0.4, 0.3, 0.2, 0.07, 0.03]
 
-        for freq, amp in zip(frequencies, amplitudes):
+        for freq, amp in zip(frequencies, amplitudes, strict=False):
             # Create organic noise pattern
             octave_noise = np.random.normal(
                 0, intensity * amp, (self.height, self.width)
@@ -257,7 +257,7 @@ class OrganicGradientGenerator(BaseGenerator):
                 distorted_noise = ndimage.map_coordinates(
                     octave_noise, [distorted_y, distorted_x], order=1, mode="reflect"
                 )
-            except:
+            except Exception:
                 distorted_noise = octave_noise
 
             # Apply frequency-dependent smoothing
@@ -449,7 +449,7 @@ class GlassGradientGenerator(BaseGenerator):
 
         return rgb_array
 
-    def _blend_glass_layers(self, layers: List[np.ndarray]) -> np.ndarray:
+    def _blend_glass_layers(self, layers: list[np.ndarray]) -> np.ndarray:
         """Blend glass layers with transparency."""
 
         if not layers:
@@ -498,7 +498,9 @@ class GlassGradientGenerator(BaseGenerator):
             highlight_positions = [(0.3, 0.2), (0.7, 0.8), (0.15, 0.6)]
             intensities = [1.0, 0.6, 0.4]
 
-            for (hx, hy), intensity in zip(highlight_positions, intensities):
+            for (hx, hy), intensity in zip(
+                highlight_positions, intensities, strict=False
+            ):
                 highlight_x = self.width * hx
                 highlight_y = self.height * hy
 
@@ -543,10 +545,8 @@ class GlassGradientGenerator(BaseGenerator):
 
         # Shift each channel slightly for prismatic effect
         red_shift = np.sin(X * np.pi * 3 + Y * np.pi * 2) * prism_offset
-        green_shift = np.sin(X * np.pi * 3 + Y * np.pi * 2 + np.pi / 3) * prism_offset
-        blue_shift = (
-            np.sin(X * np.pi * 3 + Y * np.pi * 2 + 2 * np.pi / 3) * prism_offset
-        )
+        np.sin(X * np.pi * 3 + Y * np.pi * 2 + np.pi / 3) * prism_offset
+        (np.sin(X * np.pi * 3 + Y * np.pi * 2 + 2 * np.pi / 3) * prism_offset)
 
         # Apply color shifting
         for i in range(self.height):
@@ -669,7 +669,7 @@ class FluidGradientGenerator(BaseGenerator):
 
         return result
 
-    def _create_fluid_flows(self, complexity: float) -> List[np.ndarray]:
+    def _create_fluid_flows(self, complexity: float) -> list[np.ndarray]:
         """Create multiple fluid flow fields."""
 
         flows = []
@@ -696,7 +696,7 @@ class FluidGradientGenerator(BaseGenerator):
         return flows
 
     def _create_color_field(
-        self, flows: List[np.ndarray], bleeding: float
+        self, flows: list[np.ndarray], bleeding: float
     ) -> np.ndarray:
         """Create color field from flow patterns."""
 

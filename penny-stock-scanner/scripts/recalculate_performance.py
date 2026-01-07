@@ -3,9 +3,9 @@
 import asyncio
 import os
 from datetime import date
-from supabase import create_client
+
 from dotenv import load_dotenv
-from loguru import logger
+from supabase import create_client
 
 # Load environment variables
 load_dotenv()
@@ -25,8 +25,8 @@ async def recalculate_with_stop_losses():
 
     # Import services
     from penny_scanner.config.settings import get_settings
-    from penny_scanner.services.database_service import DatabaseService
     from penny_scanner.services.data_service import DataService
+    from penny_scanner.services.database_service import DatabaseService
     from penny_scanner.services.stop_loss_checker import StopLossChecker
 
     settings = get_settings()
@@ -64,7 +64,7 @@ async def recalculate_with_stop_losses():
         )
 
         if not stop_loss_price:
-            print(f"  ⚠️  No stop loss set, skipping")
+            print("  ⚠️  No stop loss set, skipping")
             continue
 
         try:
@@ -106,14 +106,14 @@ async def recalculate_with_stop_losses():
                 stop_losses_hit += 1
                 recalculated += 1
             else:
-                print(f"  ✅ Stop not hit, exit at market was correct")
+                print("  ✅ Stop not hit, exit at market was correct")
 
         except Exception as e:
             print(f"  ❌ Error: {e}")
             continue
 
     print(f"\n{'=' * 80}")
-    print(f"Recalculation complete!")
+    print("Recalculation complete!")
     print(f"Total trades: {len(trades)}")
     print(f"Stop losses hit: {stop_losses_hit}")
     print(f"Records updated: {recalculated}")

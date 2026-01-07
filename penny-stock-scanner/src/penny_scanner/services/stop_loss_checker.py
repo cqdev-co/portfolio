@@ -1,9 +1,9 @@
 """Service for checking if stop losses were hit during trade lifecycle."""
 
-from datetime import date, timedelta
-from typing import Optional, Dict, Any
+from datetime import date
+from typing import Any
+
 from loguru import logger
-from decimal import Decimal
 
 from penny_scanner.services.database_service import DatabaseService
 
@@ -22,8 +22,8 @@ class StopLossChecker:
         entry_date: date,
         exit_date: date,
         entry_price: float,
-        stop_loss_price: Optional[float],
-    ) -> Dict[str, Any]:
+        stop_loss_price: float | None,
+    ) -> dict[str, Any]:
         """
         Check if stop loss was hit during the trade period.
 

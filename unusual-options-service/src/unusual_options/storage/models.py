@@ -1,8 +1,7 @@
 """Database models for signals and performance tracking."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
-from typing import List, Optional, Dict
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 
@@ -20,7 +19,7 @@ class RiskAssessment:
     """Risk assessment for a signal."""
 
     risk_level: str  # LOW, MEDIUM, HIGH, EXTREME
-    risk_factors: List[RiskFactor]
+    risk_factors: list[RiskFactor]
 
     @property
     def risk_count(self) -> int:
@@ -36,9 +35,7 @@ class UnusualOptionsSignal:
     signal_id: str = field(default_factory=lambda: str(uuid4()))
     ticker: str = ""
     option_symbol: str = ""
-    detection_timestamp: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    detection_timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Option Details
     strike: float = 0.0
@@ -75,58 +72,58 @@ class UnusualOptionsSignal:
 
     # Risk Assessment
     risk_level: str = "MEDIUM"
-    risk_factors: List[str] = field(default_factory=list)
+    risk_factors: list[str] = field(default_factory=list)
 
     # Market Context
     underlying_price: float = 0.0
-    implied_volatility: Optional[float] = None
-    iv_rank: Optional[float] = None
-    market_cap: Optional[int] = None
-    avg_daily_volume: Optional[int] = None
+    implied_volatility: float | None = None
+    iv_rank: float | None = None
+    market_cap: int | None = None
+    avg_daily_volume: int | None = None
 
     # Directional Bias
     sentiment: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
-    put_call_ratio: Optional[float] = None
+    put_call_ratio: float | None = None
 
     # Additional Context
-    days_to_earnings: Optional[int] = None
+    days_to_earnings: int | None = None
     has_upcoming_catalyst: bool = False
-    catalyst_description: Optional[str] = None
+    catalyst_description: str | None = None
 
     # Performance Tracking (filled later)
-    forward_return_1d: Optional[float] = None
-    forward_return_5d: Optional[float] = None
-    forward_return_30d: Optional[float] = None
-    win: Optional[bool] = None
+    forward_return_1d: float | None = None
+    forward_return_5d: float | None = None
+    forward_return_30d: float | None = None
+    win: bool | None = None
 
     # Spread Detection (Phase 1)
     is_likely_spread: bool = False
-    spread_confidence: Optional[float] = None
-    spread_type: Optional[str] = None
-    matched_leg_symbols: List[str] = field(default_factory=list)
-    spread_strike_width: Optional[float] = None
-    spread_detection_reason: Optional[str] = None
-    spread_net_premium: Optional[float] = None
+    spread_confidence: float | None = None
+    spread_type: str | None = None
+    matched_leg_symbols: list[str] = field(default_factory=list)
+    spread_strike_width: float | None = None
+    spread_detection_reason: str | None = None
+    spread_net_premium: float | None = None
 
     # Hedge Detection (Phase 2)
     likely_hedge: bool = False
     hedge_confidence: float = 0.0
-    hedge_type: Optional[str] = None  # PROTECTIVE_PUT, COLLAR,
+    hedge_type: str | None = None  # PROTECTIVE_PUT, COLLAR,
     # COVERED_CALL, INDEX_HEDGE, etc.
-    hedge_indicators: List[str] = field(default_factory=list)
+    hedge_indicators: list[str] = field(default_factory=list)
 
     # Cross-Signal Correlation
-    correlated_signal_ids: List[str] = field(default_factory=list)
-    time_window_group_id: Optional[str] = None
+    correlated_signal_ids: list[str] = field(default_factory=list)
+    time_window_group_id: str | None = None
 
     # Order Side Inference
-    inferred_side: Optional[str] = None  # BUY, SELL, MIXED
+    inferred_side: str | None = None  # BUY, SELL, MIXED
     side_confidence: float = 0.0
 
     # Metadata
     data_provider: str = ""
     detection_version: str = "0.2.0"
-    raw_detection_data: Dict = field(default_factory=dict)
+    raw_detection_data: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -138,38 +135,36 @@ class SignalPerformance:
     ticker: str = ""
 
     # Entry
-    entry_timestamp: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    entry_timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     entry_price: float = 0.0
     option_symbol: str = ""
     signal_grade: str = ""
     signal_sentiment: str = ""
 
     # Price tracking
-    price_1d_later: Optional[float] = None
-    price_5d_later: Optional[float] = None
-    price_30d_later: Optional[float] = None
-    current_price: Optional[float] = None
+    price_1d_later: float | None = None
+    price_5d_later: float | None = None
+    price_30d_later: float | None = None
+    current_price: float | None = None
 
     # Forward returns
-    forward_return_1d: Optional[float] = None
-    forward_return_5d: Optional[float] = None
-    forward_return_30d: Optional[float] = None
+    forward_return_1d: float | None = None
+    forward_return_5d: float | None = None
+    forward_return_30d: float | None = None
 
     # Win/loss
-    win_1d: Optional[bool] = None
-    win_5d: Optional[bool] = None
-    win_30d: Optional[bool] = None
-    overall_win: Optional[bool] = None
+    win_1d: bool | None = None
+    win_5d: bool | None = None
+    win_30d: bool | None = None
+    overall_win: bool | None = None
 
     # Performance metrics
-    max_favorable_move: Optional[float] = None
-    max_adverse_move: Optional[float] = None
+    max_favorable_move: float | None = None
+    max_adverse_move: float | None = None
 
     # Notes
     trade_notes: str = ""
     exit_reason: str = ""
 
     # Metadata
-    last_updated: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = field(default_factory=lambda: datetime.now(UTC))

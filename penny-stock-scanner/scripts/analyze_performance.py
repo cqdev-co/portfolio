@@ -1,14 +1,14 @@
 """Script to analyze penny stock scanner performance from database."""
 
-import asyncio
 import os
-from datetime import date, timedelta
 from collections import defaultdict
-from supabase import create_client
+from datetime import date, timedelta
+
 from dotenv import load_dotenv
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
+from supabase import create_client
 
 # Load environment variables
 load_dotenv()
@@ -174,9 +174,7 @@ def analyze_signals():
 
     # === Volume Analysis ===
     volume_ratios = [s.get("volume_ratio", 0) for s in signals if s.get("volume_ratio")]
-    volume_spikes = [
-        s.get("volume_spike_factor", 0) for s in signals if s.get("volume_spike_factor")
-    ]
+    [s.get("volume_spike_factor", 0) for s in signals if s.get("volume_spike_factor")]
 
     if volume_ratios:
         console.print("\n[bold]📊 Volume Analysis:[/bold]")

@@ -3,7 +3,7 @@ Wave-based gradient generators.
 """
 
 import numpy as np
-from typing import List, Tuple
+
 from ..core.base import BaseGenerator
 
 
@@ -87,7 +87,7 @@ class InterferencePatternGenerator(BaseGenerator):
 
         # Generate interference from multiple sources
         np.random.seed(self.params.get("seed", 42))
-        for i in range(num_sources):
+        for _i in range(num_sources):
             # Random source position
             source_x = np.random.random()
             source_y = np.random.random()

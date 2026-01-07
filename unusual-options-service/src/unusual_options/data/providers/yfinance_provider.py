@@ -1,21 +1,22 @@
 """YFinance data provider implementation."""
 
-import yfinance as yf
-import pandas as pd
 import asyncio
 import time
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta, timezone
+from datetime import UTC, date, datetime
+from typing import Any
+
+import pandas as pd
+import yfinance as yf
 from loguru import logger
 
-from .base import DataProvider, DataNotAvailableError, RateLimitError
-from ..models import OptionsChain, OptionsContract, HistoricalData, Trade
+from ..models import HistoricalData, OptionsChain, OptionsContract
+from .base import DataProvider, RateLimitError
 
 
 class YFinanceProvider(DataProvider):
     """YFinance implementation of data provider."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.name = "YFinance"
 
@@ -108,10 +109,10 @@ class YFinanceProvider(DataProvider):
                         )
                         continue
                     else:
-                        logger.error(f"Max retries exceeded for rate limited request")
+                        logger.error("Max retries exceeded for rate limited request")
                         raise RateLimitError(
                             f"Rate limit exceeded after {self.max_retries} retries"
-                        )
+                        ) from e
 
                 # Check for other recoverable errors
                 elif any(
@@ -132,7 +133,7 @@ class YFinanceProvider(DataProvider):
 
         raise Exception("Max retries exceeded")
 
-    async def get_options_chain(self, ticker: str) -> Optional[OptionsChain]:
+    async def get_options_chain(self, ticker: str) -> OptionsChain | None:
         """
         Get current options chain from YFinance.
 
@@ -175,8 +176,8 @@ class YFinanceProvider(DataProvider):
                     expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
 
                     # Get calls and puts for this expiry with retry logic
-                    def get_option_chain():
-                        return yf_ticker.option_chain(expiry_str)
+                    def get_option_chain(exp=expiry_str):
+                        return yf_ticker.option_chain(exp)
 
                     option_chain = await self._make_request_with_retry(get_option_chain)
 
@@ -217,7 +218,7 @@ class YFinanceProvider(DataProvider):
                 ticker=ticker,
                 underlying_price=float(current_price),
                 contracts=all_contracts,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
         except RateLimitError as e:
@@ -229,7 +230,7 @@ class YFinanceProvider(DataProvider):
 
     def _create_contract_from_yf_row(
         self, row: Any, expiry_date: date, option_type: str, ticker: str
-    ) -> Optional[OptionsContract]:
+    ) -> OptionsContract | None:
         """Create OptionsContract from YFinance row data."""
         try:
             # YFinance column names
@@ -259,7 +260,7 @@ class YFinanceProvider(DataProvider):
                 volume=volume,
                 open_interest=open_interest,
                 implied_volatility=float(implied_vol) if implied_vol else None,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
 
         except Exception as e:
@@ -268,7 +269,7 @@ class YFinanceProvider(DataProvider):
 
     async def get_historical_options(
         self, ticker: str, days: int = 20
-    ) -> Optional[HistoricalData]:
+    ) -> HistoricalData | None:
         """
         Get historical options data from YFinance.
 
@@ -316,7 +317,7 @@ class YFinanceProvider(DataProvider):
             logger.error(f"YFinance connection test failed: {e}")
             return False
 
-    def get_rate_limit_info(self) -> Dict[str, Any]:
+    def get_rate_limit_info(self) -> dict[str, Any]:
         """Get YFinance rate limit information."""
         return {
             "provider": "YFinance",
@@ -330,13 +331,13 @@ class YFinanceProvider(DataProvider):
 class PolygonProvider(DataProvider):
     """Polygon.io data provider (fallback, requires API key)."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         self.name = "Polygon.io"
         self.api_key = config.get("POLYGON_API_KEY", "")
         self.base_url = "https://api.polygon.io"
 
-    async def get_options_chain(self, ticker: str) -> Optional[OptionsChain]:
+    async def get_options_chain(self, ticker: str) -> OptionsChain | None:
         """Get options chain from Polygon.io."""
         if not self.api_key:
             logger.warning("Polygon.io API key not provided")
@@ -348,7 +349,7 @@ class PolygonProvider(DataProvider):
 
     async def get_historical_options(
         self, ticker: str, days: int = 20
-    ) -> Optional[HistoricalData]:
+    ) -> HistoricalData | None:
         """Get historical options from Polygon.io."""
         if not self.api_key:
             logger.warning("Polygon.io API key not provided")
@@ -368,7 +369,7 @@ class PolygonProvider(DataProvider):
         logger.info("Polygon.io connection test - not implemented yet")
         return False
 
-    def get_rate_limit_info(self) -> Dict[str, Any]:
+    def get_rate_limit_info(self) -> dict[str, Any]:
         """Get Polygon.io rate limit information."""
         return {
             "provider": "Polygon.io",
@@ -378,7 +379,7 @@ class PolygonProvider(DataProvider):
         }
 
 
-def get_provider(config: Dict[str, Any]) -> DataProvider:
+def get_provider(config: dict[str, Any]) -> DataProvider:
     """
     Get the appropriate data provider based on configuration.
 
@@ -399,7 +400,7 @@ def get_provider(config: Dict[str, Any]) -> DataProvider:
         return YFinanceProvider(config)
 
 
-async def get_provider_with_fallback(config: Dict[str, Any]) -> DataProvider:
+async def get_provider_with_fallback(config: dict[str, Any]) -> DataProvider:
     """
     Get provider with automatic fallback to YFinance if primary fails.
 

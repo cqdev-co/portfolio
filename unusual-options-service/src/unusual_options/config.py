@@ -2,12 +2,13 @@
 
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
 from dotenv import load_dotenv
 from loguru import logger
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     """
     Load configuration from environment variables.
 
@@ -98,7 +99,7 @@ def load_config() -> Dict[str, Any]:
     return config
 
 
-def setup_logging(config: Dict[str, Any]) -> None:
+def setup_logging(config: dict[str, Any]) -> None:
     """
     Configure loguru logger based on config.
 

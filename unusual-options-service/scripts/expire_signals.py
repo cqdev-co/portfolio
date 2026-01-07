@@ -7,8 +7,9 @@ has passed. Should be run daily after market close (4:30 PM ET).
 
 import os
 import sys
+from datetime import date
 from pathlib import Path
-from datetime import datetime, date, timezone
+
 from loguru import logger
 
 # Add parent directory to path for imports
@@ -138,12 +139,12 @@ def expire_signals(dry_run: bool = False) -> dict:
         logger.info("EXPIRATION SUMMARY")
         logger.info("=" * 60)
 
-        logger.info(f"\nBy Expiry Date:")
+        logger.info("\nBy Expiry Date:")
         for expiry in sorted(by_expiry.keys()):
             count = by_expiry[expiry]
             logger.info(f"  {expiry}: {count:,} signals")
 
-        logger.info(f"\nBy Grade:")
+        logger.info("\nBy Grade:")
         for grade in sorted(
             by_grade.keys(),
             key=lambda x: {"S": 6, "A": 5, "B": 4, "C": 3, "D": 2, "F": 1}.get(x, 0),
@@ -152,7 +153,7 @@ def expire_signals(dry_run: bool = False) -> dict:
             count = by_grade[grade]
             logger.info(f"  Grade {grade}: {count:,} signals")
 
-        logger.info(f"\nTop 10 Tickers:")
+        logger.info("\nTop 10 Tickers:")
         top_tickers = sorted(by_ticker.items(), key=lambda x: x[1], reverse=True)[:10]
         for ticker, count in top_tickers:
             logger.info(f"  {ticker}: {count:,} signals")

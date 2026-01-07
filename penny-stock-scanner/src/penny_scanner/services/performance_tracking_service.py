@@ -1,9 +1,10 @@
 """Performance tracking service for penny stock signals."""
 
-from datetime import datetime, date, timezone
-from typing import List, Dict, Optional, Any
-from loguru import logger
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
+
+from loguru import logger
 
 from penny_scanner.models.analysis import AnalysisResult, SignalStatus
 from penny_scanner.services.database_service import DatabaseService
@@ -18,7 +19,7 @@ class PerformanceTrackingService:
         self.data_service = data_service
 
     async def track_new_signals(
-        self, signals: List[AnalysisResult], scan_date: date = None
+        self, signals: list[AnalysisResult], scan_date: date = None
     ) -> int:
         """
         Track new signals in the performance tracking system.
@@ -88,7 +89,7 @@ class PerformanceTrackingService:
         return tracked_count
 
     async def close_ended_signals(
-        self, ended_symbols: List[str], scan_date: date = None
+        self, ended_symbols: list[str], scan_date: date = None
     ) -> int:
         """
         Close performance tracking for signals that have ended.
@@ -183,7 +184,7 @@ class PerformanceTrackingService:
                         "return_absolute": round(return_absolute, 4),
                         "days_held": days_held,
                         "is_winner": is_winner,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(UTC).isoformat(),
                     }
 
                     self.database_service.client.table(
@@ -210,7 +211,7 @@ class PerformanceTrackingService:
         # Only track actionable signals
         return signal.is_actionable()
 
-    async def _get_signal_id(self, symbol: str, scan_date: date) -> Optional[str]:
+    async def _get_signal_id(self, symbol: str, scan_date: date) -> str | None:
         """Get the database ID for a signal."""
         try:
             response = (
@@ -229,9 +230,7 @@ class PerformanceTrackingService:
 
         return None
 
-    async def _get_current_price(
-        self, symbol: str, scan_date: date
-    ) -> Optional[Decimal]:
+    async def _get_current_price(self, symbol: str, scan_date: date) -> Decimal | None:
         """Get the current/exit price for a symbol."""
         try:
             # Get the most recent price from the signals table
@@ -253,7 +252,7 @@ class PerformanceTrackingService:
 
     def _prepare_performance_data(
         self, signal: AnalysisResult, signal_id: str, scan_date: date
-    ) -> Dict:
+    ) -> dict:
         """Prepare performance tracking data for database insertion."""
         explosion = signal.explosion_signal
 
@@ -277,7 +276,7 @@ class PerformanceTrackingService:
             "status": "ACTIVE",
         }
 
-    async def get_performance_summary(self) -> Dict:
+    async def get_performance_summary(self) -> dict:
         """Get a summary of current performance tracking."""
         if not self.database_service.is_available():
             return {}
@@ -326,7 +325,7 @@ class PerformanceTrackingService:
             episodes = []
             current_episode = None
 
-            for i, signal in enumerate(signals):
+            for _i, signal in enumerate(signals):
                 symbol = signal["symbol"]
                 scan_date = date.fromisoformat(signal["scan_date"])
 
@@ -461,7 +460,7 @@ class PerformanceTrackingService:
             logger.error(f"Error backfilling history: {e}")
             return 0
 
-    async def _calculate_basic_metrics(self) -> Dict:
+    async def _calculate_basic_metrics(self) -> dict:
         """Calculate basic performance metrics."""
         try:
             # Get all performance records
@@ -516,7 +515,7 @@ class PerformanceTrackingService:
             logger.error(f"Error calculating basic metrics: {e}")
             return {}
 
-    async def get_performance_by_rank(self) -> Dict[str, Dict]:
+    async def get_performance_by_rank(self) -> dict[str, dict]:
         """Get performance metrics broken down by opportunity rank."""
         if not self.database_service.is_available():
             return {}
@@ -560,7 +559,7 @@ class PerformanceTrackingService:
             logger.error(f"Error calculating rank metrics: {e}")
             return {}
 
-    async def get_top_trades(self, limit: int = 5) -> Dict[str, List]:
+    async def get_top_trades(self, limit: int = 5) -> dict[str, list]:
         """Get top winning and losing trades."""
         if not self.database_service.is_available():
             return {"winners": [], "losers": []}

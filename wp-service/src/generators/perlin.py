@@ -3,7 +3,7 @@ Perlin noise gradient generator.
 """
 
 import numpy as np
-from typing import List, Tuple
+
 from ..core.base import BaseGenerator
 
 
@@ -11,7 +11,7 @@ class PerlinNoiseGenerator(BaseGenerator):
     """Generate gradients using Perlin noise."""
 
     def __init__(
-        self, width: int, height: int, colors: List[Tuple[int, int, int]], **params
+        self, width: int, height: int, colors: list[tuple[int, int, int]], **params
     ):
         super().__init__(width, height, colors, **params)
 

@@ -7,8 +7,8 @@ tickers with sufficient liquidity, data quality, and market presence.
 """
 
 # Database table names
-TABLE_TICKERS = 'tickers'
-TABLE_PENNY_TICKERS = 'penny_tickers'
+TABLE_TICKERS = "tickers"
+TABLE_PENNY_TICKERS = "penny_tickers"
 
 # Batch processing
 DEFAULT_BATCH_SIZE = 1000
@@ -41,9 +41,9 @@ TICKER_MIN_DOLLAR_VOLUME = 500_000
 TICKER_MIN_QUALITY_SCORE = 60.0
 
 # Data quality thresholds
-TICKER_MIN_HISTORY_DAYS = 180        # 6 months of history required
+TICKER_MIN_HISTORY_DAYS = 180  # 6 months of history required
 TICKER_MIN_DATA_COMPLETENESS = 0.90  # 90% data completeness
-TICKER_MAX_GAP_RATIO = 0.05          # Max 5% gaps allowed
+TICKER_MAX_GAP_RATIO = 0.05  # Max 5% gaps allowed
 
 # =============================================================================
 # API limits
@@ -62,20 +62,20 @@ DEFAULT_MAX_PENNY_TICKERS = 2000
 # Quality scoring weights
 # =============================================================================
 QUALITY_SCORE_WEIGHTS = {
-    'market_cap': 25,      # 25 points max
-    'liquidity': 25,       # 25 points max (volume + dollar volume)
-    'fundamentals': 20,    # 20 points max (revenue, profitability)
-    'index_inclusion': 15, # 15 points max
-    'data_quality': 15,    # 15 points max
+    "market_cap": 25,  # 25 points max
+    "liquidity": 25,  # 25 points max (volume + dollar volume)
+    "fundamentals": 20,  # 20 points max (revenue, profitability)
+    "index_inclusion": 15,  # 15 points max
+    "data_quality": 15,  # 15 points max
 }
 
 # Index membership bonuses
 INDEX_BONUSES = {
-    'sp500': 15,
-    'nasdaq100': 12,
-    'dow30': 15,
-    'russell1000': 10,
-    'russell2000': 5,
+    "sp500": 15,
+    "nasdaq100": 12,
+    "dow30": 15,
+    "russell1000": 10,
+    "russell2000": 5,
 }
 
 # =============================================================================
@@ -83,28 +83,24 @@ INDEX_BONUSES = {
 # =============================================================================
 ADVANCED_QUALITY_CONFIG = {
     # Options eligibility
-    'require_options': True,
-    'min_option_expiries': 2,
-    
+    "require_options": True,
+    "min_option_expiries": 2,
     # Institutional ownership
-    'min_institutional_ownership': 0.10,  # 10% minimum
-    'min_institutional_holders': 5,
-    
+    "min_institutional_ownership": 0.10,  # 10% minimum
+    "min_institutional_holders": 5,
     # Fundamental requirements
-    'min_revenue': 10_000_000,            # $10M minimum
-    'require_positive_revenue': True,
-    
+    "min_revenue": 10_000_000,  # $10M minimum
+    "require_positive_revenue": True,
     # Float/liquidity depth
-    'min_float_shares': 5_000_000,        # 5M shares
-    'min_float_percent': 0.20,            # 20% of outstanding
-    'max_short_percent': 0.50,            # Max 50% short interest
+    "min_float_shares": 5_000_000,  # 5M shares
+    "min_float_percent": 0.20,  # 20% of outstanding
+    "max_short_percent": 0.50,  # Max 50% short interest
 }
 
 # Advanced quality scoring (adds up to 33 bonus points)
 ADVANCED_QUALITY_SCORING = {
-    'options': 8,           # 8 pts for options eligibility
-    'institutional': 8,     # 8 pts for institutional ownership
-    'fundamentals': 11,     # 8 + 3 bonus for profitability
-    'float': 6,             # 6 pts for adequate float
+    "options": 8,  # 8 pts for options eligibility
+    "institutional": 8,  # 8 pts for institutional ownership
+    "fundamentals": 11,  # 8 + 3 bonus for profitability
+    "float": 6,  # 6 pts for adequate float
 }
-

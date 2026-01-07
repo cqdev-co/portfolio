@@ -2,20 +2,20 @@
 Mathematical gradient generators.
 """
 
-from .linear import LinearGradientGenerator
-from .radial import RadialGradientGenerator
-from .perlin import PerlinNoiseGenerator
 from .fractal import FractalGenerator
+from .linear import LinearGradientGenerator
+from .organic import (
+    FluidGradientGenerator,
+    GlassGradientGenerator,
+    OrganicGradientGenerator,
+)
+from .perlin import PerlinNoiseGenerator
+from .radial import RadialGradientGenerator
 from .wave import (
-    WaveGradientGenerator,
+    CylindricalWaveGenerator,
     InterferencePatternGenerator,
     SpiralWaveGenerator,
-    CylindricalWaveGenerator,
-)
-from .organic import (
-    OrganicGradientGenerator,
-    GlassGradientGenerator,
-    FluidGradientGenerator,
+    WaveGradientGenerator,
 )
 
 __all__ = [

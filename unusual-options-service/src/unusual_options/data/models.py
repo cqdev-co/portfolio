@@ -1,8 +1,7 @@
 """Data models for options chains and market data."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
-from typing import List, Optional, Dict
+from datetime import UTC, date, datetime
 
 
 @dataclass
@@ -22,16 +21,16 @@ class OptionsContract:
     open_interest: int
 
     # Greeks (optional)
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    theta: Optional[float] = None
-    vega: Optional[float] = None
+    delta: float | None = None
+    gamma: float | None = None
+    theta: float | None = None
+    vega: float | None = None
 
     # Implied volatility
-    implied_volatility: Optional[float] = None
+    implied_volatility: float | None = None
 
     # Metadata
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -40,18 +39,18 @@ class OptionsChain:
 
     ticker: str
     underlying_price: float
-    contracts: List[OptionsContract]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    contracts: list[OptionsContract]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def get_calls(self) -> List[OptionsContract]:
+    def get_calls(self) -> list[OptionsContract]:
         """Get all call contracts."""
         return [c for c in self.contracts if c.option_type == "call"]
 
-    def get_puts(self) -> List[OptionsContract]:
+    def get_puts(self) -> list[OptionsContract]:
         """Get all put contracts."""
         return [c for c in self.contracts if c.option_type == "put"]
 
-    def get_expiry(self, expiry_date: date) -> List[OptionsContract]:
+    def get_expiry(self, expiry_date: date) -> list[OptionsContract]:
         """Get contracts for specific expiry."""
         return [c for c in self.contracts if c.expiry == expiry_date]
 
@@ -78,9 +77,9 @@ class HistoricalData:
     """Historical options data for lookback analysis."""
 
     ticker: str
-    avg_volumes: Dict[str, float]  # contract_symbol -> avg_volume
-    prev_oi: Dict[str, int]  # contract_symbol -> previous_oi
-    time_sales: Dict[str, List[Trade]]  # contract_symbol -> trades
+    avg_volumes: dict[str, float]  # contract_symbol -> avg_volume
+    prev_oi: dict[str, int]  # contract_symbol -> previous_oi
+    time_sales: dict[str, list[Trade]]  # contract_symbol -> trades
 
     def get_avg_volume(self, contract_symbol: str, days: int = 20) -> float:
         """Get average volume for contract."""
@@ -90,13 +89,13 @@ class HistoricalData:
         """Get previous open interest."""
         return self.prev_oi.get(contract_symbol, 0)
 
-    def get_time_and_sales(self, contract_symbol: str) -> List[Trade]:
+    def get_time_and_sales(self, contract_symbol: str) -> list[Trade]:
         """Get time & sales data for contract."""
         return self.time_sales.get(contract_symbol, [])
 
     def get_time_and_sales_with_exchanges(
         self, contract_symbol: str, window_seconds: int = 5
-    ) -> List[Trade]:
+    ) -> list[Trade]:
         """Get time & sales with exchange information."""
         # TODO: Filter by time window
         return self.get_time_and_sales(contract_symbol)

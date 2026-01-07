@@ -1,12 +1,17 @@
 """Signal continuity service for tracking penny stock signals across multiple scans."""
 
 from datetime import date, timedelta
-from typing import List, Dict, Optional, Set
+from typing import TYPE_CHECKING, Optional
+
 from loguru import logger
 
 from penny_scanner.models.analysis import AnalysisResult, SignalStatus
 from penny_scanner.services.database_service import DatabaseService
 
+if TYPE_CHECKING:
+    from penny_scanner.services.performance_tracking_service import (
+        PerformanceTrackingService,
+    )
 
 # US Market Holidays (approximate - update annually)
 # These are the major market closure dates
@@ -50,7 +55,7 @@ US_MARKET_HOLIDAYS_2026 = {
 }
 
 # Combined set for quick lookup
-US_MARKET_HOLIDAYS: Set[date] = (
+US_MARKET_HOLIDAYS: set[date] = (
     US_MARKET_HOLIDAYS_2024 | US_MARKET_HOLIDAYS_2025 | US_MARKET_HOLIDAYS_2026
 )
 
@@ -117,8 +122,8 @@ class SignalContinuityService:
         self.performance_service = performance_service
 
     async def process_signals_with_continuity(
-        self, current_signals: List[AnalysisResult], scan_date: date
-    ) -> List[AnalysisResult]:
+        self, current_signals: list[AnalysisResult], scan_date: date
+    ) -> list[AnalysisResult]:
         """
         Process signals and determine continuity status.
 
@@ -217,8 +222,8 @@ class SignalContinuityService:
 
     async def _track_ended_signals(
         self,
-        current_signals: List[AnalysisResult],
-        previous_signals: List[Dict],
+        current_signals: list[AnalysisResult],
+        previous_signals: list[dict],
         scan_date: date,
     ) -> None:
         """
@@ -249,7 +254,7 @@ class SignalContinuityService:
 
     async def get_signal_history(
         self, symbol: str, trading_days_back: int = 7
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get historical signals for a specific symbol.
 
@@ -296,7 +301,7 @@ class SignalContinuityService:
 
     async def get_longest_running_signals(
         self, scan_date: date, limit: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get signals with the most consecutive days active.
 
@@ -322,7 +327,7 @@ class SignalContinuityService:
             logger.error(f"Error fetching longest running signals: {e}")
             return []
 
-    async def get_continuity_stats(self, scan_date: date) -> Dict[str, int]:
+    async def get_continuity_stats(self, scan_date: date) -> dict[str, int]:
         """
         Get continuity statistics for a scan date.
 

@@ -5,14 +5,13 @@ Calculates how penny stocks perform relative to the broader market
 to identify true outperformance vs general market moves.
 """
 
-import yfinance as yf
-from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
-from loguru import logger
-import numpy as np
+from datetime import datetime
 
-from penny_scanner.models.market_data import MarketData
+import yfinance as yf
+from loguru import logger
+
 from penny_scanner.config.settings import Settings
+from penny_scanner.models.market_data import MarketData
 
 
 class MarketComparisonService:
@@ -25,8 +24,8 @@ class MarketComparisonService:
     def __init__(self, settings: Settings):
         """Initialize market comparison service."""
         self.settings = settings
-        self._spy_cache: Dict[str, any] = {}
-        self._cache_timestamp: Optional[datetime] = None
+        self._spy_cache: dict[str, any] = {}
+        self._cache_timestamp: datetime | None = None
         self._cache_ttl_minutes = 30  # Refresh SPY data every 30 minutes
 
     def _is_cache_valid(self) -> bool:
@@ -36,7 +35,7 @@ class MarketComparisonService:
         age = datetime.now() - self._cache_timestamp
         return age.total_seconds() < (self._cache_ttl_minutes * 60)
 
-    def _fetch_spy_data(self, period: str = "1mo") -> Optional[Dict]:
+    def _fetch_spy_data(self, period: str = "1mo") -> dict | None:
         """
         Fetch SPY benchmark data.
 
@@ -102,7 +101,7 @@ class MarketComparisonService:
             logger.error(f"Error fetching SPY data: {e}")
             return None
 
-    def get_spy_data(self) -> Optional[Dict]:
+    def get_spy_data(self) -> dict | None:
         """
         Get SPY data, using cache if valid.
 
@@ -115,7 +114,7 @@ class MarketComparisonService:
 
     def calculate_market_outperformance(
         self, stock_return_5d: float, stock_return_20d: float
-    ) -> Tuple[Optional[float], Optional[float]]:
+    ) -> tuple[float | None, float | None]:
         """
         Calculate how much a stock outperforms the market.
 
@@ -140,7 +139,7 @@ class MarketComparisonService:
 
     def calculate_relative_strength(
         self, market_data: MarketData
-    ) -> Dict[str, Optional[float]]:
+    ) -> dict[str, float | None]:
         """
         Calculate comprehensive relative strength metrics for a stock.
 
@@ -194,7 +193,7 @@ class MarketComparisonService:
 
     def is_outperforming_market(
         self, market_data: MarketData, threshold_pct: float = 5.0
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         """
         Check if a stock is significantly outperforming the market.
 
@@ -217,7 +216,7 @@ class MarketComparisonService:
 
 
 # Singleton instance for efficiency
-_market_comparison_service: Optional[MarketComparisonService] = None
+_market_comparison_service: MarketComparisonService | None = None
 
 
 def get_market_comparison_service(settings: Settings) -> MarketComparisonService:

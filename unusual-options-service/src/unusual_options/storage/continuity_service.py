@@ -8,13 +8,13 @@ This service handles:
 4. Tracking signal history over time
 """
 
-import asyncio
-from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, date, timezone
-from loguru import logger
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
+from loguru import logger
 from supabase import Client
+
 from .models import UnusualOptionsSignal
 
 
@@ -32,7 +32,7 @@ class SignalContinuityService:
         """
         self.client = client
 
-    async def find_existing_signal(self, signal: UnusualOptionsSignal) -> Optional[str]:
+    async def find_existing_signal(self, signal: UnusualOptionsSignal) -> str | None:
         """
         Check if signal already exists in database (within 24 hours).
 
@@ -106,7 +106,7 @@ class SignalContinuityService:
             logger.error(f"Error updating signal continuity: {e}")
             return False
 
-    async def store_new_signal(self, signal: UnusualOptionsSignal) -> Optional[str]:
+    async def store_new_signal(self, signal: UnusualOptionsSignal) -> str | None:
         """
         Store a brand new signal in the database.
 
@@ -123,7 +123,7 @@ class SignalContinuityService:
 
             # Get current time for storage timestamps
             # Use timezone-aware UTC time to match PostgreSQL NOW()
-            current_time = datetime.now(timezone.utc).isoformat()
+            current_time = datetime.now(UTC).isoformat()
 
             # Prepare data
             data = {
@@ -196,8 +196,8 @@ class SignalContinuityService:
             return None
 
     async def process_signals(
-        self, signals: List[UnusualOptionsSignal]
-    ) -> Dict[str, Any]:
+        self, signals: list[UnusualOptionsSignal]
+    ) -> dict[str, Any]:
         """
         Process a batch of signals with deduplication.
 
@@ -278,7 +278,7 @@ class SignalContinuityService:
             logger.error(f"Error marking expired signals: {e}")
             return 0
 
-    async def get_signal_history(self, signal_id: str) -> List[Dict[str, Any]]:
+    async def get_signal_history(self, signal_id: str) -> list[dict[str, Any]]:
         """
         Get continuity history for a signal.
 
@@ -305,10 +305,10 @@ class SignalContinuityService:
 
     async def get_active_signals(
         self,
-        ticker: Optional[str] = None,
-        min_grade: Optional[str] = None,
+        ticker: str | None = None,
+        min_grade: str | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get currently active signals.
 
@@ -350,7 +350,7 @@ class SignalContinuityService:
             return []
 
 
-async def create_continuity_service(config: Dict[str, Any]) -> SignalContinuityService:
+async def create_continuity_service(config: dict[str, Any]) -> SignalContinuityService:
     """
     Factory function to create continuity service.
 
