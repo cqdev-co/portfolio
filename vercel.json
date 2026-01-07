@@ -1,4 +1,5 @@
 {
+  "framework": "nextjs",
   "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "frontend/.next",
   "installCommand": "bun install"
