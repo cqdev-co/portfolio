@@ -12,7 +12,6 @@ Provides additional quality signals beyond basic price/volume:
 import logging
 import time
 import random
-from typing import Dict, Optional, List
 from dataclasses import dataclass
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -35,14 +34,14 @@ class AdvancedQualityMetrics:
     institutional_holders: int = 0
 
     # Fundamentals
-    revenue: Optional[float] = None
-    net_income: Optional[float] = None
+    revenue: float | None = None
+    net_income: float | None = None
     is_profitable: bool = False
     has_positive_revenue: bool = False
 
     # Float/shares
-    float_shares: Optional[float] = None
-    shares_outstanding: Optional[float] = None
+    float_shares: float | None = None
+    shares_outstanding: float | None = None
     float_percent: float = 0.0
     short_percent: float = 0.0
 
@@ -54,7 +53,7 @@ class AdvancedQualityMetrics:
 
     # Overall
     advanced_quality_score: float = 0.0
-    quality_issues: List[str] = None
+    quality_issues: list[str] = None
 
     def __post_init__(self):
         if self.quality_issues is None:
@@ -307,8 +306,8 @@ class AdvancedQualityChecker:
         return metrics
 
     def check_batch(
-        self, symbols: List[str], verbose: bool = False
-    ) -> Dict[str, AdvancedQualityMetrics]:
+        self, symbols: list[str], verbose: bool = False
+    ) -> dict[str, AdvancedQualityMetrics]:
         """
         Check multiple tickers in parallel.
 
@@ -371,7 +370,7 @@ class AdvancedQualityChecker:
 
         return results
 
-    def get_summary(self, results: Dict[str, AdvancedQualityMetrics]) -> Dict:
+    def get_summary(self, results: dict[str, AdvancedQualityMetrics]) -> dict:
         """Generate summary statistics from check results."""
         if not results:
             return {}

@@ -31,7 +31,6 @@ import os
 import sys
 import logging
 import argparse
-from typing import List, Optional, Set
 from dataclasses import dataclass
 import requests
 from supabase import create_client, Client
@@ -65,12 +64,12 @@ class PennyTickerInfo:
 
     symbol: str
     name: str
-    exchange: Optional[str] = None
-    country: Optional[str] = None
-    currency: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    market_cap: Optional[int] = None
+    exchange: str | None = None
+    country: str | None = None
+    currency: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: int | None = None
     ticker_type: str = "stock"
 
 
@@ -217,7 +216,7 @@ class PennyTickerFetcher:
             self.yfinance_validator = None
             self.logger.info("YFinance validation disabled")
 
-    def fetch_fmp_penny_tickers(self) -> List[PennyTickerInfo]:
+    def fetch_fmp_penny_tickers(self) -> list[PennyTickerInfo]:
         """Fetch penny stock tickers from Financial Modeling Prep API"""
         if not self.fmp_key:
             self.logger.info("Skipping FMP (no API key)")
@@ -283,7 +282,7 @@ class PennyTickerFetcher:
 
         return tickers
 
-    def fetch_alpha_vantage_penny_tickers(self) -> List[PennyTickerInfo]:
+    def fetch_alpha_vantage_penny_tickers(self) -> list[PennyTickerInfo]:
         """
         Fetch penny stock tickers from Alpha Vantage API
         (Note: Alpha Vantage doesn't support penny stock filtering,
@@ -362,11 +361,11 @@ class PennyTickerFetcher:
         return tickers
 
     def deduplicate_tickers(
-        self, all_tickers: List[PennyTickerInfo]
-    ) -> List[PennyTickerInfo]:
+        self, all_tickers: list[PennyTickerInfo]
+    ) -> list[PennyTickerInfo]:
         """Remove duplicate tickers"""
-        seen_symbols: Set[str] = set()
-        unique_tickers: List[PennyTickerInfo] = []
+        seen_symbols: set[str] = set()
+        unique_tickers: list[PennyTickerInfo] = []
 
         for ticker in all_tickers:
             if ticker.symbol not in seen_symbols:
@@ -381,8 +380,8 @@ class PennyTickerFetcher:
         return unique_tickers
 
     def apply_yfinance_validation(
-        self, tickers: List[PennyTickerInfo]
-    ) -> List[PennyTickerInfo]:
+        self, tickers: list[PennyTickerInfo]
+    ) -> list[PennyTickerInfo]:
         """
         Apply YFinance data quality validation for penny stocks.
         This validates price range, volume, and data availability.
@@ -464,7 +463,7 @@ class PennyTickerFetcher:
             )
             return tickers
 
-    def store_tickers(self, tickers: List[PennyTickerInfo]) -> bool:
+    def store_tickers(self, tickers: list[PennyTickerInfo]) -> bool:
         """Store penny tickers in Supabase database"""
         return store_tickers_util(
             self.supabase,

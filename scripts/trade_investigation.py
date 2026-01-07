@@ -13,7 +13,6 @@ import os
 import json
 import urllib.request
 from dataclasses import dataclass
-from typing import Optional
 
 PROXY_URL = os.environ.get(
     "YAHOO_PROXY_URL", "https://yahoo-proxy.conorquinlan.workers.dev"
@@ -26,24 +25,24 @@ class TickerData:
 
     symbol: str
     price: float
-    forward_pe: Optional[float]
-    fifty_day_avg: Optional[float]
-    two_hundred_day_avg: Optional[float]
-    atm_iv: Optional[float]
-    put_call_ratio: Optional[float]
-    bullish_pct: Optional[int]
+    forward_pe: float | None
+    fifty_day_avg: float | None
+    two_hundred_day_avg: float | None
+    atm_iv: float | None
+    put_call_ratio: float | None
+    bullish_pct: int | None
     analyst_count: int
-    short_pct_float: Optional[float]
-    earnings_days: Optional[int]
+    short_pct_float: float | None
+    earnings_days: int | None
 
     @property
-    def pct_from_50dma(self) -> Optional[float]:
+    def pct_from_50dma(self) -> float | None:
         if self.fifty_day_avg and self.price:
             return ((self.price - self.fifty_day_avg) / self.fifty_day_avg) * 100
         return None
 
     @property
-    def pct_from_200dma(self) -> Optional[float]:
+    def pct_from_200dma(self) -> float | None:
         if self.two_hundred_day_avg and self.price:
             return (
                 (self.price - self.two_hundred_day_avg) / self.two_hundred_day_avg
@@ -51,7 +50,7 @@ class TickerData:
         return None
 
 
-def fetch_ticker(symbol: str) -> Optional[TickerData]:
+def fetch_ticker(symbol: str) -> TickerData | None:
     """Fetch ticker data from Yahoo Proxy."""
     url = f"{PROXY_URL}/ticker/{symbol}"
     try:

@@ -9,7 +9,6 @@ Reduces processing time from hours to minutes.
 import logging
 import time
 import requests
-from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass
 import yfinance as yf
 import numpy as np
@@ -24,22 +23,22 @@ class EfficientTickerMetrics:
     """Comprehensive ticker metrics for quality filtering"""
 
     symbol: str
-    market_cap: Optional[float] = None
-    price: Optional[float] = None
-    volume: Optional[float] = None
-    exchange: Optional[str] = None
-    sector: Optional[str] = None
-    country: Optional[str] = None
+    market_cap: float | None = None
+    price: float | None = None
+    volume: float | None = None
+    exchange: str | None = None
+    sector: str | None = None
+    country: str | None = None
     is_valid: bool = False
     quality_score: float = 0.0
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
     # Advanced quality metrics (populated by AdvancedQualityChecker)
     has_options: bool = False
     institutional_ownership: float = 0.0
-    revenue: Optional[float] = None
+    revenue: float | None = None
     is_profitable: bool = False
-    float_shares: Optional[float] = None
+    float_shares: float | None = None
     advanced_quality_score: float = 0.0
 
 
@@ -47,7 +46,7 @@ class EfficientTickerFilter:
     """High-performance ticker filtering with batch processing"""
 
     def __init__(
-        self, alpha_vantage_key: Optional[str] = None, fmp_key: Optional[str] = None
+        self, alpha_vantage_key: str | None = None, fmp_key: str | None = None
     ):
         self.alpha_vantage_key = alpha_vantage_key
         self.fmp_key = fmp_key
@@ -87,7 +86,7 @@ class EfficientTickerFilter:
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
 
-    def _load_sp500_symbols(self) -> Set[str]:
+    def _load_sp500_symbols(self) -> set[str]:
         """Load S&P 500 symbols for priority processing"""
         # Top S&P 500 symbols by market cap (these are definitely high quality)
         return {
@@ -200,7 +199,7 @@ class EfficientTickerFilter:
             "HCA",
         }
 
-    def _load_nasdaq100_symbols(self) -> Set[str]:
+    def _load_nasdaq100_symbols(self) -> set[str]:
         """Load NASDAQ-100 symbols for quality bonus"""
         return {
             "AAPL",
@@ -293,7 +292,7 @@ class EfficientTickerFilter:
             "ALGN",
         }
 
-    def _load_dow30_symbols(self) -> Set[str]:
+    def _load_dow30_symbols(self) -> set[str]:
         """Load Dow Jones 30 symbols for quality bonus"""
         return {
             "AAPL",
@@ -328,7 +327,7 @@ class EfficientTickerFilter:
             "WBA",
         }
 
-    def pre_filter_tickers_fast(self, tickers: List[Dict]) -> List[Dict]:
+    def pre_filter_tickers_fast(self, tickers: list[dict]) -> list[dict]:
         """Fast pre-filtering based on basic criteria - AGGRESSIVE FILTERING"""
         logger.info(
             f"Pre-filtering {len(tickers)} tickers with aggressive filtering..."
@@ -442,8 +441,8 @@ class EfficientTickerFilter:
         return filtered
 
     def batch_get_basic_metrics(
-        self, symbols: List[str], batch_size: int = 100
-    ) -> Dict[str, EfficientTickerMetrics]:
+        self, symbols: list[str], batch_size: int = 100
+    ) -> dict[str, EfficientTickerMetrics]:
         """Get basic metrics for symbols using batch API calls"""
         logger.info(f"Getting basic metrics for {len(symbols)} symbols...")
 
@@ -534,8 +533,8 @@ class EfficientTickerFilter:
         )
 
     def _batch_fmp_metrics(
-        self, symbols: List[str]
-    ) -> Dict[str, EfficientTickerMetrics]:
+        self, symbols: list[str]
+    ) -> dict[str, EfficientTickerMetrics]:
         """Get metrics using Financial Modeling Prep batch API"""
         metrics = {}
         batch_size = 100  # FMP batch limit
@@ -654,8 +653,8 @@ class EfficientTickerFilter:
         return metrics
 
     def _batch_yfinance_metrics(
-        self, symbols: List[str]
-    ) -> Dict[str, EfficientTickerMetrics]:
+        self, symbols: list[str]
+    ) -> dict[str, EfficientTickerMetrics]:
         """Get metrics using yfinance (slower but free)"""
         metrics = {}
 
@@ -776,10 +775,10 @@ class EfficientTickerFilter:
 
     def filter_high_quality_tickers(
         self,
-        tickers: List[Dict],
+        tickers: list[dict],
         min_quality_score: float = 60.0,
         max_tickers: int = 1000,
-    ) -> Tuple[List[str], List[EfficientTickerMetrics]]:
+    ) -> tuple[list[str], list[EfficientTickerMetrics]]:
         """Main filtering method with performance optimizations"""
         start_time = time.time()
 
@@ -812,7 +811,7 @@ class EfficientTickerFilter:
                 high_quality_metrics.append(metric)
 
         # Step 6: Sort by quality score and limit results
-        combined = list(zip(high_quality_symbols, high_quality_metrics))
+        combined = list(zip(high_quality_symbols, high_quality_metrics, strict=True))
         combined.sort(key=lambda x: x[1].quality_score, reverse=True)
 
         if len(combined) > max_tickers:
@@ -831,8 +830,8 @@ class EfficientTickerFilter:
         return final_symbols, final_metrics
 
     def get_filtering_summary(
-        self, symbols: List[str], metrics: List[EfficientTickerMetrics]
-    ) -> Dict:
+        self, symbols: list[str], metrics: list[EfficientTickerMetrics]
+    ) -> dict:
         """Generate filtering summary statistics"""
         if not metrics:
             return {}
@@ -866,10 +865,10 @@ class EfficientTickerFilter:
 
     def apply_advanced_quality_checks(
         self,
-        symbols: List[str],
-        metrics: Dict[str, EfficientTickerMetrics],
+        symbols: list[str],
+        metrics: dict[str, EfficientTickerMetrics],
         verbose: bool = False,
-    ) -> Tuple[List[str], Dict[str, EfficientTickerMetrics]]:
+    ) -> tuple[list[str], dict[str, EfficientTickerMetrics]]:
         """
         Apply advanced quality checks (options, institutional, fundamentals, float).
 
@@ -947,12 +946,12 @@ class EfficientTickerFilter:
 
     def filter_with_advanced_checks(
         self,
-        tickers: List[Dict],
+        tickers: list[dict],
         min_quality_score: float = 60.0,
         max_tickers: int = 2000,
         enable_advanced_checks: bool = True,
         verbose: bool = False,
-    ) -> Tuple[List[str], List[EfficientTickerMetrics]]:
+    ) -> tuple[list[str], list[EfficientTickerMetrics]]:
         """
         Full filtering pipeline including advanced quality checks.
 

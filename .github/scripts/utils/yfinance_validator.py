@@ -8,7 +8,6 @@ Ensures scanners won't encounter empty data, OHLC violations, or missing fields.
 
 import logging
 import time
-from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import yfinance as yf
@@ -34,8 +33,8 @@ class YFinanceValidation:
     ohlc_quality: float = 0.0  # 0-1 score
     min_history_days: int = 0
     avg_daily_volume: float = 0.0
-    last_price: Optional[float] = None
-    validation_issues: List[str] = None
+    last_price: float | None = None
+    validation_issues: list[str] = None
 
     def __post_init__(self):
         if self.validation_issues is None:
@@ -256,7 +255,7 @@ class YFinanceValidator:
         result.validation_issues.append("Max retries exceeded")
         return result
 
-    def _validate_ohlc_quality(self, hist: pd.DataFrame) -> Tuple[float, List[str]]:
+    def _validate_ohlc_quality(self, hist: pd.DataFrame) -> tuple[float, list[str]]:
         """
         Validate OHLC data quality and relationships.
 
@@ -313,7 +312,7 @@ class YFinanceValidator:
 
         return quality_score, issues
 
-    def _check_data_completeness(self, hist: pd.DataFrame) -> Tuple[float, float]:
+    def _check_data_completeness(self, hist: pd.DataFrame) -> tuple[float, float]:
         """
         Check for data gaps in the historical data.
 
@@ -335,11 +334,11 @@ class YFinanceValidator:
 
     def validate_batch(
         self,
-        symbols: List[str],
+        symbols: list[str],
         period: str = "6mo",
         verbose: bool = False,
         batch_size: int = 100,
-    ) -> Dict[str, YFinanceValidation]:
+    ) -> dict[str, YFinanceValidation]:
         """
         Validate multiple tickers in batches with rate limiting.
 
@@ -420,7 +419,7 @@ class YFinanceValidator:
 
         return results
 
-    def get_validation_summary(self, results: Dict[str, YFinanceValidation]) -> Dict:
+    def get_validation_summary(self, results: dict[str, YFinanceValidation]) -> dict:
         """
         Generate summary statistics from validation results.
 

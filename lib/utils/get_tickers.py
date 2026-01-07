@@ -19,7 +19,7 @@ Usage:
 
 import os
 import logging
-from typing import List, Dict, Optional, Any
+from typing import Any
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -39,7 +39,7 @@ class TickerClient:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(TickerClient, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialize_client()
         return cls._instance
 
@@ -76,8 +76,8 @@ def _get_ticker_client() -> TickerClient:
 
 
 def get_all_tickers(
-    active_only: bool = True, limit: Optional[int] = None, offset: int = 0
-) -> List[Dict[str, Any]]:
+    active_only: bool = True, limit: int | None = None, offset: int = 0
+) -> list[dict[str, Any]]:
     """
     Get all tickers from the database
 
@@ -147,7 +147,7 @@ def get_all_tickers(
         return []
 
 
-def get_ticker_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+def get_ticker_by_symbol(symbol: str) -> dict[str, Any] | None:
     """
     Get a specific ticker by symbol
 
@@ -184,8 +184,8 @@ def get_ticker_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
 
 
 def get_tickers_by_exchange(
-    exchange: str, active_only: bool = True, limit: Optional[int] = None
-) -> List[Dict[str, Any]]:
+    exchange: str, active_only: bool = True, limit: int | None = None
+) -> list[dict[str, Any]]:
     """
     Get tickers by exchange
 
@@ -226,8 +226,8 @@ def get_tickers_by_exchange(
 
 
 def get_tickers_by_country(
-    country: str, active_only: bool = True, limit: Optional[int] = None
-) -> List[Dict[str, Any]]:
+    country: str, active_only: bool = True, limit: int | None = None
+) -> list[dict[str, Any]]:
     """
     Get tickers by country
 
@@ -265,8 +265,8 @@ def get_tickers_by_country(
 
 
 def get_tickers_by_sector(
-    sector: str, active_only: bool = True, limit: Optional[int] = None
-) -> List[Dict[str, Any]]:
+    sector: str, active_only: bool = True, limit: int | None = None
+) -> list[dict[str, Any]]:
     """
     Get tickers by sector
 
@@ -305,10 +305,10 @@ def get_tickers_by_sector(
 
 def search_tickers(
     query: str,
-    search_fields: List[str] = ["symbol", "name"],
+    search_fields: list[str] | None = None,
     active_only: bool = True,
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Search tickers by symbol or name
 
@@ -325,6 +325,9 @@ def search_tickers(
         >>> results = search_tickers('apple')
         >>> results = search_tickers('AAPL', search_fields=['symbol'])
     """
+    if search_fields is None:
+        search_fields = ["symbol", "name"]
+
     try:
         # Build OR query for multiple fields
         conditions = []
@@ -378,7 +381,7 @@ def get_ticker_count(active_only: bool = True) -> int:
         return 0
 
 
-def get_exchanges() -> List[str]:
+def get_exchanges() -> list[str]:
     """
     Get list of all unique exchanges in the database
 
@@ -407,7 +410,7 @@ def get_exchanges() -> List[str]:
         return []
 
 
-def get_countries() -> List[str]:
+def get_countries() -> list[str]:
     """
     Get list of all unique countries in the database
 
@@ -436,7 +439,7 @@ def get_countries() -> List[str]:
         return []
 
 
-def get_sectors() -> List[str]:
+def get_sectors() -> list[str]:
     """
     Get list of all unique sectors in the database
 
@@ -464,17 +467,17 @@ def get_sectors() -> List[str]:
 
 
 # Convenience functions for common use cases
-def get_sp500_tickers() -> List[Dict[str, Any]]:
+def get_sp500_tickers() -> list[dict[str, Any]]:
     """Get S&P 500 tickers (approximation based on major US exchanges)"""
     return get_tickers_by_exchange("NYSE") + get_tickers_by_exchange("NASDAQ")
 
 
-def get_tech_tickers(limit: int = 100) -> List[Dict[str, Any]]:
+def get_tech_tickers(limit: int = 100) -> list[dict[str, Any]]:
     """Get technology sector tickers"""
     return get_tickers_by_sector("Technology", limit=limit)
 
 
-def get_recently_updated_tickers(hours: int = 24) -> List[Dict[str, Any]]:
+def get_recently_updated_tickers(hours: int = 24) -> list[dict[str, Any]]:
     """
     Get tickers updated within the last N hours
 

@@ -38,7 +38,6 @@ import os
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 # Data file location
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -53,7 +52,7 @@ class SpreadTrade:
     id: str
     ticker: str
     entry_date: str
-    exit_date: Optional[str]
+    exit_date: str | None
 
     # === SPREAD DETAILS ===
     long_strike: float
@@ -62,82 +61,82 @@ class SpreadTrade:
 
     # === FINANCIALS ===
     debit_paid: float
-    exit_credit: Optional[float]
-    pnl: Optional[float]
-    return_pct: Optional[float]
+    exit_credit: float | None
+    pnl: float | None
+    return_pct: float | None
 
     # === OUTCOME ===
-    days_held: Optional[int]
-    is_winner: Optional[bool]
+    days_held: int | None
+    is_winner: bool | None
 
     # === PRICE & POSITION (at entry) ===
-    entry_price: Optional[float] = None
-    entry_52w_high: Optional[float] = None
-    entry_52w_low: Optional[float] = None
-    entry_pct_from_52w_high: Optional[float] = None  # How far below ATH
-    entry_pct_from_52w_low: Optional[float] = None  # How far above 52w low
-    entry_50dma: Optional[float] = None
-    entry_200dma: Optional[float] = None
-    entry_pct_from_50dma: Optional[float] = None  # % above/below 50DMA
-    entry_pct_from_200dma: Optional[float] = None  # % above/below 200DMA
+    entry_price: float | None = None
+    entry_52w_high: float | None = None
+    entry_52w_low: float | None = None
+    entry_pct_from_52w_high: float | None = None  # How far below ATH
+    entry_pct_from_52w_low: float | None = None  # How far above 52w low
+    entry_50dma: float | None = None
+    entry_200dma: float | None = None
+    entry_pct_from_50dma: float | None = None  # % above/below 50DMA
+    entry_pct_from_200dma: float | None = None  # % above/below 200DMA
 
     # === FUNDAMENTALS ===
-    entry_pe: Optional[float] = None
-    entry_forward_pe: Optional[float] = None
-    entry_eps: Optional[float] = None
-    entry_market_cap: Optional[float] = None  # In billions
-    entry_beta: Optional[float] = None
-    entry_dividend_yield: Optional[float] = None
+    entry_pe: float | None = None
+    entry_forward_pe: float | None = None
+    entry_eps: float | None = None
+    entry_market_cap: float | None = None  # In billions
+    entry_beta: float | None = None
+    entry_dividend_yield: float | None = None
 
     # === TECHNICALS ===
-    entry_rsi: Optional[float] = None  # 14-day RSI
-    entry_rsi_5d: Optional[float] = None  # 5-day RSI (momentum)
-    entry_macd_hist: Optional[float] = None  # MACD histogram
-    entry_macd_signal: Optional[str] = None  # 'bullish'/'bearish'
-    entry_adx: Optional[float] = None  # Trend strength
-    entry_atr: Optional[float] = None  # Volatility (ATR)
-    entry_atr_pct: Optional[float] = None  # ATR as % of price
-    entry_bb_position: Optional[float] = None  # 0-100 within bands
-    entry_volume_ratio: Optional[float] = None  # vs 20-day avg
+    entry_rsi: float | None = None  # 14-day RSI
+    entry_rsi_5d: float | None = None  # 5-day RSI (momentum)
+    entry_macd_hist: float | None = None  # MACD histogram
+    entry_macd_signal: str | None = None  # 'bullish'/'bearish'
+    entry_adx: float | None = None  # Trend strength
+    entry_atr: float | None = None  # Volatility (ATR)
+    entry_atr_pct: float | None = None  # ATR as % of price
+    entry_bb_position: float | None = None  # 0-100 within bands
+    entry_volume_ratio: float | None = None  # vs 20-day avg
 
     # === TREND & MOMENTUM ===
-    entry_trend_5d: Optional[float] = None  # 5-day return %
-    entry_trend_10d: Optional[float] = None  # 10-day return %
-    entry_trend_20d: Optional[float] = None  # 20-day return %
-    entry_trend_pct: Optional[float] = None  # Overall trend %
-    entry_ma_alignment: Optional[str] = None  # 'bullish'/'bearish'/'mixed'
-    entry_higher_low: Optional[bool] = None  # Bounce confirmed?
+    entry_trend_5d: float | None = None  # 5-day return %
+    entry_trend_10d: float | None = None  # 10-day return %
+    entry_trend_20d: float | None = None  # 20-day return %
+    entry_trend_pct: float | None = None  # Overall trend %
+    entry_ma_alignment: str | None = None  # 'bullish'/'bearish'/'mixed'
+    entry_higher_low: bool | None = None  # Bounce confirmed?
 
     # === SUPPORT/RESISTANCE ===
-    entry_support: Optional[float] = None
-    entry_resistance: Optional[float] = None
-    entry_buffer_pct: Optional[float] = None  # % above support
+    entry_support: float | None = None
+    entry_resistance: float | None = None
+    entry_buffer_pct: float | None = None  # % above support
 
     # === SENTIMENT & FLOW ===
-    entry_analyst_pct: Optional[float] = None  # % bullish ratings
-    entry_analyst_count: Optional[int] = None  # Total analysts
-    entry_short_ratio: Optional[float] = None  # Days to cover
-    entry_short_pct: Optional[float] = None  # % of float
-    entry_put_call_ratio: Optional[float] = None  # Options sentiment
-    entry_institutional_pct: Optional[float] = None  # % held by inst.
+    entry_analyst_pct: float | None = None  # % bullish ratings
+    entry_analyst_count: int | None = None  # Total analysts
+    entry_short_ratio: float | None = None  # Days to cover
+    entry_short_pct: float | None = None  # % of float
+    entry_put_call_ratio: float | None = None  # Options sentiment
+    entry_institutional_pct: float | None = None  # % held by inst.
 
     # === VOLATILITY ===
-    entry_iv: Optional[float] = None  # ATM Implied Vol
-    entry_iv_rank: Optional[float] = None  # IV percentile
-    entry_hv_20: Optional[float] = None  # 20-day historical vol
-    entry_iv_hv_ratio: Optional[float] = None  # IV/HV premium
+    entry_iv: float | None = None  # ATM Implied Vol
+    entry_iv_rank: float | None = None  # IV percentile
+    entry_hv_20: float | None = None  # 20-day historical vol
+    entry_iv_hv_ratio: float | None = None  # IV/HV premium
 
     # === TIMING ===
-    entry_day_of_week: Optional[int] = None  # 0=Mon, 4=Fri
-    entry_week_of_month: Optional[int] = None  # 1-5
-    entry_days_to_earnings: Optional[int] = None  # Days until earnings
-    entry_days_from_earnings: Optional[int] = None  # Days since earnings
-    entry_days_to_expiry: Optional[int] = None  # Spread expiration
+    entry_day_of_week: int | None = None  # 0=Mon, 4=Fri
+    entry_week_of_month: int | None = None  # 1-5
+    entry_days_to_earnings: int | None = None  # Days until earnings
+    entry_days_from_earnings: int | None = None  # Days since earnings
+    entry_days_to_expiry: int | None = None  # Spread expiration
 
     # === MARKET CONTEXT ===
-    entry_spy_trend: Optional[float] = None  # SPY 5-day return
-    entry_vix: Optional[float] = None  # VIX level
-    entry_sector: Optional[str] = None  # Sector
+    entry_spy_trend: float | None = None  # SPY 5-day return
+    entry_vix: float | None = None  # VIX level
+    entry_sector: str | None = None  # Sector
 
     # === METADATA ===
     created_at: str = ""
@@ -155,7 +154,7 @@ class TradeDatabase:
     def _load(self):
         """Load trades from JSON file (handles missing fields)."""
         if self.filepath.exists():
-            with open(self.filepath, "r") as f:
+            with open(self.filepath) as f:
                 data = json.load(f)
                 self.trades = []
                 for t in data.get("trades", []):
@@ -371,7 +370,7 @@ class MarketDataFetcher:
 
     # === TECHNICAL INDICATOR CALCULATIONS ===
 
-    def _rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
+    def _rsi(self, closes: list[float], period: int = 14) -> float | None:
         """Calculate RSI."""
         if len(closes) < period + 1:
             return None
@@ -400,7 +399,7 @@ class MarketDataFetcher:
         signal = "bullish" if macd_line > 0 else "bearish"
         return round(macd_line, 3), signal
 
-    def _ema(self, data: list[float], period: int) -> Optional[float]:
+    def _ema(self, data: list[float], period: int) -> float | None:
         """Calculate EMA."""
         if len(data) < period:
             return None
@@ -412,7 +411,7 @@ class MarketDataFetcher:
 
     def _adx(
         self, highs: list, lows: list, closes: list, period: int = 14
-    ) -> Optional[float]:
+    ) -> float | None:
         """Calculate ADX (simplified)."""
         if len(closes) < period + 1:
             return None
@@ -429,7 +428,7 @@ class MarketDataFetcher:
 
     def _atr(
         self, highs: list, lows: list, closes: list, period: int = 14
-    ) -> Optional[float]:
+    ) -> float | None:
         """Calculate ATR."""
         if len(closes) < period + 1:
             return None
@@ -447,7 +446,7 @@ class MarketDataFetcher:
             return None
         return round(sum(trs[-period:]) / period, 2)
 
-    def _bb_position(self, closes: list, period: int = 20) -> Optional[float]:
+    def _bb_position(self, closes: list, period: int = 20) -> float | None:
         """Position within Bollinger Bands (0-100)."""
         if len(closes) < period:
             return None
@@ -466,7 +465,7 @@ class MarketDataFetcher:
         position = (current - lower) / (upper - lower) * 100
         return round(max(0, min(100, position)), 1)
 
-    def _return(self, closes: list, days: int) -> Optional[float]:
+    def _return(self, closes: list, days: int) -> float | None:
         """Calculate N-day return."""
         if len(closes) < days + 1:
             return None
@@ -487,7 +486,7 @@ class MarketDataFetcher:
             return recovery > 0.02  # 2% bounce
         return False
 
-    def _historical_vol(self, closes: list, period: int = 20) -> Optional[float]:
+    def _historical_vol(self, closes: list, period: int = 20) -> float | None:
         """Calculate historical volatility (annualized)."""
         if len(closes) < period + 1:
             return None
@@ -513,7 +512,7 @@ class CSVParser:
         """Extract spread trades from CSV."""
         trades = []
 
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             reader = csv.DictReader(f)
             option_trades = []
 
@@ -811,7 +810,7 @@ class QuantAnalyzer:
             # Filter out None values
             pairs = [
                 (r, v)
-                for r, v in zip(returns, values)
+                for r, v in zip(returns, values, strict=True)
                 if v is not None and r is not None
             ]
             if len(pairs) < 3:
@@ -1582,7 +1581,7 @@ def cmd_batch_update(args):
         "ma_alignment": "entry_ma_alignment",
     }
 
-    with open(args.csv_file, "r") as f:
+    with open(args.csv_file) as f:
         reader = csv.DictReader(f)
         updated = 0
 

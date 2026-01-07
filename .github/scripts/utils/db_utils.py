@@ -5,8 +5,7 @@ Shared database utilities for ticker fetching scripts
 
 import logging
 import time
-from typing import List
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from supabase import Client
 
 from .constants import DEFAULT_BATCH_SIZE, RATE_LIMIT_DELAY_SECONDS
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def store_tickers(
     supabase: Client,
-    tickers: List,
+    tickers: list,
     table_name: str,
     dry_run: bool = False,
     batch_size: int = DEFAULT_BATCH_SIZE,
@@ -89,7 +88,7 @@ def store_tickers(
                 "market_cap": getattr(ticker, "market_cap", None),
                 "ticker_type": getattr(ticker, "ticker_type", "stock") or "stock",
                 "is_active": True,
-                "last_fetched": datetime.now(timezone.utc).isoformat(),
+                "last_fetched": datetime.now(UTC).isoformat(),
             }
             ticker_data.append(data)
 

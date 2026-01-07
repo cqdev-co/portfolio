@@ -7,7 +7,6 @@ Used by spread_quant_analysis.py, unusual-options-service, and other Python serv
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -49,7 +48,7 @@ class SpreadWidthResult:
 # LOADER
 # =============================================================================
 
-_cached_config: Optional[dict] = None
+_cached_config: dict | None = None
 
 
 def find_config_path() -> Path:
@@ -70,7 +69,7 @@ def find_config_path() -> Path:
     )
 
 
-def load_strategy_config(config_path: Optional[Path] = None) -> dict:
+def load_strategy_config(config_path: Path | None = None) -> dict:
     """Load the strategy configuration from YAML."""
     global _cached_config
 
@@ -79,7 +78,7 @@ def load_strategy_config(config_path: Optional[Path] = None) -> dict:
 
     path = config_path or find_config_path()
 
-    with open(path, "r") as f:
+    with open(path) as f:
         _cached_config = yaml.safe_load(f)
 
     return _cached_config
@@ -98,19 +97,19 @@ def clear_config_cache() -> None:
 
 def validate_entry(
     price: float,
-    ma200: Optional[float] = None,
-    ma50: Optional[float] = None,
-    rsi: Optional[float] = None,
-    cushion_pct: Optional[float] = None,
-    iv: Optional[float] = None,
-    iv_rank: Optional[float] = None,
-    days_to_earnings: Optional[int] = None,
-    analyst_bullish_pct: Optional[float] = None,
-    analyst_count: Optional[int] = None,
-    pe_ratio: Optional[float] = None,
-    market_cap_b: Optional[float] = None,
-    return_on_risk_pct: Optional[float] = None,
-    config: Optional[dict] = None,
+    ma200: float | None = None,
+    ma50: float | None = None,
+    rsi: float | None = None,
+    cushion_pct: float | None = None,
+    iv: float | None = None,
+    iv_rank: float | None = None,
+    days_to_earnings: int | None = None,
+    analyst_bullish_pct: float | None = None,
+    analyst_count: int | None = None,
+    pe_ratio: float | None = None,
+    market_cap_b: float | None = None,
+    return_on_risk_pct: float | None = None,
+    config: dict | None = None,
 ) -> EntryValidation:
     """
     Validate a potential trade against entry criteria.
@@ -222,7 +221,7 @@ def validate_entry(
 
 def get_position_sizing(
     account_size: float,
-    config: Optional[dict] = None,
+    config: dict | None = None,
 ) -> PositionSizingResult:
     """Get position sizing based on account size."""
     cfg = config or load_strategy_config()
@@ -248,7 +247,7 @@ def get_position_sizing(
 
 def get_spread_width(
     account_size: float,
-    config: Optional[dict] = None,
+    config: dict | None = None,
 ) -> SpreadWidthResult:
     """Get spread width recommendation based on account size."""
     cfg = config or load_strategy_config()
@@ -268,13 +267,13 @@ def get_spread_width(
     )
 
 
-def get_exit_rules(config: Optional[dict] = None) -> dict:
+def get_exit_rules(config: dict | None = None) -> dict:
     """Get exit rules from config."""
     cfg = config or load_strategy_config()
     return cfg["exit"]
 
 
-def get_circuit_breakers(config: Optional[dict] = None) -> dict:
+def get_circuit_breakers(config: dict | None = None) -> dict:
     """Get circuit breaker rules from config."""
     cfg = config or load_strategy_config()
     return cfg["risk_management"]["circuit_breakers"]
@@ -282,7 +281,7 @@ def get_circuit_breakers(config: Optional[dict] = None) -> dict:
 
 def is_ticker_allowed(
     ticker: str,
-    config: Optional[dict] = None,
+    config: dict | None = None,
 ) -> bool:
     """Check if ticker is allowed (not blacklisted)."""
     cfg = config or load_strategy_config()
@@ -292,8 +291,8 @@ def is_ticker_allowed(
 
 def get_ticker_tier(
     ticker: str,
-    config: Optional[dict] = None,
-) -> Optional[int]:
+    config: dict | None = None,
+) -> int | None:
     """Get the tier of a ticker (1, 2, 3) or None if not in universe."""
     cfg = config or load_strategy_config()
     ticker_upper = ticker.upper()

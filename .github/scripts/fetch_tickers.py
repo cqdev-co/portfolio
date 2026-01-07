@@ -26,7 +26,6 @@ import os
 import sys
 import logging
 import argparse
-from typing import List, Optional, Set
 from dataclasses import dataclass
 import requests
 from supabase import create_client, Client
@@ -62,12 +61,12 @@ class TickerInfo:
 
     symbol: str
     name: str
-    exchange: Optional[str] = None
-    country: Optional[str] = None
-    currency: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    market_cap: Optional[int] = None
+    exchange: str | None = None
+    country: str | None = None
+    currency: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    market_cap: int | None = None
     ticker_type: str = "stock"
 
 
@@ -185,7 +184,7 @@ class TickerFetcher:
             self.yfinance_validator = None
             self.logger.info("YFinance validation disabled")
 
-    def fetch_alpha_vantage_tickers(self) -> List[TickerInfo]:
+    def fetch_alpha_vantage_tickers(self) -> list[TickerInfo]:
         """Fetch tickers from Alpha Vantage API"""
         if not self.alpha_vantage_key:
             self.logger.info("Skipping Alpha Vantage (no API key)")
@@ -259,7 +258,7 @@ class TickerFetcher:
 
         return tickers
 
-    def fetch_fmp_tickers(self) -> List[TickerInfo]:
+    def fetch_fmp_tickers(self) -> list[TickerInfo]:
         """Fetch tickers from Financial Modeling Prep API"""
         if not self.fmp_key:
             self.logger.info("Skipping FMP (no API key)")
@@ -305,10 +304,10 @@ class TickerFetcher:
 
         return tickers
 
-    def deduplicate_tickers(self, all_tickers: List[TickerInfo]) -> List[TickerInfo]:
+    def deduplicate_tickers(self, all_tickers: list[TickerInfo]) -> list[TickerInfo]:
         """Remove duplicate tickers, keeping the most complete information"""
-        seen_symbols: Set[str] = set()
-        unique_tickers: List[TickerInfo] = []
+        seen_symbols: set[str] = set()
+        unique_tickers: list[TickerInfo] = []
 
         # Sort by completeness (more fields filled = better)
         def completeness_score(ticker: TickerInfo) -> int:
@@ -341,7 +340,7 @@ class TickerFetcher:
 
         return unique_tickers
 
-    def apply_cfd_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+    def apply_cfd_filters(self, tickers: list[TickerInfo]) -> list[TickerInfo]:
         """Apply CFD filtering to remove Contract for Difference instruments"""
         if not self.enable_cfd_filter:
             self.logger.info("CFD filtering disabled, returning all tickers")
@@ -371,7 +370,7 @@ class TickerFetcher:
 
         return filtered_tickers
 
-    def apply_quality_filters(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+    def apply_quality_filters(self, tickers: list[TickerInfo]) -> list[TickerInfo]:
         """Apply efficient quality filters to ticker list"""
         if not self.enable_quality_filter or not self.quality_filter:
             self.logger.info("Quality filtering disabled, returning all tickers")
@@ -488,7 +487,7 @@ class TickerFetcher:
             self.logger.info("Falling back to unfiltered ticker list")
             return tickers
 
-    def apply_yfinance_validation(self, tickers: List[TickerInfo]) -> List[TickerInfo]:
+    def apply_yfinance_validation(self, tickers: list[TickerInfo]) -> list[TickerInfo]:
         """
         Apply YFinance data quality validation.
 
@@ -571,7 +570,7 @@ class TickerFetcher:
             )
             return tickers
 
-    def store_tickers(self, tickers: List[TickerInfo]) -> bool:
+    def store_tickers(self, tickers: list[TickerInfo]) -> bool:
         """Store tickers in Supabase database"""
         return store_tickers_util(
             self.supabase,

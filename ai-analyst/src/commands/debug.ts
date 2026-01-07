@@ -131,8 +131,12 @@ class DebugLogger {
     // Create logs directory if it doesn't exist
     const logsDir = path.join(process.cwd(), 'logs');
     if (!fs.existsSync(logsDir)) {
-      // @ts-expect-error - Bun types don't recognize recursive option
-      fs.mkdirSync(logsDir, { recursive: true });
+      (
+        fs.mkdirSync as (
+          path: string,
+          options?: { recursive?: boolean }
+        ) => void
+      )(logsDir, { recursive: true });
     }
 
     // Generate filename with timestamp

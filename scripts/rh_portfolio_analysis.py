@@ -18,7 +18,6 @@ import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from pathlib import Path
 
 
@@ -66,13 +65,13 @@ class SpreadTrade:
     short_strike: float
     spread_width: float
     entry_debit: float
-    exit_credit: Optional[float] = None
-    entry_date: Optional[datetime] = None
-    exit_date: Optional[datetime] = None
+    exit_credit: float | None = None
+    entry_date: datetime | None = None
+    exit_date: datetime | None = None
     status: str = "open"  # open, closed
 
     @property
-    def pnl(self) -> Optional[float]:
+    def pnl(self) -> float | None:
         """
         Calculate P&L.
         entry_debit is negative (cash out), exit_credit is positive (cash in).
@@ -83,7 +82,7 @@ class SpreadTrade:
         return self.exit_credit + self.entry_debit
 
     @property
-    def pnl_percent(self) -> Optional[float]:
+    def pnl_percent(self) -> float | None:
         if self.pnl is None or self.entry_debit == 0:
             return None
         return (self.pnl / abs(self.entry_debit)) * 100
@@ -93,13 +92,13 @@ class SpreadTrade:
         return (self.spread_width * 100) - abs(self.entry_debit)
 
     @property
-    def days_held(self) -> Optional[int]:
+    def days_held(self) -> int | None:
         if self.entry_date and self.exit_date:
             return (self.exit_date - self.entry_date).days
         return None
 
     @property
-    def is_winner(self) -> Optional[bool]:
+    def is_winner(self) -> bool | None:
         if self.pnl is None:
             return None
         return self.pnl > 0
@@ -123,7 +122,7 @@ class OtherIncome:
 
     date: datetime
     type: str
-    ticker: Optional[str]
+    ticker: str | None
     amount: float
 
 
@@ -212,7 +211,7 @@ class RobinhoodCSVParser:
 
     def parse(self) -> tuple[list[OptionTrade], list[StockTrade], list[OtherIncome]]:
         """Parse the CSV file and return categorized trades."""
-        with open(self.filepath, "r", encoding="utf-8") as f:
+        with open(self.filepath, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -292,7 +291,7 @@ class RobinhoodCSVParser:
 
     def _parse_option(
         self, row: dict, date: datetime, action: str, amount: float
-    ) -> Optional[OptionTrade]:
+    ) -> OptionTrade | None:
         """Parse an option trade row."""
         description = row.get("Description", "")
         match = self.OPTION_PATTERN.match(description)
@@ -329,7 +328,7 @@ class RobinhoodCSVParser:
 
     def _parse_stock(
         self, row: dict, date: datetime, action: str, amount: float
-    ) -> Optional[StockTrade]:
+    ) -> StockTrade | None:
         """Parse a stock trade row."""
         ticker = row.get("Instrument", "").strip()
         if not ticker:
@@ -406,7 +405,7 @@ class SpreadAnalyzer:
             grouped[key].append(trade)
 
         # Process each group to find spreads
-        for key, trades in grouped.items():
+        for _key, trades in grouped.items():
             self._process_spread_group(trades)
 
     def _process_spread_group(self, trades: list[OptionTrade]) -> None:
