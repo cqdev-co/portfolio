@@ -19,12 +19,13 @@ class RateLimiterConfig:
     """Configuration for rate limiter."""
 
     # Max requests per window
-    requests_per_minute: int = 30  # Conservative for yfinance
-    requests_per_hour: int = 1500
+    # With batch downloads, we make fewer but larger requests
+    requests_per_minute: int = 60  # Increased - batch downloads are efficient
+    requests_per_hour: int = 2000  # yfinance allows ~2000/hour
 
-    # Delays
-    min_delay_between_requests: float = 0.5  # 500ms minimum
-    batch_delay: float = 2.0  # 2s between batches
+    # Delays - reduced for faster scanning
+    min_delay_between_requests: float = 0.2  # 200ms minimum
+    batch_delay: float = 1.0  # 1s between batches
 
     # Backoff settings
     initial_backoff: float = 5.0  # Start with 5 second backoff

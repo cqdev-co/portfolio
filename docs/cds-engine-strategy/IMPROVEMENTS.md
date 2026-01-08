@@ -315,10 +315,10 @@ If proxy fails or is not configured, you'll see warnings:
 
 Fixed test failures across the monorepo:
 
-| Package | Issue | Fix |
-|---------|-------|-----|
-| `@portfolio/core` | `bun test` exits with code 1 when no tests found | Added placeholder test file `src/index.test.ts` |
-| `@portfolio/web` | Date tests failing due to timezone issues | Changed from UTC-based `toISOString()` to local date strings and flexible regex matching |
+| Package           | Issue                                            | Fix                                                                                      |
+| ----------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `@portfolio/core` | `bun test` exits with code 1 when no tests found | Added placeholder test file `src/index.test.ts`                                          |
+| `@portfolio/web`  | Date tests failing due to timezone issues        | Changed from UTC-based `toISOString()` to local date strings and flexible regex matching |
 
 ### Web Test Fix
 
@@ -344,40 +344,43 @@ expect(result).toMatch(/\dd ago/); // ✅ Matches any day count
 
 Fixed 10 TypeScript errors across 5 files to pass `bun run typecheck`:
 
-| File | Error | Fix |
-|------|-------|-----|
-| `briefing.ts:142` | `confidence` doesn't exist on `MarketContext` | Replaced with `vix` display |
-| `briefing.ts:145-149` | `metrics` doesn't exist on `MarketContext` | Replaced with `spyPrice`, `return20d`, `return50d` |
-| `performance.ts:19` | Unused `createClient` import | Removed import |
-| `performance.ts:332` | `chalk.keyword('orange')` not available | Changed to `chalk.hex('#FFA500')` |
-| `scan-all.ts:446` | `string \| undefined` not assignable to `parseFloat` | Added optional chaining `rsiMatch?.[1]` |
-| `scan-all.ts:453` | `confidence` doesn't exist on `MarketContext` | Set to `null` |
-| `trade.ts:20` | Unused `logger` import | Removed import |
-| `watchlist.ts:61` | `mkdirSync` overload mismatch with `{ recursive: true }` | Type assertion for proper signature |
+| File                  | Error                                                    | Fix                                                |
+| --------------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| `briefing.ts:142`     | `confidence` doesn't exist on `MarketContext`            | Replaced with `vix` display                        |
+| `briefing.ts:145-149` | `metrics` doesn't exist on `MarketContext`               | Replaced with `spyPrice`, `return20d`, `return50d` |
+| `performance.ts:19`   | Unused `createClient` import                             | Removed import                                     |
+| `performance.ts:332`  | `chalk.keyword('orange')` not available                  | Changed to `chalk.hex('#FFA500')`                  |
+| `scan-all.ts:446`     | `string \| undefined` not assignable to `parseFloat`     | Added optional chaining `rsiMatch?.[1]`            |
+| `scan-all.ts:453`     | `confidence` doesn't exist on `MarketContext`            | Set to `null`                                      |
+| `trade.ts:20`         | Unused `logger` import                                   | Removed import                                     |
+| `watchlist.ts:61`     | `mkdirSync` overload mismatch with `{ recursive: true }` | Type assertion for proper signature                |
 
 ### Key Changes
 
 **briefing.ts** - Updated regime display to use available `MarketContext` properties:
+
 ```typescript
 // Before (invalid)
-chalk.gray(` | Confidence: ${(regime.confidence * 100).toFixed(0)}%`)
-chalk.gray(`  ADX: ${regime.metrics?.adx?.toFixed(1) ?? 'N/A'}`)
+chalk.gray(` | Confidence: ${(regime.confidence * 100).toFixed(0)}%`);
+chalk.gray(`  ADX: ${regime.metrics?.adx?.toFixed(1) ?? 'N/A'}`);
 
 // After (valid)
-chalk.gray(` | VIX: ${regime.vix?.toFixed(1) ?? 'N/A'}`)
-chalk.gray(`  SPY: $${regime.spyPrice.toFixed(2)}`)
+chalk.gray(` | VIX: ${regime.vix?.toFixed(1) ?? 'N/A'}`);
+chalk.gray(`  SPY: $${regime.spyPrice.toFixed(2)}`);
 ```
 
 **performance.ts** - Updated chalk usage for orange color:
+
 ```typescript
 // Before (chalk v5+ doesn't have .keyword())
-chalk.keyword('orange').bold
+chalk.keyword('orange').bold;
 
 // After
-chalk.hex('#FFA500').bold
+chalk.hex('#FFA500').bold;
 ```
 
 **watchlist.ts** - Fixed `fs.mkdirSync` type compatibility:
+
 ```typescript
 // Before (type error with old @types/node)
 mkdirSync(dir, { recursive: true });

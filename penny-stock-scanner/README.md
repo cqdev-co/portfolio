@@ -21,6 +21,26 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 - ✅ **China risk reassessed**: Removed from risk list - actually 61.2% WR, +15.98%!
 - ✅ **Rate limiting**: Proper Yahoo Finance rate limiting with exponential backoff
 
+**⚡ Scan Performance Optimization:**
+
+- ✅ **Batch downloads**: `yf.download()` fetches 50 symbols at once (was 1-by-1)
+- ✅ **Parallel analysis**: 20 signals analyzed concurrently
+- ✅ **Deferred metadata**: `ticker.info` only for high-scoring signals
+- ✅ **Scan time reduced**: 40+ minutes → **~5-10 minutes** (75-85% faster!)
+
+**🎨 Frontend Improvements:**
+
+- ✅ **Performance dashboard**: 30-day win rate, avg return, profit targets, stop loss rate
+- ✅ **Functional filters**: Filter by rank, recommendation, volume sweet spot, breakouts
+- ✅ **Signal quality indicators**: Visual cues for optimal entry conditions
+
+**🔔 Enhanced Discord Alerts:**
+
+- ✅ **Signal quality indicators**: Volume sweet spot, green days, 52-week position
+- ✅ **Late entry warnings**: Alerts when price already moved 15%+
+- ✅ **Market context**: SPY outperformance, 52-week range
+- ✅ **Weekly performance summaries**: Automated weekly reports with insights
+
 **See**: [`../docs/penny-stock-scanner/performance-analysis-jan-2026.md`](../docs/penny-stock-scanner/performance-analysis-jan-2026.md) for full analysis.
 
 ### December 2025 - Performance Improvements

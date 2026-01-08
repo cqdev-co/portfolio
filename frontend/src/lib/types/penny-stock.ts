@@ -103,6 +103,9 @@ export interface PennyStockSignal {
  */
 export interface PennyStockFilters {
   opportunity_rank?: OpportunityRank;
+  opportunity_ranks?: OpportunityRank[]; // Multiple ranks
+  recommendation?: string;
+  recommendations?: string[]; // Multiple recommendations
   min_score?: number;
   max_score?: number;
   is_breakout?: boolean;
@@ -110,9 +113,12 @@ export interface PennyStockFilters {
   signal_status?: SignalStatus;
   trend_direction?: TrendDirection;
   min_volume_ratio?: number;
+  max_volume_ratio?: number;
   min_dollar_volume?: number;
   pump_dump_risk?: RiskLevel;
   scan_date?: string;
+  volume_in_sweet_spot?: boolean; // 2-3x volume
+  has_optimal_indicators?: boolean; // Combined optimal indicators
 }
 
 /**
@@ -145,4 +151,20 @@ export interface PennyStockResponse {
   data: PennyStockSignal[];
   error: string | null;
   count?: number;
+}
+
+/**
+ * Performance statistics from closed trades
+ */
+export interface PennyStockPerformanceStats {
+  total_closed_trades: number;
+  win_rate: number;
+  avg_return: number;
+  avg_hold_days: number;
+  stop_loss_hit_rate: number;
+  profit_target_hit_rate: number;
+  best_return: number;
+  worst_return: number;
+  win_rate_by_rank: Record<OpportunityRank, number>;
+  avg_return_by_rank: Record<OpportunityRank, number>;
 }

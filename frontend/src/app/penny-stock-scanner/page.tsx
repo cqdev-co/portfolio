@@ -29,9 +29,21 @@ import type {
 import {
   fetchPennyStockSignals,
   fetchPennyStockStats,
+  fetchPerformanceStats,
   subscribeToPennyStockUpdates,
 } from '@/lib/api/penny-stock-signals';
-import type { PennyStockStats } from '@/lib/types/penny-stock';
+import type {
+  PennyStockStats,
+  PennyStockPerformanceStats,
+  OpportunityRank,
+} from '@/lib/types/penny-stock';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import {
   ArrowUpDown,
@@ -46,6 +58,13 @@ import {
   Zap,
   AlertTriangle,
   Globe,
+  TrendingUp,
+  Calendar,
+  Flame,
+  Clock,
+  Trophy,
+  X,
+  Check,
 } from 'lucide-react';
 
 // Helper function to safely parse numeric values
@@ -142,13 +161,74 @@ function getRiskLevelColor(risk: string) {
   }
 }
 
+// Get recommendation badge color - Jan 2026 update
+function getRecommendationColor(rec: string) {
+  switch (rec) {
+    case 'STRONG_BUY':
+      return 'bg-green-600 text-white';
+    case 'BUY':
+      return 'bg-emerald-500 text-white';
+    case 'WATCH':
+      return 'bg-blue-500 text-white';
+    case 'HOLD':
+      return 'bg-gray-500 text-white';
+    default:
+      return 'bg-secondary text-secondary-foreground';
+  }
+}
+
+// Check if volume is in sweet spot (2-3x is optimal per Jan 2026 data)
+function isVolumeInSweetSpot(volumeRatio: number | null): boolean {
+  if (!volumeRatio) return false;
+  return volumeRatio >= 2.0 && volumeRatio <= 3.0;
+}
+
+// Check if late entry (price already moved 15%+ in 5 days)
+function isLateEntry(priceChange5d: number | null): boolean {
+  if (!priceChange5d) return false;
+  return priceChange5d > 15;
+}
+
+// Check if 52-week position is optimal (25-50% from low)
+function is52wPositionOptimal(distanceFromLow: number | null): boolean {
+  if (!distanceFromLow) return false;
+  return distanceFromLow >= 25 && distanceFromLow <= 50;
+}
+
+// Check if green days count is optimal (1 day = 64.8% WR)
+function isGreenDaysOptimal(greenDays: number | null): boolean {
+  return greenDays === 1;
+}
+
+// Get day of week name from date
+function getDayOfWeek(dateStr: string): string {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const date = new Date(dateStr);
+  return days[date.getDay()];
+}
+
+// Check if Friday (bonus day) or Wednesday (penalty day)
+function getDayOfWeekStatus(dateStr: string): 'bonus' | 'penalty' | 'neutral' {
+  const day = new Date(dateStr).getDay();
+  if (day === 5) return 'bonus'; // Friday
+  if (day === 3) return 'penalty'; // Wednesday
+  return 'neutral';
+}
+
+// Filter options
+const RANK_OPTIONS: OpportunityRank[] = ['S', 'A', 'B', 'C', 'D'];
+const RECOMMENDATION_OPTIONS = ['STRONG_BUY', 'BUY', 'WATCH', 'HOLD'];
+
 export default function PennyStockScanner() {
   const [signals, setSignals] = useState<PennyStockSignal[]>([]);
   const [stats, setStats] = useState<PennyStockStats | null>(null);
+  const [perfStats, setPerfStats] = useState<PennyStockPerformanceStats | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters] = useState<PennyStockFilters>({});
+  const [filters, setFilters] = useState<PennyStockFilters>({});
   const [sortConfig, setSortConfig] = useState<PennyStockSortConfig>({
     field: 'overall_score',
     direction: 'desc',
@@ -158,6 +238,48 @@ export default function PennyStockScanner() {
     null
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Filter state
+  const [selectedRanks, setSelectedRanks] = useState<OpportunityRank[]>([]);
+  const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
+  const [volumeSweetSpot, setVolumeSweetSpot] = useState(false);
+  const [breakoutOnly, setBreakoutOnly] = useState(false);
+
+  // Count active filters
+  const activeFilterCount =
+    selectedRanks.length +
+    selectedRecs.length +
+    (volumeSweetSpot ? 1 : 0) +
+    (breakoutOnly ? 1 : 0);
+
+  // Apply filters
+  const applyFilters = useCallback(() => {
+    const newFilters: PennyStockFilters = {};
+    if (selectedRanks.length > 0) {
+      newFilters.opportunity_ranks = selectedRanks;
+    }
+    if (selectedRecs.length > 0) {
+      newFilters.recommendations = selectedRecs;
+    }
+    if (volumeSweetSpot) {
+      newFilters.volume_in_sweet_spot = true;
+    }
+    if (breakoutOnly) {
+      newFilters.is_breakout = true;
+    }
+    setFilters(newFilters);
+    setFiltersOpen(false);
+  }, [selectedRanks, selectedRecs, volumeSweetSpot, breakoutOnly]);
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setSelectedRanks([]);
+    setSelectedRecs([]);
+    setVolumeSweetSpot(false);
+    setBreakoutOnly(false);
+    setFilters({});
+  }, []);
 
   // Load data
   const loadData = useCallback(
@@ -166,9 +288,9 @@ export default function PennyStockScanner() {
       try {
         setError(null);
 
-        // Load signals and stats in parallel
+        // Load signals, stats, and performance stats in parallel
         const today = new Date().toISOString().split('T')[0];
-        const [signalsResponse, statsData] = await Promise.all([
+        const [signalsResponse, statsData, perfData] = await Promise.all([
           fetchPennyStockSignals({
             limit: 100,
             sortBy: sortConfig.field,
@@ -177,6 +299,7 @@ export default function PennyStockScanner() {
             searchTerm,
           }),
           fetchPennyStockStats(),
+          fetchPerformanceStats(),
         ]);
 
         if (signalsResponse.error) {
@@ -186,6 +309,7 @@ export default function PennyStockScanner() {
         }
 
         setStats(statsData);
+        setPerfStats(perfData);
       } catch (error) {
         console.error('Failed to load data:', error);
         setError('Failed to load penny stock signals');
@@ -359,13 +483,13 @@ export default function PennyStockScanner() {
           </span>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Top Row: Today's Signals */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-green-500"></div>
               <span className="text-caption text-muted-foreground">
-                Total Signals
+                Today&apos;s Signals
               </span>
             </div>
             <p className="text-lg font-medium mt-1">
@@ -406,6 +530,79 @@ export default function PennyStockScanner() {
             </p>
           </Card>
         </div>
+
+        {/* Performance Stats - Bottom Row: 30-Day Performance */}
+        {perfStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-3 w-3 text-emerald-600" />
+                <span className="text-caption text-emerald-700 dark:text-emerald-300">
+                  30-Day Win Rate
+                </span>
+              </div>
+              <p
+                className={cn(
+                  'text-lg font-bold mt-1',
+                  perfStats.win_rate >= 50 ? 'text-emerald-600' : 'text-red-600'
+                )}
+              >
+                {perfStats.win_rate.toFixed(1)}%
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {perfStats.total_closed_trades} trades
+              </p>
+            </Card>
+            <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-3 w-3 text-blue-600" />
+                <span className="text-caption text-blue-700 dark:text-blue-300">
+                  Avg Return
+                </span>
+              </div>
+              <p
+                className={cn(
+                  'text-lg font-bold mt-1',
+                  perfStats.avg_return >= 0 ? 'text-green-600' : 'text-red-600'
+                )}
+              >
+                {perfStats.avg_return >= 0 ? '+' : ''}
+                {perfStats.avg_return.toFixed(2)}%
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Avg hold: {perfStats.avg_hold_days.toFixed(1)} days
+              </p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2">
+                <Target className="h-3 w-3 text-green-500" />
+                <span className="text-caption text-muted-foreground">
+                  Profit Targets
+                </span>
+              </div>
+              <p className="text-lg font-medium mt-1 text-green-600">
+                {perfStats.profit_target_hit_rate.toFixed(0)}%
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Hit 10%+ target
+              </p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3 w-3 text-amber-500" />
+                <span className="text-caption text-muted-foreground">
+                  Stop Loss Rate
+                </span>
+              </div>
+              <p className="text-lg font-medium mt-1 text-amber-600">
+                {perfStats.stop_loss_hit_rate.toFixed(0)}%
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Best: +{perfStats.best_return.toFixed(0)}%
+              </p>
+            </Card>
+          </div>
+        )}
       </section>
 
       {/* Search and Filters */}
@@ -443,14 +640,163 @@ export default function PennyStockScanner() {
             />
             Refresh
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-          </Button>
+
+          {/* Filters Popover */}
+          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={activeFilterCount > 0 ? 'default' : 'outline'}
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="h-5 w-5 p-0 flex items-center justify-center text-xs"
+                  >
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Filter Signals</h4>
+                  {activeFilterCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="h-8 text-xs"
+                    >
+                      Clear all
+                    </Button>
+                  )}
+                </div>
+
+                {/* Rank Filter */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">
+                    Opportunity Rank
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {RANK_OPTIONS.map((rank) => (
+                      <Button
+                        key={rank}
+                        variant={
+                          selectedRanks.includes(rank) ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        className={cn(
+                          'h-7 px-2',
+                          selectedRanks.includes(rank) &&
+                            getOpportunityRankColor(rank)
+                        )}
+                        onClick={() => {
+                          setSelectedRanks((prev) =>
+                            prev.includes(rank)
+                              ? prev.filter((r) => r !== rank)
+                              : [...prev, rank]
+                          );
+                        }}
+                      >
+                        {rank}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recommendation Filter */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Recommendation</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {RECOMMENDATION_OPTIONS.map((rec) => (
+                      <Button
+                        key={rec}
+                        variant={
+                          selectedRecs.includes(rec) ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        className={cn(
+                          'h-7 px-2 text-xs',
+                          selectedRecs.includes(rec) &&
+                            getRecommendationColor(rec)
+                        )}
+                        onClick={() => {
+                          setSelectedRecs((prev) =>
+                            prev.includes(rec)
+                              ? prev.filter((r) => r !== rec)
+                              : [...prev, rec]
+                          );
+                        }}
+                      >
+                        {rec.replace('_', ' ')}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Filters */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Quick Filters</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="volumeSweetSpot"
+                        checked={volumeSweetSpot}
+                        onCheckedChange={(checked) =>
+                          setVolumeSweetSpot(checked === true)
+                        }
+                      />
+                      <label
+                        htmlFor="volumeSweetSpot"
+                        className="text-xs cursor-pointer flex items-center gap-1"
+                      >
+                        <DollarSign className="h-3 w-3 text-emerald-500" />
+                        Volume Sweet Spot (2-3x)
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="breakoutOnly"
+                        checked={breakoutOnly}
+                        onCheckedChange={(checked) =>
+                          setBreakoutOnly(checked === true)
+                        }
+                      />
+                      <label
+                        htmlFor="breakoutOnly"
+                        className="text-xs cursor-pointer flex items-center gap-1"
+                      >
+                        <Zap className="h-3 w-3 text-yellow-500" />
+                        Breakouts Only
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Apply Button */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setFiltersOpen(false)}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={applyFilters}>
+                    <Check className="h-3 w-3 mr-1" />
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </section>
 
@@ -513,7 +859,8 @@ export default function PennyStockScanner() {
                     {getSortIcon('opportunity_rank')}
                   </div>
                 </TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Signals</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -601,17 +948,89 @@ export default function PennyStockScanner() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {signal.signal_status && (
+                    {signal.recommendation && (
                       <Badge
-                        variant="outline"
                         className={cn(
                           'text-xs',
-                          getSignalStatusColor(signal.signal_status)
+                          getRecommendationColor(signal.recommendation)
                         )}
                       >
-                        {signal.signal_status}
+                        {signal.recommendation.replace('_', ' ')}
                       </Badge>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <TooltipProvider delayDuration={100}>
+                      <div className="flex items-center gap-1">
+                        {/* Volume Sweet Spot indicator */}
+                        {isVolumeInSweetSpot(
+                          safeParseNumber(signal.volume_ratio)
+                        ) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DollarSign className="h-3 w-3 text-emerald-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Volume in sweet spot (2-3x)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {/* Green Days Optimal indicator */}
+                        {isGreenDaysOptimal(signal.consecutive_green_days) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Flame className="h-3 w-3 text-green-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Optimal: 1 green day (64.8% WR)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {/* 52-Week Position Optimal */}
+                        {is52wPositionOptimal(
+                          safeParseNumber(signal.distance_from_52w_low)
+                        ) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <TrendingUp className="h-3 w-3 text-blue-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Optimal: 25-50% from 52w low</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {/* Late Entry Warning */}
+                        {isLateEntry(
+                          safeParseNumber(signal.price_change_5d)
+                        ) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Clock className="h-3 w-3 text-amber-500" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-amber-600">
+                              <p>
+                                ⚠️ Late entry: +
+                                {safeParseNumber(
+                                  signal.price_change_5d
+                                ).toFixed(0)}
+                                % in 5d
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {/* Day of Week indicator */}
+                        {getDayOfWeekStatus(signal.scan_date) === 'bonus' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Calendar className="h-3 w-3 text-green-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Friday entry (bonus)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TooltipProvider>
                   </TableCell>
                 </TableRow>
               ))}
@@ -779,26 +1198,258 @@ export default function PennyStockScanner() {
 
                 <Separator />
 
+                {/* Recommendation & Action */}
+                <div className="space-y-2">
+                  <h3
+                    className="text-xs font-medium text-muted-foreground 
+                      uppercase tracking-wide"
+                  >
+                    Recommendation
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {selectedSignal.recommendation && (
+                      <Badge
+                        className={cn(
+                          'text-sm px-3 py-1',
+                          getRecommendationColor(selectedSignal.recommendation)
+                        )}
+                      >
+                        {selectedSignal.recommendation.replace('_', ' ')}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {(
+                        safeParseNumber(selectedSignal.overall_score) * 100
+                      ).toFixed(0)}
+                      % score
+                    </span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Signal Quality Indicators - Jan 2026 */}
+                <div className="space-y-2">
+                  <h3
+                    className="text-xs font-medium text-muted-foreground 
+                      uppercase tracking-wide"
+                  >
+                    Signal Quality
+                  </h3>
+                  <div className="space-y-2">
+                    {/* Volume Sweet Spot */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                        Volume Range
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          isVolumeInSweetSpot(
+                            safeParseNumber(selectedSignal.volume_ratio)
+                          )
+                            ? 'text-emerald-600'
+                            : safeParseNumber(selectedSignal.volume_ratio) > 5
+                              ? 'text-amber-600'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {safeParseNumber(selectedSignal.volume_ratio).toFixed(
+                          1
+                        )}
+                        x
+                        {isVolumeInSweetSpot(
+                          safeParseNumber(selectedSignal.volume_ratio)
+                        )
+                          ? ' ✓ Sweet Spot'
+                          : safeParseNumber(selectedSignal.volume_ratio) > 5
+                            ? ' ⚠️ High'
+                            : ''}
+                      </span>
+                    </div>
+                    {/* Consecutive Green Days */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs flex items-center gap-1">
+                        <Flame className="h-3 w-3" />
+                        Green Days
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          isGreenDaysOptimal(
+                            selectedSignal.consecutive_green_days
+                          )
+                            ? 'text-green-600'
+                            : (selectedSignal.consecutive_green_days ?? 0) >= 4
+                              ? 'text-amber-600'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {selectedSignal.consecutive_green_days ?? 0} days
+                        {isGreenDaysOptimal(
+                          selectedSignal.consecutive_green_days
+                        )
+                          ? ' ✓ Optimal'
+                          : (selectedSignal.consecutive_green_days ?? 0) >= 4
+                            ? ' ⚠️ Extended'
+                            : ''}
+                      </span>
+                    </div>
+                    {/* 52-Week Position */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        From 52w Low
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          is52wPositionOptimal(
+                            safeParseNumber(
+                              selectedSignal.distance_from_52w_low
+                            )
+                          )
+                            ? 'text-blue-600'
+                            : safeParseNumber(
+                                  selectedSignal.distance_from_52w_low
+                                ) < 15
+                              ? 'text-amber-600'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {safeParseNumber(
+                          selectedSignal.distance_from_52w_low
+                        ).toFixed(0)}
+                        %
+                        {is52wPositionOptimal(
+                          safeParseNumber(selectedSignal.distance_from_52w_low)
+                        )
+                          ? ' ✓ Optimal'
+                          : safeParseNumber(
+                                selectedSignal.distance_from_52w_low
+                              ) < 15
+                            ? ' ⚠️ Near Low'
+                            : ''}
+                      </span>
+                    </div>
+                    {/* Late Entry Check */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        5-Day Move
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          isLateEntry(
+                            safeParseNumber(selectedSignal.price_change_5d)
+                          )
+                            ? 'text-amber-600'
+                            : safeParseNumber(selectedSignal.price_change_5d) >
+                                0
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                        )}
+                      >
+                        {safeParseNumber(selectedSignal.price_change_5d) >= 0
+                          ? '+'
+                          : ''}
+                        {safeParseNumber(
+                          selectedSignal.price_change_5d
+                        ).toFixed(1)}
+                        %
+                        {isLateEntry(
+                          safeParseNumber(selectedSignal.price_change_5d)
+                        )
+                          ? ' ⚠️ Late'
+                          : ''}
+                      </span>
+                    </div>
+                    {/* Day of Week */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Entry Day
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          getDayOfWeekStatus(selectedSignal.scan_date) ===
+                            'bonus'
+                            ? 'text-green-600'
+                            : getDayOfWeekStatus(selectedSignal.scan_date) ===
+                                'penalty'
+                              ? 'text-amber-600'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {getDayOfWeek(selectedSignal.scan_date)}
+                        {getDayOfWeekStatus(selectedSignal.scan_date) ===
+                        'bonus'
+                          ? ' ✓ Bonus'
+                          : getDayOfWeekStatus(selectedSignal.scan_date) ===
+                              'penalty'
+                            ? ' ⚠️'
+                            : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Market Comparison */}
+                {selectedSignal.market_outperformance !== null && (
+                  <>
+                    <div className="space-y-2">
+                      <h3
+                        className="text-xs font-medium text-muted-foreground 
+                          uppercase tracking-wide"
+                      >
+                        Market Comparison
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">vs SPY (5d)</span>
+                          <span
+                            className={cn(
+                              'text-xs font-medium',
+                              safeParseNumber(
+                                selectedSignal.market_outperformance
+                              ) > 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                            )}
+                          >
+                            {safeParseNumber(
+                              selectedSignal.market_outperformance
+                            ) >= 0
+                              ? '+'
+                              : ''}
+                            {safeParseNumber(
+                              selectedSignal.market_outperformance
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+
                 {/* Signal Analysis */}
                 <div className="space-y-2">
                   <h3
                     className="text-xs font-medium text-muted-foreground 
                       uppercase tracking-wide"
                   >
-                    Signal Analysis
+                    Component Scores
                   </h3>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs">Overall Score</span>
-                      <span className="text-xs font-semibold">
-                        {(
-                          safeParseNumber(selectedSignal.overall_score) * 100
-                        ).toFixed(0)}
-                        %
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">Volume Score</span>
+                      <span className="text-xs">Volume (50%)</span>
                       <span className="text-xs font-semibold">
                         {(
                           safeParseNumber(selectedSignal.volume_score) * 100
@@ -807,7 +1458,7 @@ export default function PennyStockScanner() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs">Momentum Score</span>
+                      <span className="text-xs">Momentum (30%)</span>
                       <span className="text-xs font-semibold">
                         {(
                           safeParseNumber(selectedSignal.momentum_score) * 100
@@ -816,12 +1467,21 @@ export default function PennyStockScanner() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs">Relative Strength</span>
+                      <span className="text-xs">Rel Strength (15%)</span>
                       <span className="text-xs font-semibold">
                         {(
                           safeParseNumber(
                             selectedSignal.relative_strength_score
                           ) * 100
+                        ).toFixed(0)}
+                        %
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs">Risk (5%)</span>
+                      <span className="text-xs font-semibold">
+                        {(
+                          safeParseNumber(selectedSignal.risk_score) * 100
                         ).toFixed(0)}
                         %
                       </span>

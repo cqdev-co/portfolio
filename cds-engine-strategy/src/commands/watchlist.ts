@@ -59,10 +59,12 @@ function saveWatchlist(items: WatchlistItem[]): void {
     // Ensure directory exists
     const dir = dirname(WATCHLIST_PATH);
     if (!existsSync(dir)) {
-      (fs.mkdirSync as (path: string, options?: { recursive?: boolean }) => void)(
-        dir,
-        { recursive: true }
-      );
+      (
+        fs.mkdirSync as (
+          path: string,
+          options?: { recursive?: boolean }
+        ) => void
+      )(dir, { recursive: true });
     }
     writeFileSync(WATCHLIST_PATH, JSON.stringify(items, null, 4));
     logger.debug(`Saved watchlist to ${WATCHLIST_PATH}`);

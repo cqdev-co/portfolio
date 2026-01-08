@@ -2,20 +2,10 @@ name: Market Hours Penny Stock Scanner
 
 on:
   schedule:
-    # Run every 30 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
-    - cron: '30 13 * * 1-5' # 9:30 AM EDT (13:30 UTC)
-    - cron: '0 14 * * 1-5' # 10:00 AM EDT (14:00 UTC)
-    - cron: '30 14 * * 1-5' # 10:30 AM EDT (14:30 UTC)
-    - cron: '0 15 * * 1-5' # 11:00 AM EDT (15:00 UTC)
-    - cron: '30 15 * * 1-5' # 11:30 AM EDT (15:30 UTC)
-    - cron: '0 16 * * 1-5' # 12:00 PM EDT (16:00 UTC)
-    - cron: '30 16 * * 1-5' # 12:30 PM EDT (16:30 UTC)
-    - cron: '0 17 * * 1-5' # 1:00 PM EDT (17:00 UTC)
-    - cron: '30 17 * * 1-5' # 1:30 PM EDT (17:30 UTC)
-    - cron: '0 18 * * 1-5' # 2:00 PM EDT (18:00 UTC)
-    - cron: '30 18 * * 1-5' # 2:30 PM EDT (18:30 UTC)
-    - cron: '0 19 * * 1-5' # 3:00 PM EDT (19:00 UTC)
-    - cron: '30 19 * * 1-5' # 3:30 PM EDT (19:30 UTC)
+    # Run every 10 minutes during US EDT market hours (9:30 AM - 4:00 PM ET)
+    # Optimized scan time: ~5-10 minutes (was 40+ minutes)
+    - cron: '30,40,50 13 * * 1-5' # 9:30-9:50 AM EDT (13:30-13:50 UTC)
+    - cron: '*/10 14-19 * * 1-5' # 10:00 AM - 3:59 PM EDT (every 10 min)
     - cron: '0 20 * * 1-5' # 4:00 PM EDT (20:00 UTC) - Market close
   workflow_dispatch:
     inputs:

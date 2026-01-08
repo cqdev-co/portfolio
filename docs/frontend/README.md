@@ -2,6 +2,111 @@
 
 ## Recent Updates
 
+### Penny Stock Scanner UI Enhancements (January 2026)
+
+Enhanced the Penny Stock Scanner frontend to display new signal quality indicators based on January 2026 performance analysis. These changes surface the data-driven insights that were added to the backend scoring logic.
+
+#### Performance Stats Dashboard (NEW)
+
+Added a prominent performance stats section showing 30-day trading performance:
+
+- **Win Rate**: Overall win rate with color coding (green ≥50%, red <50%)
+- **Avg Return**: Average return percentage with trend indicator
+- **Profit Targets**: Percentage of trades hitting 10%+ profit target
+- **Stop Loss Rate**: Percentage of trades hitting stop loss
+
+The stats are displayed in gradient cards that stand out from the regular signal stats.
+
+#### Functional Filters (NEW)
+
+Replaced the placeholder Filters button with a functional filter popover:
+
+**Filter Options:**
+
+- **Opportunity Rank**: Multi-select (S, A, B, C, D) with color-coded buttons
+- **Recommendation**: Multi-select (STRONG_BUY, BUY, WATCH, HOLD)
+- **Quick Filters**:
+  - Volume Sweet Spot (2-3x) - checkbox
+  - Breakouts Only - checkbox
+
+**Features:**
+
+- Active filter count badge on button
+- Clear all filters option
+- Apply/Cancel buttons
+- Filter state persists until cleared
+
+#### New Table Columns
+
+1. **Action Column**: Displays the recommendation (STRONG_BUY, BUY, WATCH, HOLD) with color-coded badges
+2. **Signals Column**: Visual indicators showing signal quality factors:
+   - 💰 **Volume Sweet Spot** (emerald): Volume is in optimal 2-3x range
+   - 🔥 **Green Days Optimal** (green): 1 consecutive green day (64.8% WR)
+   - 📈 **52-Week Position Optimal** (blue): Stock is 25-50% from 52-week low
+   - ⏰ **Late Entry Warning** (amber): Price already moved 15%+ in 5 days
+   - 📅 **Friday Bonus** (green): Entry on Friday (historically better performance)
+
+#### Enhanced Sidebar Sections
+
+**Recommendation Section**:
+
+- Prominent recommendation badge with color coding
+- Overall score displayed inline
+
+**Signal Quality Section** (New):
+
+- **Volume Range**: Shows volume ratio with "Sweet Spot" or "High" indicators
+- **Green Days**: Consecutive up days with optimal (1 day) highlighting
+- **From 52w Low**: Distance from 52-week low with optimal zone (25-50%) indicator
+- **5-Day Move**: Late entry detection with warning for 15%+ moves
+- **Entry Day**: Day of week with bonus/penalty indicators
+
+**Market Comparison Section** (New):
+
+- SPY outperformance percentage for 5-day period
+- Green/red color coding based on relative performance
+
+**Component Scores Section** (Updated):
+
+- Now shows weight percentages: Volume (50%), Momentum (30%), Rel Strength (15%), Risk (5%)
+- Added Risk Score display
+
+#### Helper Functions Added
+
+```typescript
+// Check if volume is in sweet spot (2-3x is optimal)
+function isVolumeInSweetSpot(volumeRatio: number | null): boolean;
+
+// Check if late entry (price already moved 15%+ in 5 days)
+function isLateEntry(priceChange5d: number | null): boolean;
+
+// Check if 52-week position is optimal (25-50% from low)
+function is52wPositionOptimal(distanceFromLow: number | null): boolean;
+
+// Check if green days count is optimal (1 day = 64.8% WR)
+function isGreenDaysOptimal(greenDays: number | null): boolean;
+
+// Get day of week status (bonus/penalty/neutral)
+function getDayOfWeekStatus(dateStr: string): 'bonus' | 'penalty' | 'neutral';
+```
+
+#### New Icons Used
+
+- `TrendingUp` - 52-week position indicator
+- `Calendar` - Day of week indicator
+- `Flame` - Green days indicator
+- `Clock` - Late entry warning
+
+#### Design Principles
+
+- All indicators use consistent color coding:
+  - ✓ Green/Emerald/Blue: Optimal conditions
+  - ⚠️ Amber: Warning conditions
+  - Muted: Neutral conditions
+- Tooltips explain what each indicator means
+- Compact layout to avoid overwhelming users
+- Information hierarchy: Most actionable info (recommendation) shown first
+
 ### Chat Component Fix (December 2025)
 
 Fixed runtime TypeErrors in the chat components related to the `@ai-sdk/react`

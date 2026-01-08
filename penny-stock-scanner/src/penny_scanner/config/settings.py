@@ -80,20 +80,28 @@ class Settings(BaseSettings):
         default=3600, description="YFinance cache TTL in seconds"
     )
     max_concurrent_requests: int = Field(
-        default=5,
-        description="Maximum concurrent API requests (reduced for rate limiting)",
+        default=10,
+        description="Maximum concurrent API requests",
     )
 
-    # Rate Limiting - ADDED Jan 2026
-    # Yahoo Finance rate limits: ~2000/hour, ~100/minute aggressive
+    # Batch Download Settings - OPTIMIZED Jan 2026
+    # yfinance batch download can handle 50-100 symbols per call efficiently
+    batch_download_size: int = Field(
+        default=50,
+        description="Number of symbols per batch download (yfinance handles internally)",
+    )
+
+    # Rate Limiting - OPTIMIZED Jan 2026
+    # Yahoo Finance limits: ~2000/hour, batch downloads count as single requests
+    # Batch downloads are much more efficient - one call for 50 symbols
     rate_limit_requests_per_minute: int = Field(
-        default=30, description="Max requests per minute to Yahoo Finance"
+        default=60, description="Max requests per minute (batch downloads)"
     )
     rate_limit_min_delay: float = Field(
-        default=0.5, description="Minimum delay between requests (seconds)"
+        default=0.2, description="Minimum delay between requests (seconds)"
     )
     rate_limit_batch_delay: float = Field(
-        default=2.0, description="Delay between batches (seconds)"
+        default=1.0, description="Delay between batch downloads (seconds)"
     )
     rate_limit_initial_backoff: float = Field(
         default=5.0, description="Initial backoff on rate limit error (seconds)"

@@ -52,7 +52,7 @@
     "clean:turbo": "rm -rf .turbo */.turbo",
     "prepare": "husky",
     "py:unusual-options": "cd unusual-options-service && poetry run unusual-options",
-    "py:penny-scanner": "cd penny-stock-scanner && poetry run penny-scanner",
+    "py:penny-scanner": "cd penny-stock-scanner && poetry run penny-scanner scan-all --min-score 0.70",
     "py:wp-service": "cd wp-service && poetry run wp-service",
     "py:install": "cd unusual-options-service && poetry install && cd ../penny-stock-scanner && poetry install && cd ../wp-service && poetry install"
   },

@@ -162,9 +162,55 @@ class PennyDiscordNotifier:
         }
         return rank_colors.get(rank, self.COLOR_BLUE)
 
+    def _get_signal_quality_indicators(self, result: AnalysisResult) -> list[str]:
+        """Get signal quality indicators based on Jan 2026 analysis."""
+        signal = result.explosion_signal
+        indicators = []
+
+        # Volume sweet spot (2-3x is optimal - 69% WR)
+        if 2.0 <= signal.volume_spike_factor <= 3.0:
+            indicators.append("💰 Vol Sweet Spot")
+        elif signal.volume_spike_factor > 5.0:
+            indicators.append("⚠️ High Volume")
+
+        # Green days optimal (1 day = 64.8% WR)
+        green_days = getattr(signal, "consecutive_green_days", None)
+        if green_days == 1:
+            indicators.append("🔥 Optimal Entry")
+        elif green_days and green_days >= 4:
+            indicators.append("⚠️ Extended Run")
+
+        # 52-week position (25-50% from low is optimal)
+        dist_from_low = getattr(signal, "distance_from_52w_low", None)
+        if dist_from_low and 25 <= dist_from_low <= 50:
+            indicators.append("📍 Sweet Zone")
+        elif dist_from_low and dist_from_low < 15:
+            indicators.append("⚠️ Near Lows")
+
+        # Late entry warning (15%+ move in 5 days)
+        price_change_5d = getattr(signal, "price_change_5d", None)
+        if price_change_5d and price_change_5d > 15:
+            indicators.append(f"⏰ Late +{price_change_5d:.0f}%")
+
+        # Day of week
+        scan_date = getattr(signal, "scan_date", None)
+        if scan_date:
+            try:
+                from datetime import date as date_cls
+                if isinstance(scan_date, str):
+                    scan_date = date_cls.fromisoformat(scan_date)
+                if scan_date.weekday() == 4:  # Friday
+                    indicators.append("📅 Friday Bonus")
+            except Exception:
+                pass
+
+        return indicators
+
     async def send_signal_alert(self, result: AnalysisResult) -> bool:
         """
         Send alert for a high-quality penny stock signal.
+
+        Enhanced with signal quality indicators from Jan 2026 analysis.
 
         Args:
             result: Analysis result to alert on
@@ -197,58 +243,85 @@ class PennyDiscordNotifier:
             " | ".join(setup_indicators) if setup_indicators else "Volume Surge"
         )
 
+        # Get signal quality indicators
+        quality_indicators = self._get_signal_quality_indicators(result)
+        quality_text = " • ".join(quality_indicators) if quality_indicators else ""
+
         # Trend indicator
         trend_emoji = {"BULLISH": "🟢", "NEUTRAL": "🟡", "BEARISH": "🔴"}.get(
             signal.trend_direction.value, "⚪"
         )
 
+        # Build description with quality indicators
+        description_parts = [f"**{result.recommendation}** | {setup_text}"]
+        if quality_text:
+            description_parts.append(f"\n{quality_text}")
+
+        # Market outperformance
+        market_outperf = getattr(signal, "market_outperformance", None)
+        if market_outperf is not None:
+            outperf_text = f"+{market_outperf:.1f}%" if market_outperf >= 0 else f"{market_outperf:.1f}%"
+            description_parts.append(f"\n📊 vs SPY: **{outperf_text}**")
+
+        fields = [
+            {
+                "name": "💵 Price",
+                "value": f"${signal.close_price:.2f}",
+                "inline": True,
+            },
+            {
+                "name": "📊 Score",
+                "value": f"**{result.overall_score:.3f}**",
+                "inline": True,
+            },
+            {
+                "name": "📈 Volume",
+                "value": f"**{signal.volume_spike_factor:.1f}x** avg",
+                "inline": True,
+            },
+            {
+                "name": f"{trend_emoji} Trend",
+                "value": signal.trend_direction.value.title(),
+                "inline": True,
+            },
+            {
+                "name": "🎯 Stop Loss",
+                "value": f"${result.stop_loss_level:.2f}",
+                "inline": True,
+            },
+            {
+                "name": "📏 Position",
+                "value": f"{result.position_size_pct:.1f}%",
+                "inline": True,
+            },
+            {
+                "name": "📅 Status",
+                "value": f"{signal.signal_status.value} (Day {signal.days_active})",
+                "inline": True,
+            },
+            {
+                "name": "⚠️ Risk",
+                "value": signal.pump_dump_risk.value,
+                "inline": True,
+            },
+        ]
+
+        # Add 52-week context if available
+        dist_from_low = getattr(signal, "distance_from_52w_low", None)
+        dist_from_high = getattr(signal, "distance_from_52w_high", None)
+        if dist_from_low is not None and dist_from_high is not None:
+            fields.append({
+                "name": "📍 52W Range",
+                "value": f"+{dist_from_low:.0f}% from low\n-{dist_from_high:.0f}% from high",
+                "inline": True,
+            })
+
         embed = DiscordEmbed(
             title=f"{emoji} {result.symbol} - {rank.value}-Tier Signal",
-            description=f"**{result.recommendation}** | {setup_text}",
+            description="\n".join(description_parts),
             color=color,
-            fields=[
-                {
-                    "name": "💵 Price",
-                    "value": f"${signal.close_price:.2f}",
-                    "inline": True,
-                },
-                {
-                    "name": "📊 Score",
-                    "value": f"**{result.overall_score:.3f}**",
-                    "inline": True,
-                },
-                {
-                    "name": "📈 Volume",
-                    "value": f"**{signal.volume_spike_factor:.1f}x** avg",
-                    "inline": True,
-                },
-                {
-                    "name": f"{trend_emoji} Trend",
-                    "value": signal.trend_direction.value.title(),
-                    "inline": True,
-                },
-                {
-                    "name": "🎯 Stop Loss",
-                    "value": f"${result.stop_loss_level:.2f}",
-                    "inline": True,
-                },
-                {
-                    "name": "📏 Position",
-                    "value": f"{result.position_size_pct:.1f}%",
-                    "inline": True,
-                },
-                {
-                    "name": "📅 Status",
-                    "value": f"{signal.signal_status.value} (Day {signal.days_active})",
-                    "inline": True,
-                },
-                {
-                    "name": "⚠️ Risk",
-                    "value": signal.pump_dump_risk.value,
-                    "inline": True,
-                },
-            ],
-            footer="Penny Stock Scanner",
+            fields=fields,
+            footer="Penny Stock Scanner • Data-driven signals",
             timestamp=datetime.now(UTC).isoformat(),
         )
 
@@ -476,6 +549,142 @@ class PennyDiscordNotifier:
                 color=self.COLOR_GREEN,
             )
             embeds.append(winners_embed)
+
+        return await self.send_message(embeds=embeds)
+
+
+    async def send_weekly_performance_summary(
+        self,
+        win_rate: float,
+        avg_return: float,
+        total_trades: int,
+        best_trade: dict | None = None,
+        worst_trade: dict | None = None,
+        win_rate_change: float = 0,
+        performance_by_indicator: dict | None = None,
+    ) -> bool:
+        """
+        Send weekly performance summary with insights.
+
+        Args:
+            win_rate: Overall win rate
+            avg_return: Average return
+            total_trades: Total closed trades
+            best_trade: Best performing trade
+            worst_trade: Worst performing trade
+            win_rate_change: Change from previous week
+            performance_by_indicator: Performance breakdown by indicators
+
+        Returns:
+            True if successful
+        """
+        # Determine status and color
+        if win_rate >= 55:
+            status = "🔥 Excellent Week"
+            color = self.COLOR_GOLD
+        elif win_rate >= 50:
+            status = "✅ Profitable Week"
+            color = self.COLOR_GREEN
+        elif win_rate >= 45:
+            status = "⚠️ Near Breakeven"
+            color = self.COLOR_ORANGE
+        else:
+            status = "📉 Tough Week"
+            color = self.COLOR_RED
+
+        # Win rate trend
+        if win_rate_change > 0:
+            trend_text = f"📈 +{win_rate_change:.1f}% vs last week"
+        elif win_rate_change < 0:
+            trend_text = f"📉 {win_rate_change:.1f}% vs last week"
+        else:
+            trend_text = "➡️ Same as last week"
+
+        embed = DiscordEmbed(
+            title="📊 Weekly Performance Summary",
+            description=f"**{status}**\n{trend_text}",
+            color=color,
+            fields=[
+                {
+                    "name": "🎯 Win Rate",
+                    "value": f"**{win_rate:.1f}%**",
+                    "inline": True,
+                },
+                {
+                    "name": "💰 Avg Return",
+                    "value": f"**{avg_return:+.2f}%**",
+                    "inline": True,
+                },
+                {
+                    "name": "📈 Total Trades",
+                    "value": f"**{total_trades}**",
+                    "inline": True,
+                },
+            ],
+            footer="Penny Stock Scanner Weekly Report",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+
+        embeds = [embed]
+
+        # Best/Worst trades
+        if best_trade or worst_trade:
+            trades_fields = []
+            if best_trade:
+                trades_fields.append({
+                    "name": "🏆 Best Trade",
+                    "value": f"**{best_trade['symbol']}** +{best_trade['return']:.1f}%",
+                    "inline": True,
+                })
+            if worst_trade:
+                trades_fields.append({
+                    "name": "📉 Worst Trade",
+                    "value": f"**{worst_trade['symbol']}** {worst_trade['return']:.1f}%",
+                    "inline": True,
+                })
+
+            trades_embed = DiscordEmbed(
+                title="📋 Trade Highlights",
+                color=self.COLOR_BLUE,
+                fields=trades_fields,
+            )
+            embeds.append(trades_embed)
+
+        # Performance by indicator insights
+        if performance_by_indicator:
+            insights = []
+
+            # Volume sweet spot performance
+            if "volume_sweet_spot" in performance_by_indicator:
+                vs = performance_by_indicator["volume_sweet_spot"]
+                insights.append(
+                    f"💰 **Volume 2-3x**: {vs['win_rate']:.0f}% WR, "
+                    f"{vs['avg_return']:+.1f}% avg"
+                )
+
+            # Green day performance
+            if "one_green_day" in performance_by_indicator:
+                gd = performance_by_indicator["one_green_day"]
+                insights.append(
+                    f"🔥 **1 Green Day**: {gd['win_rate']:.0f}% WR, "
+                    f"{gd['avg_return']:+.1f}% avg"
+                )
+
+            # Friday entries
+            if "friday_entry" in performance_by_indicator:
+                fri = performance_by_indicator["friday_entry"]
+                insights.append(
+                    f"📅 **Friday Entries**: {fri['win_rate']:.0f}% WR, "
+                    f"{fri['avg_return']:+.1f}% avg"
+                )
+
+            if insights:
+                insights_embed = DiscordEmbed(
+                    title="🎯 What's Working",
+                    description="\n".join(insights),
+                    color=self.COLOR_GREEN,
+                )
+                embeds.append(insights_embed)
 
         return await self.send_message(embeds=embeds)
 

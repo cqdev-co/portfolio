@@ -337,10 +337,12 @@ def scan_all(
                 f"✅ Retrieved data for {len(symbol_data)}/{len(all_symbols)} symbols"
             )
 
-            # Analyze symbols
+            # Analyze symbols - process in parallel batches for speed
             console.print("[bold blue]🔬 Analyzing for explosion setups...[/bold blue]")
 
             signals = []
+            analysis_batch_size = 20  # Process 20 analyses in parallel
+
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -348,17 +350,35 @@ def scan_all(
             ) as progress:
                 task = progress.add_task("Analyzing...", total=len(symbol_data))
 
-                for symbol, market_data in symbol_data.items():
-                    try:
-                        result = await analysis_service.analyze_symbol(
-                            market_data, include_ai_analysis=False
-                        )
-                        if result and result.overall_score >= min_score:
-                            signals.append(result)
-                    except Exception as e:
-                        logger.debug(f"Analysis failed for {symbol}: {e}")
+                # Convert to list for batch processing
+                items = list(symbol_data.items())
 
-                    progress.update(task, advance=1)
+                for i in range(0, len(items), analysis_batch_size):
+                    batch = items[i : i + analysis_batch_size]
+
+                    # Create analysis tasks for this batch
+                    async def analyze_one(symbol: str, market_data):
+                        try:
+                            result = await analysis_service.analyze_symbol(
+                                market_data, include_ai_analysis=False
+                            )
+                            if result and result.overall_score >= min_score:
+                                return result
+                        except Exception as e:
+                            logger.debug(f"Analysis failed for {symbol}: {e}")
+                        return None
+
+                    # Run batch in parallel
+                    batch_results = await asyncio.gather(
+                        *[analyze_one(sym, data) for sym, data in batch]
+                    )
+
+                    # Collect valid results
+                    for result in batch_results:
+                        if result is not None:
+                            signals.append(result)
+
+                    progress.update(task, advance=len(batch))
 
             # Get today's date for continuity and storage
             today = date.today()

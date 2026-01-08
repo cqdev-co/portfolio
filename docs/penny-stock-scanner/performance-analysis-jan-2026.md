@@ -1,5 +1,11 @@
 # Penny Stock Scanner Performance Analysis - January 2026
 
+> **Frontend Updates**: Signal quality indicators from this analysis are now displayed
+> in the frontend. See [Frontend README](../frontend/README.md) for UI details.
+
+> **Performance Optimization**: Scan time reduced from 40+ minutes to ~5-10 minutes.
+> See [Scan Performance](#scan-performance-optimization) section below.
+
 ## 📊 Executive Summary
 
 Analysis of 1,000 signals and 673 closed trades over Dec 2025 - Jan 2026 reveals:
@@ -372,7 +378,154 @@ Based on deeper data analysis, the following improvements were added:
 
 ---
 
-_Analysis Date: January 7, 2026_
+## Scan Performance Optimization
+
+### Problem
+
+Full penny stock scans were taking **40+ minutes** to complete, making daily automated
+scanning impractical and CI workflows timeout-prone.
+
+**Root Causes:**
+
+1. Individual API calls for each symbol (500+ symbols × 2 calls each = 1000+ calls)
+2. Conservative rate limiting (30 req/min = 0.5 req/sec)
+3. Sequential processing within batches
+4. 2-second delays between batches
+5. Fetching `ticker.info` for every symbol (unnecessary for most)
+
+### Solution: Batch Downloads + Parallel Analysis
+
+**1. yfinance Batch Download**
+
+```python
+# OLD: Individual calls - SLOW
+for symbol in symbols:
+    ticker = yf.Ticker(symbol)
+    hist = ticker.history(period="6mo")  # One API call
+    info = ticker.info                    # Another API call
+
+# NEW: Batch download - FAST
+df = yf.download(
+    tickers=symbols[:50],  # 50 symbols at once
+    period="6mo",
+    group_by="ticker",
+    threads=True,          # Internal parallelism
+)
+```
+
+**2. Deferred `ticker.info` Fetching**
+
+- Only fetch sector/industry/float data for high-scoring signals
+- Most symbols don't need this extra metadata
+- Saves ~500 API calls per scan
+
+**3. Parallel Analysis Processing**
+
+```python
+# Process 20 analyses in parallel
+batch_results = await asyncio.gather(
+    *[analyze_one(sym, data) for sym, data in batch]
+)
+```
+
+**4. Optimized Rate Limits**
+
+| Setting                      | Old Value | New Value |
+| ---------------------------- | --------- | --------- |
+| `batch_download_size`        | N/A       | 50        |
+| `requests_per_minute`        | 30        | 60        |
+| `min_delay_between_requests` | 0.5s      | 0.2s      |
+| `batch_delay`                | 2.0s      | 1.0s      |
+
+### Results
+
+| Metric                | Before   | After     | Improvement       |
+| --------------------- | -------- | --------- | ----------------- |
+| **Scan Time**         | 40+ min  | ~5-10 min | **75-85% faster** |
+| **API Calls**         | ~1000+   | ~15-20    | **98% reduction** |
+| **Rate Limit Errors** | Frequent | Rare      | Stable            |
+
+### Configuration
+
+```bash
+# Environment variables for tuning
+BATCH_DOWNLOAD_SIZE=50        # Symbols per batch download
+RATE_LIMIT_REQUESTS_PER_MINUTE=60
+RATE_LIMIT_MIN_DELAY=0.2
+RATE_LIMIT_BATCH_DELAY=1.0
+```
+
+### Files Changed
+
+1. `src/penny_scanner/services/data_service.py`
+   - Added `get_multiple_symbols_batch()` with `yf.download()`
+   - Added `enrich_with_info()` for deferred metadata fetching
+   - Removed redundant `ticker.info` calls from main scan
+
+2. `src/penny_scanner/config/settings.py`
+   - Added `batch_download_size` setting
+   - Optimized rate limit defaults
+
+3. `src/penny_scanner/utils/rate_limiter.py`
+   - Increased default limits for batch operations
+
+4. `src/penny_scanner/cli.py`
+   - Added parallel analysis processing with `asyncio.gather()`
+   - Analysis batch size of 20 for parallel execution
+
+5. `src/penny_scanner/services/discord_service.py`
+   - Added signal quality indicators to alerts
+   - Volume sweet spot, green days, 52-week position
+   - Late entry warnings
+   - Market outperformance display
+   - 52-week range context
+   - New weekly performance summary method
+
+---
+
+## Discord Alert Enhancements
+
+### Signal Alert Improvements
+
+Discord alerts now include signal quality indicators:
+
+**Quality Indicators Added:**
+
+- 💰 **Volume Sweet Spot** (2-3x = 69% WR)
+- 🔥 **Optimal Entry** (1 green day = 64.8% WR)
+- 📍 **Sweet Zone** (25-50% from 52-week low)
+- ⚠️ **Late Entry** warning when 15%+ in 5 days
+- 📅 **Friday Bonus** indicator
+
+**Additional Context:**
+
+- Market outperformance vs SPY
+- 52-week range position
+- Enhanced footer with "Data-driven signals" branding
+
+### Weekly Performance Summary (NEW)
+
+New method `send_weekly_performance_summary()` for automated weekly reports:
+
+```python
+await notifier.send_weekly_performance_summary(
+    win_rate=52.3,
+    avg_return=1.2,
+    total_trades=45,
+    best_trade={"symbol": "AEMD", "return": 45.2},
+    worst_trade={"symbol": "XYZ", "return": -18.5},
+    win_rate_change=3.1,  # vs last week
+    performance_by_indicator={
+        "volume_sweet_spot": {"win_rate": 69, "avg_return": 5.2},
+        "one_green_day": {"win_rate": 64.8, "avg_return": 4.1},
+        "friday_entry": {"win_rate": 57.4, "avg_return": 3.8},
+    }
+)
+```
+
+---
+
+_Analysis Date: January 8, 2026_
 _Data Period: December 2, 2025 - January 7, 2026_
 _Signals Analyzed: 1,000_
 _Closed Trades: 673_

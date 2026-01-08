@@ -8,6 +8,8 @@ import type {
   PennyStockFilters,
   PennyStockResponse,
   PennyStockStats,
+  PennyStockPerformanceStats,
+  OpportunityRank,
 } from '@/lib/types/penny-stock';
 
 /**
@@ -39,8 +41,16 @@ export async function fetchPennyStockSignals(options: {
     }
 
     // Apply filters
-    if (filters.opportunity_rank) {
+    if (filters.opportunity_ranks && filters.opportunity_ranks.length > 0) {
+      query = query.in('opportunity_rank', filters.opportunity_ranks);
+    } else if (filters.opportunity_rank) {
       query = query.eq('opportunity_rank', filters.opportunity_rank);
+    }
+
+    if (filters.recommendations && filters.recommendations.length > 0) {
+      query = query.in('recommendation', filters.recommendations);
+    } else if (filters.recommendation) {
+      query = query.eq('recommendation', filters.recommendation);
     }
 
     if (filters.min_score !== undefined) {
@@ -69,6 +79,15 @@ export async function fetchPennyStockSignals(options: {
 
     if (filters.min_volume_ratio !== undefined) {
       query = query.gte('volume_ratio', filters.min_volume_ratio);
+    }
+
+    if (filters.max_volume_ratio !== undefined) {
+      query = query.lte('volume_ratio', filters.max_volume_ratio);
+    }
+
+    // Volume sweet spot filter (2-3x)
+    if (filters.volume_in_sweet_spot) {
+      query = query.gte('volume_ratio', 2.0).lte('volume_ratio', 3.0);
     }
 
     if (filters.min_dollar_volume !== undefined) {
@@ -228,4 +247,106 @@ export function subscribeToPennyStockUpdates(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+/**
+ * Fetch performance statistics from closed trades (last 30 days)
+ * Returns null gracefully if no data available
+ */
+export async function fetchPerformanceStats(): Promise<PennyStockPerformanceStats | null> {
+  try {
+    // Get closed trades from penny_signal_performance table
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+
+    const { data, error } = await supabase
+      .from('penny_signal_performance')
+      .select('*')
+      .eq('status', 'CLOSED')
+      .gte('entry_date', thirtyDaysAgo);
+
+    // Gracefully handle missing table or no data
+    if (error) {
+      // Table might not exist or other DB error - this is okay
+      console.debug('Performance stats unavailable:', error.message);
+      return null;
+    }
+
+    if (!data || data.length === 0) {
+      // No closed trades yet - this is normal for new setups
+      return null;
+    }
+
+    // Calculate overall stats
+    const total_closed_trades = data.length;
+    const wins = data.filter((t) => (t.actual_return || 0) > 0);
+    const win_rate = (wins.length / total_closed_trades) * 100;
+
+    const avg_return =
+      data.reduce((sum, t) => sum + (t.actual_return || 0), 0) /
+      total_closed_trades;
+
+    const avg_hold_days =
+      data.reduce((sum, t) => sum + (t.days_held || 0), 0) /
+      total_closed_trades;
+
+    const stop_loss_hits = data.filter((t) => t.stop_loss_hit === true);
+    const stop_loss_hit_rate =
+      (stop_loss_hits.length / total_closed_trades) * 100;
+
+    const profit_target_hits = data.filter(
+      (t) => t.hit_10_pct || t.hit_20_pct || t.hit_30_pct
+    );
+    const profit_target_hit_rate =
+      (profit_target_hits.length / total_closed_trades) * 100;
+
+    const returns = data.map((t) => t.actual_return || 0);
+    const best_return = Math.max(...returns);
+    const worst_return = Math.min(...returns);
+
+    // Calculate by rank
+    const ranks: OpportunityRank[] = ['S', 'A', 'B', 'C', 'D'];
+    const win_rate_by_rank: Record<OpportunityRank, number> = {
+      S: 0,
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+    };
+    const avg_return_by_rank: Record<OpportunityRank, number> = {
+      S: 0,
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+    };
+
+    for (const rank of ranks) {
+      const rankTrades = data.filter((t) => t.opportunity_rank === rank);
+      if (rankTrades.length > 0) {
+        const rankWins = rankTrades.filter((t) => (t.actual_return || 0) > 0);
+        win_rate_by_rank[rank] = (rankWins.length / rankTrades.length) * 100;
+        avg_return_by_rank[rank] =
+          rankTrades.reduce((sum, t) => sum + (t.actual_return || 0), 0) /
+          rankTrades.length;
+      }
+    }
+
+    return {
+      total_closed_trades,
+      win_rate,
+      avg_return,
+      avg_hold_days,
+      stop_loss_hit_rate,
+      profit_target_hit_rate,
+      best_return,
+      worst_return,
+      win_rate_by_rank,
+      avg_return_by_rank,
+    };
+  } catch (error) {
+    console.error('Unexpected error fetching performance stats:', error);
+    return null;
+  }
 }
