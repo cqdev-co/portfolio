@@ -31,14 +31,14 @@ AI "Employee" - a 67-year-old veteran Wall Street analyst with 45 years experien
 - **Status**: Production-ready
 - [README](ai-analyst/README.md)
 
-#### [Stock Opportunity Scanner](screen-ticker/)
+#### [CDS Engine Strategy](cds-engine-strategy/)
 
-CLI tool for identifying high-conviction stock buy opportunities.
+Call Debit Spread trading engine - finds optimal entry opportunities.
 
 - **Strategy**: Technical + Fundamental + Analyst confluence scoring
-- **Key Features**: Narrative analysis, ASCII charts, AI-first architecture
+- **Key Features**: Market regime awareness, sector rotation, spread finding
 - **Status**: Production-ready
-- [README](screen-ticker/README.md) | [Scan Analysis](screen-ticker/scan-command-analysis.md)
+- [README](cds-engine-strategy/README.md) | [Process Flow](cds-engine-strategy/PROCESS_FLOW.md)
 
 #### [Cloudflare Yahoo Proxy](../cloudflare/README.md)
 
@@ -122,13 +122,13 @@ Monorepo architecture and Turborepo configuration.
 
 ## 🔍 Service Comparison
 
-| Service         | Focus             | Language   | Update Frequency |
-| --------------- | ----------------- | ---------- | ---------------- |
-| AI Analyst      | Entry decisions   | TypeScript | On-demand        |
-| Screen Ticker   | Buy opportunities | TypeScript | Daily            |
-| Unusual Options | Options flow      | Python     | Real-time        |
-| Penny Scanner   | Penny breakouts   | Python     | Daily            |
-| Frontend        | Web interface     | TypeScript | -                |
+| Service             | Focus             | Language   | Update Frequency |
+| ------------------- | ----------------- | ---------- | ---------------- |
+| AI Analyst          | Entry decisions   | TypeScript | On-demand        |
+| CDS Engine Strategy | CDS opportunities | TypeScript | Daily            |
+| Unusual Options     | Options flow      | Python     | Real-time        |
+| Penny Scanner       | Penny breakouts   | Python     | Daily            |
+| Frontend            | Web interface     | TypeScript | -                |
 
 ## 🚀 Quick Start by Use Case
 
@@ -140,12 +140,13 @@ Monorepo architecture and Turborepo configuration.
 cd ai-analyst && bun run chat
 ```
 
-### "I want to find buy opportunities"
+### "I want to find CDS opportunities"
 
-→ Use **[Screen Ticker](screen-ticker/)**
+→ Use **[CDS Engine Strategy](cds-engine-strategy/)**
 
 ```bash
-cd screen-ticker && bun run scan:sp500
+bun run cds              # Full engine briefing
+bun run cds:scan-all     # Scan + find spreads
 ```
 
 ### "I want to track unusual options"
@@ -195,4 +196,4 @@ All service documentation includes:
 
 ---
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-07

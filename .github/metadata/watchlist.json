@@ -1,0 +1,29 @@
+[
+  {
+    "ticker": "MSFT",
+    "targetAbove": null,
+    "targetBelow": 470,
+    "notes": "Wait for pullback to MA50",
+    "lastPrice": 483.47,
+    "lastChecked": "2026-01-07",
+    "addedAt": "2026-01-07"
+  },
+  {
+    "ticker": "META",
+    "targetAbove": null,
+    "targetBelow": 620,
+    "notes": "Wait for support test",
+    "lastPrice": 648.69,
+    "lastChecked": "2026-01-07",
+    "addedAt": "2026-01-07"
+  },
+  {
+    "ticker": "INVH",
+    "targetAbove": null,
+    "targetBelow": 25.5,
+    "notes": "REIT - watch rates",
+    "lastPrice": 26.41,
+    "lastChecked": "2026-01-07",
+    "addedAt": "2026-01-07"
+  }
+]

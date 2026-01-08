@@ -193,8 +193,10 @@ class Settings(BaseSettings):
         ],
         description="Countries with historically poor performance - demote signals from these",
     )
+    # NOTE: China removed from moderate risk - Jan 2026 data shows
+    # China = 61.2% WR, +15.98% avg return (surprisingly best performer!)
     moderate_risk_countries: list = Field(
-        default=["China", "Hong Kong"],
+        default=["Hong Kong"],
         description="Countries with moderate risk - flag but don't filter",
     )
 
@@ -204,11 +206,87 @@ class Settings(BaseSettings):
         default=10.0,
         description="Volume above this is penalized (likely pump-and-dump)",
     )
+    # Volume Sweet Spot - UPDATED Jan 2026
+    # Data shows: 2-3x = 69% WR, +3.53% vs 3-5x = 47.5% WR, +2.74%
     volume_sweet_spot_min: float = Field(
         default=2.0, description="Minimum volume for optimal zone"
     )
     volume_sweet_spot_max: float = Field(
-        default=5.0, description="Maximum volume for optimal zone"
+        default=3.0,
+        description="Maximum volume for optimal zone (narrowed from 5.0 per Jan 2026 data)",
+    )
+
+    # Late Entry Penalty - ADDED Jan 2026
+    # Data shows: 0.60-0.69 scores = 56.1% WR vs 0.70-0.79 = 35.4% WR
+    # Higher scores are buying AFTER the move - penalize late entries
+    late_entry_threshold_5d: float = Field(
+        default=15.0,
+        description="Penalize if price already up this % in 5 days (chasing)",
+    )
+    late_entry_threshold_10d: float = Field(
+        default=30.0,
+        description="Penalize if price already up this % in 10 days (very late)",
+    )
+    late_entry_penalty_moderate: float = Field(
+        default=0.85, description="Score multiplier for moderate late entry (15%+ 5d)"
+    )
+    late_entry_penalty_severe: float = Field(
+        default=0.70, description="Score multiplier for severe late entry (30%+ 10d)"
+    )
+    early_entry_bonus: float = Field(
+        default=1.10, description="Score multiplier for early entry (-5% to +10% 5d)"
+    )
+
+    # Minimum Hold Period - ADDED Jan 2026
+    # Data shows: 1 day = 43.7% WR, 4-7 days = 76.5% WR
+    min_hold_days: int = Field(
+        default=3,
+        description="Minimum days to hold before closing (unless stop hit)",
+    )
+
+    # Consecutive Green Days - ADDED Jan 2026
+    # Data shows: 1 green day = 64.8% WR (best!)
+    #             0 green days = 42.2% WR
+    #             4+ green days = 41.9% WR (late entry)
+    green_day_optimal: int = Field(
+        default=1, description="Optimal number of consecutive green days"
+    )
+    green_day_optimal_bonus: float = Field(
+        default=1.08, description="Score multiplier for optimal green days (8% bonus)"
+    )
+    green_day_zero_penalty: float = Field(
+        default=0.95, description="Score multiplier for 0 green days (5% penalty)"
+    )
+    green_day_excessive_penalty: float = Field(
+        default=0.92,
+        description="Score multiplier for 4+ green days (8% penalty - late entry)",
+    )
+
+    # 52-Week Position - ADDED Jan 2026
+    # Data shows: 25-50% from low = 55.1% WR, +5.90% (best!)
+    #             <25% from low = 45.3% WR, -3.78% (catching falling knife)
+    #             100%+ from low = 48.0% WR, -0.11% (overextended)
+    position_52w_optimal_min: float = Field(
+        default=25.0, description="Optimal min distance from 52w low (%)"
+    )
+    position_52w_optimal_max: float = Field(
+        default=50.0, description="Optimal max distance from 52w low (%)"
+    )
+    position_52w_optimal_bonus: float = Field(
+        default=1.06, description="Score multiplier for optimal 52w position (6% bonus)"
+    )
+    position_52w_near_low_penalty: float = Field(
+        default=0.92,
+        description="Score multiplier for <25% from low (8% penalty - falling knife)",
+    )
+
+    # Day of Week - ADDED Jan 2026
+    # Data shows: Friday = 57.4% WR (best), Wednesday = 44.7% WR (worst)
+    day_of_week_friday_bonus: float = Field(
+        default=1.05, description="Score multiplier for Friday entries (5% bonus)"
+    )
+    day_of_week_wednesday_penalty: float = Field(
+        default=0.95, description="Score multiplier for Wednesday entries (5% penalty)"
     )
 
     # Risk & Liquidity: 5%

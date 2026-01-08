@@ -341,7 +341,7 @@ Log to Supabase (strategy_signals table)
 
 | Service                    | Purpose            | Integration                |
 | -------------------------- | ------------------ | -------------------------- |
-| `screen-ticker`            | Find opportunities | Reads strategy.config.yaml |
+| `cds-engine-strategy`      | Find opportunities | Reads strategy.config.yaml |
 | `ai-analyst`               | Validate entries   | Reads strategy.config.yaml |
 | `unusual-options-service`  | Smart money flow   | Additional signal          |
 | `spread_quant_analysis.py` | Track performance  | Validates against config   |
@@ -459,9 +459,9 @@ $10,000 account → $1,200 max per trade
 
 - [Strategy Config Reference](../lib/strategy-config.md)
 - [AI Analyst Setup](../ai-analyst/README.md)
-- [Screen Ticker Usage](../screen-ticker/README.md)
+- [CDS Engine Strategy](../cds-engine-strategy/README.md)
 - [Quant Analysis Guide](../scripts/spread-quant-analysis.md)
 
 ---
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-07

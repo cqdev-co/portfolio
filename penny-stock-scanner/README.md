@@ -4,6 +4,24 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 
 ## ⚠️ Recent Updates
 
+### January 2026 - Score Inversion Fix & Data-Driven Improvements
+
+**Major fixes based on 1,000 signals and 673 closed trades analysis:**
+
+- ✅ **Late entry penalty**: Penalizes signals where price already moved 15%+ (fixes score inversion)
+- ✅ **Volume sweet spot narrowed**: 2-3x optimal (was 2-5x), 69% WR vs 47.5%
+- ✅ **Minimum hold period**: 3 days minimum before closing (4-7 day holds = 76.5% WR!)
+- ✅ **BUY criteria fixed**: Was 27.7% WR, now requires sweet spot volume + no late entry
+
+**Additional Data-Driven Improvements:**
+
+- ✅ **1 Green Day bonus**: 64.8% WR (best) vs 0 days (42.2%) or 4+ days (41.9%)
+- ✅ **52-Week position filter**: 25-50% from low = 55.1% WR, +5.90% (optimal zone)
+- ✅ **Day of week adjustment**: Friday +5% bonus (57.4% WR), Wednesday -5% penalty (44.7%)
+- ✅ **China risk reassessed**: Removed from risk list - actually 61.2% WR, +15.98%!
+
+**See**: [`../docs/penny-stock-scanner/performance-analysis-jan-2026.md`](../docs/penny-stock-scanner/performance-analysis-jan-2026.md) for full analysis.
+
 ### December 2025 - Performance Improvements
 
 **Major fixes based on real performance data (248 signals, 65 closed trades):**

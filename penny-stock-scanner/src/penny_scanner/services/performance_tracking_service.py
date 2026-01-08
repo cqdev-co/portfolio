@@ -6,6 +6,7 @@ from typing import Any
 
 from loguru import logger
 
+from penny_scanner.config.settings import get_settings
 from penny_scanner.models.analysis import AnalysisResult, SignalStatus
 from penny_scanner.services.database_service import DatabaseService
 
@@ -94,6 +95,10 @@ class PerformanceTrackingService:
         """
         Close performance tracking for signals that have ended.
 
+        UPDATED Jan 2026: Added minimum hold period.
+        Data shows: 1 day = 43.7% WR, 4-7 days = 76.5% WR
+        Don't close signals before MIN_HOLD_DAYS unless stop loss hit.
+
         Args:
             ended_symbols: List of symbols that have ended
             scan_date: Date when signals ended (defaults to today)
@@ -107,7 +112,11 @@ class PerformanceTrackingService:
         if scan_date is None:
             scan_date = date.today()
 
+        settings = get_settings()
+        min_hold_days = settings.min_hold_days
+
         closed_count = 0
+        deferred_count = 0
 
         for symbol in ended_symbols:
             try:
@@ -128,6 +137,9 @@ class PerformanceTrackingService:
                 entry_price = float(record.get("entry_price", 0))
                 entry_date = date.fromisoformat(record["entry_date"])
                 stop_loss_price = record.get("stop_loss_price")
+
+                # Calculate days held
+                days_held_so_far = (scan_date - entry_date).days
 
                 # Get current market price
                 current_price = await self._get_current_price(symbol, scan_date)
@@ -166,6 +178,20 @@ class PerformanceTrackingService:
                     except Exception as e:
                         logger.warning(f"Could not check stop loss for {symbol}: {e}")
 
+                # MINIMUM HOLD PERIOD CHECK (Added Jan 2026)
+                # Data shows: 1 day = 43.7% WR, 4-7 days = 76.5% WR
+                # Don't close unless stop hit or minimum hold met
+                if (
+                    exit_reason != "STOP_LOSS"
+                    and days_held_so_far < min_hold_days
+                ):
+                    logger.debug(
+                        f"{symbol}: Deferring close - only {days_held_so_far} days held "
+                        f"(min: {min_hold_days})"
+                    )
+                    deferred_count += 1
+                    continue
+
                 # Calculate metrics
                 days_held = (exit_date - entry_date).days
 
@@ -203,6 +229,10 @@ class PerformanceTrackingService:
 
         if closed_count > 0:
             logger.info(f"Closed performance tracking for {closed_count} ended signals")
+        if deferred_count > 0:
+            logger.info(
+                f"Deferred {deferred_count} signals - minimum hold period not met"
+            )
 
         return closed_count
 

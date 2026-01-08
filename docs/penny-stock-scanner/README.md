@@ -57,10 +57,13 @@ penny-scanner scan-all --min-score 0.70 --output results.json
 
 ## 🏆 Opportunity Ranks
 
-- **S-Tier** (≥0.90): Exceptional - strong volume, clean consolidation breakout
-- **A-Tier** (≥0.80): Excellent - high volume surge, good momentum
-- **B-Tier** (≥0.70): Solid - decent volume, positive momentum
-- **C-Tier** (≥0.60): Fair - minimal requirements met
+- **S-Tier** (≥0.82): Exceptional - strong volume, clean consolidation breakout
+- **A-Tier** (≥0.72): Excellent - high volume surge, good momentum
+- **B-Tier** (≥0.62): Solid - decent volume, positive momentum (best actual win rate!)
+- **C-Tier** (≥0.55): Fair - minimal requirements met
+
+> **Note (Jan 2026)**: Due to late entry penalty, B-Tier signals often outperform higher tiers
+> because they catch moves earlier. See [performance analysis](performance-analysis-jan-2026.md).
 
 ## 📊 The "Explosion Setup" Pattern
 
@@ -96,7 +99,11 @@ The ideal penny stock signal we're looking for:
 - **API Examples**: See user guide for programmatic usage
 - **Backtesting**: Coming soon - validate strategy performance
 - **AI Integration**: Optional AI analysis for signal classification
-- **[Performance Improvements (Dec 2025)](performance-improvements-dec-2025.md)**: Analysis of real performance data and fixes
+
+### Performance Analysis & Improvements
+
+- **[Performance Analysis (Jan 2026)](performance-analysis-jan-2026.md)**: Latest analysis - score inversion fix, late entry penalty, minimum hold period
+- **[Performance Improvements (Dec 2025)](performance-improvements-dec-2025.md)**: Stop loss widening, breakout detection, tier adjustments
 
 ## ⚠️ Risk Disclaimer
 

@@ -78,3 +78,6 @@ lib/ai-agent/bun.lock
 # Keep only root lockfile (consolidate bun.lock files)
 **/bun.lock
 !bun.lock
+
+.ruff_cache/
+.husky

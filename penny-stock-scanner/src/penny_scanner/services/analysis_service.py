@@ -570,23 +570,29 @@ class AnalysisService:
         - Volume consistency: 10%
         - Liquidity depth: 5%
 
-        UPDATED Dec 2024: Added volume ceiling to penalize extreme spikes.
-        Data shows 10x+ volume = 34% WR, -3.16% vs 2-5x = 50% WR, +1.9%
+        UPDATED Jan 2026: Narrowed sweet spot based on performance data.
+        Data shows: 2-3x = 69% WR, +3.53% (BEST)
+                    3-5x = 47.5% WR, +2.74%
+                    5-10x = 49.1% WR, +1.61%
+                    10x+ = likely pump-and-dump
         """
         score = 0.0
 
         # Volume surge (20%) - with ceiling for pump-and-dump protection
         volume_ratio = metrics["volume_ratio"]
 
-        # Sweet spot is 2-5x volume (best performance)
+        # UPDATED Jan 2026: Sweet spot narrowed to 2-3x (was 2-5x)
         if volume_ratio >= self.settings.volume_ceiling:
             # 10x+ volume is a WARNING sign - likely pump-and-dump
             surge_score = 0.50  # Penalize extreme volume
-        elif volume_ratio >= self.settings.volume_sweet_spot_max:
-            # 5-10x: Good but slightly concerning
-            surge_score = 0.80
+        elif volume_ratio >= 5.0:
+            # 5-10x: Elevated risk, below optimal
+            surge_score = 0.70
+        elif volume_ratio > self.settings.volume_sweet_spot_max:
+            # 3-5x: Good but not optimal (was part of sweet spot)
+            surge_score = 0.85
         elif volume_ratio >= self.settings.volume_sweet_spot_min:
-            # 2-5x: OPTIMAL zone
+            # 2-3x: OPTIMAL zone (narrowed from 2-5x)
             surge_score = 1.0
         elif volume_ratio >= 1.5:
             surge_score = 0.50
@@ -765,7 +771,13 @@ class AnalysisService:
         return score
 
     def _calculate_overall_score(self, explosion_signal: ExplosionSignal) -> float:
-        """Calculate overall signal score (0-1.0)."""
+        """
+        Calculate overall signal score (0-1.0).
+
+        UPDATED Jan 2026: Added late entry penalty to fix score inversion.
+        Data showed 0.60-0.69 scores had 56.1% WR vs 0.70-0.79 had 35.4% WR
+        because high scores were buying AFTER the move already happened.
+        """
         total_score = (
             explosion_signal.volume_score
             + explosion_signal.momentum_score
@@ -773,7 +785,178 @@ class AnalysisService:
             + explosion_signal.risk_score
         )
 
+        # Apply late entry penalty (fixes score inversion problem)
+        total_score = self._apply_late_entry_adjustment(
+            total_score, explosion_signal
+        )
+
+        # Apply green day adjustment (Jan 2026)
+        # 1 green day = 64.8% WR (best), 0 or 4+ = ~42% WR
+        total_score = self._apply_green_day_adjustment(
+            total_score, explosion_signal
+        )
+
+        # Apply 52-week position adjustment (Jan 2026)
+        # 25-50% from low = 55.1% WR, +5.90% (optimal zone)
+        total_score = self._apply_52w_position_adjustment(
+            total_score, explosion_signal
+        )
+
+        # Apply day of week adjustment (Jan 2026)
+        # Friday = 57.4% WR (best), Wednesday = 44.7% WR (worst)
+        total_score = self._apply_day_of_week_adjustment(
+            total_score, explosion_signal
+        )
+
         return clamp(total_score, 0.0, 1.0)
+
+    def _apply_late_entry_adjustment(
+        self, score: float, signal: ExplosionSignal
+    ) -> float:
+        """
+        Apply late entry penalty or early entry bonus based on recent price action.
+
+        ADDED Jan 2026: Data shows higher scores were "chasing" - buying after
+        the move already happened. This adjustment penalizes late entries
+        and rewards catching moves early.
+
+        - Already up 30%+ in 10d: 30% penalty (chasing hard)
+        - Already up 15%+ in 5d: 15% penalty (late entry)
+        - Flat to +10% in 5d: 10% bonus (early entry, catching the start)
+        """
+        price_5d = signal.price_change_5d or 0
+        price_10d = signal.price_change_10d or 0
+
+        # Severe late entry: Already up 30%+ in 10 days
+        if price_10d > self.settings.late_entry_threshold_10d:
+            logger.debug(
+                f"{signal.symbol}: Late entry penalty (severe) - "
+                f"+{price_10d:.1f}% in 10d"
+            )
+            return score * self.settings.late_entry_penalty_severe
+
+        # Moderate late entry: Already up 15%+ in 5 days
+        if price_5d > self.settings.late_entry_threshold_5d:
+            logger.debug(
+                f"{signal.symbol}: Late entry penalty (moderate) - "
+                f"+{price_5d:.1f}% in 5d"
+            )
+            return score * self.settings.late_entry_penalty_moderate
+
+        # Early entry bonus: Flat to slightly up (-5% to +10%)
+        # This is the ideal entry point - catching the move early
+        if -5 < price_5d < 10:
+            logger.debug(
+                f"{signal.symbol}: Early entry bonus - "
+                f"{price_5d:+.1f}% in 5d"
+            )
+            return score * self.settings.early_entry_bonus
+
+        return score
+
+    def _apply_green_day_adjustment(
+        self, score: float, signal: ExplosionSignal
+    ) -> float:
+        """
+        Apply consecutive green days adjustment.
+
+        ADDED Jan 2026: Data shows optimal entry is after exactly 1 green day.
+        - 1 green day: 64.8% WR, +3.64% (BEST - momentum starting)
+        - 0 green days: 42.2% WR (no momentum yet)
+        - 2-3 green days: 43.0% WR (okay)
+        - 4+ green days: 41.9% WR, -2.54% (late entry, move exhausted)
+        """
+        green_days = signal.consecutive_green_days or 0
+
+        # Optimal: exactly 1 green day (momentum just starting)
+        if green_days == self.settings.green_day_optimal:
+            logger.debug(
+                f"{signal.symbol}: Green day bonus - {green_days} consecutive green day(s)"
+            )
+            return score * self.settings.green_day_optimal_bonus
+
+        # Penalty: 0 green days (no momentum yet)
+        if green_days == 0:
+            logger.debug(
+                f"{signal.symbol}: Green day penalty - no momentum (0 green days)"
+            )
+            return score * self.settings.green_day_zero_penalty
+
+        # Penalty: 4+ green days (late entry, move may be exhausted)
+        if green_days >= 4:
+            logger.debug(
+                f"{signal.symbol}: Green day penalty - late entry ({green_days} green days)"
+            )
+            return score * self.settings.green_day_excessive_penalty
+
+        # 2-3 green days: neutral (no adjustment)
+        return score
+
+    def _apply_52w_position_adjustment(
+        self, score: float, signal: ExplosionSignal
+    ) -> float:
+        """
+        Apply 52-week position adjustment.
+
+        ADDED Jan 2026: Data shows optimal entry is 25-50% above 52-week low.
+        - 25-50% from low: 55.1% WR, +5.90% (BEST - recovering, not overextended)
+        - <25% from low: 45.3% WR, -3.78% (catching falling knife)
+        - 50-100% from low: 45.1% WR, +2.25% (okay)
+        - 100%+ from low: 48.0% WR, -0.11% (overextended)
+        """
+        dist_from_low = signal.distance_from_52w_low or 0
+
+        # Optimal: 25-50% above 52-week low
+        if (
+            self.settings.position_52w_optimal_min
+            <= dist_from_low
+            <= self.settings.position_52w_optimal_max
+        ):
+            logger.debug(
+                f"{signal.symbol}: 52w position bonus - "
+                f"{dist_from_low:.1f}% from low (optimal zone)"
+            )
+            return score * self.settings.position_52w_optimal_bonus
+
+        # Penalty: <25% from low (catching falling knife)
+        if dist_from_low < self.settings.position_52w_optimal_min:
+            logger.debug(
+                f"{signal.symbol}: 52w position penalty - "
+                f"{dist_from_low:.1f}% from low (falling knife risk)"
+            )
+            return score * self.settings.position_52w_near_low_penalty
+
+        # 50%+ from low: neutral (no adjustment)
+        return score
+
+    def _apply_day_of_week_adjustment(
+        self, score: float, signal: ExplosionSignal
+    ) -> float:
+        """
+        Apply day of week adjustment based on entry timing.
+
+        ADDED Jan 2026: Data shows significant day-of-week performance variance.
+        - Friday: 57.4% WR (BEST - weekend catalyst potential)
+        - Thursday: 52.7% WR (good)
+        - Monday: 51.8% WR (good)
+        - Tuesday: 41.1% WR (poor but high return variance)
+        - Wednesday: 44.7% WR (WORST - mid-week weakness)
+        """
+        # Get day of week from signal timestamp (0=Monday, 4=Friday)
+        day_of_week = signal.timestamp.weekday()
+
+        # Friday bonus (day 4)
+        if day_of_week == 4:
+            logger.debug(f"{signal.symbol}: Friday entry bonus")
+            return score * self.settings.day_of_week_friday_bonus
+
+        # Wednesday penalty (day 2)
+        if day_of_week == 2:
+            logger.debug(f"{signal.symbol}: Wednesday entry penalty")
+            return score * self.settings.day_of_week_wednesday_penalty
+
+        # Other days: neutral
+        return score
 
     def _calculate_opportunity_rank(self, score: float) -> OpportunityRank:
         """Calculate opportunity tier ranking."""
@@ -803,18 +986,21 @@ class AnalysisService:
         """
         Generate trading recommendation based on score and signal characteristics.
 
-        UPDATED Dec 2024: Fixed BUY criteria - was 25.5% WR vs STRONG_BUY 61.5%
-        Data shows: BUY was too loose, HOLD actually performed better!
+        UPDATED Jan 2026: Fixed BUY criteria - was 27.7% WR, worst of all!
+        Data shows:
+        - STRONG_BUY: 62.5% WR, +3.10% (good)
+        - WATCH: 57.7% WR, +2.21% (good)
+        - HOLD: 49.3% WR, +2.67% (decent)
+        - BUY: 27.7% WR, -4.65% (TERRIBLE - too loose!)
 
-        New criteria requires:
-        - Market outperformance (63.6% WR when outperforming SPY)
-        - Breakout confirmation (48.7% WR vs 20.4% without)
-        - Volume in sweet spot (2-5x optimal, 10x+ penalized)
+        New criteria requires BUY to also:
+        - Have volume in 2-3x sweet spot (69% WR vs 47.5% for 3-5x)
+        - NOT be a late entry (already up 15%+ in 5d)
 
         STRONG_BUY: High score + breakout + outperforming + good volume
-        BUY: Good score + breakout + outperforming
+        BUY: Good score + breakout + outperforming + 2-3x volume + NOT late
         WATCH: Breakout OR outperforming (one of the key signals)
-        HOLD: Neither breakout nor outperforming
+        HOLD: Neither breakout nor outperforming, or late entry
         """
         # Check for concerning risk factors
         high_risk = signal.pump_dump_risk in (RiskLevel.HIGH, RiskLevel.EXTREME)
@@ -826,7 +1012,16 @@ class AnalysisService:
             and signal.market_outperformance > 0
         )
 
-        # Check volume is in sweet spot (not extreme pump)
+        # Check volume is in sweet spot (2-3x is optimal per Jan 2026 data)
+        volume_in_sweet_spot = (
+            self.settings.volume_sweet_spot_min
+            <= signal.volume_spike_factor
+            <= self.settings.volume_sweet_spot_max
+        )
+
+        # Check for late entry (already moved significantly)
+        price_5d = signal.price_change_5d or 0
+        is_late_entry = price_5d > self.settings.late_entry_threshold_5d
 
         # Strong buy requires ALL key confirmations
         if (
@@ -836,29 +1031,33 @@ class AnalysisService:
             and signal.volume_spike_factor >= 3.0
             and not extreme_volume
             and not high_risk
+            and not is_late_entry
         ):
             return "STRONG_BUY"
 
-        # Buy requires breakout + outperforming (the two best predictors)
+        # BUY: MUCH STRICTER - requires sweet spot volume + not late entry
+        # This fixes the 27.7% WR issue from Jan 2026 analysis
         elif (
-            score >= 0.72
+            score >= 0.70
             and signal.is_breakout
             and outperforming_market
-            and signal.volume_spike_factor >= 2.0
+            and volume_in_sweet_spot  # 2-3x only (was 2x+)
+            and not is_late_entry  # NEW: Not chasing
             and not extreme_volume
             and not high_risk
         ):
             return "BUY"
 
-        # Watch: Has at least one strong predictor
+        # Watch: Has at least one strong predictor and not late
         elif (
             score >= 0.62
             and (signal.is_breakout or outperforming_market)
             and not high_risk
+            and not is_late_entry
         ):
             return "WATCH"
 
-        # Hold: Missing key predictors or high risk
+        # Hold: Missing key predictors, high risk, or late entry
         else:
             return "HOLD"
 

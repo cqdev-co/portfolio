@@ -1,0 +1,1177 @@
+import YahooFinance from 'yahoo-finance2';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import type {
+  QuoteData,
+  QuoteSummary,
+  HistoricalData,
+} from '../types/index.ts';
+import { logger } from '../utils/logger.ts';
+import {
+  isProxyConfigured,
+  fetchTickerCached,
+  convertToQuoteData,
+  convertToHistoricalData,
+  convertToQuoteSummary,
+  getProxyStats,
+  resetProxyStats,
+  getCacheStats as getSharedCacheStats,
+  fetchOptionsChainCached,
+} from './shared-yahoo.ts';
+
+// Instantiate yahoo-finance2 (required in v3+)
+// Suppress validation errors and notices for cleaner output during batch scans
+const yahooFinance = new YahooFinance({
+  suppressNotices: ['yahooSurvey'],
+  validation: {
+    logErrors: false, // Don't spam console with validation errors
+    logOptionsErrors: false,
+  },
+});
+
+const CACHE_DIR = join(process.cwd(), 'cache');
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MEMORY_CACHE_MAX_SIZE = 500; // Max entries in memory cache
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+/**
+ * Simple LRU cache implementation for in-memory caching
+ * Provides O(1) get/set with automatic eviction of oldest entries
+ */
+class LRUMemoryCache<T> {
+  private cache = new Map<string, CacheEntry<T>>();
+  private maxSize: number;
+  private ttlMs: number;
+
+  constructor(
+    maxSize: number = MEMORY_CACHE_MAX_SIZE,
+    ttlMs: number = CACHE_TTL_MS
+  ) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+  }
+
+  get(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    // Check TTL
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    // Move to end (most recently used) - Map maintains insertion order
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.data;
+  }
+
+  set(key: string, data: T): void {
+    // Delete if exists (to update position)
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+
+    // Evict oldest entries if at capacity
+    while (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
+    }
+
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
+  has(key: string): boolean {
+    const entry = this.cache.get(key);
+    if (!entry) return false;
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+}
+
+// Global memory cache instances (shared across provider instances)
+const memoryCache = {
+  quote: new LRUMemoryCache<QuoteData>(),
+  summary: new LRUMemoryCache<QuoteSummary>(),
+  historical: new LRUMemoryCache<HistoricalData[]>(),
+  options: new LRUMemoryCache<{
+    calls: Array<{
+      strike: number;
+      expiration: Date;
+      bid: number;
+      ask: number;
+      openInterest: number;
+      volume: number;
+      impliedVolatility: number;
+    }>;
+    puts: Array<{
+      strike: number;
+      expiration: Date;
+      bid: number;
+      ask: number;
+      openInterest: number;
+      volume: number;
+      impliedVolatility: number;
+    }>;
+    expiration: Date;
+  }>(),
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type YahooQuote = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type YahooSummary = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type YahooChart = any;
+
+/**
+ * Rate limiting configuration
+ */
+const RATE_LIMIT = {
+  baseDelay: 500, // Base delay between requests (ms)
+  maxRetries: 3, // Max retry attempts per request
+  backoffMultiplier: 2, // Exponential backoff multiplier
+  rateLimitCooldown: 5000, // Cooldown after hitting rate limit (ms)
+  burstLimit: 5, // Requests before forcing a longer pause
+  burstPause: 2000, // Pause after burst limit (ms)
+};
+
+/**
+ * Yahoo Finance data provider with caching and rate limiting
+ */
+export class YahooProvider {
+  private lastRequest = 0;
+  private requestCount = 0;
+  private rateLimitHit = false;
+  private rateLimitCooldownUntil = 0;
+
+  constructor() {
+    if (!existsSync(CACHE_DIR)) {
+      Bun.spawnSync(['mkdir', '-p', CACHE_DIR]);
+    }
+  }
+
+  /**
+   * Rate limit requests with exponential backoff
+   */
+  private async rateLimit(): Promise<void> {
+    const now = Date.now();
+
+    // If we're in a rate limit cooldown, wait
+    if (now < this.rateLimitCooldownUntil) {
+      const waitTime = this.rateLimitCooldownUntil - now;
+      logger.debug(`Rate limit cooldown: waiting ${waitTime}ms`);
+      await new Promise((r) => setTimeout(r, waitTime));
+    }
+
+    // Burst control - pause after every N requests
+    this.requestCount++;
+    if (this.requestCount >= RATE_LIMIT.burstLimit) {
+      this.requestCount = 0;
+      await new Promise((r) => setTimeout(r, RATE_LIMIT.burstPause));
+    }
+
+    // Standard rate limiting
+    const elapsed = Date.now() - this.lastRequest;
+    if (elapsed < RATE_LIMIT.baseDelay) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT.baseDelay - elapsed));
+    }
+    this.lastRequest = Date.now();
+  }
+
+  /**
+   * Handle rate limit error
+   */
+  private handleRateLimit(): void {
+    this.rateLimitHit = true;
+    this.rateLimitCooldownUntil = Date.now() + RATE_LIMIT.rateLimitCooldown;
+    logger.debug(
+      `Rate limited - cooling down for ${RATE_LIMIT.rateLimitCooldown}ms`
+    );
+  }
+
+  /**
+   * Check if error is a rate limit error
+   */
+  private isRateLimitError(error: unknown): boolean {
+    const errorStr = String(error);
+    return (
+      errorStr.includes('Too Many Requests') ||
+      errorStr.includes('429') ||
+      errorStr.includes('rate limit')
+    );
+  }
+
+  /**
+   * Check if error is a validation error (expected for some edge-case tickers)
+   * These don't need to be logged as warnings - just skip the ticker
+   */
+  private isValidationError(error: unknown): boolean {
+    const errorStr = String(error);
+    return (
+      errorStr.includes('FailedYahooValidationError') ||
+      errorStr.includes('Failed Yahoo Schema validation') ||
+      errorStr.includes('validation') ||
+      errorStr.includes('internal-error')
+    );
+  }
+
+  /**
+   * Execute request with retry logic
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    symbol: string,
+    requestType: string
+  ): Promise<T | null> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < RATE_LIMIT.maxRetries; attempt++) {
+      try {
+        await this.rateLimit();
+        return await fn();
+      } catch (error) {
+        lastError = error;
+
+        if (this.isRateLimitError(error)) {
+          this.handleRateLimit();
+
+          // Exponential backoff
+          const backoff =
+            RATE_LIMIT.baseDelay *
+            Math.pow(RATE_LIMIT.backoffMultiplier, attempt + 1);
+
+          logger.debug(
+            `Retry ${attempt + 1}/${RATE_LIMIT.maxRetries} ` +
+              `for ${symbol} ${requestType} after ${backoff}ms`
+          );
+
+          await new Promise((r) => setTimeout(r, backoff));
+        } else {
+          // Non-rate-limit error, don't retry
+          break;
+        }
+      }
+    }
+
+    // Only log errors that aren't expected (rate limits, validation errors)
+    // Validation errors are common for edge-case tickers - just skip silently
+    if (
+      !this.isRateLimitError(lastError) &&
+      !this.isValidationError(lastError)
+    ) {
+      logger.warn(`Failed ${requestType} for ${symbol}: ${lastError}`);
+    }
+    return null;
+  }
+
+  /**
+   * Get cached data if valid, otherwise return null
+   * v1.7.1: Now uses two-tier caching (memory first, then file)
+   */
+  private getCache<T>(
+    key: string,
+    cacheType?: keyof typeof memoryCache
+  ): T | null {
+    // Tier 1: Check memory cache first (fastest)
+    if (cacheType && memoryCache[cacheType]) {
+      const memData = memoryCache[cacheType].get(key);
+      if (memData) {
+        return memData as T;
+      }
+    }
+
+    // Tier 2: Check file cache
+    const cachePath = join(CACHE_DIR, `${key}.json`);
+    if (!existsSync(cachePath)) return null;
+
+    try {
+      const content = readFileSync(cachePath, 'utf-8');
+      const entry = JSON.parse(content) as CacheEntry<T>;
+
+      if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
+        // Populate memory cache for next time
+        if (cacheType && memoryCache[cacheType]) {
+          (memoryCache[cacheType] as LRUMemoryCache<T>).set(key, entry.data);
+        }
+        return entry.data;
+      }
+    } catch {
+      // Cache read failed, return null
+    }
+    return null;
+  }
+
+  /**
+   * Write data to cache
+   * v1.7.1: Now writes to both memory and file cache
+   */
+  private setCache<T>(
+    key: string,
+    data: T,
+    cacheType?: keyof typeof memoryCache
+  ): void {
+    // Tier 1: Write to memory cache (instant)
+    if (cacheType && memoryCache[cacheType]) {
+      (memoryCache[cacheType] as LRUMemoryCache<T>).set(key, data);
+    }
+
+    // Tier 2: Write to file cache (persistent)
+    const cachePath = join(CACHE_DIR, `${key}.json`);
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+    };
+    try {
+      writeFileSync(cachePath, JSON.stringify(entry));
+    } catch {
+      // Cache write failed, continue without file caching
+    }
+  }
+
+  /**
+   * Fetch basic quote data for a ticker
+   * v1.8.0: Uses Cloudflare Worker proxy when configured
+   */
+  async getQuote(symbol: string): Promise<QuoteData | null> {
+    const cacheKey = `quote_${symbol}`;
+    const cached = this.getCache<QuoteData>(cacheKey, 'quote');
+    if (cached) {
+      return cached;
+    }
+
+    // Try proxy first (bypasses rate limits)
+    if (isProxyConfigured()) {
+      const proxyData = await fetchTickerCached(symbol);
+      if (proxyData) {
+        const data = convertToQuoteData(proxyData);
+        if (data) {
+          this.setCache(cacheKey, data, 'quote');
+          return data;
+        }
+      }
+    }
+
+    // Fallback to direct yahoo-finance2
+    logger.debug(`[Yahoo] Fallback to yahoo-finance2 for ${symbol}`);
+
+    const quote: YahooQuote = await this.withRetry(
+      () => yahooFinance.quote(symbol),
+      symbol,
+      'quote'
+    );
+
+    if (!quote) return null;
+
+    const data: QuoteData = {
+      symbol: quote.symbol ?? symbol,
+      shortName: quote.shortName ?? undefined,
+      regularMarketPrice: quote.regularMarketPrice ?? undefined,
+      regularMarketVolume: quote.regularMarketVolume ?? undefined,
+      averageDailyVolume10Day: quote.averageDailyVolume10Day ?? undefined,
+      fiftyDayAverage: quote.fiftyDayAverage ?? undefined,
+      twoHundredDayAverage: quote.twoHundredDayAverage ?? undefined,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ?? undefined,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ?? undefined,
+      marketCap: quote.marketCap ?? undefined,
+    };
+
+    this.setCache(cacheKey, data, 'quote');
+    return data;
+  }
+
+  /**
+   * Fetch detailed quote summary with fundamentals and analyst data
+   */
+  /**
+   * Fetch detailed quote summary with fundamentals and analyst data
+   * v1.8.0: Falls back to proxy data when direct calls fail
+   */
+  async getQuoteSummary(symbol: string): Promise<QuoteSummary | null> {
+    const cacheKey = `summary_${symbol}`;
+    const cached = this.getCache<QuoteSummary>(cacheKey, 'summary');
+    if (cached) {
+      return cached;
+    }
+
+    // Try proxy FIRST (bypasses rate limits, faster)
+    if (isProxyConfigured()) {
+      const proxyData = await fetchTickerCached(symbol);
+      if (proxyData) {
+        const proxySummary = convertToQuoteSummary(proxyData);
+        this.setCache(cacheKey, proxySummary, 'summary');
+        return proxySummary;
+      }
+    }
+
+    // Fallback to direct yahoo-finance2
+    logger.debug(`[Yahoo] Fallback to yahoo-finance2 summary for ${symbol}`);
+
+    const summary: YahooSummary = await this.withRetry(
+      () =>
+        yahooFinance.quoteSummary(
+          symbol,
+          {
+            modules: [
+              'price',
+              'summaryDetail',
+              'defaultKeyStatistics',
+              'financialData',
+              'earningsTrend',
+              'recommendationTrend',
+              'upgradeDowngradeHistory',
+              'calendarEvents',
+              'assetProfile',
+              'majorHoldersBreakdown',
+              'netSharePurchaseActivity',
+              'earnings',
+              'earningsHistory',
+            ],
+          },
+          {
+            // Skip validation to avoid verbose errors for edge-case tickers
+            // with non-standard analyst ratings or missing fields
+            validateResult: false,
+          }
+        ),
+      symbol,
+      'summary'
+    );
+
+    if (!summary) {
+      logger.error(`[Yahoo] ❌ Both proxy and direct failed for ${symbol}`);
+      return null;
+    }
+
+    // Map to our QuoteSummary type
+    const data: QuoteSummary = {
+      price: summary.price
+        ? {
+            regularMarketPrice: summary.price.regularMarketPrice
+              ? { raw: summary.price.regularMarketPrice }
+              : undefined,
+            shortName: summary.price.shortName,
+          }
+        : undefined,
+      summaryDetail: summary.summaryDetail
+        ? {
+            forwardPE: summary.summaryDetail.forwardPE
+              ? { raw: summary.summaryDetail.forwardPE }
+              : undefined,
+            trailingPE: summary.summaryDetail.trailingPE
+              ? { raw: summary.summaryDetail.trailingPE }
+              : undefined,
+            pegRatio: summary.summaryDetail.pegRatio
+              ? { raw: summary.summaryDetail.pegRatio }
+              : undefined,
+            priceToBook: summary.summaryDetail.priceToBook
+              ? { raw: summary.summaryDetail.priceToBook }
+              : undefined,
+          }
+        : undefined,
+      defaultKeyStatistics: summary.defaultKeyStatistics
+        ? {
+            enterpriseToEbitda: summary.defaultKeyStatistics.enterpriseToEbitda
+              ? { raw: summary.defaultKeyStatistics.enterpriseToEbitda }
+              : undefined,
+            pegRatio: summary.defaultKeyStatistics.pegRatio
+              ? { raw: summary.defaultKeyStatistics.pegRatio }
+              : undefined,
+            shortPercentOfFloat: summary.defaultKeyStatistics
+              .shortPercentOfFloat
+              ? { raw: summary.defaultKeyStatistics.shortPercentOfFloat }
+              : undefined,
+            sharesShort: summary.defaultKeyStatistics.sharesShort
+              ? { raw: summary.defaultKeyStatistics.sharesShort }
+              : undefined,
+            shortRatio: summary.defaultKeyStatistics.shortRatio
+              ? { raw: summary.defaultKeyStatistics.shortRatio }
+              : undefined,
+            beta: summary.defaultKeyStatistics.beta
+              ? { raw: summary.defaultKeyStatistics.beta }
+              : undefined,
+            fiftyTwoWeekChange: summary.defaultKeyStatistics['52WeekChange']
+              ? { raw: summary.defaultKeyStatistics['52WeekChange'] }
+              : undefined,
+            floatShares: summary.defaultKeyStatistics.floatShares
+              ? { raw: summary.defaultKeyStatistics.floatShares }
+              : undefined,
+            sharesOutstanding: summary.defaultKeyStatistics.sharesOutstanding
+              ? { raw: summary.defaultKeyStatistics.sharesOutstanding }
+              : undefined,
+          }
+        : undefined,
+      financialData: summary.financialData
+        ? {
+            freeCashflow: summary.financialData.freeCashflow
+              ? { raw: summary.financialData.freeCashflow }
+              : undefined,
+            currentPrice: summary.financialData.currentPrice
+              ? { raw: summary.financialData.currentPrice }
+              : undefined,
+            targetMeanPrice: summary.financialData.targetMeanPrice
+              ? { raw: summary.financialData.targetMeanPrice }
+              : undefined,
+            recommendationMean: summary.financialData.recommendationMean
+              ? { raw: summary.financialData.recommendationMean }
+              : undefined,
+            numberOfAnalystOpinions: summary.financialData
+              .numberOfAnalystOpinions
+              ? { raw: summary.financialData.numberOfAnalystOpinions }
+              : undefined,
+            revenueGrowth: summary.financialData.revenueGrowth
+              ? { raw: summary.financialData.revenueGrowth }
+              : undefined,
+            earningsGrowth: summary.financialData.earningsGrowth
+              ? { raw: summary.financialData.earningsGrowth }
+              : undefined,
+            profitMargins: summary.financialData.profitMargins
+              ? { raw: summary.financialData.profitMargins }
+              : undefined,
+            operatingMargins: summary.financialData.operatingMargins
+              ? { raw: summary.financialData.operatingMargins }
+              : undefined,
+            returnOnEquity: summary.financialData.returnOnEquity
+              ? { raw: summary.financialData.returnOnEquity }
+              : undefined,
+            financialCurrency: summary.financialData.financialCurrency,
+            // v1.7.0: Balance sheet health metrics
+            debtToEquity: summary.financialData.debtToEquity
+              ? { raw: summary.financialData.debtToEquity }
+              : undefined,
+            currentRatio: summary.financialData.currentRatio
+              ? { raw: summary.financialData.currentRatio }
+              : undefined,
+            quickRatio: summary.financialData.quickRatio
+              ? { raw: summary.financialData.quickRatio }
+              : undefined,
+            totalCash: summary.financialData.totalCash
+              ? { raw: summary.financialData.totalCash }
+              : undefined,
+            totalDebt: summary.financialData.totalDebt
+              ? { raw: summary.financialData.totalDebt }
+              : undefined,
+          }
+        : undefined,
+      earningsTrend: summary.earningsTrend
+        ? {
+            trend: summary.earningsTrend.trend?.map(
+              (t: {
+                period?: string;
+                growth?: number;
+                epsTrend?: {
+                  current?: number;
+                  '7daysAgo'?: number;
+                  '30daysAgo'?: number;
+                  '60daysAgo'?: number;
+                  '90daysAgo'?: number;
+                };
+                epsRevisions?: {
+                  upLast7days?: number;
+                  upLast30days?: number;
+                  downLast7days?: number;
+                  downLast30days?: number;
+                };
+              }) => ({
+                period: t.period,
+                growth: t.growth ? { raw: t.growth } : undefined,
+                epsTrend: t.epsTrend
+                  ? {
+                      current: t.epsTrend.current,
+                      sevenDaysAgo: t.epsTrend['7daysAgo'],
+                      thirtyDaysAgo: t.epsTrend['30daysAgo'],
+                      sixtyDaysAgo: t.epsTrend['60daysAgo'],
+                      ninetyDaysAgo: t.epsTrend['90daysAgo'],
+                    }
+                  : undefined,
+                epsRevisions: t.epsRevisions
+                  ? {
+                      upLast7days: t.epsRevisions.upLast7days,
+                      upLast30days: t.epsRevisions.upLast30days,
+                      downLast7days: t.epsRevisions.downLast7days,
+                      downLast30days: t.epsRevisions.downLast30days,
+                    }
+                  : undefined,
+              })
+            ),
+          }
+        : undefined,
+      recommendationTrend: summary.recommendationTrend
+        ? {
+            trend: summary.recommendationTrend.trend?.map(
+              (t: {
+                period?: string;
+                strongBuy?: number;
+                buy?: number;
+                hold?: number;
+                sell?: number;
+                strongSell?: number;
+              }) => ({
+                period: t.period,
+                strongBuy: t.strongBuy,
+                buy: t.buy,
+                hold: t.hold,
+                sell: t.sell,
+                strongSell: t.strongSell,
+              })
+            ),
+          }
+        : undefined,
+      upgradeDowngradeHistory: summary.upgradeDowngradeHistory
+        ? {
+            history: summary.upgradeDowngradeHistory.history?.map(
+              (h: {
+                epochGradeDate?: Date;
+                firm?: string;
+                toGrade?: string;
+                fromGrade?: string;
+                action?: string;
+              }) => ({
+                epochGradeDate: h.epochGradeDate
+                  ? h.epochGradeDate.getTime() / 1000
+                  : undefined,
+                firm: h.firm,
+                toGrade: h.toGrade,
+                fromGrade: h.fromGrade,
+                action: h.action,
+              })
+            ),
+          }
+        : undefined,
+      calendarEvents: summary.calendarEvents
+        ? {
+            earnings: summary.calendarEvents.earnings
+              ? {
+                  earningsDate:
+                    summary.calendarEvents.earnings.earningsDate?.map(
+                      (d: Date) => new Date(d)
+                    ),
+                }
+              : undefined,
+          }
+        : undefined,
+      assetProfile: summary.assetProfile
+        ? {
+            sector: summary.assetProfile.sector,
+            industry: summary.assetProfile.industry,
+            country: summary.assetProfile.country,
+            website: summary.assetProfile.website,
+          }
+        : undefined,
+      majorHoldersBreakdown: summary.majorHoldersBreakdown
+        ? {
+            insidersPercentHeld:
+              summary.majorHoldersBreakdown.insidersPercentHeld,
+            institutionsPercentHeld:
+              summary.majorHoldersBreakdown.institutionsPercentHeld,
+            institutionsCount: summary.majorHoldersBreakdown.institutionsCount,
+          }
+        : undefined,
+      netSharePurchaseActivity: summary.netSharePurchaseActivity
+        ? {
+            period: summary.netSharePurchaseActivity.period,
+            buyInfoCount: summary.netSharePurchaseActivity.buyInfoCount,
+            buyInfoShares: summary.netSharePurchaseActivity.buyInfoShares,
+            sellInfoCount: summary.netSharePurchaseActivity.sellInfoCount,
+            sellInfoShares: summary.netSharePurchaseActivity.sellInfoShares,
+            netInfoCount: summary.netSharePurchaseActivity.netInfoCount,
+            netInfoShares: summary.netSharePurchaseActivity.netInfoShares,
+          }
+        : undefined,
+      earnings: summary.earnings
+        ? {
+            financialsChart: summary.earnings.financialsChart
+              ? {
+                  quarterly: summary.earnings.financialsChart.quarterly?.map(
+                    (q: {
+                      date?: string;
+                      revenue?: number;
+                      earnings?: number;
+                    }) => ({
+                      date: q.date,
+                      revenue: q.revenue,
+                      earnings: q.earnings,
+                    })
+                  ),
+                }
+              : undefined,
+          }
+        : undefined,
+      earningsHistory: summary.earningsHistory
+        ? {
+            history: summary.earningsHistory.history?.map(
+              (h: {
+                quarter?: Date;
+                epsActual?: number;
+                epsEstimate?: number;
+                epsDifference?: number;
+                surprisePercent?: number;
+              }) => ({
+                quarter: h.quarter,
+                epsActual: h.epsActual,
+                epsEstimate: h.epsEstimate,
+                epsDifference: h.epsDifference,
+                surprisePercent: h.surprisePercent,
+              })
+            ),
+          }
+        : undefined,
+    };
+
+    this.setCache(cacheKey, data, 'summary');
+    return data;
+  }
+
+  /**
+   * Fetch historical price data
+   */
+  /**
+   * Fetch historical OHLCV data for a ticker
+   * v1.8.0: Uses Cloudflare Worker proxy when configured
+   */
+  async getHistorical(
+    symbol: string,
+    days = 365 // Need 365 calendar days to get ~252 trading days for MA200
+  ): Promise<HistoricalData[]> {
+    const cacheKey = `historical_${symbol}_${days}`;
+    const cached = this.getCache<HistoricalData[]>(cacheKey, 'historical');
+    if (cached) {
+      return cached;
+    }
+
+    // Try proxy first (bypasses rate limits, returns 1yr data)
+    if (isProxyConfigured()) {
+      const proxyData = await fetchTickerCached(symbol);
+      if (proxyData) {
+        const data = convertToHistoricalData(proxyData);
+        if (data.length > 0) {
+          this.setCache(cacheKey, data, 'historical');
+          return data;
+        }
+      }
+    }
+
+    // Fallback to direct yahoo-finance2
+    logger.debug(`[Yahoo] Fallback to yahoo-finance2 chart for ${symbol}`);
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const result: YahooChart = await this.withRetry(
+      () =>
+        yahooFinance.chart(symbol, {
+          period1: startDate,
+          period2: endDate,
+          interval: '1d',
+        }),
+      symbol,
+      'historical'
+    );
+
+    if (!result || !result.quotes) {
+      return [];
+    }
+
+    const data: HistoricalData[] = result.quotes.map(
+      (q: {
+        date: Date;
+        open?: number | null;
+        high?: number | null;
+        low?: number | null;
+        close?: number | null;
+        volume?: number | null;
+        adjclose?: number | null;
+      }) => ({
+        date: new Date(q.date),
+        open: q.open ?? 0,
+        high: q.high ?? 0,
+        low: q.low ?? 0,
+        close: q.close ?? 0,
+        volume: q.volume ?? 0,
+        adjClose: q.adjclose ?? undefined,
+      })
+    );
+
+    this.setCache(cacheKey, data, 'historical');
+    return data;
+  }
+
+  /**
+   * Fetch options chain for a symbol
+   * Returns calls and puts for the nearest monthly expiration
+   * v1.9.0: Uses proxy first (bypasses rate limits), then falls back to yahoo-finance2
+   */
+  async getOptionsChain(
+    symbol: string,
+    targetDTE: number = 30
+  ): Promise<{
+    calls: Array<{
+      strike: number;
+      expiration: Date;
+      bid: number;
+      ask: number;
+      openInterest: number;
+      volume: number;
+      impliedVolatility: number;
+    }>;
+    puts: Array<{
+      strike: number;
+      expiration: Date;
+      bid: number;
+      ask: number;
+      openInterest: number;
+      volume: number;
+      impliedVolatility: number;
+    }>;
+    expiration: Date;
+  } | null> {
+    const cacheKey = `options_${symbol}_${targetDTE}`;
+    const cached = this.getCache<{
+      calls: Array<{
+        strike: number;
+        expiration: Date;
+        bid: number;
+        ask: number;
+        openInterest: number;
+        volume: number;
+        impliedVolatility: number;
+      }>;
+      puts: Array<{
+        strike: number;
+        expiration: Date;
+        bid: number;
+        ask: number;
+        openInterest: number;
+        volume: number;
+        impliedVolatility: number;
+      }>;
+      expiration: Date;
+    }>(cacheKey, 'options');
+
+    if (cached) return cached;
+
+    // ========================================================================
+    // TRY PROXY FIRST (bypasses client-side rate limits)
+    // ========================================================================
+    if (isProxyConfigured()) {
+      logger.debug(`[Yahoo] Trying proxy for options chain ${symbol}`);
+      const proxyData = await fetchOptionsChainCached(symbol, targetDTE);
+
+      if (proxyData && proxyData.calls.length > 0) {
+        const expiration = new Date(proxyData.expirationDate);
+
+        const result = {
+          calls: proxyData.calls.map((c) => ({
+            strike: c.strike,
+            expiration,
+            bid: c.bid,
+            ask: c.ask,
+            openInterest: c.openInterest,
+            volume: c.volume,
+            impliedVolatility: c.impliedVolatility,
+          })),
+          puts: proxyData.puts.map((p) => ({
+            strike: p.strike,
+            expiration,
+            bid: p.bid,
+            ask: p.ask,
+            openInterest: p.openInterest,
+            volume: p.volume,
+            impliedVolatility: p.impliedVolatility,
+          })),
+          expiration,
+        };
+
+        logger.info(
+          `[Yahoo] ✅ Options via proxy: ${symbol} - ${result.calls.length} calls, ` +
+            `${result.puts.length} puts, exp ${proxyData.expirationDate}`
+        );
+
+        this.setCache(cacheKey, result, 'options');
+        return result;
+      }
+    }
+
+    // ========================================================================
+    // FALLBACK TO DIRECT YAHOO-FINANCE2
+    // ========================================================================
+    logger.debug(`[Yahoo] Fallback to yahoo-finance2 for options ${symbol}`);
+
+    // Use withRetry for options fetching (options API is more prone to rate limits)
+    const expirations = await this.withRetry(
+      () => yahooFinance.options(symbol),
+      symbol,
+      'options-expirations'
+    );
+
+    if (!expirations?.expirationDates?.length) {
+      return null;
+    }
+
+    // Find expiration closest to target DTE
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + targetDTE);
+
+    let closestExp = expirations.expirationDates[0];
+    if (!closestExp) {
+      return null;
+    }
+    let closestDiff = Math.abs(closestExp.getTime() - targetDate.getTime());
+
+    for (const exp of expirations.expirationDates) {
+      const diff = Math.abs(exp.getTime() - targetDate.getTime());
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestExp = exp;
+      }
+    }
+
+    // Fetch options chain for that expiration with retry
+    const chain = await this.withRetry(
+      () => yahooFinance.options(symbol, { date: closestExp }),
+      symbol,
+      'options-chain'
+    );
+
+    if (!chain?.options?.[0]) {
+      return null;
+    }
+
+    const opts = chain.options[0];
+
+    const calls = (opts.calls ?? []).map(
+      (c: {
+        strike: number;
+        bid?: number;
+        ask?: number;
+        openInterest?: number;
+        volume?: number;
+        impliedVolatility?: number;
+      }) => ({
+        strike: c.strike,
+        expiration: closestExp,
+        bid: c.bid ?? 0,
+        ask: c.ask ?? 0,
+        openInterest: c.openInterest ?? 0,
+        volume: c.volume ?? 0,
+        impliedVolatility: c.impliedVolatility ?? 0,
+      })
+    );
+
+    const puts = (opts.puts ?? []).map(
+      (p: {
+        strike: number;
+        bid?: number;
+        ask?: number;
+        openInterest?: number;
+        volume?: number;
+        impliedVolatility?: number;
+      }) => ({
+        strike: p.strike,
+        expiration: closestExp,
+        bid: p.bid ?? 0,
+        ask: p.ask ?? 0,
+        openInterest: p.openInterest ?? 0,
+        volume: p.volume ?? 0,
+        impliedVolatility: p.impliedVolatility ?? 0,
+      })
+    );
+
+    const result = {
+      calls,
+      puts,
+      expiration: closestExp as Date,
+    };
+    this.setCache(cacheKey, result, 'options');
+    return result;
+  }
+
+  /**
+   * Fetch all data for a symbol
+   * v1.7.1: Now uses parallel fetching for better performance
+   * Rate limiting is handled at the individual request level
+   */
+  async getAllData(symbol: string): Promise<{
+    quote: QuoteData | null;
+    summary: QuoteSummary | null;
+    historical: HistoricalData[];
+  }> {
+    // Only show verbose logging for debug command, not batch scans
+    const verbose = process.env.DEBUG_YAHOO === '1';
+
+    if (verbose) {
+      logger.info(
+        `[Yahoo] ═══════════════════════════════════════════════════════`
+      );
+      logger.info(`[Yahoo] 🎯 getAllData() called for ${symbol}`);
+      logger.info(`[Yahoo] Proxy: ${isProxyConfigured() ? '✅ YES' : '❌ NO'}`);
+      logger.info(
+        `[Yahoo] ═══════════════════════════════════════════════════════`
+      );
+    }
+
+    // Parallel fetching - each method handles its own rate limiting
+    // This reduces latency by ~40% compared to sequential
+    const [quote, summary, historical] = await Promise.all([
+      this.getQuote(symbol),
+      this.getQuoteSummary(symbol),
+      this.getHistorical(symbol),
+    ]);
+
+    // Always log completion for progress tracking
+    logger.info(
+      `[Yahoo] ✅ ${symbol}: $${quote?.regularMarketPrice?.toFixed(2) || '?'} ` +
+        `(${historical.length} days)`
+    );
+
+    return { quote, summary, historical };
+  }
+
+  /**
+   * Clear both memory and file caches
+   */
+  clearCache(): void {
+    // Clear memory caches
+    memoryCache.quote.clear();
+    memoryCache.summary.clear();
+    memoryCache.historical.clear();
+    memoryCache.options.clear();
+
+    // Clear file cache
+    const files = Bun.spawnSync(['rm', '-rf', `${CACHE_DIR}/*`]);
+    if (files.success) {
+      logger.info('Cache cleared (memory + file)');
+    }
+  }
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  getCacheStats(): {
+    memory: {
+      quote: number;
+      summary: number;
+      historical: number;
+      options: number;
+    };
+  } {
+    return {
+      memory: {
+        quote: memoryCache.quote.size,
+        summary: memoryCache.summary.size,
+        historical: memoryCache.historical.size,
+        options: memoryCache.options.size,
+      },
+    };
+  }
+
+  /**
+   * Get rate limit status for debugging
+   */
+  getRateLimitStatus(): {
+    rateLimitHit: boolean;
+    cooldownRemaining: number;
+  } {
+    return {
+      rateLimitHit: this.rateLimitHit,
+      cooldownRemaining: Math.max(0, this.rateLimitCooldownUntil - Date.now()),
+    };
+  }
+
+  /**
+   * Get comprehensive stats for debugging proxy vs fallback behavior
+   */
+  getDebugStats(): void {
+    const proxyStats = getProxyStats();
+    const sharedCache = getSharedCacheStats();
+    const localCache = this.getCacheStats();
+    const rateLimit = this.getRateLimitStatus();
+
+    console.log('\n╔══════════════════════════════════════════════════════╗');
+    console.log('║           YAHOO PROVIDER DEBUG STATS                 ║');
+    console.log('╠══════════════════════════════════════════════════════╣');
+
+    console.log('║ PROXY STATUS                                         ║');
+    console.log(
+      `║   Configured: ${proxyStats.configured ? '✅ YES' : '❌ NO'}`.padEnd(
+        55
+      ) + '║'
+    );
+    console.log(
+      `║   URL: ${proxyStats.proxyUrl || 'NOT SET'}`.padEnd(55) + '║'
+    );
+    console.log(`║   Hit Rate: ${proxyStats.hitRate}`.padEnd(55) + '║');
+    console.log(`║   Hits: ${proxyStats.proxyHits}`.padEnd(55) + '║');
+    console.log(`║   Misses: ${proxyStats.proxyMisses}`.padEnd(55) + '║');
+    console.log(`║   Errors: ${proxyStats.proxyErrors}`.padEnd(55) + '║');
+    if (proxyStats.lastError) {
+      console.log(
+        `║   Last Error: ${proxyStats.lastError.slice(0, 35)}...`.padEnd(55) +
+          '║'
+      );
+    }
+
+    console.log('╠──────────────────────────────────────────────────────╣');
+    console.log('║ CACHE STATUS                                         ║');
+    console.log(
+      `║   Shared Cache Hits: ${proxyStats.cacheHits}`.padEnd(55) + '║'
+    );
+    console.log(
+      `║   Shared Cache Entries: ${sharedCache.entries}`.padEnd(55) + '║'
+    );
+    console.log(
+      `║   Local Quote Cache: ${localCache.memory.quote}`.padEnd(55) + '║'
+    );
+    console.log(
+      `║   Local Summary Cache: ${localCache.memory.summary}`.padEnd(55) + '║'
+    );
+    console.log(
+      `║   Local Historical Cache: ${localCache.memory.historical}`.padEnd(55) +
+        '║'
+    );
+
+    console.log('╠──────────────────────────────────────────────────────╣');
+    console.log('║ RATE LIMIT STATUS                                    ║');
+    console.log(
+      `║   Rate Limited: ${rateLimit.rateLimitHit ? '⚠️  YES' : '✅ NO'}`.padEnd(
+        55
+      ) + '║'
+    );
+    if (rateLimit.cooldownRemaining > 0) {
+      console.log(
+        `║   Cooldown: ${(rateLimit.cooldownRemaining / 1000).toFixed(1)}s`.padEnd(
+          55
+        ) + '║'
+      );
+    }
+
+    console.log('╚══════════════════════════════════════════════════════╝\n');
+  }
+
+  /**
+   * Reset proxy stats (useful before a fresh run)
+   */
+  resetStats(): void {
+    resetProxyStats();
+    logger.info('[Yahoo] 🔄 Proxy stats reset');
+  }
+}
+
+export const yahooProvider = new YahooProvider();
