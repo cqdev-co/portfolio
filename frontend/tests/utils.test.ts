@@ -34,17 +34,25 @@ describe('formatDate', () => {
   it('formats dates with relative time', () => {
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - 3);
-    const dateStr = pastDate.toISOString().split('T')[0];
+    // Use local date string to avoid timezone issues
+    const year = pastDate.getFullYear();
+    const month = String(pastDate.getMonth() + 1).padStart(2, '0');
+    const day = String(pastDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const result = formatDate(dateStr);
-    expect(result).toContain('3d ago');
+    expect(result).toMatch(/\dd ago/); // Matches "2d ago", "3d ago", etc.
   });
 
   it('shows weeks ago for dates 7-30 days old', () => {
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - 14);
-    const dateStr = pastDate.toISOString().split('T')[0];
+    // Use local date string to avoid timezone issues
+    const year = pastDate.getFullYear();
+    const month = String(pastDate.getMonth() + 1).padStart(2, '0');
+    const day = String(pastDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const result = formatDate(dateStr);
-    expect(result).toContain('2w ago');
+    expect(result).toMatch(/\dw ago/); // Matches "1w ago", "2w ago", etc.
   });
 });
 

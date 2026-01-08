@@ -181,10 +181,7 @@ class PerformanceTrackingService:
                 # MINIMUM HOLD PERIOD CHECK (Added Jan 2026)
                 # Data shows: 1 day = 43.7% WR, 4-7 days = 76.5% WR
                 # Don't close unless stop hit or minimum hold met
-                if (
-                    exit_reason != "STOP_LOSS"
-                    and days_held_so_far < min_hold_days
-                ):
+                if exit_reason != "STOP_LOSS" and days_held_so_far < min_hold_days:
                     logger.debug(
                         f"{symbol}: Deferring close - only {days_held_so_far} days held "
                         f"(min: {min_hold_days})"

@@ -786,27 +786,19 @@ class AnalysisService:
         )
 
         # Apply late entry penalty (fixes score inversion problem)
-        total_score = self._apply_late_entry_adjustment(
-            total_score, explosion_signal
-        )
+        total_score = self._apply_late_entry_adjustment(total_score, explosion_signal)
 
         # Apply green day adjustment (Jan 2026)
         # 1 green day = 64.8% WR (best), 0 or 4+ = ~42% WR
-        total_score = self._apply_green_day_adjustment(
-            total_score, explosion_signal
-        )
+        total_score = self._apply_green_day_adjustment(total_score, explosion_signal)
 
         # Apply 52-week position adjustment (Jan 2026)
         # 25-50% from low = 55.1% WR, +5.90% (optimal zone)
-        total_score = self._apply_52w_position_adjustment(
-            total_score, explosion_signal
-        )
+        total_score = self._apply_52w_position_adjustment(total_score, explosion_signal)
 
         # Apply day of week adjustment (Jan 2026)
         # Friday = 57.4% WR (best), Wednesday = 44.7% WR (worst)
-        total_score = self._apply_day_of_week_adjustment(
-            total_score, explosion_signal
-        )
+        total_score = self._apply_day_of_week_adjustment(total_score, explosion_signal)
 
         return clamp(total_score, 0.0, 1.0)
 
@@ -846,10 +838,7 @@ class AnalysisService:
         # Early entry bonus: Flat to slightly up (-5% to +10%)
         # This is the ideal entry point - catching the move early
         if -5 < price_5d < 10:
-            logger.debug(
-                f"{signal.symbol}: Early entry bonus - "
-                f"{price_5d:+.1f}% in 5d"
-            )
+            logger.debug(f"{signal.symbol}: Early entry bonus - {price_5d:+.1f}% in 5d")
             return score * self.settings.early_entry_bonus
 
         return score

@@ -19,6 +19,7 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 - ✅ **52-Week position filter**: 25-50% from low = 55.1% WR, +5.90% (optimal zone)
 - ✅ **Day of week adjustment**: Friday +5% bonus (57.4% WR), Wednesday -5% penalty (44.7%)
 - ✅ **China risk reassessed**: Removed from risk list - actually 61.2% WR, +15.98%!
+- ✅ **Rate limiting**: Proper Yahoo Finance rate limiting with exponential backoff
 
 **See**: [`../docs/penny-stock-scanner/performance-analysis-jan-2026.md`](../docs/penny-stock-scanner/performance-analysis-jan-2026.md) for full analysis.
 

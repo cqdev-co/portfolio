@@ -80,7 +80,26 @@ class Settings(BaseSettings):
         default=3600, description="YFinance cache TTL in seconds"
     )
     max_concurrent_requests: int = Field(
-        default=10, description="Maximum concurrent API requests"
+        default=5,
+        description="Maximum concurrent API requests (reduced for rate limiting)",
+    )
+
+    # Rate Limiting - ADDED Jan 2026
+    # Yahoo Finance rate limits: ~2000/hour, ~100/minute aggressive
+    rate_limit_requests_per_minute: int = Field(
+        default=30, description="Max requests per minute to Yahoo Finance"
+    )
+    rate_limit_min_delay: float = Field(
+        default=0.5, description="Minimum delay between requests (seconds)"
+    )
+    rate_limit_batch_delay: float = Field(
+        default=2.0, description="Delay between batches (seconds)"
+    )
+    rate_limit_initial_backoff: float = Field(
+        default=5.0, description="Initial backoff on rate limit error (seconds)"
+    )
+    rate_limit_max_backoff: float = Field(
+        default=120.0, description="Maximum backoff on rate limit error (seconds)"
     )
 
     # Penny Stock Filters

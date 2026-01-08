@@ -5,6 +5,7 @@ Calculates how penny stocks perform relative to the broader market
 to identify true outperformance vs general market moves.
 """
 
+import asyncio
 from datetime import datetime
 
 import yfinance as yf
@@ -12,6 +13,7 @@ from loguru import logger
 
 from penny_scanner.config.settings import Settings
 from penny_scanner.models.market_data import MarketData
+from penny_scanner.utils.rate_limiter import get_rate_limiter
 
 
 class MarketComparisonService:
@@ -26,7 +28,8 @@ class MarketComparisonService:
         self.settings = settings
         self._spy_cache: dict[str, any] = {}
         self._cache_timestamp: datetime | None = None
-        self._cache_ttl_minutes = 30  # Refresh SPY data every 30 minutes
+        self._cache_ttl_minutes = 60  # Refresh SPY data every 60 minutes
+        self.rate_limiter = get_rate_limiter()
 
     def _is_cache_valid(self) -> bool:
         """Check if SPY cache is still valid."""
@@ -37,7 +40,7 @@ class MarketComparisonService:
 
     def _fetch_spy_data(self, period: str = "1mo") -> dict | None:
         """
-        Fetch SPY benchmark data.
+        Fetch SPY benchmark data with rate limiting.
 
         Args:
             period: Time period to fetch
@@ -45,61 +48,95 @@ class MarketComparisonService:
         Returns:
             Dictionary with SPY performance metrics
         """
-        try:
-            spy = yf.Ticker("SPY")
-            hist = spy.history(period=period)
+        last_error = None
 
-            if hist.empty:
-                logger.warning("No SPY data available")
-                return None
+        while self.rate_limiter.should_retry():
+            try:
+                # Use synchronous rate limit check (SPY fetch is sync)
+                # We'll just add a small delay before fetching
+                import time
 
-            # Calculate various timeframe returns
-            closes = hist["Close"].values
+                # Check rate limiter stats and wait if needed
+                stats = self.rate_limiter.get_stats()
+                if stats["requests_last_minute"] > 25:
+                    wait_time = 2.0
+                    logger.debug(f"SPY fetch: rate limiting, waiting {wait_time}s")
+                    time.sleep(wait_time)
 
-            spy_data = {
-                "latest_close": closes[-1],
-                "prices": closes,
-                "dates": hist.index.tolist(),
-            }
+                spy = yf.Ticker("SPY")
+                hist = spy.history(period=period)
 
-            # 5-day return
-            if len(closes) >= 6:
-                spy_data["return_5d"] = (closes[-1] - closes[-6]) / closes[-6] * 100
-            else:
-                spy_data["return_5d"] = 0
+                if hist.empty:
+                    logger.warning("No SPY data available")
+                    return None
 
-            # 10-day return
-            if len(closes) >= 11:
-                spy_data["return_10d"] = (closes[-1] - closes[-11]) / closes[-11] * 100
-            else:
-                spy_data["return_10d"] = 0
+                # Calculate various timeframe returns
+                closes = hist["Close"].values
 
-            # 20-day return
-            if len(closes) >= 21:
-                spy_data["return_20d"] = (closes[-1] - closes[-21]) / closes[-21] * 100
-            else:
-                spy_data["return_20d"] = 0
+                spy_data = {
+                    "latest_close": closes[-1],
+                    "prices": closes,
+                    "dates": hist.index.tolist(),
+                }
 
-            # 1-day return
-            if len(closes) >= 2:
-                spy_data["return_1d"] = (closes[-1] - closes[-2]) / closes[-2] * 100
-            else:
-                spy_data["return_1d"] = 0
+                # 5-day return
+                if len(closes) >= 6:
+                    spy_data["return_5d"] = (closes[-1] - closes[-6]) / closes[-6] * 100
+                else:
+                    spy_data["return_5d"] = 0
 
-            self._spy_cache = spy_data
-            self._cache_timestamp = datetime.now()
+                # 10-day return
+                if len(closes) >= 11:
+                    spy_data["return_10d"] = (
+                        (closes[-1] - closes[-11]) / closes[-11] * 100
+                    )
+                else:
+                    spy_data["return_10d"] = 0
 
-            logger.debug(
-                f"Fetched SPY data: 1d={spy_data['return_1d']:.2f}%, "
-                f"5d={spy_data['return_5d']:.2f}%, "
-                f"20d={spy_data['return_20d']:.2f}%"
-            )
+                # 20-day return
+                if len(closes) >= 21:
+                    spy_data["return_20d"] = (
+                        (closes[-1] - closes[-21]) / closes[-21] * 100
+                    )
+                else:
+                    spy_data["return_20d"] = 0
 
-            return spy_data
+                # 1-day return
+                if len(closes) >= 2:
+                    spy_data["return_1d"] = (closes[-1] - closes[-2]) / closes[-2] * 100
+                else:
+                    spy_data["return_1d"] = 0
 
-        except Exception as e:
-            logger.error(f"Error fetching SPY data: {e}")
-            return None
+                self._spy_cache = spy_data
+                self._cache_timestamp = datetime.now()
+
+                self.rate_limiter.record_success()
+
+                logger.debug(
+                    f"Fetched SPY data: 1d={spy_data['return_1d']:.2f}%, "
+                    f"5d={spy_data['return_5d']:.2f}%, "
+                    f"20d={spy_data['return_20d']:.2f}%"
+                )
+
+                return spy_data
+
+            except Exception as e:
+                error_str = str(e).lower()
+
+                # Check for rate limit errors
+                if "rate limit" in error_str or "too many requests" in error_str:
+                    backoff = self.rate_limiter.record_rate_limit_error()
+                    logger.warning(f"SPY rate limited, backing off {backoff:.1f}s")
+                    import time
+
+                    time.sleep(backoff)
+                    last_error = e
+                else:
+                    logger.error(f"Error fetching SPY data: {e}")
+                    return None
+
+        logger.error(f"Max retries exceeded for SPY: {last_error}")
+        return None
 
     def get_spy_data(self) -> dict | None:
         """

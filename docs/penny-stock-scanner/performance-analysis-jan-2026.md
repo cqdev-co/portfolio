@@ -350,11 +350,25 @@ Based on deeper data analysis, the following improvements were added:
    - Added 52-week position settings
    - Added day of week settings
    - Removed China from moderate risk
+   - Added rate limiting settings
 
 2. `src/penny_scanner/services/analysis_service.py`
    - Added `_apply_green_day_adjustment()` method
    - Added `_apply_52w_position_adjustment()` method
    - Added `_apply_day_of_week_adjustment()` method
+
+3. `src/penny_scanner/utils/rate_limiter.py` (NEW)
+   - Rate limiting with sliding window
+   - Exponential backoff on 429 errors
+   - Configurable limits (30 req/min default)
+
+4. `src/penny_scanner/services/data_service.py`
+   - Integrated rate limiter
+   - Added retry logic for rate limit errors
+
+5. `src/penny_scanner/services/market_comparison_service.py`
+   - Integrated rate limiter for SPY fetches
+   - Extended cache TTL to 60 minutes
 
 ---
 

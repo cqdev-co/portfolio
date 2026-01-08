@@ -17,7 +17,6 @@ import {
   getRecentSignals,
   isConfigured,
 } from '../storage/supabase.ts';
-import { logger } from '../utils/logger.ts';
 
 /**
  * Create the trade command

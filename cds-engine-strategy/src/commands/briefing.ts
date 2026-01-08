@@ -139,14 +139,12 @@ export async function showDailyBriefing(
       console.log(
         `  ${regimeEmoji} ` +
           regimeColor(regime.regime.toUpperCase()) +
-          chalk.gray(` | Confidence: ${(regime.confidence * 100).toFixed(0)}%`)
+          chalk.gray(` | VIX: ${regime.vix?.toFixed(1) ?? 'N/A'}`)
       );
       console.log(
-        chalk.gray(`  ADX: ${regime.metrics?.adx?.toFixed(1) ?? 'N/A'}`) +
-          chalk.gray(
-            ` | Chop: ${regime.metrics?.chopIndex?.toFixed(1) ?? 'N/A'}`
-          ) +
-          chalk.gray(` | Breadth: ${regime.metrics?.breadth ?? 'N/A'}%`)
+        chalk.gray(`  SPY: $${regime.spyPrice.toFixed(2)}`) +
+          chalk.gray(` | 20d Return: ${(regime.return20d * 100).toFixed(1)}%`) +
+          chalk.gray(` | 50d Return: ${(regime.return50d * 100).toFixed(1)}%`)
       );
 
       // Action recommendation

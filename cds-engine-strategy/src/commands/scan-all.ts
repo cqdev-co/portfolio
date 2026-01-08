@@ -443,14 +443,14 @@ async function captureSignals(
       s.name.toLowerCase().includes('rsi')
     );
     const rsiMatch = rsiSignal?.name.match(/(\d+)/);
-    const rsiValue = rsiMatch ? parseFloat(rsiMatch[1]) : null;
+    const rsiValue = rsiMatch?.[1] ? parseFloat(rsiMatch[1]) : null;
 
     return {
       ticker: r.score.ticker,
       signalDate: new Date(),
       signalScore: r.score.totalScore,
       regime: marketContext?.regime ?? null,
-      regimeConfidence: marketContext?.confidence ?? null,
+      regimeConfidence: null,
       sector: null, // Could be enhanced with sector lookup
       signals: r.score.signals.map((s) => s.name),
       topSignals: r.score.signals

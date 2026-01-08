@@ -16,7 +16,6 @@ import {
   getPerformanceByRegime,
   isConfigured,
 } from '../storage/supabase.ts';
-import { createClient } from '@supabase/supabase-js';
 
 /**
  * Create the performance command
@@ -329,7 +328,7 @@ export function createPerformanceCommand(): Command {
             : r.regime === 'bear'
               ? chalk.red.bold
               : r.regime === 'caution'
-                ? chalk.keyword('orange').bold
+                ? chalk.hex('#FFA500').bold
                 : chalk.yellow.bold;
 
         console.log(regimeColor(`  ${r.regime.toUpperCase()} Market`));

@@ -13,7 +13,8 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import { logger } from '../utils/logger.ts';
 import { yahooProvider } from '../providers/yahoo.ts';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import * as fs from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 
 // Metadata watchlist path (relative to monorepo root)
@@ -58,7 +59,10 @@ function saveWatchlist(items: WatchlistItem[]): void {
     // Ensure directory exists
     const dir = dirname(WATCHLIST_PATH);
     if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+      (fs.mkdirSync as (path: string, options?: { recursive?: boolean }) => void)(
+        dir,
+        { recursive: true }
+      );
     }
     writeFileSync(WATCHLIST_PATH, JSON.stringify(items, null, 4));
     logger.debug(`Saved watchlist to ${WATCHLIST_PATH}`);
