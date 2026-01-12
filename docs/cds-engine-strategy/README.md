@@ -1,13 +1,14 @@
-# Screen-Ticker Documentation
+# CDS Engine Strategy Documentation
 
-The `screen-ticker` service is a comprehensive stock opportunity scanner
+The `cds-engine-strategy` service is a comprehensive stock opportunity scanner
 that analyzes tickers across technical, fundamental, and analyst dimensions
-to identify high-conviction entry points.
+to identify high-conviction entry points for Credit/Debit Spread trading.
 
 ## Version History
 
 | Version | Date     | Changes                                                            |
 | ------- | -------- | ------------------------------------------------------------------ |
+| v2.2.0  | Jan 2026 | Fixed briefing regime detection using shared lib, VIX display      |
 | v2.1.0  | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads         |
 | v1.7.1  | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps) |
 | v1.7.0  | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest        |
@@ -24,35 +25,44 @@ to identify high-conviction entry points.
 ### Commands
 
 ```bash
+# Daily morning briefing (RECOMMENDED START)
+bun run cds:briefing
+
+# Check market regime before trading
+bun run cds:regime
+bun run cds:regime --weekly  # Include transition warnings
+
 # Scan S&P 500 stocks (default)
-bun run scan
+bun run cds:scan
 
 # Scan with custom parameters
-bun run scan --list sp500 --min-score 70
+bun run cds:scan --list sp500 --min-score 70
 
 # Scan specific tickers
-bun run scan --tickers NVDA,AAPL,GOOGL
-
-# Detailed single-stock analysis with AI
-bun run analyze NVDA
-
-# Position management mode
-bun run analyze NVDA --position "165/170 Call Debit Spread"
-
-# View score trends
-bun run trends --days 7
+bun run cds:scan --tickers NVDA,AAPL,GOOGL
 
 # Two-stage workflow (RECOMMENDED):
 # Stage 1: Find technically sound stocks
-bun run scan --list sp500
+bun run cds:scan --list sp500
 
 # Stage 2: Find spreads for qualified tickers
-bun run scan-spreads --from-scan --relaxed
+bun run cds:scan-spreads --from-scan --relaxed
 
 # Direct spread scanning
-bun run scan-spreads --list db
-bun run scan-spreads --list mega --relaxed
+bun run cds:scan-spreads --list db
+bun run cds:scan-spreads --list mega --relaxed
 ```
+
+### Daily Briefing
+
+The `briefing` command provides a one-stop morning routine:
+
+- **Market Regime**: GO / CAUTION / NO_TRADE with confidence %
+- **VIX Level**: Current volatility and classification (CALM/NORMAL/ELEVATED)
+- **Key Metrics**: SPY trend, breadth, ADX
+- **Watchlist Alerts**: Price targets from `.github/metadata/watchlist.json`
+- **Earnings Proximity**: Warns of earnings within 14 days
+- **Action Recommendation**: What to do based on current regime
 
 ### Spread Scanner (Two-Stage Workflow)
 
@@ -95,4 +105,4 @@ Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 
 ---
 
-_Last Updated: December 2024_
+_Last Updated: January 2026_

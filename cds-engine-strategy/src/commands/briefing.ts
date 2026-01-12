@@ -1,9 +1,9 @@
 /**
  * Daily Briefing Command
- * v1.0.0: One-stop morning routine for CDS trading
+ * v1.1.0: One-stop morning routine for CDS trading
  *
  * Combines:
- * - Market regime analysis
+ * - Market regime analysis (using shared lib)
  * - Earnings proximity warnings
  * - Top opportunities from recent scans
  * - Watchlist alerts
@@ -11,10 +11,17 @@
 
 import chalk from 'chalk';
 import { logger } from '../utils/logger.ts';
-import { getMarketRegime } from '../utils/market-regime.ts';
 import { yahooProvider } from '../providers/yahoo.ts';
+import { fetchTickerViaProxy } from '../providers/shared-yahoo.ts';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+
+// Import robust regime detection from lib
+import {
+  analyzeTradingRegime,
+  type TradingRegimeAnalysis,
+  type PriceHistory,
+} from '../../../lib/ai-agent/market/no-trade-regime.ts';
 
 // Metadata watchlist path (relative to monorepo root)
 const WATCHLIST_PATH = join(
@@ -36,6 +43,28 @@ interface WatchlistItem {
 
 interface BriefingOptions {
   verbose?: boolean;
+}
+
+/**
+ * Fetch SPY price history for regime analysis
+ */
+async function fetchSPYPriceHistory(): Promise<PriceHistory | undefined> {
+  try {
+    const data = await fetchTickerViaProxy('SPY');
+    if (!data?.chart?.quotes || data.chart.quotes.length < 20) {
+      return undefined;
+    }
+
+    const quotes = data.chart.quotes;
+    return {
+      highs: quotes.map((q) => q.high),
+      lows: quotes.map((q) => q.low),
+      closes: quotes.map((q) => q.close),
+    };
+  } catch (error) {
+    logger.debug(`Failed to fetch SPY price history: ${error}`);
+    return undefined;
+  }
 }
 
 /**
@@ -114,51 +143,60 @@ export async function showDailyBriefing(
   console.log(chalk.bold.cyan('═'.repeat(60)));
   console.log();
 
-  // 1. Market Regime
+  // 1. Market Regime (using shared lib for robust detection)
   console.log(chalk.bold.white('📊 MARKET REGIME'));
   console.log(chalk.gray('─'.repeat(40)));
 
+  let regimeAnalysis: TradingRegimeAnalysis | null = null;
+
   try {
-    const regime = await getMarketRegime();
+    const priceHistory = await fetchSPYPriceHistory();
+    regimeAnalysis = await analyzeTradingRegime(priceHistory);
 
-    if (regime) {
-      const regimeColor =
-        regime.regime === 'bull'
-          ? chalk.green
-          : regime.regime === 'bear'
-            ? chalk.red
-            : chalk.yellow;
+    const regimeColor =
+      regimeAnalysis.regime === 'GO'
+        ? chalk.green
+        : regimeAnalysis.regime === 'NO_TRADE'
+          ? chalk.red
+          : chalk.yellow;
 
-      const regimeEmoji =
-        regime.regime === 'bull'
-          ? '🟢'
-          : regime.regime === 'bear'
-            ? '🔴'
-            : '🟡';
+    const regimeEmoji =
+      regimeAnalysis.regime === 'GO'
+        ? '🟢'
+        : regimeAnalysis.regime === 'NO_TRADE'
+          ? '🔴'
+          : '🟡';
 
-      console.log(
-        `  ${regimeEmoji} ` +
-          regimeColor(regime.regime.toUpperCase()) +
-          chalk.gray(` | VIX: ${regime.vix?.toFixed(1) ?? 'N/A'}`)
-      );
-      console.log(
-        chalk.gray(`  SPY: $${regime.spyPrice.toFixed(2)}`) +
-          chalk.gray(` | 20d Return: ${(regime.return20d * 100).toFixed(1)}%`) +
-          chalk.gray(` | 50d Return: ${(regime.return50d * 100).toFixed(1)}%`)
-      );
+    const vixDisplay = regimeAnalysis.vix?.current?.toFixed(1) ?? 'N/A';
+    const vixLevel = regimeAnalysis.metrics?.vixLevel ?? '';
 
-      // Action recommendation
-      if (regime.regime === 'bull') {
-        console.log(chalk.green('  → Full position sizes. Look for entries.'));
-      } else if (regime.regime === 'bear') {
-        console.log(chalk.red('  → No new CDS positions. Consider hedges.'));
-      } else {
-        console.log(
-          chalk.yellow('  → Grade A setups only. 50% position size.')
-        );
+    console.log(
+      `  ${regimeEmoji} ` +
+        regimeColor(regimeAnalysis.regime) +
+        chalk.gray(` (${regimeAnalysis.confidence}% confidence)`) +
+        chalk.gray(` | VIX: ${vixDisplay} ${vixLevel}`)
+    );
+
+    // Key metrics
+    const m = regimeAnalysis.metrics;
+    if (m) {
+      const parts: string[] = [];
+      if (m.spyTrend) parts.push(`SPY: ${m.spyTrend}`);
+      if (m.breadthScore !== undefined)
+        parts.push(`Breadth: ${m.breadthScore.toFixed(0)}%`);
+      if (m.adxValue !== undefined) parts.push(`ADX: ${m.adxValue.toFixed(1)}`);
+      if (parts.length > 0) {
+        console.log(chalk.gray(`  ${parts.join(' | ')}`));
       }
+    }
+
+    // Action recommendation
+    if (regimeAnalysis.regime === 'GO') {
+      console.log(chalk.green('  → Full position sizes. Look for entries.'));
+    } else if (regimeAnalysis.regime === 'NO_TRADE') {
+      console.log(chalk.red('  → No new CDS positions. Preserve cash.'));
     } else {
-      console.log(chalk.yellow('  ⚠️ Could not determine regime'));
+      console.log(chalk.yellow('  → Grade A setups only. 50% position size.'));
     }
   } catch (error) {
     console.log(chalk.red('  ✗ Failed to fetch regime'));
@@ -259,28 +297,22 @@ export async function showDailyBriefing(
 
   console.log();
 
-  // 4. Today's Action
+  // 4. Today's Action (use cached regime from above)
   console.log(chalk.bold.white("🎯 TODAY'S ACTION"));
   console.log(chalk.gray('─'.repeat(40)));
 
-  // Determine action based on regime
-  try {
-    const regime = await getMarketRegime();
-
-    if (regime?.regime === 'bull') {
-      console.log(chalk.green('  ✅ Run full scan: bun run cds:scan-all'));
-      console.log(chalk.gray('     Look for setups with score ≥70'));
-    } else if (regime?.regime === 'bear') {
-      console.log(chalk.red('  🛑 No new CDS positions today'));
-      console.log(
-        chalk.gray('     Consider: Review existing positions for exits')
-      );
-    } else {
-      console.log(chalk.yellow('  ⚠️ Selective mode: Only Grade A setups'));
-      console.log(chalk.gray('     Run: bun run cds:scan --min-score 80'));
-    }
-  } catch {
-    console.log(chalk.gray('  Run: bun run cds:regime to check market'));
+  // Determine action based on regime analysis
+  if (regimeAnalysis?.regime === 'GO') {
+    console.log(chalk.green('  ✅ Run full scan: bun run cds:scan-all'));
+    console.log(chalk.gray('     Look for setups with score ≥70'));
+  } else if (regimeAnalysis?.regime === 'NO_TRADE') {
+    console.log(chalk.red('  🛑 No new CDS positions today'));
+    console.log(
+      chalk.gray('     Consider: Review existing positions for exits')
+    );
+  } else {
+    console.log(chalk.yellow('  ⚠️ Selective mode: Only Grade A setups'));
+    console.log(chalk.gray('     Run: bun run cds:scan --min-score 80'));
   }
 
   console.log();

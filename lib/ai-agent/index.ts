@@ -83,6 +83,8 @@ export {
   GET_FINANCIALS_DEEP_TOOL,
   GET_INSTITUTIONAL_HOLDINGS_TOOL,
   GET_UNUSUAL_OPTIONS_TOOL,
+  GET_IV_BY_STRIKE_TOOL,
+  CALCULATE_SPREAD_TOOL,
 
   // Converters
   toOllamaTools,
@@ -183,6 +185,8 @@ export {
   handleGetFinancialsDeep,
   handleGetInstitutionalHoldings,
   handleGetUnusualOptionsActivity,
+  handleGetIVByStrike,
+  handleCalculateSpread,
 
   // Unified executor
   executeToolCall,
@@ -196,6 +200,8 @@ export {
   type FinancialsToolResult,
   type HoldingsToolResult,
   type UnusualOptionsToolResult,
+  type IVByStrikeToolResult,
+  type SpreadCalculationToolResult,
   type OutputFormat,
 } from './handlers';
 
@@ -292,3 +298,28 @@ export {
   type SPYTrend,
   type SectorPerformance,
 } from './market';
+
+// ============================================================================
+// SESSION CACHE
+// ============================================================================
+
+export {
+  // Main cache instance
+  sessionCache,
+
+  // Cache configuration
+  CACHE_TTL,
+  CacheKeys,
+
+  // Cache class (for custom instances)
+  SessionCache,
+} from './cache';
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+export {
+  // Logger (DEBUG mode support)
+  log,
+} from './utils';

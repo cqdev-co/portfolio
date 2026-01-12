@@ -6,6 +6,7 @@
  */
 
 import { fetchTickerData } from '../data/yahoo';
+import { log } from '../utils';
 import {
   formatTickerDataForAI,
   formatSearchResultsForAI,
@@ -29,6 +30,12 @@ import type {
   UnusualOptionsToolResult,
   UnusualOptionsSignal,
 } from '../data/types';
+import {
+  analyzeTradingRegime,
+  formatRegimeForAI as formatTradingRegimeForAI,
+  getRegimeEmoji,
+  type TradingRegimeAnalysis,
+} from '../market';
 
 // ============================================================================
 // RATE LIMITING
@@ -68,7 +75,7 @@ async function rateLimitedYahooRequest<T>(
 
       if (isRateLimit && attempt < retries - 1) {
         const delay = baseDelay * Math.pow(2, attempt);
-        console.log(
+        log.debug(
           `[Handler] Rate limited, waiting ${Math.round(delay / 1000)}s...`
         );
         await sleep(delay);
@@ -131,6 +138,44 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 /**
+ * Clean HTML entities and tags from text
+ */
+function cleanHtmlContent(text: string): string {
+  if (!text) return '';
+
+  return (
+    text
+      // Decode common HTML entities
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      )
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&times;/g, '×')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&lsquo;/g, "'")
+      .replace(/&rsquo;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"')
+      // Remove HTML tags
+      .replace(/<[^>]+>/g, '')
+      // Remove markdown links but keep text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Remove image markdown
+      .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+      // Collapse multiple spaces/newlines
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * Ollama native web search implementation
  * Uses Ollama's web search API (requires OLLAMA_API_KEY)
  *
@@ -150,7 +195,7 @@ export async function ollamaWebSearch(
     throw new Error('OLLAMA_API_KEY required for web search');
   }
 
-  console.log(`[WebSearch] Searching: "${query}" (max ${maxResults} results)`);
+  log.debug(`[WebSearch] Searching: "${query}" (max ${maxResults} results)`);
 
   const response = await fetch(OLLAMA_WEB_SEARCH_URL, {
     method: 'POST',
@@ -173,31 +218,33 @@ export async function ollamaWebSearch(
 
   const data = (await response.json()) as OllamaWebSearchResponse;
 
-  console.log(`[WebSearch] Got ${data.results?.length ?? 0} results`);
+  log.debug(`[WebSearch] Got ${data.results?.length ?? 0} results`);
 
   // Convert and truncate results
   let totalChars = 0;
   const results: SearchResult[] = [];
 
   for (const r of (data.results || []).slice(0, maxResults)) {
-    // Truncate snippet
+    // Clean and truncate title and snippet
+    const cleanTitle = cleanHtmlContent(r.title || 'Untitled');
+    const cleanContent = cleanHtmlContent(r.content || '');
     const snippet = truncateText(
-      r.content || '',
+      cleanContent,
       WEB_SEARCH_CONFIG.maxSnippetLength
     );
 
     // Check total limit
     const resultSize =
-      (r.title?.length || 0) + snippet.length + (r.url?.length || 0);
+      cleanTitle.length + snippet.length + (r.url?.length || 0);
     if (totalChars + resultSize > WEB_SEARCH_CONFIG.maxTotalChars) {
-      console.log(
+      log.debug(
         `[WebSearch] Hit char limit, stopping at ${results.length} results`
       );
       break;
     }
 
     results.push({
-      title: truncateText(r.title || 'Untitled', 100),
+      title: truncateText(cleanTitle, 100),
       url: r.url || '',
       snippet,
     });
@@ -205,7 +252,7 @@ export async function ollamaWebSearch(
     totalChars += resultSize;
   }
 
-  console.log(
+  log.debug(
     `[WebSearch] Returning ${results.length} results (${totalChars} chars)`
   );
 
@@ -236,7 +283,7 @@ export async function handleGetTickerData(
     };
   }
 
-  console.log(
+  log.debug(
     `[Handler] Fetching ticker data for: ${ticker} (format: ${format})`
   );
 
@@ -244,7 +291,7 @@ export async function handleGetTickerData(
     const data = await fetchTickerData(ticker);
 
     if (!data) {
-      console.log(`[Handler] No data returned for ${ticker}`);
+      log.debug(`[Handler] No data returned for ${ticker}`);
       return {
         success: false,
         error: `Could not fetch data for ${ticker} - no quote available`,
@@ -252,7 +299,7 @@ export async function handleGetTickerData(
     }
 
     // Log summary for debugging (full data sent to frontend)
-    console.log(`[Handler] Got data for ${ticker}:`, {
+    log.debug(`[Handler] Got data for ${ticker}:`, {
       price: data.price,
       rsi: data.rsi,
       hasSpread: !!data.spread,
@@ -269,7 +316,7 @@ export async function handleGetTickerData(
         ? encodeTickerToTOON(data)
         : formatTickerDataForAI(data);
 
-    console.log(`[Handler] Formatted output: ${formatted.length} chars`);
+    log.debug(`[Handler] Formatted output: ${formatted.length} chars`);
 
     return {
       success: true,
@@ -320,7 +367,7 @@ export async function handleWebSearch(
         ? encodeSearchToTOON(results)
         : formatSearchResultsForAI(results);
 
-    console.log(`[Handler] Search formatted output: ${formatted.length} chars`);
+    log.debug(`[Handler] Search formatted output: ${formatted.length} chars`);
 
     return {
       success: true,
@@ -367,7 +414,7 @@ export async function handleGetFinancialsDeep(args: {
     };
   }
 
-  console.log(`[Handler] Fetching financials for: ${ticker}`);
+  log.debug(`[Handler] Fetching financials for: ${ticker}`);
 
   // Try proxy first (no rate limiting issues)
   if (isProxyConfigured()) {
@@ -453,10 +500,7 @@ EV/EBITDA: ${proxyData.valuationMetrics?.evToEbitda?.toFixed(1) ?? 'N/A'}
         };
       }
     } catch (proxyError) {
-      console.log(
-        `[Handler] Proxy financials failed, falling back:`,
-        proxyError
-      );
+      log.debug(`[Handler] Proxy financials failed, falling back:`, proxyError);
     }
   }
 
@@ -680,7 +724,7 @@ export async function handleGetInstitutionalHoldings(args: {
     };
   }
 
-  console.log(`[Handler] Fetching institutional holdings for: ${ticker}`);
+  log.debug(`[Handler] Fetching institutional holdings for: ${ticker}`);
 
   // Try proxy first (no rate limiting issues)
   if (isProxyConfigured()) {
@@ -725,7 +769,7 @@ ${proxyData.topHolders
         };
       }
     } catch (proxyError) {
-      console.log(`[Handler] Proxy holdings failed, falling back:`, proxyError);
+      log.debug(`[Handler] Proxy holdings failed, falling back:`, proxyError);
     }
   }
 
@@ -840,7 +884,7 @@ export async function handleGetUnusualOptionsActivity(
   const minGrade = args.minGrade ?? 'B';
   const limit = args.limit ?? 10;
 
-  console.log(`[Handler] Fetching unusual options activity`, {
+  log.debug(`[Handler] Fetching unusual options activity`, {
     ticker: ticker ?? 'all',
     minGrade,
     limit,
@@ -998,6 +1042,374 @@ ${signals
 }
 
 // ============================================================================
+// TRADING REGIME HANDLER
+// ============================================================================
+
+/**
+ * Tool result for trading regime analysis
+ */
+export interface TradingRegimeToolResult extends ToolResult {
+  data?: TradingRegimeAnalysis;
+}
+
+/**
+ * Handle get_trading_regime tool call
+ * Analyzes market conditions to determine if trading is advisable
+ */
+export async function handleGetTradingRegime(
+  args: { ticker?: string },
+  _options?: { format?: OutputFormat }
+): Promise<TradingRegimeToolResult> {
+  log.debug(
+    `[Handler] Analyzing trading regime${args.ticker ? ` for ${args.ticker}` : ''}`
+  );
+
+  try {
+    // Analyze current market conditions
+    // Note: Full price history analysis requires historical data
+    // For now, we analyze based on VIX, SPY, and breadth indicators
+    const analysis = await analyzeTradingRegime();
+
+    if (!analysis) {
+      return {
+        success: false,
+        error: 'Could not analyze trading regime',
+      };
+    }
+
+    // Format for AI consumption
+    const emoji = getRegimeEmoji(analysis.regime);
+    const formatted = `
+=== TRADING REGIME ANALYSIS ===
+${emoji} REGIME: ${analysis.regime}
+Confidence: ${analysis.confidence}%
+Primary Reason: ${analysis.primaryReason.replace(/_/g, ' ')}
+
+📊 METRICS
+• Trend Strength: ${analysis.metrics.trendStrength}
+• Conflict Score: ${analysis.metrics.conflictScore}%${
+      analysis.metrics.vixLevel
+        ? `\n• VIX: ${analysis.vix?.current} (${analysis.metrics.vixLevel})`
+        : ''
+    }${analysis.metrics.spyTrend ? `\n• SPY: ${analysis.metrics.spyTrend}` : ''}${
+      analysis.metrics.adxValue !== undefined
+        ? `\n• ADX: ${analysis.metrics.adxValue?.toFixed(1)} (${analysis.metrics.adxTrend})`
+        : ''
+    }${
+      analysis.metrics.breadthScore !== undefined
+        ? `\n• Breadth: ${analysis.metrics.breadthScore?.toFixed(0)}% (${analysis.metrics.breadthSignal})`
+        : ''
+    }
+
+🎯 FACTORS
+${analysis.reasons.map((r) => `• ${r}`).join('\n')}
+
+💡 RECOMMENDATION
+${analysis.recommendation}
+`.trim();
+
+    log.debug(`[Handler] Regime: ${analysis.regime} (${analysis.confidence}%)`);
+
+    return {
+      success: true,
+      data: analysis,
+      formatted,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Handler] Trading regime error:`, errorMsg);
+    return {
+      success: false,
+      error: `Error analyzing trading regime: ${errorMsg}`,
+    };
+  }
+}
+
+// ============================================================================
+// IV BY STRIKE HANDLER
+// ============================================================================
+
+export interface IVByStrikeResult {
+  strike: number;
+  callIV: number | null;
+  putIV: number | null;
+  dte: number;
+  expirationDate: string;
+}
+
+export interface IVByStrikeToolResult extends ToolResult {
+  data?: IVByStrikeResult;
+}
+
+/**
+ * Get IV for a specific strike and target DTE
+ */
+export async function handleGetIVByStrike(
+  args: { ticker: string; strike: number; targetDTE?: number },
+  _options: { format?: OutputFormat } = {}
+): Promise<IVByStrikeToolResult> {
+  const { ticker, strike, targetDTE = 30 } = args;
+  const symbol = ticker.toUpperCase();
+
+  try {
+    log.debug(`[Handler] Fetching IV for ${symbol} at $${strike} strike...`);
+
+    // Use the yahoo-client from ai-analyst (we'll import dynamically)
+    // For now, implement directly using shared options chain fetcher
+    const { getOptionsChain } = await import('../options/chain');
+
+    const chain = await rateLimitedYahooRequest(() =>
+      getOptionsChain(symbol, targetDTE)
+    );
+
+    if (!chain || chain.calls.length === 0) {
+      return {
+        success: false,
+        error: `No options data available for ${symbol}`,
+      };
+    }
+
+    // Find call and put at the specified strike
+    const call = chain.calls.find((c) => Math.abs(c.strike - strike) < 0.5);
+    const put = chain.puts.find((p) => Math.abs(p.strike - strike) < 0.5);
+
+    if (!call && !put) {
+      return {
+        success: false,
+        error: `Strike $${strike} not found in options chain for ${symbol}`,
+      };
+    }
+
+    const result: IVByStrikeResult = {
+      strike,
+      callIV: call?.impliedVolatility
+        ? Math.round(call.impliedVolatility * 100 * 10) / 10
+        : null,
+      putIV: put?.impliedVolatility
+        ? Math.round(put.impliedVolatility * 100 * 10) / 10
+        : null,
+      dte: chain.dte,
+      expirationDate: chain.expiration.toISOString().split('T')[0],
+    };
+
+    const formatted = `
+📊 IV FOR ${symbol} $${strike} STRIKE (${result.dte} DTE)
+• Call IV: ${result.callIV !== null ? `${result.callIV}%` : 'N/A'}
+• Put IV: ${result.putIV !== null ? `${result.putIV}%` : 'N/A'}
+• Expiration: ${result.expirationDate}
+`.trim();
+
+    log.debug(
+      `[Handler] IV at $${strike}: Call ${result.callIV}%, Put ${result.putIV}%`
+    );
+
+    return {
+      success: true,
+      data: result,
+      formatted,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Handler] IV by strike error:`, errorMsg);
+    return {
+      success: false,
+      error: `Error fetching IV for ${symbol}: ${errorMsg}`,
+    };
+  }
+}
+
+// ============================================================================
+// CALCULATE SPREAD HANDLER
+// ============================================================================
+
+export interface SpreadCalculationResult {
+  longStrike: number;
+  shortStrike: number;
+  dte: number;
+  expirationDate: string;
+  underlyingPrice: number;
+  longBid: number;
+  longAsk: number;
+  longMid: number;
+  shortBid: number;
+  shortAsk: number;
+  shortMid: number;
+  estimatedDebit: number;
+  maxProfit: number;
+  breakeven: number;
+  cushion: number;
+  longIV: number | null;
+  shortIV: number | null;
+  longOI: number;
+  shortOI: number;
+  returnOnRisk: number;
+}
+
+export interface SpreadCalculationToolResult extends ToolResult {
+  data?: SpreadCalculationResult;
+}
+
+/**
+ * Calculate exact pricing for user-specified spread
+ */
+export async function handleCalculateSpread(
+  args: {
+    ticker: string;
+    longStrike: number;
+    shortStrike: number;
+    targetDTE?: number;
+  },
+  _options: { format?: OutputFormat } = {}
+): Promise<SpreadCalculationToolResult> {
+  const { ticker, longStrike, shortStrike, targetDTE = 30 } = args;
+  const symbol = ticker.toUpperCase();
+
+  try {
+    log.debug(
+      `[Handler] Calculating $${longStrike}/$${shortStrike} spread for ${symbol}...`
+    );
+
+    // Validate strikes
+    if (longStrike >= shortStrike) {
+      return {
+        success: false,
+        error: `Long strike ($${longStrike}) must be less than short strike ($${shortStrike})`,
+      };
+    }
+
+    // Get options chain
+    const { getOptionsChain } = await import('../options/chain');
+
+    const chain = await rateLimitedYahooRequest(() =>
+      getOptionsChain(symbol, targetDTE)
+    );
+
+    if (!chain || chain.calls.length === 0) {
+      return {
+        success: false,
+        error: `No options data available for ${symbol}`,
+      };
+    }
+
+    // Find calls at specified strikes
+    const longCall = chain.calls.find(
+      (c) => Math.abs(c.strike - longStrike) < 0.5
+    );
+    const shortCall = chain.calls.find(
+      (c) => Math.abs(c.strike - shortStrike) < 0.5
+    );
+
+    if (!longCall) {
+      return {
+        success: false,
+        error: `Long strike $${longStrike} not found in options chain`,
+      };
+    }
+
+    if (!shortCall) {
+      return {
+        success: false,
+        error: `Short strike $${shortStrike} not found in options chain`,
+      };
+    }
+
+    const underlyingPrice = chain.underlyingPrice;
+
+    // Calculate pricing
+    const longMid = (longCall.bid + longCall.ask) / 2 || longCall.mid;
+    const shortMid = (shortCall.bid + shortCall.ask) / 2 || shortCall.mid;
+
+    // Use worst-case fills
+    const longAsk = longCall.ask || longMid;
+    const shortBid = shortCall.bid || shortMid;
+    let estimatedDebit = longAsk - shortBid;
+
+    const spreadWidth = shortStrike - longStrike;
+
+    // Validate debit
+    if (estimatedDebit <= 0 || estimatedDebit >= spreadWidth) {
+      estimatedDebit = longMid - shortMid;
+    }
+
+    const maxProfit = spreadWidth - estimatedDebit;
+    const breakeven = longStrike + estimatedDebit;
+    const cushion = ((underlyingPrice - breakeven) / underlyingPrice) * 100;
+    const returnOnRisk = (maxProfit / estimatedDebit) * 100;
+
+    const result: SpreadCalculationResult = {
+      longStrike,
+      shortStrike,
+      dte: chain.dte,
+      expirationDate: chain.expiration.toISOString().split('T')[0],
+      underlyingPrice: Math.round(underlyingPrice * 100) / 100,
+      longBid: longCall.bid,
+      longAsk: longCall.ask,
+      longMid: Math.round(longMid * 100) / 100,
+      shortBid: shortCall.bid,
+      shortAsk: shortCall.ask,
+      shortMid: Math.round(shortMid * 100) / 100,
+      estimatedDebit: Math.round(estimatedDebit * 100) / 100,
+      maxProfit: Math.round(maxProfit * 100) / 100,
+      breakeven: Math.round(breakeven * 100) / 100,
+      cushion: Math.round(cushion * 100) / 100,
+      longIV: longCall.impliedVolatility
+        ? Math.round(longCall.impliedVolatility * 100 * 10) / 10
+        : null,
+      shortIV: shortCall.impliedVolatility
+        ? Math.round(shortCall.impliedVolatility * 100 * 10) / 10
+        : null,
+      longOI: longCall.openInterest,
+      shortOI: shortCall.openInterest,
+      returnOnRisk: Math.round(returnOnRisk * 10) / 10,
+    };
+
+    // Format output
+    const itmPct = ((underlyingPrice - longStrike) / underlyingPrice) * 100;
+    const itmLabel = itmPct > 0 ? `${itmPct.toFixed(1)}% ITM` : 'OTM';
+
+    const formatted = `
+📊 ${symbol} $${longStrike}/$${shortStrike} CDS (${result.dte} DTE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stock: $${result.underlyingPrice}
+Expiry: ${result.expirationDate}
+
+PRICING (per contract)
+• Long $${longStrike}: Bid $${result.longBid.toFixed(2)} / Ask $${result.longAsk.toFixed(2)}
+• Short $${shortStrike}: Bid $${result.shortBid.toFixed(2)} / Ask $${result.shortAsk.toFixed(2)}
+• Est. Debit: $${result.estimatedDebit.toFixed(2)} ($${(result.estimatedDebit * 100).toFixed(0)} per contract)
+
+RISK/REWARD
+• Max Profit: $${result.maxProfit.toFixed(2)} ($${(result.maxProfit * 100).toFixed(0)})
+• Return on Risk: ${result.returnOnRisk.toFixed(1)}%
+• Breakeven: $${result.breakeven.toFixed(2)}
+• Cushion: ${result.cushion.toFixed(1)}% (${itmLabel})
+
+LIQUIDITY
+• Long OI: ${result.longOI.toLocaleString()} | IV: ${result.longIV ?? 'N/A'}%
+• Short OI: ${result.shortOI.toLocaleString()} | IV: ${result.shortIV ?? 'N/A'}%
+`.trim();
+
+    log.debug(
+      `[Handler] Spread: Debit $${result.estimatedDebit}, ` +
+        `Max $${result.maxProfit}, Cushion ${result.cushion}%`
+    );
+
+    return {
+      success: true,
+      data: result,
+      formatted,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Handler] Calculate spread error:`, errorMsg);
+    return {
+      success: false,
+      error: `Error calculating spread for ${symbol}: ${errorMsg}`,
+    };
+  }
+}
+
+// ============================================================================
 // UNIFIED TOOL EXECUTOR
 // ============================================================================
 
@@ -1088,6 +1500,47 @@ export async function executeToolCall(
       return result;
     }
 
+    case 'get_trading_regime': {
+      const ticker = args.ticker as string | undefined;
+      onStatus?.(
+        ticker
+          ? `🚦 Analyzing trading regime for ${ticker}...`
+          : `🚦 Analyzing market trading regime...`
+      );
+      result = await handleGetTradingRegime({ ticker }, { format });
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'get_iv_by_strike': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const strike = args.strike as number;
+      const targetDTE = (args.targetDTE as number) ?? 30;
+      onStatus?.(`📊 Fetching IV for ${ticker} $${strike} strike...`);
+      result = await handleGetIVByStrike(
+        { ticker, strike, targetDTE },
+        { format }
+      );
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'calculate_spread': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const longStrike = args.longStrike as number;
+      const shortStrike = args.shortStrike as number;
+      const targetDTE = (args.targetDTE as number) ?? 30;
+      onStatus?.(
+        `📊 Calculating ${ticker} $${longStrike}/$${shortStrike} spread...`
+      );
+      result = await handleCalculateSpread(
+        { ticker, longStrike, shortStrike, targetDTE },
+        { format }
+      );
+      onToolResult?.(name, result);
+      return result;
+    }
+
     default:
       result = {
         success: false,
@@ -1110,3 +1563,4 @@ export type {
   HoldingsToolResult,
   UnusualOptionsToolResult,
 };
+// Note: TradingRegimeToolResult is exported at its interface definition

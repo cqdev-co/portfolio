@@ -19,6 +19,7 @@ import { logger } from './utils/logger';
 import {
   handleTicker,
   handleQuote,
+  handleBatchQuotes,
   handleChart,
   handleOptions,
   handleOptionsChain,
@@ -49,7 +50,8 @@ export default {
     }
 
     const url = new URL(request.url);
-    const path = url.pathname;
+    // Decode path to handle URL-encoded symbols like %5EVIX -> ^VIX
+    const path = decodeURIComponent(url.pathname);
     const searchParams = url.searchParams;
 
     try {
@@ -69,6 +71,15 @@ export default {
       const quoteMatch = path.match(/^\/quote\/([A-Z0-9.^-]+)$/i);
       if (quoteMatch) {
         return handleQuote(quoteMatch[1]);
+      }
+
+      // /batch-quotes?symbols=XLK,XLF,... - Multiple quotes in one request
+      if (path === '/batch-quotes') {
+        const symbols = searchParams.get('symbols');
+        if (!symbols) {
+          return jsonResponse({ error: 'Missing symbols parameter' }, 400);
+        }
+        return handleBatchQuotes(symbols);
       }
 
       // /chart/:ticker - Historical data

@@ -6,6 +6,7 @@
  */
 
 import type { TickerData, NewsItem } from './types';
+import { log } from '../utils';
 
 // ============================================================================
 // CONFIGURATION
@@ -34,7 +35,7 @@ async function polygonFetch<T>(endpoint: string): Promise<T> {
   const timeSince = now - lastPolygonRequest;
   if (timeSince < MIN_POLYGON_DELAY_MS && lastPolygonRequest > 0) {
     const waitTime = MIN_POLYGON_DELAY_MS - timeSince;
-    console.log(
+    log.debug(
       `[Polygon] Rate limiting, waiting ${Math.round(waitTime / 1000)}s...`
     );
     await sleep(waitTime);
@@ -45,7 +46,7 @@ async function polygonFetch<T>(endpoint: string): Promise<T> {
   const separator = endpoint.includes('?') ? '&' : '?';
   const fullUrl = `${url}${separator}apiKey=${getApiKey()}`;
 
-  console.log(`[Polygon] Fetching: ${endpoint}`);
+  log.debug(`[Polygon] Fetching: ${endpoint}`);
 
   const response = await fetch(fullUrl);
 
@@ -167,7 +168,7 @@ export async function fetchTickerDataFromPolygon(
   ticker: string
 ): Promise<TickerData | null> {
   const symbol = ticker.toUpperCase();
-  console.log(`[Polygon] Fetching data for ${symbol} (fallback)...`);
+  log.debug(`[Polygon] Fetching data for ${symbol} (fallback)...`);
 
   try {
     // Fetch previous day's data (EOD - free tier)
@@ -176,7 +177,7 @@ export async function fetchTickerDataFromPolygon(
     );
 
     if (!prevClose.results?.[0]) {
-      console.log(`[Polygon] No data for ${symbol}`);
+      log.debug(`[Polygon] No data for ${symbol}`);
       return null;
     }
 
@@ -210,7 +211,7 @@ export async function fetchTickerDataFromPolygon(
         }
       }
     } catch (e) {
-      console.log(`[Polygon] Could not fetch details for ${symbol}`);
+      log.debug(`[Polygon] Could not fetch details for ${symbol}`);
     }
 
     // Fetch historical data for technicals (last 60 days)
@@ -267,7 +268,7 @@ export async function fetchTickerDataFromPolygon(
         }
       }
     } catch (e) {
-      console.log(`[Polygon] Could not fetch history for ${symbol}`);
+      log.debug(`[Polygon] Could not fetch history for ${symbol}`);
     }
 
     // Fetch news
@@ -285,10 +286,10 @@ export async function fetchTickerDataFromPolygon(
         }));
       }
     } catch (e) {
-      console.log(`[Polygon] Could not fetch news for ${symbol}`);
+      log.debug(`[Polygon] Could not fetch news for ${symbol}`);
     }
 
-    console.log(`[Polygon] Got data for ${symbol}: $${price}`);
+    log.debug(`[Polygon] Got data for ${symbol}: $${price}`);
     return data;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

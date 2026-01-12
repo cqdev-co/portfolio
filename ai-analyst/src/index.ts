@@ -112,7 +112,7 @@ program
         aiModel: opts.aiModel,
         position: opts.position,
         noChart: !opts.chart,
-        accountSize: parseInt(opts.account, 10) || 1500,
+        accountSize: parseInt(opts.account, 10) || 1750,
       };
 
       await analyzeCommand(ticker, options);
@@ -254,8 +254,14 @@ program
   .option('--ai-mode <mode>', 'Ollama mode: local or cloud', 'cloud')
   .option('--ai-model <model>', 'Override default AI model')
   .option('-a, --account <size>', 'Account size in dollars', '1500')
+  .option('-s, --stream', 'Enable streaming responses for better UX')
   .action(
-    async (opts: { aiMode: string; aiModel?: string; account: string }) => {
+    async (opts: {
+      aiMode: string;
+      aiModel?: string;
+      account: string;
+      stream?: boolean;
+    }) => {
       // Validate AI mode
       if (!['local', 'cloud'].includes(opts.aiMode)) {
         console.log(chalk.red(`  Invalid --ai-mode: ${opts.aiMode}`));
@@ -267,6 +273,7 @@ program
         aiMode: opts.aiMode as OllamaMode,
         aiModel: opts.aiModel,
         accountSize: parseInt(opts.account, 10) || 1500,
+        stream: opts.stream,
       };
 
       await startChat(options);

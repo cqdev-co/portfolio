@@ -1,7 +1,6 @@
 """Data service for fetching market data."""
 
 import asyncio
-from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -130,8 +129,7 @@ class DataService:
             total_batches = (total + batch_size - 1) // batch_size
 
             logger.info(
-                f"Batch download {batch_num}/{total_batches}: "
-                f"{len(batch)} symbols"
+                f"Batch download {batch_num}/{total_batches}: {len(batch)} symbols"
             )
 
             try:
@@ -238,9 +236,7 @@ class DataService:
         # Use batch download for efficiency
         return await self.get_multiple_symbols_batch(symbols, period)
 
-    async def enrich_with_info(
-        self, market_data: MarketData
-    ) -> MarketData:
+    async def enrich_with_info(self, market_data: MarketData) -> MarketData:
         """
         Enrich market data with ticker info (sector, industry, float).
 

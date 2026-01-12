@@ -12,6 +12,8 @@
  * - Sector participation
  */
 
+import { log } from '../utils';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -421,7 +423,7 @@ export async function fetchBreadthViaProxy(
     ]);
 
     if (!spyRes?.quote?.price) {
-      console.log('[Breadth] Could not fetch SPY data');
+      log.debug('[Breadth] Could not fetch SPY data');
       return null;
     }
 
@@ -513,7 +515,7 @@ export async function fetchSectorBreadthViaProxy(
       }));
 
     if (sectorData.length < 5) {
-      console.log('[Breadth] Insufficient sector data');
+      log.debug('[Breadth] Insufficient sector data');
       return null;
     }
 

@@ -232,6 +232,44 @@ export async function searchMarketAnalysis(
 }
 
 /**
+ * Clean HTML entities and tags from text
+ */
+function cleanHtmlContent(text: string): string {
+  if (!text) return '';
+
+  return (
+    text
+      // Decode common HTML entities
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      )
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&times;/g, '×')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&lsquo;/g, "'")
+      .replace(/&rsquo;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"')
+      // Remove HTML tags
+      .replace(/<[^>]+>/g, '')
+      // Remove markdown links but keep text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Remove image markdown
+      .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+      // Collapse multiple spaces/newlines
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * Format search results for AI context
  */
 export function formatSearchForAI(response: WebSearchResponse): string {
@@ -242,13 +280,16 @@ export function formatSearchForAI(response: WebSearchResponse): string {
   let output = `\n=== WEB SEARCH: "${response.query}" ===\n`;
 
   if (response.instantAnswer) {
-    output += `\nSummary: ${response.instantAnswer}\n`;
+    const cleanAnswer = cleanHtmlContent(response.instantAnswer);
+    output += `\nSummary: ${cleanAnswer}\n`;
   }
 
   if (response.results.length > 0) {
     output += `\nResults:\n`;
     for (const r of response.results.slice(0, 3)) {
-      output += `• ${r.title}\n  ${r.snippet.substring(0, 150)}...\n`;
+      const cleanTitle = cleanHtmlContent(r.title);
+      const cleanSnippet = cleanHtmlContent(r.snippet);
+      output += `• ${cleanTitle}\n  ${cleanSnippet.substring(0, 200)}${cleanSnippet.length > 200 ? '...' : ''}\n`;
     }
   }
 

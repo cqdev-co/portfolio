@@ -132,6 +132,15 @@ class SupabaseStorage:
                     "spread_net_premium": float(signal.spread_net_premium)
                     if signal.spread_net_premium
                     else None,
+                    # Signal Classification (Jan 2026 - data-driven approach)
+                    "signal_classification": signal.signal_classification,
+                    "classification_reason": signal.classification_reason,
+                    "predicted_win_rate": float(signal.predicted_win_rate)
+                    if signal.predicted_win_rate is not None
+                    else None,
+                    "classification_factors": json.dumps(signal.classification_factors)
+                    if signal.classification_factors
+                    else None,
                 }
                 signal_data.append(data)
 
@@ -256,6 +265,19 @@ class SupabaseStorage:
                         data_provider=row["data_provider"] or "Unknown",
                         detection_timestamp=datetime.fromisoformat(
                             row["detection_timestamp"]
+                        ),
+                        # Signal Classification fields
+                        signal_classification=row.get(
+                            "signal_classification", "unclassified"
+                        ),
+                        classification_reason=row.get("classification_reason", ""),
+                        predicted_win_rate=row.get("predicted_win_rate"),
+                        classification_factors=row.get("classification_factors")
+                        if isinstance(row.get("classification_factors"), list)
+                        else (
+                            json.loads(row.get("classification_factors"))
+                            if row.get("classification_factors")
+                            else []
                         ),
                     )
                     signals.append(signal)

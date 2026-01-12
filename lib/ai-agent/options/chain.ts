@@ -3,9 +3,14 @@
  *
  * Fetches REAL options data from Yahoo Finance.
  * This is the same logic used by the CLI (ai-analyst).
+ *
+ * CACHING: Uses SessionCache with 2-minute TTL to avoid redundant fetches.
+ * This eliminates duplicate calls from PFV and spread calculations.
  */
 
 import type { OptionsChain, OptionContract } from './types';
+import { sessionCache, CacheKeys, CACHE_TTL } from '../cache';
+import { log } from '../utils';
 
 // ============================================================================
 // RATE LIMITING
@@ -45,7 +50,7 @@ async function rateLimitedRequest<T>(
 
       if (isRateLimit && attempt < retries - 1) {
         const delay = baseDelay * Math.pow(2, attempt);
-        console.log(
+        log.debug(
           `[Options] Rate limited, waiting ${Math.round(delay / 1000)}s...`
         );
         await sleep(delay);
@@ -64,7 +69,10 @@ async function rateLimitedRequest<T>(
 // ============================================================================
 
 /**
- * Fetch options chain for a symbol
+ * Fetch options chain for a symbol (with caching)
+ *
+ * Uses proxy first (avoids rate limiting), falls back to direct yahoo-finance2
+ * Results are cached for 2 minutes to avoid duplicate fetches from PFV + spreads.
  *
  * @param symbol - Ticker symbol
  * @param targetDTE - Target days to expiration (default 30)
@@ -74,6 +82,130 @@ export async function getOptionsChain(
   symbol: string,
   targetDTE: number = 30
 ): Promise<OptionsChain | null> {
+  const cacheKey = CacheKeys.options(symbol.toUpperCase(), targetDTE);
+
+  // Check cache first
+  const cached = sessionCache.get<OptionsChain>(cacheKey);
+  if (cached) {
+    log.debug(`[Options] Cache HIT for ${symbol} (DTE ${targetDTE})`);
+    return cached;
+  }
+
+  log.debug(`[Options] Cache MISS for ${symbol}, fetching...`);
+  const chain = await fetchOptionsChainInternal(symbol, targetDTE);
+
+  // Cache the result (even if null to avoid repeated failed fetches)
+  if (chain) {
+    sessionCache.set(cacheKey, chain, CACHE_TTL.OPTIONS);
+    log.debug(`[Options] Cached ${symbol} chain (TTL: 2 min)`);
+  }
+
+  return chain;
+}
+
+/**
+ * Internal fetch function - does the actual API calls
+ */
+async function fetchOptionsChainInternal(
+  symbol: string,
+  targetDTE: number
+): Promise<OptionsChain | null> {
+  const proxyUrl = process.env.YAHOO_PROXY_URL;
+
+  // Try proxy first
+  if (proxyUrl) {
+    try {
+      // Calculate target expiration timestamp
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + targetDTE);
+      const targetTs = Math.floor(targetDate.getTime() / 1000);
+
+      // Use options-chain endpoint with date parameter
+      const url = `${proxyUrl}/options-chain/${symbol.toUpperCase()}?date=${targetTs}`;
+      log.debug(`[Options] Fetching chain via proxy: ${url}`);
+      const response = await fetch(url);
+
+      if (response.ok) {
+        // Proxy returns OptionsChainData directly
+        const data = (await response.json()) as {
+          underlying?: string;
+          underlyingPrice?: number;
+          expirationDate?: string;
+          expirationTimestamp?: number;
+          calls?: Array<{
+            strike: number;
+            bid: number;
+            ask: number;
+            openInterest: number;
+            volume: number;
+            impliedVolatility: number;
+            inTheMoney: boolean;
+          }>;
+          puts?: Array<{
+            strike: number;
+            bid: number;
+            ask: number;
+            openInterest: number;
+            volume: number;
+            impliedVolatility: number;
+            inTheMoney: boolean;
+          }>;
+        };
+
+        if (data.calls && data.puts && data.underlyingPrice) {
+          const closestExp = data.expirationTimestamp
+            ? new Date(data.expirationTimestamp * 1000)
+            : targetDate;
+          const dte = Math.ceil(
+            (closestExp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+
+          const calls: OptionContract[] = data.calls.map((c) => ({
+            strike: c.strike,
+            expiration: closestExp,
+            bid: c.bid ?? 0,
+            ask: c.ask ?? 0,
+            mid: ((c.bid ?? 0) + (c.ask ?? 0)) / 2,
+            openInterest: c.openInterest ?? 0,
+            volume: c.volume ?? 0,
+            impliedVolatility: c.impliedVolatility ?? 0,
+            inTheMoney: c.inTheMoney ?? c.strike < data.underlyingPrice!,
+          }));
+
+          const puts: OptionContract[] = data.puts.map((p) => ({
+            strike: p.strike,
+            expiration: closestExp,
+            bid: p.bid ?? 0,
+            ask: p.ask ?? 0,
+            mid: ((p.bid ?? 0) + (p.ask ?? 0)) / 2,
+            openInterest: p.openInterest ?? 0,
+            volume: p.volume ?? 0,
+            impliedVolatility: p.impliedVolatility ?? 0,
+            inTheMoney: p.inTheMoney ?? p.strike > data.underlyingPrice!,
+          }));
+
+          log.debug(
+            `[Options] Got ${calls.length} calls, ${puts.length} puts from proxy for ${symbol}`
+          );
+          return {
+            calls,
+            puts,
+            expiration: closestExp,
+            dte,
+            underlyingPrice: data.underlyingPrice,
+          };
+        } else {
+          log.debug(`[Options] Proxy returned incomplete data for ${symbol}`);
+        }
+      } else {
+        log.debug(`[Options] Proxy returned ${response.status} for ${symbol}`);
+      }
+    } catch (e) {
+      log.debug(`[Options] Proxy failed for ${symbol}, trying direct:`, e);
+    }
+  }
+
+  // Fallback to direct yahoo-finance2
   try {
     // Dynamic import for yahoo-finance2
     const YahooFinance = (await import('yahoo-finance2')).default;

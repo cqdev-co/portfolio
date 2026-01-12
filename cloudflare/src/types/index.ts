@@ -397,40 +397,83 @@ export interface YahooSearchResponse {
   }>;
 }
 
+/**
+ * Income/Balance/Cashflow statement types (used for both annual and quarterly)
+ */
+interface IncomeStatement {
+  endDate?: { raw?: number };
+  totalRevenue?: { raw?: number };
+  grossProfit?: { raw?: number };
+  operatingIncome?: { raw?: number };
+  netIncome?: { raw?: number };
+}
+
+interface BalanceSheet {
+  totalAssets?: { raw?: number };
+  totalLiab?: { raw?: number };
+  totalStockholderEquity?: { raw?: number };
+  cash?: { raw?: number };
+  cashAndShortTermInvestments?: { raw?: number };
+  longTermDebt?: { raw?: number };
+  totalDebt?: { raw?: number };
+  totalCurrentAssets?: { raw?: number };
+  totalCurrentLiabilities?: { raw?: number };
+}
+
+interface CashflowStatement {
+  totalCashFromOperatingActivities?: { raw?: number };
+  capitalExpenditures?: { raw?: number };
+  dividendsPaid?: { raw?: number };
+}
+
+/**
+ * v4.3: Extended financialData module with all available fields
+ */
+interface FinancialDataModule {
+  // Growth metrics
+  revenueGrowth?: { raw?: number };
+  earningsGrowth?: { raw?: number };
+  // Margins
+  grossMargins?: { raw?: number };
+  operatingMargins?: { raw?: number };
+  profitMargins?: { raw?: number };
+  // Raw values (TTM)
+  totalRevenue?: { raw?: number };
+  grossProfits?: { raw?: number };
+  totalCash?: { raw?: number };
+  totalDebt?: { raw?: number };
+  freeCashflow?: { raw?: number };
+  operatingCashflow?: { raw?: number };
+  // Ratios
+  debtToEquity?: { raw?: number };
+  currentRatio?: { raw?: number };
+}
+
 export interface YahooFinancialsResponse {
   quoteSummary?: {
     result?: Array<{
+      // Annual statements
       incomeStatementHistory?: {
-        incomeStatementHistory?: Array<{
-          endDate?: { raw?: number };
-          totalRevenue?: { raw?: number };
-          grossProfit?: { raw?: number };
-          operatingIncome?: { raw?: number };
-          netIncome?: { raw?: number };
-        }>;
+        incomeStatementHistory?: IncomeStatement[];
       };
       balanceSheetHistory?: {
-        balanceSheetStatements?: Array<{
-          totalAssets?: { raw?: number };
-          totalLiab?: { raw?: number };
-          totalStockholderEquity?: { raw?: number };
-          cash?: { raw?: number };
-          longTermDebt?: { raw?: number };
-          totalCurrentAssets?: { raw?: number };
-          totalCurrentLiabilities?: { raw?: number };
-        }>;
+        balanceSheetStatements?: BalanceSheet[];
       };
       cashflowStatementHistory?: {
-        cashflowStatements?: Array<{
-          totalCashFromOperatingActivities?: { raw?: number };
-          capitalExpenditures?: { raw?: number };
-          dividendsPaid?: { raw?: number };
-        }>;
+        cashflowStatements?: CashflowStatement[];
       };
-      financialData?: {
-        revenueGrowth?: { raw?: number };
-        earningsGrowth?: { raw?: number };
+      // Quarterly statements (v4.3)
+      incomeStatementHistoryQuarterly?: {
+        incomeStatementHistory?: IncomeStatement[];
       };
+      balanceSheetHistoryQuarterly?: {
+        balanceSheetStatements?: BalanceSheet[];
+      };
+      cashflowStatementHistoryQuarterly?: {
+        cashflowStatements?: CashflowStatement[];
+      };
+      // Calculated/TTM financials (v4.3: expanded)
+      financialData?: FinancialDataModule;
       defaultKeyStatistics?: {
         trailingEps?: { raw?: number };
         pegRatio?: { raw?: number };

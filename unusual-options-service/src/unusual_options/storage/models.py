@@ -2,7 +2,48 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from enum import Enum
 from uuid import uuid4
+
+
+class SignalClassification(str, Enum):
+    """
+    Signal classification based on historical win rate analysis.
+
+    Jan 2026 Analysis Results:
+    - PUT signals: 60% win rate
+    - CALL signals: 8.6% win rate
+    - PUT ATM 8-14 DTE: 61.5% win rate (sweet spot)
+    """
+
+    # Follow directionally - high historical win rate
+    HIGH_CONVICTION = "high_conviction"
+
+    # Consider with caution - moderate win rate
+    MODERATE = "moderate"
+
+    # Market intel only - unclear direction
+    INFORMATIONAL = "informational"
+
+    # Institutional hedging activity - not directional
+    LIKELY_HEDGE = "likely_hedge"
+
+    # Consider fading - historically fails as directional play
+    CONTRARIAN = "contrarian"
+
+    # Not yet classified
+    UNCLASSIFIED = "unclassified"
+
+
+# Historical win rates by classification (updated from analysis)
+CLASSIFICATION_WIN_RATES = {
+    SignalClassification.HIGH_CONVICTION: 0.60,
+    SignalClassification.MODERATE: 0.40,
+    SignalClassification.INFORMATIONAL: 0.25,
+    SignalClassification.LIKELY_HEDGE: None,  # Not applicable
+    SignalClassification.CONTRARIAN: 0.09,
+    SignalClassification.UNCLASSIFIED: None,
+}
 
 
 @dataclass
@@ -120,9 +161,16 @@ class UnusualOptionsSignal:
     inferred_side: str | None = None  # BUY, SELL, MIXED
     side_confidence: float = 0.0
 
+    # Signal Classification (Jan 2026 - data-driven approach)
+    # Replaces grade as primary actionability indicator
+    signal_classification: str = "unclassified"  # SignalClassification value
+    classification_reason: str = ""  # Human-readable explanation
+    predicted_win_rate: float | None = None  # Based on historical combos
+    classification_factors: list[str] = field(default_factory=list)
+
     # Metadata
     data_provider: str = ""
-    detection_version: str = "0.2.0"
+    detection_version: str = "0.3.0"  # Bumped for classification system
     raw_detection_data: dict = field(default_factory=dict)
 
 

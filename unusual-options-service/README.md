@@ -109,17 +109,24 @@ The service includes a comprehensive suite of analysis tools designed for quants
    - Identifies paired call/put activity
    - See [Hedge Detection Analysis](../docs/unusual-options-service/hedge-detection-analysis.md)
 
-3. **Performance Tracker** (`scripts/performance_tracker.py`) 📈 **[NEW]** - Measure actual results
+3. **Performance Tracker** (`scripts/performance_tracker.py`) 📈 - Measure actual results
    - Tracks forward returns (1d, 5d) on all signals
    - Calculates win rates by grade, option type, ticker
    - Shows top/worst performing signals
    - Creates feedback loop for filter tuning
 
-4. **Signal Analysis** (`scripts/analyze_results.py`) - Statistical overview with AI insights
-5. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation
-6. **Correlation Analysis** (`scripts/signal_correlation.py`) - Cross-ticker correlations and market regime detection
-7. **Flow Divergence** (`scripts/flow_divergence.py`) - Identify unusual patterns in positioning
-8. **Momentum Tracker** (`scripts/momentum_tracker.py`) - Track acceleration, exhaustion, and reversals
+4. **Classification Validator** (`scripts/classification_validator.py`) 🔍 **[NEW]** - Validate predictions
+   - Compares predicted vs actual win rates by classification
+   - Identifies over/under-rated classifications
+   - Factor-level performance analysis
+   - Updates signals with actual outcomes in DB
+   - Powers the continuous improvement feedback loop
+
+5. **Signal Analysis** (`scripts/analyze_results.py`) - Statistical overview with AI insights
+6. **Trade Sizing** (`scripts/trade_sizing.py`) - Kelly Criterion position sizing with Monte Carlo simulation
+7. **Correlation Analysis** (`scripts/signal_correlation.py`) - Cross-ticker correlations and market regime detection
+8. **Flow Divergence** (`scripts/flow_divergence.py`) - Identify unusual patterns in positioning
+9. **Momentum Tracker** (`scripts/momentum_tracker.py`) - Track acceleration, exhaustion, and reversals
 
 ### Quick Analysis
 
@@ -139,6 +146,12 @@ poetry run python scripts/hedge_analyzer.py --days 7 --min-grade A
 
 # Track actual performance of signals (win rates, returns)
 poetry run python scripts/performance_tracker.py --days 30 --report
+
+# Validate classification system predictions
+poetry run python scripts/classification_validator.py --validate --days 30
+
+# Update signals with actual outcomes (writes to DB)
+poetry run python scripts/classification_validator.py --update --days 30
 
 # Statistical overview of signals
 poetry run python scripts/analyze_results.py --days 7 --min-grade A
@@ -313,52 +326,69 @@ unusual-options performance --ticker AAPL --days 90
 unusual-options report --month 2025-09
 ```
 
-## 📈 Signal Grading System
+## 📊 Signal Classification System (Jan 2026)
 
-### Grade Classifications
+Based on 60 days of performance analysis (274 signals), we implemented a data-driven
+classification system that replaces the traditional grade system for actionability.
 
-**S Tier (≥0.90)** - Exceptional Opportunity
+### Key Finding: Option Type Matters Most
 
-- Multiple strong anomaly indicators
-- Historical win rate > 70%
-- Large premium flow (> $1M)
-- Institutional order patterns detected
-- Low implied volatility suggesting mispricing
+| Type            | Win Rate | Action                      |
+| --------------- | -------- | --------------------------- |
+| **PUT signals** | **60%**  | Follow directionally        |
+| CALL signals    | 9%       | Consider fading or ignoring |
 
-**A Tier (0.80-0.89)** - High Conviction
+### Classification Categories
 
-- Strong volume and OI anomalies
-- Premium flow > $500k
-- Historical win rate > 60%
-- Sweep orders detected
-- Clear directional bias
+**🟢 HIGH_CONVICTION** (60% historical win rate)
 
-**B Tier (0.70-0.79)** - Good Signal
+- PUT + ATM + 8-14 DTE (sweet spot: 61.5%)
+- PUT + ITM + 8-14 DTE (56.2%)
+- PUT + ATM/ITM + 7-21 DTE
+- **Action**: Follow these signals directionally
 
-- Significant volume anomaly (> 3x average)
-- Moderate premium flow (> $200k)
-- Historical win rate > 50%
-- Worth monitoring closely
+**🟡 MODERATE** (40% historical win rate)
 
-**C Tier (0.60-0.69)** - Watch List
+- PUT signals with less optimal DTE
+- PUT + OTM setups
+- **Action**: Consider with caution
 
-- Moderate unusual activity
-- May be early positioning
-- Requires confirmation
-- Consider waiting for stronger signals
+**⚪ INFORMATIONAL** (25% historical win rate)
 
-**D Tier (0.50-0.59)** - Low Conviction
+- Direction unclear
+- Mixed signals
+- **Action**: Market intel only
 
-- Weak or mixed signals
-- May be noise or retail activity
-- High risk, low probability
+**🔵 LIKELY_HEDGE** (N/A - not directional)
 
-**F Tier (<0.50)** - Avoid
+- Index ETF puts (SPY, QQQ, IWM)
+- Far OTM puts with long DTE
+- Sector ETF puts
+- **Action**: Informational - shows institutional positioning
 
-- Likely false positive
-- No clear directional bias
-- Poor historical performance
-- Potential manipulation or pump
+**🔴 CONTRARIAN** (9% historical win rate)
+
+- ALL call signals
+- OTM calls are especially unreliable
+- **Action**: Consider fading or ignoring
+
+### Example Output
+
+```
+🟢 HIGH_CONVICTION - NVDA $140 PUT
+   Classification: high_conviction (60% win rate)
+   Reason: PUT + ATM + 12 DTE (sweet spot combo)
+
+🔴 CONTRARIAN - TSLA $500 CALL
+   Classification: contrarian (9% win rate)
+   Reason: CALL signals historically fail - consider fading
+```
+
+## 📈 Legacy Grade System
+
+The S/A/B/C/D/F grade system is still calculated but is **not predictive** of
+outcomes. Jan 2026 analysis showed S-grade signals had 0% win rate while B-grade
+had 26.5%. Use the new classification system instead.
 
 ### Scoring Components
 
@@ -641,6 +671,7 @@ _Win defined as: Underlying moves > 2% in signal direction within 5 trading days
 
 ### Recent Updates
 
+- [January 9, 2026 - Performance Analysis](../docs/unusual-options-service/performance-analysis-jan-2026.md) - **Critical: 60-day performance review with optimization recommendations**
 - [October 10, 2025 - Core Scanner Improvements](../docs/unusual-options-service/oct-10-2025-core-scanner-improvements.md) - 0DTE filter + earnings calendar
 - [October 9, 2025 - Insider Plays Updates v2](../docs/unusual-options-service/oct-9-2025-updates-v2.md) - Deduplication, mega-cap filter, surprise factor
 - [Insider Plays Improvements](../docs/unusual-options-service/insider-plays-improvements.md) - Detection algorithm details

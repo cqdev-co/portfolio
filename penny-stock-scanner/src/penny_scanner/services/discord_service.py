@@ -197,6 +197,7 @@ class PennyDiscordNotifier:
         if scan_date:
             try:
                 from datetime import date as date_cls
+
                 if isinstance(scan_date, str):
                     scan_date = date_cls.fromisoformat(scan_date)
                 if scan_date.weekday() == 4:  # Friday
@@ -260,7 +261,11 @@ class PennyDiscordNotifier:
         # Market outperformance
         market_outperf = getattr(signal, "market_outperformance", None)
         if market_outperf is not None:
-            outperf_text = f"+{market_outperf:.1f}%" if market_outperf >= 0 else f"{market_outperf:.1f}%"
+            outperf_text = (
+                f"+{market_outperf:.1f}%"
+                if market_outperf >= 0
+                else f"{market_outperf:.1f}%"
+            )
             description_parts.append(f"\n📊 vs SPY: **{outperf_text}**")
 
         fields = [
@@ -310,11 +315,13 @@ class PennyDiscordNotifier:
         dist_from_low = getattr(signal, "distance_from_52w_low", None)
         dist_from_high = getattr(signal, "distance_from_52w_high", None)
         if dist_from_low is not None and dist_from_high is not None:
-            fields.append({
-                "name": "📍 52W Range",
-                "value": f"+{dist_from_low:.0f}% from low\n-{dist_from_high:.0f}% from high",
-                "inline": True,
-            })
+            fields.append(
+                {
+                    "name": "📍 52W Range",
+                    "value": f"+{dist_from_low:.0f}% from low\n-{dist_from_high:.0f}% from high",
+                    "inline": True,
+                }
+            )
 
         embed = DiscordEmbed(
             title=f"{emoji} {result.symbol} - {rank.value}-Tier Signal",
@@ -552,7 +559,6 @@ class PennyDiscordNotifier:
 
         return await self.send_message(embeds=embeds)
 
-
     async def send_weekly_performance_summary(
         self,
         win_rate: float,
@@ -631,17 +637,21 @@ class PennyDiscordNotifier:
         if best_trade or worst_trade:
             trades_fields = []
             if best_trade:
-                trades_fields.append({
-                    "name": "🏆 Best Trade",
-                    "value": f"**{best_trade['symbol']}** +{best_trade['return']:.1f}%",
-                    "inline": True,
-                })
+                trades_fields.append(
+                    {
+                        "name": "🏆 Best Trade",
+                        "value": f"**{best_trade['symbol']}** +{best_trade['return']:.1f}%",
+                        "inline": True,
+                    }
+                )
             if worst_trade:
-                trades_fields.append({
-                    "name": "📉 Worst Trade",
-                    "value": f"**{worst_trade['symbol']}** {worst_trade['return']:.1f}%",
-                    "inline": True,
-                })
+                trades_fields.append(
+                    {
+                        "name": "📉 Worst Trade",
+                        "value": f"**{worst_trade['symbol']}** {worst_trade['return']:.1f}%",
+                        "inline": True,
+                    }
+                )
 
             trades_embed = DiscordEmbed(
                 title="📋 Trade Highlights",

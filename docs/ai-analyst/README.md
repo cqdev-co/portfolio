@@ -3,7 +3,79 @@
 Your first "employee" at your personal hedge fund - an AI analyst that finds
 trades, makes recommendations, and helps you grow your options account.
 
-**Version 2.8.0**
+**Version 2.9.0**
+
+## What's New (v2.9.0) - Rate Limiting & New Analysis Tools
+
+### Yahoo Finance Proxy Support
+
+All Yahoo Finance requests now route through the Cloudflare Worker proxy to avoid
+IP-based rate limiting (429 errors). Falls back to direct API with exponential
+backoff retry if proxy is unavailable.
+
+**New File**: `ai-analyst/src/services/yahoo-client.ts`
+
+- Centralized Yahoo Finance client with proxy support
+- Automatic retry with exponential backoff (1s, 2s, 4s)
+- Rate limit tracking and graceful degradation
+- Used by all AI analyst commands
+
+### New Tools for Victor
+
+Two new tools added to help Victor verify user claims and calculate specific spreads:
+
+#### 1. `get_iv_by_strike` - Verify IV at Specific Strikes
+
+When user claims "I'm seeing spreads that aren't expensive at 49 DTE", Victor can
+now verify:
+
+```
+📊 IV FOR SNOW $200 STRIKE (49 DTE)
+• Call IV: 61.2%
+• Put IV: 63.5%
+• Expiration: 2026-02-28
+```
+
+#### 2. `calculate_spread` - Exact Spread Pricing
+
+When user proposes specific strikes (e.g. "$200/$205 CDS at 49 DTE"), Victor can
+calculate the exact pricing:
+
+```
+📊 SNOW $200/$205 CDS (49 DTE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stock: $219.54
+Expiry: 2026-02-28
+
+PRICING (per contract)
+• Long $200: Bid $22.10 / Ask $22.45
+• Short $205: Bid $18.50 / Ask $18.85
+• Est. Debit: $3.95 ($395 per contract)
+
+RISK/REWARD
+• Max Profit: $1.05 ($105)
+• Return on Risk: 26.6%
+• Breakeven: $203.95
+• Cushion: 7.1% (8.9% ITM)
+
+LIQUIDITY
+• Long OI: 1,234 | IV: 61.2%
+• Short OI: 892 | IV: 58.4%
+```
+
+### Enhanced Tool Instructions
+
+Victor's prompt now includes guidance on when to use the new tools:
+
+```
+### NEW: Verifying User Claims
+When user says "I'm seeing spreads that aren't expensive" or claims IV is lower:
+• USE get_iv_by_strike to verify IV at their specific strike and DTE
+• USE calculate_spread to get EXACT pricing for their proposed spread
+• Don't assume - verify with real data, then analyze
+```
+
+---
 
 ## What's New (v2.8.0) - Bug Fixes & Probability of Profit
 

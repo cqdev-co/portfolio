@@ -9,7 +9,13 @@
  *
  * PROXY SUPPORT: When YAHOO_PROXY_URL is set, routes requests through
  * Cloudflare Worker to bypass IP-based rate limiting.
+ *
+ * CACHING: Uses SessionCache for 60-second TTL caching of ticker data.
+ * This eliminates redundant fetches for the same ticker within a session.
  */
+
+import { sessionCache, CacheKeys, CACHE_TTL } from '../cache';
+import { log } from '../utils';
 
 import type {
   TickerData,
@@ -151,7 +157,7 @@ export function isYahooRateLimited(): boolean {
   if (!yahooRateLimited) return false;
   if (Date.now() > rateLimitExpiry) {
     yahooRateLimited = false;
-    console.log('[Yahoo] Rate limit cooldown expired, will try again');
+    log.debug('[Yahoo] Rate limit cooldown expired, will try again');
     return false;
   }
   return true;
@@ -163,7 +169,7 @@ export function isYahooRateLimited(): boolean {
 function setYahooRateLimited(): void {
   yahooRateLimited = true;
   rateLimitExpiry = Date.now() + RATE_LIMIT_COOLDOWN_MS;
-  console.log('[Yahoo] Rate limited - switching to Polygon fallback for 5 min');
+  log.debug('[Yahoo] Rate limited - switching to Polygon fallback for 5 min');
 }
 
 async function rateLimitedRequest<T>(
@@ -198,7 +204,7 @@ async function rateLimitedRequest<T>(
       if (isRateLimit) {
         if (attempt < retries - 1) {
           const delay = baseDelay * Math.pow(2, attempt);
-          console.log(
+          log.debug(
             `[Yahoo] Rate limited, waiting ${Math.round(delay / 1000)}s ` +
               `(attempt ${attempt + 1}/${retries})...`
           );
@@ -243,7 +249,7 @@ async function getYahooFinance() {
 function clearYahooCache(): void {
   yahooFinanceInstance = null;
   lastRequestTime = 0;
-  console.log('[Yahoo] Cache cleared');
+  log.debug('[Yahoo] Cache cleared');
 }
 
 // ============================================================================
@@ -258,7 +264,7 @@ async function fetchTickerDataViaProxy(
   ticker: string
 ): Promise<TickerData | null> {
   const symbol = ticker.toUpperCase();
-  console.log(
+  log.debug(
     `[Yahoo Proxy] Fetching ${symbol} via combined endpoint (1 request)...`
   );
 
@@ -266,26 +272,26 @@ async function fetchTickerDataViaProxy(
     // Use combined endpoint - 5x more efficient (1 request vs 5)
     const combined = await fetchAllViaProxy(symbol);
     if (!combined?.quote) {
-      console.log(`[Yahoo Proxy] No data for ${symbol}`);
+      log.debug(`[Yahoo Proxy] No data for ${symbol}`);
       return null;
     }
 
     const { quote, chart, earnings, analysts, shortInterest, options, news } =
       combined;
     const price = quote.price;
-    console.log(
+    log.debug(
       `[Yahoo Proxy] Got ${symbol}: $${price} (${combined.elapsed_ms}ms)`
     );
 
     // Debug: log what we got from proxy
-    console.log(`[Yahoo Proxy] Raw quote data:`, {
+    log.debug(`[Yahoo Proxy] Raw quote data:`, {
       marketCap: quote.marketCap,
       peRatio: quote.peRatio,
       beta: quote.beta,
       eps: quote.eps,
     });
-    console.log(`[Yahoo Proxy] Has analysts:`, !!analysts, analysts?.total);
-    console.log(`[Yahoo Proxy] Has options:`, !!options, options?.atmIV);
+    log.debug(`[Yahoo Proxy] Has analysts:`, !!analysts, analysts?.total);
+    log.debug(`[Yahoo Proxy] Has options:`, !!options, options?.atmIV);
 
     // Build ticker data from clean combined response
     // Convert null to undefined where needed (TickerData uses undefined for optional fields)
@@ -445,19 +451,71 @@ async function fetchTickerDataViaProxy(
       }
     }
 
+    // ================================================================
+    // PFV & SPREAD - Calculate using shared library (SAME AS CLI)
+    // These are expensive operations so they happen after basic data
+    // ================================================================
+    try {
+      log.debug(`[Yahoo Proxy] Calculating PFV for ${symbol}...`);
+
+      // Get PFV - this calculates psychological fair value from options data
+      const pfvResult = await getPsychologicalFairValue(symbol);
+      if (pfvResult) {
+        data.pfv = {
+          fairValue: pfvResult.fairValue,
+          bias: pfvResult.bias,
+          confidence: pfvResult.confidence,
+          deviationPercent: pfvResult.deviationPercent,
+        };
+        log.debug(
+          `[Yahoo Proxy] PFV for ${symbol}: $${pfvResult.fairValue.toFixed(2)} (${pfvResult.bias})`
+        );
+
+        // Get spread using PFV walls for context
+        const walls = extractWallsFromPFV(pfvResult);
+        const spreadContext = {
+          ma50: data.ma50,
+          ma200: data.ma200,
+          supportLevels: data.support ? [data.support] : undefined,
+          resistanceLevels: data.resistance ? [data.resistance] : undefined,
+          putWalls: walls.putWalls.length > 0 ? walls.putWalls : undefined,
+          callWalls: walls.callWalls.length > 0 ? walls.callWalls : undefined,
+        };
+
+        const spreadResult = await findSpreadWithAlternatives(
+          symbol,
+          30,
+          undefined,
+          spreadContext
+        );
+
+        if (spreadResult.primary) {
+          data.spread = spreadResult.primary;
+          log.debug(
+            `[Yahoo Proxy] Spread for ${symbol}: ` +
+              `$${spreadResult.primary.longStrike}/$${spreadResult.primary.shortStrike}, ` +
+              `${spreadResult.primary.cushion}% cushion`
+          );
+        }
+      }
+    } catch (pfvError) {
+      log.debug(`[Yahoo Proxy] PFV/Spread calculation failed:`, pfvError);
+      // Continue without PFV - basic data is still valuable
+    }
+
     // Calculate grade if we have enough data
     if (data.rsi && data.price) {
       data.grade = calculateTradeGrade(data);
     }
 
-    console.log(`[Yahoo Proxy] Successfully fetched ${symbol}`);
+    log.debug(`[Yahoo Proxy] Successfully fetched ${symbol}`);
     return data;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[Yahoo Proxy] Error fetching ${symbol}:`, msg);
 
     // Fall back to Polygon if proxy fails
-    console.log(`[Yahoo Proxy] Falling back to Polygon...`);
+    log.debug(`[Yahoo Proxy] Falling back to Polygon...`);
     return fetchTickerDataFromPolygon(ticker);
   }
 }
@@ -475,25 +533,49 @@ async function fetchTickerDataViaProxy(
  * 3. Polygon.io fallback (if Yahoo rate limited)
  *
  * Architecture optimized to minimize API calls:
+ * - Session caching with 60-second TTL (avoids redundant fetches)
  * - Options chain fetched ONCE and shared across IV/spread/PFV analysis
  * - Total: ~5-6 API calls instead of 15+
  */
 export async function fetchTickerData(
   ticker: string
 ): Promise<TickerData | null> {
+  const cacheKey = CacheKeys.ticker(ticker);
+
+  // CHECK CACHE FIRST - massive performance improvement for follow-up questions
+  const cached = sessionCache.get<TickerData>(cacheKey);
+  if (cached) {
+    const age = sessionCache.getAge(cacheKey);
+    log.debug(
+      `[Yahoo] Cache HIT for ${ticker} ` +
+        `(age: ${age ? Math.round(age / 1000) : 0}s)`
+    );
+    return cached;
+  }
+
+  log.debug(`[Yahoo] Cache MISS for ${ticker}, fetching...`);
+
   // PRIORITY 1: Use Cloudflare Worker proxy if configured
   if (isProxyConfigured()) {
-    console.log(`[Yahoo] Using Cloudflare Worker proxy for ${ticker}...`);
-    return fetchTickerDataViaProxy(ticker);
+    log.debug(`[Yahoo] Using Cloudflare Worker proxy for ${ticker}...`);
+    const data = await fetchTickerDataViaProxy(ticker);
+    if (data) {
+      sessionCache.set(cacheKey, data, CACHE_TTL.TICKER);
+    }
+    return data;
   }
 
   // PRIORITY 2: Check if Yahoo is rate limited
   if (isYahooRateLimited()) {
-    console.log(`[Yahoo] Currently rate limited, using Polygon fallback...`);
-    return fetchTickerDataFromPolygon(ticker);
+    log.debug(`[Yahoo] Currently rate limited, using Polygon fallback...`);
+    const data = await fetchTickerDataFromPolygon(ticker);
+    if (data) {
+      sessionCache.set(cacheKey, data, CACHE_TTL.TICKER);
+    }
+    return data;
   }
 
-  console.log(`[Yahoo] Fetching data for ${ticker} (direct)...`);
+  log.debug(`[Yahoo] Fetching data for ${ticker} (direct)...`);
 
   let yahooFinance;
   try {
@@ -504,19 +586,17 @@ export async function fetchTickerData(
   }
 
   try {
-    console.log(`[Yahoo] Calling quote API for ${ticker}...`);
+    log.debug(`[Yahoo] Calling quote API for ${ticker}...`);
     const quote = await rateLimitedRequest(() =>
       yahooFinance.quote(ticker.toUpperCase())
     );
 
     if (!quote?.regularMarketPrice) {
-      console.log(`[Yahoo] No price data for ${ticker}`);
+      log.debug(`[Yahoo] No price data for ${ticker}`);
       return null;
     }
 
-    console.log(
-      `[Yahoo] Got quote for ${ticker}: $${quote.regularMarketPrice}`
-    );
+    log.debug(`[Yahoo] Got quote for ${ticker}: $${quote.regularMarketPrice}`);
 
     const price = quote.regularMarketPrice;
     const change = quote.regularMarketChange ?? 0;
@@ -595,7 +675,7 @@ export async function fetchTickerData(
           );
           if (relStrength) {
             data.relativeStrength = relStrength;
-            console.log(
+            log.debug(
               `[Yahoo] Relative strength for ${ticker}: ${
                 relStrength.vsSPY > 0 ? '+' : ''
               }${relStrength.vsSPY}% vs SPY (${relStrength.trend})`
@@ -620,7 +700,7 @@ export async function fetchTickerData(
       // OPTIMIZED: Fetch options chain ONCE and share across all analysis
       // ================================================================
       try {
-        console.log(`[Yahoo] Fetching options data for ${ticker}...`);
+        log.debug(`[Yahoo] Fetching options data for ${ticker}...`);
 
         // SINGLE options chain fetch - shared across IV, spreads, PFV
         const optionsChain = await getOptionsChain(ticker, 30);
@@ -648,9 +728,7 @@ export async function fetchTickerData(
                   : 'neutral';
 
             data.optionsFlow = { pcRatioOI, pcRatioVol, sentiment };
-            console.log(
-              `[Yahoo] Options flow: P/C ${pcRatioOI} (${sentiment})`
-            );
+            log.debug(`[Yahoo] Options flow: P/C ${pcRatioOI} (${sentiment})`);
           }
         }
 
@@ -668,7 +746,7 @@ export async function fetchTickerData(
           const walls = extractWallsFromPFV(pfvResult);
           putWalls = walls.putWalls.length > 0 ? walls.putWalls : undefined;
           callWalls = walls.callWalls.length > 0 ? walls.callWalls : undefined;
-          console.log(
+          log.debug(
             `[Yahoo] PFV for ${ticker}: $${pfvResult.fairValue.toFixed(2)} (${pfvResult.bias})`
           );
         }
@@ -692,7 +770,7 @@ export async function fetchTickerData(
         );
 
         if (ivResult) {
-          console.log(
+          log.debug(
             `[Yahoo] Got REAL IV for ${ticker}: ${ivResult.currentIV}%`
           );
           data.iv = {
@@ -708,7 +786,7 @@ export async function fetchTickerData(
                   : 'fair',
           };
         } else {
-          console.log(
+          log.debug(
             `[Yahoo] No options IV available for ${ticker}, using HV fallback`
           );
           // Fallback to HV-based estimate if options unavailable
@@ -738,7 +816,7 @@ export async function fetchTickerData(
 
         if (spreadResult.primary) {
           const spread = spreadResult.primary;
-          console.log(
+          log.debug(
             `[Yahoo] Got REAL spread for ${ticker}: ` +
               `$${spread.longStrike}/$${spread.shortStrike}, ` +
               `${spread.cushion}% cushion`
@@ -747,17 +825,17 @@ export async function fetchTickerData(
 
           // Log alternatives if any (useful for debugging)
           if (spreadResult.alternatives.length > 0) {
-            console.log(
+            log.debug(
               `[Yahoo] Spread alternatives: ${spreadResult.alternatives
                 .map((a) => `$${a.longStrike}/$${a.shortStrike}`)
                 .join(', ')}`
             );
           }
           if (spreadResult.reason) {
-            console.log(`[Yahoo] Spread note: ${spreadResult.reason}`);
+            log.debug(`[Yahoo] Spread note: ${spreadResult.reason}`);
           }
         } else {
-          console.log(
+          log.debug(
             `[Yahoo] No viable spread for ${ticker} - options too expensive or illiquid`
           );
           // Explicitly tell the AI there's no viable spread
@@ -781,6 +859,12 @@ export async function fetchTickerData(
       // Continue with basic data if additional fetches fail
     }
 
+    // Cache the result before returning
+    sessionCache.set(cacheKey, data, CACHE_TTL.TICKER);
+    log.debug(
+      `[Yahoo] Cached ${ticker} data (TTL: ${CACHE_TTL.TICKER / 1000}s)`
+    );
+
     return data;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -793,8 +877,12 @@ export async function fetchTickerData(
       errorMsg.toLowerCase().includes('crumb');
 
     if (isRateLimit) {
-      console.log(`[Yahoo] Rate limited - falling back to Polygon...`);
-      return fetchTickerDataFromPolygon(ticker);
+      log.debug(`[Yahoo] Rate limited - falling back to Polygon...`);
+      const fallbackData = await fetchTickerDataFromPolygon(ticker);
+      if (fallbackData) {
+        sessionCache.set(cacheKey, fallbackData, CACHE_TTL.TICKER);
+      }
+      return fallbackData;
     }
 
     return null;

@@ -6,6 +6,7 @@
  */
 
 import type { TickerData, NewsItem } from './types';
+import { log } from '../utils';
 
 // ============================================================================
 // CONFIGURATION
@@ -200,7 +201,7 @@ async function proxyFetch<T>(endpoint: string): Promise<T> {
   }
 
   const url = `${baseUrl}${endpoint}`;
-  console.log(`[Yahoo Proxy] Fetching: ${endpoint}`);
+  log.debug(`[Yahoo Proxy] Fetching: ${endpoint}`);
 
   const response = await fetch(url);
 
@@ -228,7 +229,7 @@ export async function fetchQuoteViaProxy(
     );
 
     if (data.quoteResponse?.error) {
-      console.log(
+      log.debug(
         `[Yahoo Proxy] Quote error: ${data.quoteResponse.error.description}`
       );
       return null;
@@ -261,7 +262,7 @@ export async function fetchChartViaProxy(
     );
 
     if (data.chart?.error) {
-      console.log(`[Yahoo Proxy] Chart error: ${data.chart.error.description}`);
+      log.debug(`[Yahoo Proxy] Chart error: ${data.chart.error.description}`);
       return null;
     }
 
@@ -317,7 +318,7 @@ export async function fetchOptionsViaProxy(
     const data = await proxyFetch<ProxyOptionsResponse>(endpoint);
 
     if (data.optionChain?.error) {
-      console.log(
+      log.debug(
         `[Yahoo Proxy] Options error: ${data.optionChain.error.description}`
       );
       return null;
@@ -346,7 +347,7 @@ export async function fetchSummaryViaProxy(
     const data = await proxyFetch<ProxySummaryResponse>(endpoint);
 
     if (data.quoteSummary?.error) {
-      console.log(
+      log.debug(
         `[Yahoo Proxy] Summary error: ${data.quoteSummary.error.description}`
       );
       return null;
@@ -546,19 +547,19 @@ export async function fetchAllViaProxy(
     );
 
     if (!data.quote) {
-      console.log(`[Yahoo Proxy] No quote data in combined response`);
+      log.debug(`[Yahoo Proxy] No quote data in combined response`);
       return null;
     }
 
-    console.log(`[Yahoo Proxy] Combined fetch: ${data.elapsed_ms}ms`);
+    log.debug(`[Yahoo Proxy] Combined fetch: ${data.elapsed_ms}ms`);
 
     // Debug: dump what proxy returned
-    console.log(`[Yahoo Proxy] Response keys:`, Object.keys(data));
-    console.log(
+    log.debug(`[Yahoo Proxy] Response keys:`, Object.keys(data));
+    log.debug(
       `[Yahoo Proxy] Quote fields:`,
       data.quote ? Object.keys(data.quote) : 'none'
     );
-    console.log(
+    log.debug(
       `[Yahoo Proxy] Quote sample:`,
       JSON.stringify({
         marketCap: data.quote?.marketCap,
@@ -567,15 +568,15 @@ export async function fetchAllViaProxy(
         eps: data.quote?.eps,
       })
     );
-    console.log(
+    log.debug(
       `[Yahoo Proxy] Analysts:`,
       data.analysts ? JSON.stringify(data.analysts) : 'null/undefined'
     );
-    console.log(
+    log.debug(
       `[Yahoo Proxy] Options:`,
       data.options ? 'present' : 'null/undefined'
     );
-    console.log(
+    log.debug(
       `[Yahoo Proxy] Errors:`,
       data.errors ? JSON.stringify(data.errors) : 'none'
     );

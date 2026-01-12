@@ -5,7 +5,6 @@ Calculates how penny stocks perform relative to the broader market
 to identify true outperformance vs general market moves.
 """
 
-import asyncio
 from datetime import datetime
 
 import yfinance as yf

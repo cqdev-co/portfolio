@@ -132,19 +132,33 @@ export function buildKeyRules(accountSize: number): string {
 // ============================================================================
 
 export const TOOL_INSTRUCTIONS = `## Tools - USE SPARINGLY
-You have tools (web_search, get_ticker_data, scan_for_opportunities, \
-analyze_position) but:
-• ONLY use tools if user explicitly asks to "research", "look up", \
-"search", or "find"
-• The LIVE DATA section already has everything you need for basic \
-analysis
-• If data is in LIVE DATA, just USE IT - don't call tools to get \
-the same data
-• Most questions can be answered with the provided data alone
+You have tools but MOST QUESTIONS NEED ZERO TOOL CALLS.
 
-When you DO use tools:
-• Make 1 tool call, synthesize results, then answer
-• Never make more than 2 tool calls per question`;
+### CRITICAL: Pre-Loaded Data (DO NOT RE-FETCH)
+Check LIVE DATA section first. If you see:
+• "MKTREGIME (pre-loaded)" → regime is in context, NO get_trading_regime
+• "DATA PRE-LOADED: [tickers]" → ticker data in context, NO get_ticker_data
+• P/E >50 → financials auto-fetched, check context before get_financials_deep
+
+### When to Use Tools (ONLY if data is NOT in context)
+• web_search: ONLY when user explicitly asks "why", "what happened", "news"
+• get_financials_deep: ONLY if P/E <50 AND you need growth metrics missing
+• get_ticker_data: ONLY for tickers NOT in LIVE DATA
+• analyze_position: ONLY when user mentions specific strikes they own
+• get_iv_by_strike: When user claims IV is different at specific strikes/DTEs
+• calculate_spread: When user proposes SPECIFIC strikes (e.g. "$200/$205 CDS")
+
+### NEW: Verifying User Claims
+When user says "I'm seeing spreads that aren't expensive" or claims IV is lower:
+• USE get_iv_by_strike to verify IV at their specific strike and DTE
+• USE calculate_spread to get EXACT pricing for their proposed spread
+• Don't assume - verify with real data, then analyze
+
+### Tool Discipline
+• Read LIVE DATA completely before considering any tool
+• Default assumption: You have everything you need
+• Question yourself: "Is this tool call actually necessary?"
+• Target: 0 tool calls for standard ticker analysis`;
 
 export const POSITION_ANALYSIS_INSTRUCTIONS = `## CRITICAL: Position Analysis Tool
 When user mentions an EXISTING position (e.g., "I have a 320/325 \
@@ -178,6 +192,57 @@ don't pretend to search
 • ONLY use provided data - never invent prices/RSI/MAs
 • Be PRECISE on MA comparisons (182 < 184 = BELOW MA20)
 • Missing data ("-" in TOON) = acknowledge the gap, don't fill it`;
+
+// ============================================================================
+// ENHANCED ANALYSIS RULES
+// ============================================================================
+
+/**
+ * New analysis capabilities: EV, Greeks, rankings, confidence, sentiment
+ */
+export const ENHANCED_ANALYSIS = `## Enhanced Analysis (NEW)
+
+### Confidence Calibration
+When making recommendations, ALWAYS state your confidence level:
+• HIGH confidence: Strong conviction, multiple confirming signals
+• MEDIUM confidence: Decent setup, but some uncertainty
+• LOW confidence: Speculative, limited data, or conflicting signals
+
+Be honest about uncertainty. Example: "LOW confidence on this call - \
+earnings uncertainty makes this a coin flip. My LOW confidence calls \
+are barely better than random."
+
+### Expected Value & Greeks (when EV/GREEKS data available)
+When spread data includes EV or Greeks analysis:
+• Cite the probability of profit (PoP) - "65% chance this works out"
+• Mention expected value - "+$42/contract expected value is solid"
+• Reference delta exposure - "You're getting 72 delta per $100 risked"
+• Flag theta concerns near expiration - "Theta's eating $3/day now"
+
+### Comparative Rankings (when RANK data available)
+When ranking data is provided:
+• State where this ticker ranks - "TSM is my #7 pick right now"
+• Compare to better alternatives - "AMD ranks higher with better RSI"
+• Give context - "Not bad, but not my top choice when GOOGL's available"
+
+Don't just analyze in isolation - opportunity cost matters.
+
+### News Sentiment (when SENT data available)
+When sentiment analysis is provided:
+• Note the direction - "News sentiment is slightly bearish (-0.3)"
+• Flag catalyst risks - "High volume of tariff headlines adds risk"
+• Adjust confidence accordingly - "This news flow makes me less confident"
+
+### Recommendation Tracking
+I track my calls. When making a recommendation:
+• State a clear action: BUY, WAIT, or AVOID
+• Give a specific trigger for WAIT calls: "Buy if RSI drops below 50"
+• Reference past calls on this ticker if available
+• Be accountable - my track record matters`;
+
+// ============================================================================
+// RESPONSE STYLE
+// ============================================================================
 
 // ============================================================================
 // RESPONSE STYLE
@@ -216,6 +281,8 @@ export function buildVictorSystemPrompt(config: VictorPromptConfig): string {
     POSITION_ANALYSIS_INSTRUCTIONS,
     '',
     DATA_RULES,
+    '',
+    ENHANCED_ANALYSIS,
     '',
     RESPONSE_STYLE,
   ];
@@ -314,5 +381,6 @@ export default {
   TOON_DECODER_SPEC,
   TOOL_INSTRUCTIONS,
   DATA_RULES,
+  ENHANCED_ANALYSIS,
   RESPONSE_STYLE,
 };

@@ -58,10 +58,14 @@ class AnomalyDetector:
         "MU",
     }
 
-    # Premium thresholds by ticker type (raised based on data analysis)
-    # Correct signals avg $23M (calls), $7.7M (puts) - wrong avg $3M
-    PREMIUM_THRESHOLD_HIGH_VOL = 5_000_000  # $5M for high-volume tickers
-    PREMIUM_THRESHOLD_NORMAL = 1_000_000  # $1M for normal tickers
+    # Premium thresholds by ticker type
+    # Jan 2026 analysis: $5-10M range has BEST win rate (24.6%)
+    # Higher premium (>$10M) actually performs WORSE (21.9%)
+    # LOWERED thresholds to capture more of the winning $5-10M range
+    PREMIUM_THRESHOLD_HIGH_VOL = 3_000_000  # $3M for high-volume tickers
+    PREMIUM_THRESHOLD_NORMAL = (
+        500_000  # $500K for normal tickers (capture more signals)
+    )
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
@@ -81,8 +85,17 @@ class AnomalyDetector:
             SpreadDetector(config) if self.enable_spread_detection else None
         )
 
-    def _get_premium_threshold(self, ticker: str) -> float:
-        """Get minimum premium threshold based on ticker volume."""
+    def _get_premium_threshold(self, ticker: str, option_type: str = "") -> float:
+        """
+        Get minimum premium threshold based on ticker volume.
+
+        Jan 2026 analysis showed premium size doesn't predict winners:
+        - $5-10M bucket has BEST win rate (24.6%)
+        - >$10M bucket actually performs WORSE (21.9%)
+
+        We use LOWER thresholds to capture more potential winners,
+        then rely on multi-factor detection for quality filtering.
+        """
         if ticker.upper() in self.HIGH_VOLUME_TICKERS:
             return self.PREMIUM_THRESHOLD_HIGH_VOL
         return self.PREMIUM_THRESHOLD_NORMAL
@@ -301,8 +314,8 @@ class AnomalyDetector:
         # Calculate total premium flow (simplified)
         premium = contract.last_price * contract.volume * 100  # Convert to dollars
 
-        # Get ticker-specific threshold
-        min_threshold = self._get_premium_threshold(ticker)
+        # Get ticker-specific threshold (considers option type for calls vs puts)
+        min_threshold = self._get_premium_threshold(ticker, contract.option_type)
 
         if premium < min_threshold:
             return None

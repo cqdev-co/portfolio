@@ -886,7 +886,7 @@ export function formatRegimeBadge(analysis: TradingRegimeAnalysis): string {
 }
 
 /**
- * Format regime for AI context
+ * Format regime for AI context (verbose)
  */
 export function formatRegimeForAI(analysis: TradingRegimeAnalysis): string {
   const lines: string[] = [];
@@ -926,6 +926,58 @@ export function formatRegimeForAI(analysis: TradingRegimeAnalysis): string {
   lines.push(`→ ${analysis.recommendation}`);
 
   return lines.join('\n');
+}
+
+/**
+ * Format regime in TOON format (~80% token reduction)
+ * Example: REGIME:GO|80%|VIX:15.45:N|SPY:B|BR:85%|STR:STRONG|→Risk-On,normal
+ */
+export function formatRegimeTOON(analysis: TradingRegimeAnalysis): string {
+  const parts: string[] = [];
+
+  // Core: REGIME:GO|80%
+  parts.push(`REGIME:${analysis.regime}|${analysis.confidence}%`);
+
+  // VIX: VIX:15.45:N (N=normal, H=high, E=elevated, L=low)
+  const vixShort =
+    analysis.metrics.vixLevel === 'NORMAL'
+      ? 'N'
+      : analysis.metrics.vixLevel === 'HIGH'
+        ? 'H'
+        : analysis.metrics.vixLevel === 'ELEVATED'
+          ? 'E'
+          : 'L';
+  parts.push(`VIX:${analysis.vix?.current ?? 0}:${vixShort}`);
+
+  // SPY: SPY:B (B=bullish, Be=bearish, N=neutral)
+  const spyShort =
+    analysis.metrics.spyTrend === 'BULLISH'
+      ? 'B'
+      : analysis.metrics.spyTrend === 'BEARISH'
+        ? 'Be'
+        : 'N';
+  parts.push(`SPY:${spyShort}`);
+
+  // Breadth: BR:85%
+  if (analysis.metrics.breadthScore !== undefined) {
+    parts.push(`BR:${Math.round(analysis.metrics.breadthScore)}%`);
+  }
+
+  // Trend: STR:STRONG
+  parts.push(`STR:${analysis.metrics.trendStrength}`);
+
+  // Conflict: CONF:0%
+  if (analysis.metrics.conflictScore > 0) {
+    parts.push(`CONF:${analysis.metrics.conflictScore}%`);
+  }
+
+  // Short recommendation (first 50 chars)
+  const shortRec = analysis.recommendation
+    .substring(0, 50)
+    .replace(/\s+/g, ' ');
+  parts.push(`→${shortRec}`);
+
+  return parts.join('|');
 }
 
 /**
@@ -977,6 +1029,7 @@ export default {
   getRegimeEmoji,
   formatRegimeBadge,
   formatRegimeForAI,
+  formatRegimeTOON,
   formatWeeklySummary,
   detectRegimeTransition,
   formatTransitionWarning,

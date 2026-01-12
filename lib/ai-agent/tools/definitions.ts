@@ -209,6 +209,74 @@ export const GET_TRADING_REGIME_TOOL: AgentTool = {
   },
 };
 
+/**
+ * Get IV by strike - fetch IV for specific option strike and expiration
+ */
+export const GET_IV_BY_STRIKE_TOOL: AgentTool = {
+  name: 'get_iv_by_strike',
+  description:
+    'Fetch implied volatility for a specific strike price and target DTE. ' +
+    'Use this to verify IV claims for specific options, check IV term ' +
+    'structure across expirations, or compare IV at different strikes. ' +
+    'Returns call IV, put IV, actual DTE, and expiration date.',
+  parameters: {
+    type: 'object',
+    required: ['ticker', 'strike'],
+    properties: {
+      ticker: {
+        type: 'string',
+        description: 'Stock ticker symbol (e.g. NVDA, AAPL, TSLA)',
+      },
+      strike: {
+        type: 'number',
+        description: 'Strike price to check (e.g. 200, 225)',
+      },
+      targetDTE: {
+        type: 'number',
+        description:
+          'Target days to expiration. Defaults to 30. Will find ' +
+          'the closest available expiration.',
+      },
+    },
+  },
+};
+
+/**
+ * Calculate spread - get exact pricing for user-specified spread
+ */
+export const CALCULATE_SPREAD_TOOL: AgentTool = {
+  name: 'calculate_spread',
+  description:
+    'Calculate exact pricing for a user-specified call debit spread. ' +
+    'Use this when the user proposes specific strikes (e.g. "$200/$205 ' +
+    'CDS at 49 DTE"). Returns real bid/ask, debit, max profit, breakeven, ' +
+    'cushion, IV for both legs, and open interest.',
+  parameters: {
+    type: 'object',
+    required: ['ticker', 'longStrike', 'shortStrike'],
+    properties: {
+      ticker: {
+        type: 'string',
+        description: 'Stock ticker symbol (e.g. NVDA, AAPL, TSLA)',
+      },
+      longStrike: {
+        type: 'number',
+        description: 'Long call strike (lower strike, bought)',
+      },
+      shortStrike: {
+        type: 'number',
+        description: 'Short call strike (higher strike, sold)',
+      },
+      targetDTE: {
+        type: 'number',
+        description:
+          'Target days to expiration. Defaults to 30. Will find ' +
+          'the closest available expiration.',
+      },
+    },
+  },
+};
+
 // ============================================================================
 // TOOL COLLECTIONS
 // ============================================================================
@@ -223,6 +291,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   GET_INSTITUTIONAL_HOLDINGS_TOOL,
   GET_UNUSUAL_OPTIONS_TOOL,
   GET_TRADING_REGIME_TOOL,
+  GET_IV_BY_STRIKE_TOOL,
+  CALCULATE_SPREAD_TOOL,
 ];
 
 /**
@@ -293,6 +363,8 @@ export default {
   GET_INSTITUTIONAL_HOLDINGS_TOOL,
   GET_UNUSUAL_OPTIONS_TOOL,
   GET_TRADING_REGIME_TOOL,
+  GET_IV_BY_STRIKE_TOOL,
+  CALCULATE_SPREAD_TOOL,
   toOllamaTools,
   getToolByName,
   filterTools,

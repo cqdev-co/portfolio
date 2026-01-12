@@ -2,7 +2,7 @@
 
 **Location**: `lib/ai-agent/`  
 **Status**: Active  
-**Updated**: December 28, 2025
+**Updated**: January 8, 2026
 
 ## Overview
 
@@ -18,6 +18,8 @@ lib/ai-agent/
 ├── index.ts              # Main exports
 ├── classification.ts     # Question classification
 ├── package.json          # Dependencies (yahoo-finance2, @toon-format/toon)
+├── cache/
+│   └── index.ts          # Session-level caching with TTL
 ├── prompts/
 │   ├── index.ts          # Prompt exports
 │   └── victor.ts         # Victor Chen persona
@@ -28,9 +30,20 @@ lib/ai-agent/
 │   ├── index.ts          # Data exports
 │   ├── types.ts          # TickerData interface
 │   ├── yahoo.ts          # Yahoo Finance fetching
+│   ├── yahoo-proxy.ts    # Cloudflare Worker proxy integration
 │   └── formatters.ts     # AI-friendly formatting
 ├── handlers/
 │   └── index.ts          # Tool execution handlers
+├── market/
+│   ├── index.ts          # Market regime detection (VIX, SPY, sectors)
+│   ├── chop-index.ts     # Chop/ATR/ADX indicators
+│   ├── no-trade-regime.ts # Trading regime analysis
+│   └── market-breadth.ts # Market breadth indicators
+├── pfv/
+│   └── index.ts          # Psychological Fair Value calculation
+├── options/
+│   ├── spreads.ts        # Spread recommendations
+│   └── types.ts          # Options-related types
 └── toon/
     └── index.ts          # TOON encoding for token efficiency
 ```
@@ -756,6 +769,74 @@ data.sectorContext = {
 };
 ```
 
+## Session Cache (`cache/`)
+
+**NEW - January 8, 2026**
+
+In-memory caching system with TTL support to reduce redundant API calls.
+
+### Usage
+
+```typescript
+import { sessionCache, CacheKeys, CACHE_TTL } from 'lib/ai-agent';
+
+// Get or fetch with automatic caching
+const data = await sessionCache.getOrFetch(
+  CacheKeys.ticker('NVDA'),
+  () => fetchTickerData('NVDA'),
+  CACHE_TTL.TICKER
+);
+
+// Manual cache operations
+sessionCache.set('custom:key', value, 60000); // 60 second TTL
+const cached = sessionCache.get<MyType>('custom:key');
+sessionCache.invalidate('custom:key');
+
+// Stats
+const stats = sessionCache.getStats();
+console.log(`Hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+```
+
+### Cache Keys & TTLs
+
+| Key              | TTL    | Description               |
+| ---------------- | ------ | ------------------------- |
+| `ticker:{NVDA}`  | 60s    | Price/technicals change   |
+| `regime`         | 5 min  | VIX/SPY relatively stable |
+| `pfv:{NVDA}`     | 5 min  | Expensive calculation     |
+| `options:{NVDA}` | 2 min  | More volatile             |
+| `trades`         | 30 min | Rarely changes            |
+| `web:{query}`    | 10 min | Search results            |
+
+### What's Cached
+
+- ✅ Ticker data (`fetchTickerData`) - 60s TTL
+- ✅ Market regime (`getMarketRegime`) - 5 min TTL
+- ✅ PFV calculations (`getPsychologicalFairValue`) - 5 min TTL
+
+---
+
+## CLI Uses Shared Library
+
+**IMPORTANT - January 8, 2026**
+
+The CLI (`ai-analyst`) now uses the shared library for market regime detection
+instead of its own implementation. This ensures consistent behavior across
+CLI and Frontend.
+
+```typescript
+// ai-analyst/src/services/market-regime.ts
+// Simply re-exports from shared library
+export {
+  type MarketRegime,
+  getMarketRegime,
+  formatRegimeForAI,
+  getRegimeBadge,
+} from '../../../lib/ai-agent/market/index';
+```
+
+---
+
 ## Future Enhancements
 
 - [x] Move TOON encoder to `lib/ai-agent/toon/` ✅ (December 2025)
@@ -769,6 +850,9 @@ data.sectorContext = {
 - [x] Earnings beat/miss history ✅ (December 28, 2025)
 - [x] Sector P/E comparison ✅ (December 28, 2025)
 - [x] Direct monorepo import ✅ (achieved via `turbopack.root`)
+- [x] Session cache with TTL ✅ (January 8, 2026)
+- [x] CLI uses shared market regime ✅ (January 8, 2026)
+- [x] PFV integrated into proxy path ✅ (January 8, 2026)
 - [ ] Move full TOON context builder (trade history, patterns)
 - [ ] Add conversation summarization
 - [ ] Scanner service (quickScan, fullScan)

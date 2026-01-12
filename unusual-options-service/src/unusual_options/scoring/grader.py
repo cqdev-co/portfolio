@@ -5,7 +5,11 @@ from typing import Any
 from loguru import logger
 
 from ..scanner.detector import Detection
-from ..storage.models import UnusualOptionsSignal
+from ..storage.models import (
+    CLASSIFICATION_WIN_RATES,
+    SignalClassification,
+    UnusualOptionsSignal,
+)
 
 
 class SignalGrader:
@@ -162,10 +166,18 @@ class SignalGrader:
         # Set sentiment based on option type and moneyness
         signal.sentiment = self._calculate_sentiment(signal)
 
+        # Classify signal based on data-driven analysis (Jan 2026)
+        classification, reason, factors = self._classify_signal(signal)
+        signal.signal_classification = classification.value
+        signal.classification_reason = reason
+        signal.classification_factors = factors
+        signal.predicted_win_rate = CLASSIFICATION_WIN_RATES.get(classification)
+
         logger.info(
             f"Created signal: {ticker} {contract.symbol} "
             f"Grade: {signal.grade} Score: {signal.overall_score:.3f} "
-            f"Conviction: {conviction_adjustment:+.3f}"
+            f"Classification: {classification.value} "
+            f"Predicted Win: {signal.predicted_win_rate or 'N/A'}"
         )
 
         return signal
@@ -225,6 +237,20 @@ class SignalGrader:
             if premium < self.HIGH_CONVICTION_PREMIUM:
                 adjustment -= 0.05  # Extra penalty for low premium on noisy tickers
 
+        # 5. Option type adjustment (Jan 2026 analysis)
+        # PUTS: 60% win rate - BOOST these signals
+        # CALLS: 8.6% win rate - heavy penalty
+        if signal.option_type == "put":
+            adjustment += 0.15  # Bonus for puts (they actually work!)
+            # Additional bonus for ATM puts 8-14 DTE (61.5% win rate sweet spot)
+            if signal.moneyness == "ATM" and 8 <= dte <= 14:
+                adjustment += 0.10  # Sweet spot bonus
+        else:  # call
+            adjustment -= 0.15  # Heavy penalty for calls (8.6% win rate)
+            # Additional penalty for OTM calls (lottery ticket pattern)
+            if signal.moneyness == "OTM":
+                adjustment -= 0.08
+
         logger.debug(
             f"Conviction adjustment for {signal.ticker}: {adjustment:+.3f} "
             f"(premium=${premium / 1e6:.1f}M, DTE={dte}, "
@@ -250,6 +276,156 @@ class SignalGrader:
                 return "BEARISH"
             else:  # ITM puts
                 return "NEUTRAL"  # Could be protective put
+
+    def _classify_signal(
+        self, signal: UnusualOptionsSignal
+    ) -> tuple[SignalClassification, str, list[str]]:
+        """
+        Classify signal based on historical win rate analysis.
+
+        Jan 2026 Analysis Results:
+        - PUT signals: 60% win rate
+        - CALL signals: 8.6% win rate
+        - PUT ATM 8-14 DTE: 61.5% win rate (sweet spot)
+        - PUT ITM 8-14 DTE: 56.2% win rate
+
+        Returns:
+            Tuple of (classification, reason, factors)
+        """
+        factors = []
+        dte = signal.days_to_expiry or 30
+
+        # Collect classification factors
+        factors.append(f"option_type={signal.option_type}")
+        factors.append(f"moneyness={signal.moneyness}")
+        factors.append(f"dte={dte}")
+
+        # Check for hedge patterns first
+        if self._is_likely_hedge_pattern(signal):
+            return (
+                SignalClassification.LIKELY_HEDGE,
+                self._get_hedge_reason(signal),
+                factors + ["hedge_pattern_detected"],
+            )
+
+        # PUT signals - historically 60% win rate
+        if signal.option_type == "put":
+            # Sweet spot: PUT ATM 8-14 DTE (61.5% win rate)
+            if signal.moneyness == "ATM" and 8 <= dte <= 14:
+                return (
+                    SignalClassification.HIGH_CONVICTION,
+                    "PUT + ATM + 8-14 DTE (61.5% historical win rate - sweet spot)",
+                    factors + ["put_atm_sweet_spot"],
+                )
+
+            # Strong: PUT ITM 8-14 DTE (56.2% win rate)
+            if signal.moneyness == "ITM" and 8 <= dte <= 14:
+                return (
+                    SignalClassification.HIGH_CONVICTION,
+                    "PUT + ITM + 8-14 DTE (56.2% historical win rate)",
+                    factors + ["put_itm_strong"],
+                )
+
+            # Good: PUT ATM/ITM 7-21 DTE
+            if signal.moneyness in ["ATM", "ITM"] and 7 <= dte <= 21:
+                return (
+                    SignalClassification.HIGH_CONVICTION,
+                    f"PUT + {signal.moneyness} + {dte} DTE (~60% historical win rate)",
+                    factors + ["put_favorable_setup"],
+                )
+
+            # Moderate: Other PUT setups
+            if signal.moneyness in ["ATM", "ITM"]:
+                return (
+                    SignalClassification.MODERATE,
+                    f"PUT + {signal.moneyness} (~40-50% win rate, DTE outside sweet spot)",
+                    factors + ["put_moderate_setup"],
+                )
+
+            # OTM puts - less reliable but still puts
+            if signal.moneyness == "OTM":
+                return (
+                    SignalClassification.MODERATE,
+                    "PUT + OTM (speculative, but puts historically outperform calls)",
+                    factors + ["put_otm_speculative"],
+                )
+
+        # CALL signals - historically only 8.6% win rate
+        if signal.option_type == "call":
+            # OTM calls are especially bad
+            if signal.moneyness == "OTM":
+                return (
+                    SignalClassification.CONTRARIAN,
+                    "CALL + OTM (8.6% win rate - consider fading or ignoring)",
+                    factors + ["call_otm_contrarian"],
+                )
+
+            # ATM/ITM calls are slightly less bad
+            return (
+                SignalClassification.CONTRARIAN,
+                f"CALL + {signal.moneyness} (8.6% win rate - likely selling/hedging activity)",
+                factors + ["call_contrarian"],
+            )
+
+        # Fallback - informational only
+        return (
+            SignalClassification.INFORMATIONAL,
+            "Unusual activity detected - direction unclear",
+            factors + ["unclassified_fallback"],
+        )
+
+    def _is_likely_hedge_pattern(self, signal: UnusualOptionsSignal) -> bool:
+        """
+        Check if signal matches common hedge patterns.
+
+        Hedge patterns:
+        - Index ETF puts (SPY, QQQ, IWM)
+        - Far OTM puts with long DTE (protective puts)
+        - Mega-cap OTM puts with 30+ DTE
+        """
+        dte = signal.days_to_expiry or 30
+
+        # Index ETF puts are usually hedges
+        index_etfs = {"SPY", "QQQ", "IWM", "DIA", "VXX", "UVXY"}
+        if signal.ticker in index_etfs and signal.option_type == "put":
+            if dte >= 21:
+                return True
+
+        # Sector ETF puts with long DTE
+        sector_etfs = {"XLF", "XLE", "XLK", "XLV", "XBI", "SMH", "GDX"}
+        if signal.ticker in sector_etfs and signal.option_type == "put":
+            if dte >= 30:
+                return True
+
+        # Far OTM puts with very long DTE (protective puts)
+        if signal.option_type == "put" and signal.moneyness == "OTM":
+            if dte >= 60:
+                return True
+
+        # Mega-cap OTM puts with medium+ DTE
+        mega_caps = {"AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"}
+        if signal.ticker in mega_caps and signal.option_type == "put":
+            if signal.moneyness == "OTM" and dte >= 45:
+                return True
+
+        return False
+
+    def _get_hedge_reason(self, signal: UnusualOptionsSignal) -> str:
+        """Get explanation for why signal is classified as hedge."""
+        dte = signal.days_to_expiry or 30
+
+        index_etfs = {"SPY", "QQQ", "IWM", "DIA", "VXX", "UVXY"}
+        if signal.ticker in index_etfs:
+            return f"Index ETF PUT ({signal.ticker}) - likely portfolio hedge"
+
+        sector_etfs = {"XLF", "XLE", "XLK", "XLV", "XBI", "SMH", "GDX"}
+        if signal.ticker in sector_etfs:
+            return f"Sector ETF PUT ({signal.ticker}) - likely sector hedge"
+
+        if dte >= 60:
+            return f"Far-dated PUT ({dte} DTE) - likely protective positioning"
+
+        return "PUT pattern suggests institutional hedging, not directional bet"
 
     def _calculate_overall_score(self, detection_metrics: dict[str, float]) -> float:
         """
@@ -290,9 +466,12 @@ class SignalGrader:
             bonus = 0.0  # Single detection type gets no bonus
 
         # PENALTY for single detection type (most are just premium flow)
+        # Jan 2026 analysis: Premium size doesn't predict winners
+        # Option type (put vs call) is the real predictor
+        # Keep moderate penalty - multi-factor still preferred but not critical
         single_type_penalty = 0.0
         if detection_count == 1:
-            single_type_penalty = 0.10  # Penalize single-factor signals
+            single_type_penalty = 0.08  # Moderate penalty for single-factor
 
         # Apply penalty for heuristic-only detections
         heuristic_penalty = 0.0

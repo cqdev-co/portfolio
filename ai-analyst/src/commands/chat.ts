@@ -65,6 +65,18 @@ import {
   type MarketRegime as MarketRegimeData,
 } from '../services/market-regime.ts';
 import {
+  analyzeTradingRegime,
+  formatTradingRegimeForAI,
+  formatTradingRegimeTOON,
+  type TradingRegimeAnalysis,
+} from '../../../lib/ai-agent/market/index.ts';
+import {
+  encodeSearchToTOON as libEncodeSearchToTOON,
+  encodeTickerToTOON as libEncodeTickerToTOON,
+} from '../../../lib/ai-agent/toon/index.ts';
+import { sessionCache } from '../../../lib/ai-agent/cache/index.ts';
+import { log } from '../../../lib/ai-agent/utils/index.ts';
+import {
   quickScan,
   fullScan,
   formatScanResults,
@@ -104,6 +116,7 @@ import {
   TOON_DECODER_SPEC,
   // Tools
   AGENT_TOOLS,
+  BASIC_TOOLS,
   toOllamaTools,
   // Classification
   classifyQuestion as sharedClassifyQuestion,
@@ -115,6 +128,8 @@ import {
   handleGetFinancialsDeep,
   handleGetInstitutionalHoldings,
   handleGetUnusualOptionsActivity,
+  handleGetIVByStrike,
+  handleCalculateSpread,
   // Types
   type QuestionClassification as SharedQuestionClassification,
   type TickerData as SharedTickerData,
@@ -133,6 +148,8 @@ export interface ChatOptions {
   aiMode: OllamaMode;
   aiModel?: string;
   accountSize?: number;
+  /** Enable streaming responses for better UX */
+  stream?: boolean;
 }
 
 interface ConversationMessage {
@@ -299,9 +316,7 @@ async function fetchTickerData(
     const sharedData = await sharedFetchTickerData(ticker);
     if (!sharedData) return null;
 
-    console.log(
-      `[CLI] Using shared fetchTickerData for ${ticker} (data parity)`
-    );
+    log.debug(`[CLI] Using shared fetchTickerData for ${ticker} (data parity)`);
 
     // CLI-specific: Fetch additional ownership data (not in shared lib)
     let ownership: OwnershipData | undefined;
@@ -442,12 +457,17 @@ async function fetchTickerData(
       analysis,
     };
   } catch (error) {
-    console.error(`[CLI] Error fetching ${ticker}:`, error);
+    log.error(`[CLI] Error fetching ${ticker}:`, error);
     return null;
   }
 }
 
-async function buildContextForAI(accountSize: number): Promise<string> {
+async function buildContextForAI(
+  accountSize: number,
+  startupRegime?: MarketRegimeData | null,
+  tradingRegime?: TradingRegimeAnalysis | null,
+  useTOON: boolean = false
+): Promise<string> {
   const contextParts: string[] = [];
 
   // Add current date/time context
@@ -490,9 +510,49 @@ async function buildContextForAI(accountSize: number): Promise<string> {
 
   contextParts.push(`Market Status: ${marketStatus}`);
 
-  // Get market regime
-  const { regime, spyPrice } = await getMarketRegime();
-  contextParts.push(`Market Regime: ${regime} (SPY $${spyPrice.toFixed(2)})`);
+  // Use startup regime if available (avoids re-fetch)
+  let regime: MarketRegime = 'neutral';
+  let spyPrice = 0;
+
+  if (startupRegime) {
+    regime =
+      startupRegime.regime === 'RISK_ON'
+        ? 'bull'
+        : startupRegime.regime === 'RISK_OFF'
+          ? 'bear'
+          : 'neutral';
+    spyPrice = startupRegime.spy.price;
+  } else {
+    const regimeData = await getMarketRegime();
+    regime = regimeData.regime;
+    spyPrice = regimeData.spyPrice;
+  }
+
+  // Include trading regime - use TOON format for simple questions
+  // This eliminates need for AI to call get_trading_regime tool
+  if (tradingRegime) {
+    if (useTOON) {
+      // Compact TOON format (~80% fewer tokens)
+      // Include warning to prevent redundant tool calls
+      contextParts.push(
+        `MKTREGIME (pre-loaded):${formatTradingRegimeTOON(tradingRegime)}`
+      );
+    } else {
+      // Full verbose format for trade analysis
+      contextParts.push(
+        `\n=== TRADING REGIME (pre-loaded - DO NOT call get_trading_regime) ===`
+      );
+      contextParts.push(formatTradingRegimeForAI(tradingRegime));
+      contextParts.push(`=== END TRADING REGIME ===\n`);
+    }
+  } else if (startupRegime) {
+    // Fallback to simple regime if detailed not available
+    contextParts.push(`\n=== MARKET REGIME ===`);
+    contextParts.push(formatRegimeForAI(startupRegime));
+    contextParts.push(`=== END REGIME ===\n`);
+  } else {
+    contextParts.push(`Market Regime: ${regime} (SPY $${spyPrice.toFixed(2)})`);
+  }
 
   // Add economic calendar
   const calendar = getCalendarContext();
@@ -567,9 +627,15 @@ export type QuestionType =
 interface QuestionClassification {
   type: QuestionType;
   needsOptions: boolean;
+  needsPFV: boolean;
+  needsSpread: boolean;
   needsNews: boolean;
   needsWebSearch: boolean;
   needsCalendar: boolean;
+  /** Skip ticker data fetch - use conversation context instead */
+  skipTickerFetch: boolean;
+  /** Use minimal tool set to save tokens */
+  minimalTools: boolean;
 }
 
 /**
@@ -584,20 +650,34 @@ export function classifyQuestion(message: string): QuestionClassification {
     return {
       type: 'scan',
       needsOptions: true,
+      needsPFV: true,
+      needsSpread: true,
       needsNews: false,
       needsWebSearch: false,
       needsCalendar: true,
+      skipTickerFetch: false,
+      minimalTools: false,
     };
   }
 
-  // Research/news questions - need web search
-  if (/\b(why is|what.+news|research|look up|what.+happening)\b/.test(lower)) {
+  // Research/news questions - need web search, NOT fresh ticker data
+  // The AI already has ticker context from previous turns
+  // Matches: "why is", "why did", "why has", "what news", "what happened", etc.
+  if (
+    /\b(why (is|did|has|does|was|are)|what.+news|research|look up|what.+(happening|happened)|what caused)\b/.test(
+      lower
+    )
+  ) {
     return {
       type: 'research',
       needsOptions: false,
+      needsPFV: false,
+      needsSpread: false,
       needsNews: true,
       needsWebSearch: true,
       needsCalendar: false,
+      skipTickerFetch: true, // Don't re-fetch - use conversation context
+      minimalTools: true, // Only need web_search tool
     };
   }
 
@@ -609,9 +689,13 @@ export function classifyQuestion(message: string): QuestionClassification {
     return {
       type: 'price_check',
       needsOptions: false,
+      needsPFV: false,
+      needsSpread: false,
       needsNews: false,
       needsWebSearch: false,
       needsCalendar: false,
+      skipTickerFetch: false,
+      minimalTools: true, // Only need get_stock_data tool
     };
   }
 
@@ -625,9 +709,13 @@ export function classifyQuestion(message: string): QuestionClassification {
     return {
       type: 'trade_analysis',
       needsOptions: true,
+      needsPFV: true,
+      needsSpread: true,
       needsNews: true,
       needsWebSearch: false,
       needsCalendar: true,
+      skipTickerFetch: false,
+      minimalTools: false,
     };
   }
 
@@ -638,9 +726,13 @@ export function classifyQuestion(message: string): QuestionClassification {
     return {
       type: 'trade_analysis',
       needsOptions: true,
+      needsPFV: true,
+      needsSpread: true,
       needsNews: true,
       needsWebSearch: false,
       needsCalendar: true,
+      skipTickerFetch: false,
+      minimalTools: false,
     };
   }
 
@@ -648,9 +740,13 @@ export function classifyQuestion(message: string): QuestionClassification {
   return {
     type: 'general',
     needsOptions: false,
+    needsPFV: false,
+    needsSpread: false,
     needsNews: false,
     needsWebSearch: false,
     needsCalendar: true,
+    skipTickerFetch: false,
+    minimalTools: true, // General questions don't need most tools
   };
 }
 
@@ -689,7 +785,16 @@ ${context}`;
  * Tools available to Victor for research and analysis
  * Using shared definitions from lib/ai-agent, converted to Ollama format
  */
-const AVAILABLE_TOOLS: ToolDefinition[] = toOllamaTools(AGENT_TOOLS);
+// Full tool set for complex queries
+const FULL_TOOLS: ToolDefinition[] = toOllamaTools(AGENT_TOOLS);
+// Minimal tool set for simple queries (saves ~500 tokens)
+const MINIMAL_TOOLS: ToolDefinition[] = toOllamaTools(BASIC_TOOLS);
+// Trade analysis tools - no web_search or regime (both pre-loaded)
+const TRADE_ANALYSIS_TOOLS: ToolDefinition[] = toOllamaTools(
+  AGENT_TOOLS.filter(
+    (t) => t.name !== 'web_search' && t.name !== 'get_trading_regime'
+  )
+);
 
 /**
  * Execute a tool call and return the result
@@ -705,18 +810,27 @@ async function executeToolCall(
       const query = args.query as string;
       showStatus(`🌐 Searching: "${query}"`);
       const results = await searchWeb(query, 5);
-      return formatSearchForAI(results);
+      // Use TOON for compact encoding (~40% fewer tokens)
+      return libEncodeSearchToTOON(
+        results.results.map((r) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.snippet,
+        }))
+      );
     }
 
     case 'get_ticker_data': {
       const ticker = (args.ticker as string).toUpperCase();
       showStatus(`📊 Fetching ${ticker} data...`);
       try {
-        const data = await fetchTickerData(ticker, true);
+        // Use shared lib directly for type compatibility
+        const data = await sharedFetchTickerData(ticker);
         if (!data) {
           return `Could not fetch data for ${ticker}`;
         }
-        return formatTickerDataForAI(data);
+        // Use shared lib's TOON encoder (~40% fewer tokens)
+        return libEncodeTickerToTOON(data);
       } catch {
         return `Error fetching data for ${ticker}`;
       }
@@ -758,6 +872,55 @@ async function executeToolCall(
         return result.error ?? 'Could not fetch unusual options activity';
       }
       return result.formatted ?? 'No unusual options signals found';
+    }
+
+    case 'get_trading_regime': {
+      const ticker = args.ticker as string | undefined;
+      showStatus(
+        ticker
+          ? `🚦 Analyzing trading regime for ${ticker}...`
+          : `🚦 Analyzing market trading regime...`
+      );
+      try {
+        const analysis = await analyzeTradingRegime();
+        // Use TOON format for compact encoding
+        return `REGIME:${formatTradingRegimeTOON(analysis)}`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return `Error analyzing trading regime: ${msg}`;
+      }
+    }
+
+    case 'get_iv_by_strike': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const strike = args.strike as number;
+      const targetDTE = (args.targetDTE as number) ?? 30;
+      showStatus(`📊 Fetching IV for ${ticker} $${strike} strike...`);
+      const result = await handleGetIVByStrike({ ticker, strike, targetDTE });
+      if (!result.success) {
+        return result.error ?? `Could not fetch IV for ${ticker}`;
+      }
+      return result.formatted ?? 'No IV data available';
+    }
+
+    case 'calculate_spread': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const longStrike = args.longStrike as number;
+      const shortStrike = args.shortStrike as number;
+      const targetDTE = (args.targetDTE as number) ?? 30;
+      showStatus(
+        `📊 Calculating ${ticker} $${longStrike}/$${shortStrike} spread...`
+      );
+      const result = await handleCalculateSpread({
+        ticker,
+        longStrike,
+        shortStrike,
+        targetDTE,
+      });
+      if (!result.success) {
+        return result.error ?? `Could not calculate spread for ${ticker}`;
+      }
+      return result.formatted ?? 'No spread data available';
     }
 
     default:
@@ -809,8 +972,10 @@ function formatTickerDataForAI(t: TickerData): string {
   }
   // Include Psychological Fair Value context
   if (t.pfv) {
+    const deviation = t.pfv.deviationPercent >= 0 ? '+' : '';
     output += `\n--- PSYCHOLOGICAL FAIR VALUE ---\n`;
-    output += t.pfv.aiContext + '\n';
+    output += `Fair Value: $${t.pfv.fairValue.toFixed(2)} (${deviation}${t.pfv.deviationPercent.toFixed(1)}% vs current)\n`;
+    output += `Bias: ${t.pfv.bias} | Confidence: ${t.pfv.confidence}\n`;
   }
   output += `=== END ${t.ticker} ===\n`;
   return output;
@@ -888,6 +1053,10 @@ interface PreparedContext {
   tickersFetched: TickerData[];
   scanResults: ScanResult[];
   webSearchResults?: WebSearchResponse;
+  /** Use minimal tool set to save tokens */
+  useMinimalTools: boolean;
+  /** Whether web search is needed for this query */
+  needsWebSearch: boolean;
 }
 
 /**
@@ -898,12 +1067,17 @@ type StatusCallback = (status: string) => void;
 /**
  * Prepare context for AI generation (fetches data, builds prompts)
  * Uses question classification for smart context loading
+ *
+ * @param startupRegime - Pre-fetched market regime from startup (avoids re-fetch)
+ * @param tradingRegime - Pre-fetched detailed trading regime (GO/CAUTION/NO_TRADE)
  */
 async function prepareContext(
   userMessage: string,
   conversationHistory: ConversationMessage[],
   accountSize: number,
-  onStatus?: StatusCallback
+  onStatus?: StatusCallback,
+  startupRegime?: MarketRegimeData | null,
+  tradingRegime?: TradingRegimeAnalysis | null
 ): Promise<PreparedContext> {
   // Classify the question to determine what context we need
   const classification = classifyQuestion(userMessage);
@@ -979,9 +1153,9 @@ async function prepareContext(
   const tickersFetched: TickerData[] = [];
 
   // Fetch data for mentioned tickers
-  // Use classification to determine if we need full options data
+  // Skip if classification says to use conversation context instead (e.g., research questions)
   let tickerContext = '';
-  if (tickers.length > 0) {
+  if (tickers.length > 0 && !classification.skipTickerFetch) {
     onStatus?.(`Fetching ${tickers.join(', ')}...`);
 
     // Skip options data for simple price checks (faster + fewer tokens)
@@ -1089,13 +1263,38 @@ async function prepareContext(
       if (classification.type === 'trade_analysis') {
         for (const d of validData) {
           if (d.pfv) {
-            tickerContext += `\n${d.ticker} PFV:\n`;
-            tickerContext += d.pfv.aiContext + '\n';
+            const dev = d.pfv.deviationPercent >= 0 ? '+' : '';
+            tickerContext += `\n${d.ticker} PFV: $${d.pfv.fairValue.toFixed(2)} `;
+            tickerContext += `(${dev}${d.pfv.deviationPercent.toFixed(1)}%) `;
+            tickerContext += `${d.pfv.bias} | ${d.pfv.confidence}\n`;
           }
         }
       }
 
       tickerContext += '=== END TICKER DATA ===';
+
+      // AUTO-FETCH FINANCIALS for high P/E stocks (>50) - adds growth context
+      // This saves Victor from needing to call get_financials_deep
+      const highPEStocks = validData.filter((d) => d.peRatio && d.peRatio > 50);
+      if (highPEStocks.length > 0 && classification.type === 'trade_analysis') {
+        onStatus?.(`Fetching financials for high P/E stocks...`);
+        for (const stock of highPEStocks.slice(0, 2)) {
+          try {
+            const financials = await handleGetFinancialsDeep({
+              ticker: stock.ticker,
+            });
+            if (financials.success && financials.formatted) {
+              tickerContext += `\n\n${financials.formatted}`;
+            }
+          } catch {
+            // Financials fetch optional
+          }
+        }
+      }
+
+      // Add note that data is pre-loaded (prevents redundant tool calls)
+      tickerContext += `\n\n⚡ DATA PRE-LOADED: ${validData.map((d) => d.ticker).join(', ')}`;
+      tickerContext += ` - Do NOT call get_ticker_data for these tickers.`;
 
       // Get trade history for mentioned tickers (compact format)
       if (isConfigured() && classification.type === 'trade_analysis') {
@@ -1121,8 +1320,15 @@ async function prepareContext(
 
   onStatus?.(`Generating response...`);
 
-  // Build context
-  const context = await buildContextForAI(accountSize);
+  // Build context (pass startup regime to avoid re-fetch)
+  // Always use TOON format for regime - verbose adds little value vs token cost
+  const useTOON = true;
+  const context = await buildContextForAI(
+    accountSize,
+    startupRegime,
+    tradingRegime,
+    useTOON
+  );
   const systemPrompt = buildSystemPrompt(
     accountSize,
     context + tickerContext + scanContext + webSearchContext
@@ -1159,6 +1365,8 @@ async function prepareContext(
     tickersFetched,
     scanResults,
     webSearchResults,
+    useMinimalTools: classification.minimalTools,
+    needsWebSearch: classification.needsWebSearch,
   };
 }
 
@@ -1169,8 +1377,10 @@ async function prepareContext(
 export async function startChat(options: ChatOptions): Promise<void> {
   const accountSize = options.accountSize ?? DEFAULT_ACCOUNT_SIZE;
 
-  // Get market regime for header
+  // Get market regime FIRST (populates cache), then trading regime (uses cache)
+  // Sequential to avoid duplicate VIX/SPY/sector fetches
   const regime = await fetchMarketRegime().catch(() => null);
+  const tradingRegimeAnalysis = await analyzeTradingRegime().catch(() => null);
 
   console.log();
   console.log(chalk.bold.cyan('  📊 YOUR ANALYST'));
@@ -1335,11 +1545,14 @@ export async function startChat(options: ChatOptions): Promise<void> {
         updateStatus('Processing...');
 
         // Prepare context (fetch tickers, build prompts)
+        // Pass startup regime + trading regime to avoid redundant fetches
         const prepared = await prepareContext(
           userInput,
           conversationHistory.slice(0, -1),
           accountSize,
-          updateStatus
+          updateStatus,
+          regime,
+          tradingRegimeAnalysis
         );
 
         // Clear status line
@@ -1951,9 +2164,12 @@ export async function startChat(options: ChatOptions): Promise<void> {
           { role: 'user', content: prepared.userPrompt },
         ];
 
-        let totalPromptTokens = 0;
+        let totalPromptTokens = 0; // Cumulative (for API cost tracking)
+        let maxPromptTokens = 0; // Max per iteration (actual context size)
         let totalCompletionTokens = 0;
         let totalDuration = 0;
+        let totalToolDuration = 0;
+        let toolCallCount = 0;
         let finalContent = '';
         let finalThinking = '';
         let modelName = '';
@@ -1976,6 +2192,17 @@ export async function startChat(options: ChatOptions): Promise<void> {
           // On final iteration, disable tools to force synthesis
           const isLastIteration = iteration === maxIterations;
 
+          // Select tools based on query classification:
+          // - minimal queries: MINIMAL_TOOLS (just web_search, get_ticker_data)
+          // - trade analysis (no research): TRADE_ANALYSIS_TOOLS (no web_search)
+          // - research queries: FULL_TOOLS (includes web_search)
+          const getToolsForQuery = () => {
+            if (isLastIteration) return undefined; // Force synthesis
+            if (prepared.useMinimalTools) return MINIMAL_TOOLS;
+            if (!prepared.needsWebSearch) return TRADE_ANALYSIS_TOOLS;
+            return FULL_TOOLS;
+          };
+
           let currentThinking = '';
           let currentContent = '';
           const currentToolCalls: ToolCall[] = [];
@@ -1984,11 +2211,11 @@ export async function startChat(options: ChatOptions): Promise<void> {
           if (iteration === 1) {
             showStatus('Victor is analyzing...');
 
-            // Use non-streaming call WITH tools (disabled on last iteration to force synthesis)
+            // Use non-streaming call WITH tools
             const response: AgentResponse = await chatWithTools(
               { mode: options.aiMode, model: options.aiModel },
               agentMessages,
-              isLastIteration ? undefined : AVAILABLE_TOOLS, // Disable tools on last iteration
+              getToolsForQuery(),
               false // Disable thinking (conflicts with tool calling in DeepSeek)
             );
 
@@ -2021,55 +2248,80 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
             // Store token stats
             totalPromptTokens += response.promptTokens;
+            maxPromptTokens = Math.max(maxPromptTokens, response.promptTokens);
             totalCompletionTokens += response.completionTokens;
             totalDuration += response.duration;
             modelName = response.model;
           } else {
-            // SUBSEQUENT ITERATIONS: Non-streaming for clean output
-            // On last iteration, disable tools to force final synthesis
-            showStatus(
-              isLastIteration
-                ? 'Victor is synthesizing...'
-                : 'Processing tool results...'
-            );
+            // SUBSEQUENT ITERATIONS: Use streaming on last iteration for
+            // better UX
+            if (isLastIteration && options.stream) {
+              // Stream final synthesis
+              const streamResult = await streamResponse(
+                { mode: options.aiMode, model: options.aiModel },
+                agentMessages,
+                undefined, // No tools
+                false // No thinking
+              );
 
-            const response: AgentResponse = await chatWithTools(
-              { mode: options.aiMode, model: options.aiModel },
-              agentMessages,
-              isLastIteration ? undefined : AVAILABLE_TOOLS, // Disable tools on last iteration
-              false // No thinking
-            );
+              currentContent = streamResult.content;
+              totalPromptTokens += streamResult.promptTokens;
+              maxPromptTokens = Math.max(
+                maxPromptTokens,
+                streamResult.promptTokens
+              );
+              totalCompletionTokens += streamResult.completionTokens;
+              totalDuration += streamResult.duration;
+              modelName = streamResult.model;
+            } else {
+              // Non-streaming for tool iterations
+              showStatus(
+                isLastIteration
+                  ? 'Victor is synthesizing...'
+                  : 'Processing tool results...'
+              );
 
-            // Clear status
-            process.stdout.write('\r'.padEnd(70) + '\r');
+              const response: AgentResponse = await chatWithTools(
+                { mode: options.aiMode, model: options.aiModel },
+                agentMessages,
+                getToolsForQuery(), // Same tool selection logic as first iteration
+                false // No thinking
+              );
 
-            // Display content with proper word wrapping
-            const cleanedContent = cleanToolTokens(response.content);
-            const prefix = chalk.cyan('  Victor: ');
-            const indent = '          ';
-            const lines = wrapText(cleanedContent, 65, '  Victor: ', indent);
-            for (let i = 0; i < lines.length; i++) {
-              if (i === 0) {
-                // First line: replace plain prefix with chalk-colored one
-                console.log(lines[i].replace('  Victor: ', prefix));
-              } else {
-                console.log(formatWithStyles(lines[i]));
+              // Clear status
+              process.stdout.write('\r'.padEnd(70) + '\r');
+
+              // Display content with proper word wrapping
+              const cleanedContent = cleanToolTokens(response.content);
+              const prefix = chalk.cyan('  Victor: ');
+              const indent = '          ';
+              const lines = wrapText(cleanedContent, 65, '  Victor: ', indent);
+              for (let i = 0; i < lines.length; i++) {
+                if (i === 0) {
+                  // First line: replace plain prefix with chalk-colored one
+                  console.log(lines[i].replace('  Victor: ', prefix));
+                } else {
+                  console.log(formatWithStyles(lines[i]));
+                }
               }
+
+              currentContent = cleanToolTokens(response.content);
+
+              // IMPORTANT: On last iteration, ignore any tool calls
+              if (response.toolCalls && !isLastIteration) {
+                currentToolCalls.push(...response.toolCalls);
+              }
+
+              // Store results
+              totalPromptTokens += response.promptTokens;
+              maxPromptTokens = Math.max(
+                maxPromptTokens,
+                response.promptTokens
+              );
+              totalCompletionTokens += response.completionTokens;
+              totalDuration += response.duration;
+              modelName = response.model;
             }
-
-            currentContent = cleanToolTokens(response.content); // Clean raw tool tokens
-
-            // IMPORTANT: On last iteration, ignore any tool calls
-            // (model may still output them from context, but we force synthesis)
-            if (response.toolCalls && !isLastIteration) {
-              currentToolCalls.push(...response.toolCalls);
-            }
-
-            // Store results
-            totalPromptTokens += response.promptTokens;
-            totalCompletionTokens += response.completionTokens;
-            totalDuration += response.duration;
-            modelName = response.model;
           }
 
           finalContent += currentContent;
@@ -2109,10 +2361,13 @@ export async function startChat(options: ChatOptions): Promise<void> {
                 chalk.dim(`: ${JSON.stringify(toolArgs)}`)
             );
 
-            // Execute the tool
+            // Execute the tool with timing
+            const toolStart = Date.now();
             const result = await executeToolCall(toolCall, (msg) => {
               console.log(chalk.dim(`  │ `) + chalk.dim(`   ${msg}`));
             });
+            totalToolDuration += Date.now() - toolStart;
+            toolCallCount++;
 
             // Show full result data for transparency
             const resultLines = result.split('\n');
@@ -2149,39 +2404,67 @@ export async function startChat(options: ChatOptions): Promise<void> {
         // we need one final synthesis call
         const lastMessage = agentMessages[agentMessages.length - 1];
         if (iteration >= maxIterations && lastMessage?.role === 'tool') {
-          showStatus('Victor is synthesizing results...');
+          // Use streaming for better UX if enabled
+          if (options.stream) {
+            const streamResult = await streamResponse(
+              { mode: options.aiMode, model: options.aiModel },
+              agentMessages,
+              undefined, // No tools
+              false // No thinking
+            );
 
-          // Final synthesis call - explicitly disable tools
-          const synthesisResponse: AgentResponse = await chatWithTools(
-            { mode: options.aiMode, model: options.aiModel },
-            agentMessages,
-            undefined, // No tools
-            false // No thinking
-          );
+            finalContent += streamResult.content;
+            totalPromptTokens += streamResult.promptTokens;
+            maxPromptTokens = Math.max(
+              maxPromptTokens,
+              streamResult.promptTokens
+            );
+            totalCompletionTokens += streamResult.completionTokens;
+            totalDuration += streamResult.duration;
+          } else {
+            showStatus('Victor is synthesizing results...');
 
-          // Clear status
-          process.stdout.write('\r'.padEnd(70) + '\r');
+            // Final synthesis call - explicitly disable tools
+            const synthesisResponse: AgentResponse = await chatWithTools(
+              { mode: options.aiMode, model: options.aiModel },
+              agentMessages,
+              undefined, // No tools
+              false // No thinking
+            );
 
-          // Display synthesis
-          const synthesisContent = cleanToolTokens(synthesisResponse.content);
-          if (synthesisContent.trim()) {
-            const prefix = chalk.cyan('  Victor: ');
-            const indent = '          ';
-            const lines = wrapText(synthesisContent, 65, '  Victor: ', indent);
-            for (let i = 0; i < lines.length; i++) {
-              if (i === 0) {
-                console.log(lines[i].replace('  Victor: ', prefix));
-              } else {
-                console.log(formatWithStyles(lines[i]));
+            // Clear status
+            process.stdout.write('\r'.padEnd(70) + '\r');
+
+            // Display synthesis
+            const synthesisContent = cleanToolTokens(synthesisResponse.content);
+            if (synthesisContent.trim()) {
+              const prefix = chalk.cyan('  Victor: ');
+              const indent = '          ';
+              const lines = wrapText(
+                synthesisContent,
+                65,
+                '  Victor: ',
+                indent
+              );
+              for (let i = 0; i < lines.length; i++) {
+                if (i === 0) {
+                  console.log(lines[i].replace('  Victor: ', prefix));
+                } else {
+                  console.log(formatWithStyles(lines[i]));
+                }
               }
+              finalContent += synthesisContent;
             }
-            finalContent += synthesisContent;
-          }
 
-          // Update token stats
-          totalPromptTokens += synthesisResponse.promptTokens;
-          totalCompletionTokens += synthesisResponse.completionTokens;
-          totalDuration += synthesisResponse.duration;
+            // Update token stats
+            totalPromptTokens += synthesisResponse.promptTokens;
+            maxPromptTokens = Math.max(
+              maxPromptTokens,
+              synthesisResponse.promptTokens
+            );
+            totalCompletionTokens += synthesisResponse.completionTokens;
+            totalDuration += synthesisResponse.duration;
+          }
         }
 
         // Ensure we end with a newline
@@ -2192,14 +2475,58 @@ export async function startChat(options: ChatOptions): Promise<void> {
         // Add final response to conversation history
         conversationHistory.push({ role: 'assistant', content: finalContent });
 
-        // Show token usage and timing
+        // Show token usage, timing, and quality metrics
         if (totalPromptTokens > 0 || totalCompletionTokens > 0) {
+          const cacheStats = sessionCache.getStats();
+          // Use max prompt tokens (actual context) for efficiency display
+          // totalPromptTokens is cumulative across iterations (for cost tracking)
+          const displayPromptTokens = maxPromptTokens;
+          const tokenEfficiency =
+            displayPromptTokens > 0
+              ? ((totalCompletionTokens / displayPromptTokens) * 100).toFixed(1)
+              : '0';
+          const inferenceTime = totalDuration - totalToolDuration;
+
           console.log();
+
+          // Main stats line - show actual context size (max per iteration)
           console.log(
             chalk.dim(
-              `  ─ ${modelName} · ${totalPromptTokens}→${totalCompletionTokens} tokens · ${(totalDuration / 1000).toFixed(1)}s`
+              `  ─ ${modelName} · ` +
+                `${displayPromptTokens}→${totalCompletionTokens} tokens ` +
+                `(${tokenEfficiency}% eff) · ` +
+                `${(totalDuration / 1000).toFixed(1)}s`
             )
           );
+
+          // Detailed breakdown (if there were tool calls or cache activity)
+          if (
+            toolCallCount > 0 ||
+            cacheStats.hits > 0 ||
+            cacheStats.misses > 0
+          ) {
+            const parts: string[] = [];
+
+            if (toolCallCount > 0) {
+              parts.push(
+                `${toolCallCount} tool${toolCallCount > 1 ? 's' : ''} ` +
+                  `(${(totalToolDuration / 1000).toFixed(1)}s)`
+              );
+            }
+
+            if (cacheStats.hits > 0 || cacheStats.misses > 0) {
+              const hitRate = (cacheStats.hitRate * 100).toFixed(0);
+              parts.push(`cache: ${hitRate}% hit`);
+            }
+
+            if (inferenceTime > 0 && toolCallCount > 0) {
+              parts.push(`AI: ${(inferenceTime / 1000).toFixed(1)}s`);
+            }
+
+            if (parts.length > 0) {
+              console.log(chalk.dim(`    ${parts.join(' · ')}`));
+            }
+          }
         }
         console.log();
       } catch (err) {
@@ -2220,7 +2547,8 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
 /**
  * Clean raw DeepSeek tool call tokens from content
- * These leak through when model outputs tool calls as text instead of structured calls
+ * These leak through when model outputs tool calls as text instead of
+ * structured calls
  */
 function cleanToolTokens(text: string): string {
   // Remove DeepSeek's raw tool call tokens
@@ -2232,6 +2560,87 @@ function cleanToolTokens(text: string): string {
     .replace(/\{"query":[^}]+\}/g, '') // Remove orphaned JSON queries
     .replace(/[ \t]+/g, ' ') // Collapse multiple spaces (but not newlines)
     .trim();
+}
+
+/**
+ * Stream AI response to console with real-time display
+ * Provides better UX by showing content as it's generated
+ */
+async function streamResponse(
+  config: { mode: OllamaMode; model?: string },
+  messages: AgentMessage[],
+  tools?: ToolDefinition[],
+  enableThinking: boolean = false
+): Promise<{
+  content: string;
+  toolCalls: ToolCall[];
+  promptTokens: number;
+  completionTokens: number;
+  duration: number;
+  model: string;
+}> {
+  process.stdout.write(chalk.cyan('  Victor: '));
+
+  const stream = streamChatWithTools(config, messages, tools, enableThinking);
+
+  let content = '';
+  const toolCalls: ToolCall[] = [];
+  let lineLength = 10; // "  Victor: " prefix length
+  const maxLineLength = 75;
+  let finalResult: StreamingAgentResult | null = null;
+
+  // Stream content chunks
+  let iterResult = await stream.next();
+  while (!iterResult.done) {
+    const chunk = iterResult.value;
+    if (chunk.type === 'content' && chunk.text) {
+      const text = cleanToolTokens(chunk.text);
+      if (text) {
+        // Word wrap as we stream
+        const words = text.split(/(\s+)/);
+        for (const word of words) {
+          if (word.trim() === '') {
+            // Handle whitespace
+            if (word.includes('\n')) {
+              process.stdout.write('\n          '); // Indent continuation
+              lineLength = 10;
+            } else if (lineLength > 10) {
+              process.stdout.write(' ');
+              lineLength++;
+            }
+          } else {
+            // Check if word would exceed line length
+            if (lineLength + word.length > maxLineLength && lineLength > 10) {
+              process.stdout.write('\n          '); // Indent continuation
+              lineLength = 10;
+            }
+            process.stdout.write(word);
+            lineLength += word.length;
+          }
+        }
+        content += text;
+      }
+    } else if (chunk.type === 'tool_call' && chunk.toolCall) {
+      toolCalls.push(chunk.toolCall);
+    }
+    iterResult = await stream.next();
+  }
+
+  // Get final result from done iteration
+  if (iterResult.done && iterResult.value) {
+    finalResult = iterResult.value;
+  }
+
+  process.stdout.write('\n');
+
+  return {
+    content: cleanToolTokens(content),
+    toolCalls,
+    promptTokens: finalResult?.promptTokens ?? 0,
+    completionTokens: finalResult?.completionTokens ?? 0,
+    duration: finalResult?.duration ?? 0,
+    model: finalResult?.model ?? config.model ?? 'unknown',
+  };
 }
 
 /**
