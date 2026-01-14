@@ -1,34 +1,34 @@
 'use client';
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useCallback } from 'react';
 import type { UIMessage } from 'ai';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { SparklesIcon } from './chat-icons';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import {
+  SparklesIcon,
+  CopyIcon,
+  CheckIcon,
+  RegenerateIcon,
+} from './chat-icons';
 import { ToolCallCard, type ToolCall } from './tool-call-card';
+import { TypewriterText } from './typewriter-text';
 
 type ChatMessageProps = {
   message: UIMessage;
   isLoading?: boolean;
+  onRegenerate?: () => void;
 };
 
 // Tool marker patterns - greedy to capture full JSON
-// Start:  <!--TOOL_START:toolName:JSON:START-->
-// Result: <!--TOOL:toolName:JSON:TOOL-->
-// Error:  <!--TOOL_ERROR:toolName:JSON:ERROR-->
 const TOOL_START_REGEX = /<!--TOOL_START:(\w+):([\s\S]+?):START-->/g;
 const TOOL_RESULT_REGEX = /<!--TOOL:(\w+):([\s\S]+?):TOOL-->/g;
 const TOOL_ERROR_REGEX = /<!--TOOL_ERROR:(\w+):([\s\S]+?):ERROR-->/g;
 
 // Thinking marker patterns
-// Complete: <!--THINKING_START-->content<!--THINKING_END-->
-// Partial (streaming): <!--THINKING_START-->content... (no end yet)
 const THINKING_COMPLETE_REGEX =
   /<!--THINKING_START-->([\s\S]*?)<!--THINKING_END-->/g;
 const THINKING_START_MARKER = '<!--THINKING_START-->';
 const THINKING_END_MARKER = '<!--THINKING_END-->';
-// Also catch partial/malformed markers during streaming
 const PARTIAL_MARKER_REGEX =
   /<!--(?:THINKING_?(?:START|END)?|TOOL_?(?:START)?)[^>]*$/;
 
@@ -56,12 +56,7 @@ function parseToolCalls(content: string): {
   const toolMap = new Map<string, ToolCall>();
   let cleanContent = content;
 
-  // ========================================
   // STEP 1: Extract tool calls FIRST
-  // (before thinking, so thinking content is clean)
-  // ========================================
-
-  // Find all START markers
   cleanContent = cleanContent.replace(
     TOOL_START_REGEX,
     (_, toolName, jsonData) => {
@@ -74,11 +69,10 @@ function parseToolCalls(content: string): {
             id,
             tool: toolName,
             args,
-            status: 'running', // Default to running
+            status: 'running',
           });
         }
       } catch {
-        // Create placeholder if JSON fails
         const id = `${toolName}_unknown`;
         if (!toolMap.has(id)) {
           toolMap.set(id, {
@@ -89,18 +83,17 @@ function parseToolCalls(content: string): {
           });
         }
       }
-      return ''; // Remove marker
+      return '';
     }
   );
 
-  // Second pass: find all RESULT markers and update status
+  // Find all RESULT markers
   cleanContent = cleanContent.replace(
     TOOL_RESULT_REGEX,
     (_, toolName, jsonData) => {
       try {
         const result = JSON.parse(jsonData);
 
-        // Find existing tool call or create new one
         let found = false;
         for (const tc of toolMap.values()) {
           if (tc.tool === toolName && tc.status === 'running') {
@@ -111,7 +104,6 @@ function parseToolCalls(content: string): {
           }
         }
 
-        // Create complete entry if no running one found
         if (!found) {
           const id = `${toolName}_${Date.now()}`;
           toolMap.set(id, {
@@ -123,7 +115,6 @@ function parseToolCalls(content: string): {
           });
         }
       } catch {
-        // Mark as error if JSON fails
         for (const tc of toolMap.values()) {
           if (tc.tool === toolName && tc.status === 'running') {
             tc.status = 'error';
@@ -132,18 +123,17 @@ function parseToolCalls(content: string): {
           }
         }
       }
-      return ''; // Remove marker
+      return '';
     }
   );
 
-  // Third pass: find all ERROR markers and update status
+  // Find all ERROR markers
   cleanContent = cleanContent.replace(
     TOOL_ERROR_REGEX,
     (_, toolName, jsonData) => {
       try {
         const errorInfo = JSON.parse(jsonData);
 
-        // Find existing tool call and mark as error
         for (const tc of toolMap.values()) {
           if (tc.tool === toolName && tc.status === 'running') {
             tc.status = 'error';
@@ -152,7 +142,6 @@ function parseToolCalls(content: string): {
           }
         }
       } catch {
-        // Still mark as error even if parse fails
         for (const tc of toolMap.values()) {
           if (tc.tool === toolName && tc.status === 'running') {
             tc.status = 'error';
@@ -161,39 +150,29 @@ function parseToolCalls(content: string): {
           }
         }
       }
-      return ''; // Remove marker
+      return '';
     }
   );
 
-  // ========================================
   // STEP 2: Extract thinking content
-  // (after tool markers removed, so thinking is clean)
-  // ========================================
-
   const thinkingParts: string[] = [];
 
-  // First: Extract complete thinking blocks (with both START and END markers)
   cleanContent = cleanContent.replace(
     THINKING_COMPLETE_REGEX,
     (_, thinkingContent) => {
       const cleaned = thinkingContent.trim();
       if (cleaned) thinkingParts.push(cleaned);
-      return ''; // Remove complete thinking block
+      return '';
     }
   );
 
-  // Second: Handle incomplete thinking (streaming - START exists but no END yet)
-  // This captures everything AFTER the START marker as thinking
   const startIdx = cleanContent.indexOf(THINKING_START_MARKER);
   if (startIdx !== -1) {
-    // Everything before START marker stays as cleanContent
     const beforeStart = cleanContent.slice(0, startIdx);
-    // Everything after START marker is thinking (still streaming)
     let afterStart = cleanContent.slice(
       startIdx + THINKING_START_MARKER.length
     );
 
-    // Remove any stray END markers that might be in there
     afterStart = afterStart.replace(THINKING_END_MARKER, '');
 
     const thinkingContent = afterStart.trim();
@@ -204,16 +183,12 @@ function parseToolCalls(content: string): {
     cleanContent = beforeStart;
   }
 
-  // Third: Clean up any orphaned markers (shouldn't happen but just in case)
   cleanContent = cleanContent
     .replace(/<!--THINKING_START-->/g, '')
     .replace(/<!--THINKING_END-->/g, '');
 
-  // Fourth: Remove any partial markers at the end (mid-stream artifacts)
-  // e.g., "text<!--THINK" or "text<!--THINKING_ST"
   cleanContent = cleanContent.replace(PARTIAL_MARKER_REGEX, '');
 
-  // Combine all thinking parts
   const thinking = thinkingParts.length > 0 ? thinkingParts.join('\n\n') : null;
 
   return {
@@ -223,32 +198,55 @@ function parseToolCalls(content: string): {
   };
 }
 
-function PureChatMessage({ message, isLoading }: ChatMessageProps) {
+function PureChatMessage({
+  message,
+  isLoading,
+  onRegenerate,
+}: ChatMessageProps) {
   const isUser = message.role === 'user';
   const rawContent = getMessageContent(message);
+  const [copied, setCopied] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
-  // Parse tool calls, thinking, and clean content - memoized
   const { cleanContent, toolCalls, thinking } = useMemo(
     () => parseToolCalls(rawContent),
     [rawContent]
   );
 
-  // Don't render empty messages unless streaming/loading or has tool calls/thinking
   const hasContent = cleanContent.length > 0;
   const hasToolCalls = toolCalls.length > 0;
   const hasThinking = thinking && thinking.length > 0;
+
+  // Copy to clipboard handler
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(cleanContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }, [cleanContent]);
 
   if (!hasContent && !isLoading && !hasToolCalls && !hasThinking) {
     return null;
   }
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{
+        duration: 0.35,
+        ease: [0.16, 1, 0.3, 1],
+      }}
       className={cn(
-        'w-full animate-in fade-in duration-200',
+        'w-full group',
         isUser ? 'flex justify-end' : 'flex justify-start'
       )}
       data-role={message.role}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div
         className={cn(
@@ -261,8 +259,7 @@ function PureChatMessage({ message, isLoading }: ChatMessageProps) {
           <div
             className={cn(
               'flex size-7 shrink-0 items-center justify-center',
-              'rounded-full bg-background ring-1 ring-border',
-              isLoading && 'animate-pulse'
+              'rounded-full bg-background ring-1 ring-border'
             )}
           >
             <SparklesIcon size={12} />
@@ -272,7 +269,7 @@ function PureChatMessage({ message, isLoading }: ChatMessageProps) {
         {/* Message content */}
         <div
           className={cn(
-            'min-w-0 overflow-hidden',
+            'min-w-0 overflow-hidden relative',
             isUser
               ? 'rounded-2xl bg-primary text-primary-foreground px-3 py-2'
               : 'flex-1'
@@ -289,7 +286,7 @@ function PureChatMessage({ message, isLoading }: ChatMessageProps) {
             </p>
           ) : (
             <div className="space-y-3">
-              {/* Thinking display - collapsible reasoning */}
+              {/* Thinking display */}
               {hasThinking && (
                 <ThinkingDisplay thinking={thinking} isLoading={isLoading} />
               )}
@@ -303,234 +300,76 @@ function PureChatMessage({ message, isLoading }: ChatMessageProps) {
                 </div>
               )}
 
-              {/* Message content */}
+              {/* Message content with typewriter effect */}
               {hasContent && (
+                <TypewriterText
+                  content={cleanContent}
+                  isStreaming={isLoading}
+                  speed={4}
+                />
+              )}
+
+              {/* Message actions - visible on hover (no layout shift) */}
+              {hasContent && !isLoading && (
                 <div
                   className={cn(
-                    'text-sm leading-relaxed text-foreground',
-                    'prose-container',
-                    // Streaming cursor
-                    isLoading && [
-                      "after:content-['▋']",
-                      'after:animate-pulse',
-                      'after:ml-0.5',
-                      'after:text-muted-foreground',
-                    ]
+                    'flex items-center gap-1 pt-1',
+                    'transition-opacity duration-150',
+                    isHovered ? 'opacity-100' : 'opacity-0'
                   )}
                 >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      // Paragraphs
-                      p: ({ children }) => (
-                        <p className="mb-3 last:mb-0">{children}</p>
-                      ),
-
-                      // Code - inline and block
-                      code: ({ children, className }) => {
-                        const isBlock = className?.includes('language-');
-                        if (isBlock) {
-                          return (
-                            <code className="text-xs font-mono">
-                              {children}
-                            </code>
-                          );
-                        }
-                        return (
-                          <code
-                            className={cn(
-                              'bg-muted px-1.5 py-0.5 rounded',
-                              'text-xs font-mono break-all'
-                            )}
-                          >
-                            {children}
-                          </code>
-                        );
-                      },
-
-                      // Code blocks
-                      pre: ({ children }) => (
-                        <pre
-                          className={cn(
-                            'bg-muted rounded-lg p-3 my-3',
-                            'overflow-x-auto text-xs',
-                            '[&>code]:bg-transparent [&>code]:p-0'
-                          )}
-                        >
-                          {children}
-                        </pre>
-                      ),
-
-                      // Tables
-                      table: ({ children }) => (
-                        <div className="my-3 overflow-x-auto rounded-lg border">
-                          <table className="w-full text-xs">{children}</table>
-                        </div>
-                      ),
-                      thead: ({ children }) => (
-                        <thead className="bg-muted/50 border-b">
-                          {children}
-                        </thead>
-                      ),
-                      tbody: ({ children }) => (
-                        <tbody className="divide-y">{children}</tbody>
-                      ),
-                      tr: ({ children }) => (
-                        <tr className="divide-x">{children}</tr>
-                      ),
-                      th: ({ children }) => (
-                        <th
-                          className={cn(
-                            'px-3 py-2 text-left font-semibold',
-                            'text-xs whitespace-nowrap'
-                          )}
-                        >
-                          {children}
-                        </th>
-                      ),
-                      td: ({ children }) => (
-                        <td className="px-3 py-2 text-xs">{children}</td>
-                      ),
-
-                      // Lists
-                      ul: ({ children }) => (
-                        <ul
-                          className={cn(
-                            'list-disc pl-5 mb-3 space-y-1',
-                            'last:mb-0 [&_ul]:mb-0 [&_ul]:mt-1'
-                          )}
-                        >
-                          {children}
-                        </ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol
-                          className={cn(
-                            'list-decimal pl-5 mb-3 space-y-1',
-                            'last:mb-0 [&_ol]:mb-0 [&_ol]:mt-1'
-                          )}
-                        >
-                          {children}
-                        </ol>
-                      ),
-                      li: ({ children }) => (
-                        <li className="pl-1">{children}</li>
-                      ),
-
-                      // Text formatting
-                      strong: ({ children }) => (
-                        <strong className="font-semibold">{children}</strong>
-                      ),
-                      em: ({ children }) => (
-                        <em className="italic">{children}</em>
-                      ),
-                      del: ({ children }) => (
-                        <del className="line-through opacity-70">
-                          {children}
-                        </del>
-                      ),
-
-                      // Links
-                      a: ({ href, children }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(
-                            'text-primary underline underline-offset-2',
-                            'hover:opacity-80 transition-opacity'
-                          )}
-                        >
-                          {children}
-                        </a>
-                      ),
-
-                      // Blockquotes
-                      blockquote: ({ children }) => (
-                        <blockquote
-                          className={cn(
-                            'border-l-2 border-border',
-                            'pl-4 my-3 text-muted-foreground italic',
-                            '[&>p]:mb-0'
-                          )}
-                        >
-                          {children}
-                        </blockquote>
-                      ),
-
-                      // Headings
-                      h1: ({ children }) => (
-                        <h1
-                          className={cn(
-                            'text-base font-semibold',
-                            'mt-4 mb-2 first:mt-0'
-                          )}
-                        >
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2
-                          className={cn(
-                            'text-sm font-semibold',
-                            'mt-4 mb-2 first:mt-0'
-                          )}
-                        >
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3
-                          className={cn(
-                            'text-sm font-semibold',
-                            'mt-3 mb-1.5 first:mt-0'
-                          )}
-                        >
-                          {children}
-                        </h3>
-                      ),
-                      h4: ({ children }) => (
-                        <h4
-                          className={cn(
-                            'text-sm font-medium',
-                            'mt-3 mb-1 first:mt-0'
-                          )}
-                        >
-                          {children}
-                        </h4>
-                      ),
-
-                      // Horizontal rule
-                      hr: () => <hr className="my-4 border-border" />,
-
-                      // Images
-                      img: ({ src, alt }) => (
-                        <img
-                          src={src}
-                          alt={alt || ''}
-                          className={cn(
-                            'max-w-full h-auto rounded-lg my-3',
-                            'border'
-                          )}
-                        />
-                      ),
-                    }}
+                  {/* Copy button */}
+                  <button
+                    onClick={handleCopy}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1 rounded-md',
+                      'text-[10px] text-muted-foreground',
+                      'hover:bg-muted hover:text-foreground',
+                      'transition-all duration-150'
+                    )}
+                    title="Copy message"
                   >
-                    {cleanContent || ' '}
-                  </ReactMarkdown>
+                    {copied ? (
+                      <>
+                        <CheckIcon size={12} />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <CopyIcon size={12} />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Regenerate button */}
+                  {onRegenerate && (
+                    <button
+                      onClick={onRegenerate}
+                      className={cn(
+                        'flex items-center gap-1 px-2 py-1 rounded-md',
+                        'text-[10px] text-muted-foreground',
+                        'hover:bg-muted hover:text-foreground',
+                        'transition-all duration-150'
+                      )}
+                      title="Regenerate response"
+                    >
+                      <RegenerateIcon size={12} />
+                      <span>Regenerate</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 /**
- * Collapsible thinking display - Claude/ChatGPT style
- * Collapsed by default, subtle appearance
+ * Collapsible thinking display
  */
 function ThinkingDisplay({
   thinking,
@@ -541,11 +380,15 @@ function ThinkingDisplay({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Estimate thinking time based on content length (rough approximation)
   const estimatedSeconds = Math.max(1, Math.round(thinking.length / 150));
 
   return (
-    <div className="mb-2">
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.2 }}
+      className="mb-2"
+    >
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -556,24 +399,24 @@ function ThinkingDisplay({
           'py-1'
         )}
       >
-        {/* Sparkle/thinking icon */}
-        <svg
-          className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')}
+        {/* Thinking icon */}
+        <motion.svg
+          className="w-3.5 h-3.5"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
+          animate={isLoading ? { rotate: 360 } : {}}
+          transition={
+            isLoading ? { repeat: Infinity, duration: 1, ease: 'linear' } : {}
+          }
         >
           {isLoading ? (
-            // Loading spinner
             <path d="M12 2v4m0 12v4m-7.07-14.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
           ) : (
-            // Sparkles icon (completed)
-            <>
-              <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
-            </>
+            <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
           )}
-        </svg>
+        </motion.svg>
 
         <span className="font-medium">
           {isLoading ? (
@@ -590,15 +433,13 @@ function ThinkingDisplay({
           )}
         </span>
 
-        {/* Expand/collapse chevron */}
-        <svg
-          className={cn(
-            'w-3 h-3 transition-transform duration-200',
-            'opacity-0 group-hover:opacity-100',
-            isExpanded && 'rotate-90'
-          )}
+        {/* Expand chevron */}
+        <motion.svg
+          className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"
           viewBox="0 0 16 16"
           fill="none"
+          animate={{ rotate: isExpanded ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
         >
           <path
             d="M6 4L10 8L6 12"
@@ -607,36 +448,41 @@ function ThinkingDisplay({
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-        </svg>
+        </motion.svg>
       </button>
 
-      {/* Expandable thinking content */}
-      <div
-        className={cn(
-          'overflow-hidden transition-all duration-200',
-          isExpanded ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
+      {/* Expandable content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div
+              className={cn(
+                'pl-5 py-2 text-xs leading-relaxed',
+                'text-muted-foreground/60',
+                'border-l-2 border-muted-foreground/10',
+                'max-h-[280px] overflow-y-auto',
+                'whitespace-pre-wrap break-words'
+              )}
+            >
+              {thinking}
+              {isLoading && (
+                <span className="animate-pulse text-muted-foreground">▋</span>
+              )}
+            </div>
+          </motion.div>
         )}
-      >
-        <div
-          className={cn(
-            'pl-5 py-2 text-xs leading-relaxed',
-            'text-muted-foreground/60',
-            'border-l-2 border-muted-foreground/10',
-            'max-h-[280px] overflow-y-auto',
-            'whitespace-pre-wrap break-words'
-          )}
-        >
-          {thinking}
-          {isLoading && (
-            <span className="animate-pulse text-muted-foreground">▋</span>
-          )}
-        </div>
-      </div>
-    </div>
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
-// Always re-render during streaming for live updates
+// Memo with smart comparison
 export const ChatMessage = memo(PureChatMessage, (prev, next) => {
   if (prev.isLoading || next.isLoading) {
     return false;
@@ -649,8 +495,11 @@ export const ChatMessage = memo(PureChatMessage, (prev, next) => {
 
 // Thinking/loading indicator
 export const ThinkingMessage = () => (
-  <div
-    className="w-full animate-in fade-in duration-300 flex justify-start"
+  <motion.div
+    initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+    transition={{ duration: 0.3 }}
+    className="w-full flex justify-start"
     data-role="assistant"
   >
     <div className="flex gap-3">
@@ -660,9 +509,7 @@ export const ThinkingMessage = () => (
           'rounded-full bg-background ring-1 ring-border'
         )}
       >
-        <div className="animate-pulse">
-          <SparklesIcon size={12} />
-        </div>
+        <SparklesIcon size={12} />
       </div>
 
       <div
@@ -671,7 +518,7 @@ export const ThinkingMessage = () => (
           'text-muted-foreground text-sm'
         )}
       >
-        <span className="animate-pulse">Thinking</span>
+        <span>Thinking</span>
         <span className="inline-flex">
           <span className="animate-bounce [animation-delay:0ms]">.</span>
           <span className="animate-bounce [animation-delay:150ms]">.</span>
@@ -679,5 +526,5 @@ export const ThinkingMessage = () => (
         </span>
       </div>
     </div>
-  </div>
+  </motion.div>
 );

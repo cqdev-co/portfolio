@@ -23,8 +23,8 @@ const yahooFinance = new YahooFinance({
 // CONSTANTS
 // ============================================================================
 
-const INDEX_TICKERS = ['SPY', 'QQQ'] as const;
-type IndexTicker = (typeof INDEX_TICKERS)[number];
+const _INDEX_TICKERS = ['SPY', 'QQQ'] as const; // Reserved for future index analysis
+type IndexTicker = (typeof _INDEX_TICKERS)[number];
 
 // Entry thresholds (conservative for low capital)
 const ENTRY_THRESHOLDS = {
@@ -189,7 +189,8 @@ async function fetchTechnicals(
     const closes = quotes.map((q) => q.close as number);
     const highs = quotes.map((q) => q.high as number);
     const lows = quotes.map((q) => q.low as number);
-    const volumes = quotes.map((q) => q.volume as number);
+    // volumes available for future volume analysis
+    const _volumes = quotes.map((q) => q.volume as number);
 
     // Calculate RSI
     const rsiValues = RSI.calculate({ values: closes, period: 14 });
@@ -206,7 +207,7 @@ async function fetchTechnicals(
     // Calculate VWAP (simplified - daily average)
     const currentPrice = closes[closes.length - 1];
     const typicalPrices = quotes.map(
-      (q, i) =>
+      (q, _i) =>
         ((q.high as number) + (q.low as number) + (q.close as number)) / 3
     );
     const vwapValues = typicalPrices.slice(-5); // 5-day VWAP approximation
@@ -567,7 +568,7 @@ conditions would make it a go? Use the ${nextFriday.formatted} expiration.`;
   try {
     const response = await generateCompletion(config, systemPrompt, userPrompt);
     return response.content;
-  } catch (err) {
+  } catch {
     return 'AI analysis unavailable';
   }
 }

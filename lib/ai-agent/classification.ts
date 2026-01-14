@@ -218,7 +218,7 @@ function matchesAny(message: string, patterns: RegExp[]): boolean {
  */
 export function classifyQuestion(message: string): QuestionClassification {
   const tickers = extractTickers(message);
-  const lower = message.toLowerCase();
+  const _lower = message.toLowerCase(); // Reserved for future use
 
   // Check for position questions first (highest priority)
   if (matchesAny(message, POSITION_PATTERNS)) {

@@ -273,7 +273,7 @@ async function fetchSP500FromWikipedia(): Promise<string[]> {
 
   try {
     logger.info('Fetching S&P 500 list from Wikipedia...');
-    const response: any = await fetch(url);
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Wikipedia returned ${response.status}`);

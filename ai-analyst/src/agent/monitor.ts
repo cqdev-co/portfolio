@@ -12,14 +12,9 @@ import {
   checkAlertCooldown,
   updateAlertCooldown,
   type WatchlistItem,
-  type AlertType,
 } from '../services/supabase.ts';
 import { scanForOpportunities, type ScanResult } from '../services/scanner.ts';
-import {
-  sendDiscordAlert,
-  sendEntrySignal,
-  isDiscordConfigured,
-} from '../services/discord.ts';
+import { sendEntrySignal, isDiscordConfigured } from '../services/discord.ts';
 import {
   evaluateEntrySignal,
   shouldSendAlert,
@@ -462,7 +457,7 @@ async function processAlert(
   }
 
   // Save alert to database
-  const alert = await createAlert({
+  await createAlert({
     ticker,
     alertType: decision.alertType,
     priority: decision.priority,
@@ -761,7 +756,7 @@ export function displayAgentStatus(): void {
 /**
  * Run a single scan with full debug output (no alerts sent)
  */
-export async function runDryScan(options?: {
+export async function runDryScan(_options?: {
   aiMode?: OllamaMode;
 }): Promise<void> {
   console.log();

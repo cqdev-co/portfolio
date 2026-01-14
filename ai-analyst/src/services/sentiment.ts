@@ -402,7 +402,7 @@ function buildSentimentSummary(
   catalysts: CatalystRisk[],
   bullish: string[],
   bearish: string[],
-  newsCount: number
+  _newsCount: number // Reserved for future detailed news summaries
 ): string {
   const parts: string[] = [];
 

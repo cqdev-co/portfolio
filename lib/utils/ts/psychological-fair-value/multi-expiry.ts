@@ -8,7 +8,6 @@
 import type {
   OptionsExpiration,
   ExpirationAnalysis,
-  MaxPainResult,
   GammaWallsResult,
 } from './types';
 import { calculateMaxPain, isMonthlyOpex, isWeeklyOpex } from './max-pain';

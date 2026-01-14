@@ -206,16 +206,15 @@ function Blockquote(props: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) {
   );
 }
 
-export const globalComponents = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const globalComponents: any = {
   h1: createHeading(1),
   h2: createHeading(2),
   h3: createHeading(3),
   h4: createHeading(4),
   h5: createHeading(5),
   h6: createHeading(6),
-  // Cast to any to satisfy react-markdown's strict component typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  img: RoundedImage as any,
+  img: RoundedImage,
   Image: RoundedImage,
   a: CustomLink,
   Table,

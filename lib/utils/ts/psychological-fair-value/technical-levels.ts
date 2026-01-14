@@ -266,36 +266,30 @@ export function determineTrendBias(
   const { currentPrice, ma20, ma50, ma200 } = data;
 
   let bullishSignals = 0;
-  let bearishSignals = 0;
   let totalSignals = 0;
 
   if (ma200) {
     totalSignals += 2; // MA200 counts double
     if (currentPrice > ma200) bullishSignals += 2;
-    else bearishSignals += 2;
   }
 
   if (ma50) {
     totalSignals += 1;
     if (currentPrice > ma50) bullishSignals += 1;
-    else bearishSignals += 1;
   }
 
   if (ma20) {
     totalSignals += 1;
     if (currentPrice > ma20) bullishSignals += 1;
-    else bearishSignals += 1;
   }
 
   // Check MA alignment (MA20 > MA50 > MA200 = bullish)
   if (ma20 && ma50 && ma200) {
+    totalSignals += 1;
     if (ma20 > ma50 && ma50 > ma200) {
       bullishSignals += 1;
-      totalSignals += 1;
-    } else if (ma20 < ma50 && ma50 < ma200) {
-      bearishSignals += 1;
-      totalSignals += 1;
     }
+    // Bearish alignment (ma20 < ma50 < ma200) implicitly gives 0 bullish points
   }
 
   if (totalSignals === 0) return 'NEUTRAL';

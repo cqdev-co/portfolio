@@ -555,7 +555,8 @@ export async function findSpreadWithAlternatives(
 
   // Minimum liquidity thresholds
   const MIN_OI = 50; // Minimum open interest for fillable strikes
-  const MIN_VOLUME_PREFERRED = 10; // Prefer strikes with recent volume
+  // MIN_VOLUME_PREFERRED reserved for stricter liquidity filtering
+  const _MIN_VOLUME_PREFERRED = 10;
 
   // Find spreads with different widths: $2.50, $5, $10
   const widths = [2.5, 5, 10];

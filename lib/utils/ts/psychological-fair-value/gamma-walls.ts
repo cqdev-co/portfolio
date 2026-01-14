@@ -298,7 +298,7 @@ function estimateGamma(strike: number, spot: number, dte: number): number {
  */
 export function findGammaFlip(
   gexMap: Map<number, { callGEX: number; putGEX: number; netGEX: number }>,
-  currentPrice: number
+  _currentPrice: number // Reserved for proximity-based filtering
 ): number | null {
   const strikes = Array.from(gexMap.keys()).sort((a, b) => a - b);
 

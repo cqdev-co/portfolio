@@ -774,9 +774,9 @@ class AnalysisService:
         """
         Calculate overall signal score (0-1.0).
 
-        UPDATED Jan 2026: Added late entry penalty to fix score inversion.
-        Data showed 0.60-0.69 scores had 56.1% WR vs 0.70-0.79 had 35.4% WR
-        because high scores were buying AFTER the move already happened.
+        UPDATED Jan 13, 2026: Added extreme volume penalty.
+        Data showed: 2-3x volume = 72.5% WR vs 5x+ = 46.1% WR
+        Extreme volume often signals end of move, not beginning.
         """
         total_score = (
             explosion_signal.volume_score
@@ -792,13 +792,17 @@ class AnalysisService:
         # 1 green day = 64.8% WR (best), 0 or 4+ = ~42% WR
         total_score = self._apply_green_day_adjustment(total_score, explosion_signal)
 
-        # Apply 52-week position adjustment (Jan 2026)
-        # 25-50% from low = 55.1% WR, +5.90% (optimal zone)
+        # Apply 52-week position adjustment (Jan 2026, updated Jan 13)
+        # 25-50% from low = 55.1% WR, >75% = overextended (NEW)
         total_score = self._apply_52w_position_adjustment(total_score, explosion_signal)
 
         # Apply day of week adjustment (Jan 2026)
         # Friday = 57.4% WR (best), Wednesday = 44.7% WR (worst)
         total_score = self._apply_day_of_week_adjustment(total_score, explosion_signal)
+
+        # Apply extreme volume penalty (NEW Jan 13, 2026)
+        # 5x+ volume = 46.1% WR vs 2-3x = 72.5% WR
+        total_score = self._apply_extreme_volume_penalty(total_score, explosion_signal)
 
         return clamp(total_score, 0.0, 1.0)
 
@@ -887,11 +891,13 @@ class AnalysisService:
         """
         Apply 52-week position adjustment.
 
-        ADDED Jan 2026: Data shows optimal entry is 25-50% above 52-week low.
+        UPDATED Jan 13, 2026: Added penalty for stocks near 52-week highs.
+        Data analysis showed S-Tier signals averaged 98% from 52w low (near highs!)
+        which is a major cause of their poor performance (11.8% WR).
+
         - 25-50% from low: 55.1% WR, +5.90% (BEST - recovering, not overextended)
         - <25% from low: 45.3% WR, -3.78% (catching falling knife)
-        - 50-100% from low: 45.1% WR, +2.25% (okay)
-        - 100%+ from low: 48.0% WR, -0.11% (overextended)
+        - >75% from low: Overextended, sellers waiting (NEW PENALTY)
         """
         dist_from_low = signal.distance_from_52w_low or 0
 
@@ -915,7 +921,16 @@ class AnalysisService:
             )
             return score * self.settings.position_52w_near_low_penalty
 
-        # 50%+ from low: neutral (no adjustment)
+        # NEW: Penalty for >75% from low (near 52-week highs, overextended)
+        # S-Tier signals avg 98% from low - this is why they underperform!
+        if dist_from_low > self.settings.position_52w_near_high_threshold:
+            logger.debug(
+                f"{signal.symbol}: 52w position penalty - "
+                f"{dist_from_low:.1f}% from low (near highs, overextended)"
+            )
+            return score * self.settings.position_52w_near_high_penalty
+
+        # 50-75% from low: neutral (no adjustment)
         return score
 
     def _apply_day_of_week_adjustment(
@@ -945,6 +960,38 @@ class AnalysisService:
             return score * self.settings.day_of_week_wednesday_penalty
 
         # Other days: neutral
+        return score
+
+    def _apply_extreme_volume_penalty(
+        self, score: float, signal: ExplosionSignal
+    ) -> float:
+        """
+        Apply penalty for extreme volume (5x+).
+
+        ADDED Jan 13, 2026: Data analysis showed:
+        - Volume 2-3x: 72.5% WR, +5.40% avg return (BEST)
+        - Volume 5x+: 46.1% WR, +0.65% avg return
+
+        Extreme volume often signals:
+        - End of a move, not the beginning
+        - Retail FOMO chasing (late entry)
+        - Potential pump-and-dump activity
+
+        The volume scoring already penalizes 5x+ to some degree, but
+        this additional adjustment ensures the final score reflects
+        the poor performance of extreme volume signals.
+        """
+        volume_ratio = signal.volume_spike_factor or signal.volume_ratio or 1.0
+
+        # Apply penalty for extreme volume (>5x)
+        if volume_ratio > self.settings.extreme_volume_threshold:
+            logger.debug(
+                f"{signal.symbol}: Extreme volume penalty - "
+                f"{volume_ratio:.1f}x (often signals end of move)"
+            )
+            return score * self.settings.extreme_volume_penalty
+
+        # Normal volume: no adjustment
         return score
 
     def _calculate_opportunity_rank(self, score: float) -> OpportunityRank:

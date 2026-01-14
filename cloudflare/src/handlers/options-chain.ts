@@ -181,7 +181,7 @@ export async function handleOptionsChain(
     // Debug: log a sample raw option to see what Yahoo returns
     if (firstOptions.calls && firstOptions.calls.length > 0) {
       const sampleCall = firstOptions.calls.find(
-        (c: any) => c.strike && c.strike > 0
+        (c) => c.strike && c.strike > 0
       );
       if (sampleCall) {
         logger.debug(

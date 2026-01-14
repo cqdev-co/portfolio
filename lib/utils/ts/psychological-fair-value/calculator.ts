@@ -18,8 +18,6 @@ import type {
 } from './types';
 
 import { detectProfile, normalizeWeights } from './profiles';
-import { calculateMaxPain } from './max-pain';
-import { detectGammaWalls } from './gamma-walls';
 import {
   analyzeTechnicalLevels,
   findConfluenceZones,
@@ -30,9 +28,13 @@ import {
   analyzeMultipleExpirations,
   getWeightedMaxPain,
   getWeightedGammaCenter,
-  aggregateGammaWalls,
   getPrimaryExpiration,
 } from './multi-expiry';
+
+// Re-export for external consumers
+export { calculateMaxPain } from './max-pain';
+export { detectGammaWalls } from './gamma-walls';
+export { aggregateGammaWalls } from './multi-expiry';
 
 // ============================================================================
 // MAIN CALCULATOR

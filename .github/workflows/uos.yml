@@ -30,6 +30,7 @@ on:
         options:
           - scan
           - performance_report
+          - classification_validation
       min_grade:
         description: 'Minimum signal grade (for scan)'
         required: false
@@ -131,6 +132,27 @@ jobs:
           echo "=== Hedge vs Directional Breakdown ==="
           echo ""
           poetry run python scripts/hedge_analyzer.py --days 7 --min-grade A
+          echo ""
+          echo "=== Classification System Validation ==="
+          echo ""
+          poetry run python scripts/classification_validator.py --validate --days 30
+
+      - name: Run classification validation (manual or weekly)
+        if: github.event.inputs.job_type == 'classification_validation'
+        working-directory: unusual-options-service
+        env:
+          PYTHONUNBUFFERED: 1
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "=== Classification System Validation ==="
+          echo ""
+          poetry run python scripts/classification_validator.py --report --days 60
+          echo ""
+          echo "=== Updating Signals with Actual Outcomes ==="
+          echo ""
+          poetry run python scripts/classification_validator.py --update --days 60
 
       - name: Send Discord weekly performance report
         if: github.event.inputs.job_type == 'performance_report' || github.event.schedule == '0 23 * * 0'

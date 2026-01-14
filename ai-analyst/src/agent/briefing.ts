@@ -17,7 +17,6 @@ import {
   saveBriefing,
   markBriefingDelivered,
   type WatchlistItem,
-  type Briefing as DBBriefing,
 } from '../services/supabase.ts';
 import { scanForOpportunities, type ScanResult } from '../services/scanner.ts';
 import { generateCompletion, type OllamaMode } from '../services/ollama.ts';

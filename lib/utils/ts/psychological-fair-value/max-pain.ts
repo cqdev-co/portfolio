@@ -6,7 +6,7 @@
  * and profit for market makers.
  */
 
-import type { OptionsExpiration, MaxPainResult, OptionContract } from './types';
+import type { OptionsExpiration, MaxPainResult } from './types';
 
 // ============================================================================
 // MAX PAIN CALCULATION

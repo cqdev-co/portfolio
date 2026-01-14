@@ -1,7 +1,25 @@
 /**
- * Advanced Trade Analyzer
- * Provides trade grading, scenario analysis, and risk scoring
+ * Trade Scanner Service
+ *
+ * Scans multiple tickers to find optimal trading opportunities.
+ * Shared between CLI and Frontend for consistent scanning logic.
+ *
+ * Features:
+ * - Predefined scan lists (tech, semis, mega-cap, etc.)
+ * - Trade grading with A-F system
+ * - Risk scoring
+ * - Cushion and RSI filtering
+ *
+ * @example
+ * ```typescript
+ * import { quickScan, SCAN_LISTS } from '@lib/ai-agent';
+ *
+ * const results = await quickScan(SCAN_LISTS.TECH, { minGrade: 'B' });
+ * console.log(`Found ${results.length} opportunities`);
+ * ```
  */
+
+import { fetchTickerData } from '../data';
 
 // ============================================================================
 // TYPES
@@ -36,20 +54,12 @@ export interface TradeGradeResult {
   criteria: GradingCriteria[];
   summary: string;
   recommendation: 'STRONG BUY' | 'BUY' | 'WAIT' | 'AVOID';
-  // Additional data for analysis
-  rsi?: number;
-  aboveMA200?: boolean;
-  earningsDays?: number;
 }
 
-export interface ScenarioResult {
-  scenario: string;
-  priceChange: number;
-  newPrice: number;
-  spreadValue: number;
-  pnl: number;
-  pnlPercent: number;
-  outcome: 'MAX PROFIT' | 'PROFIT' | 'BREAKEVEN' | 'LOSS' | 'MAX LOSS';
+export interface RiskFactor {
+  name: string;
+  impact: number; // 1-3
+  description: string;
 }
 
 export interface RiskScore {
@@ -59,22 +69,208 @@ export interface RiskScore {
   summary: string;
 }
 
-export interface RiskFactor {
-  name: string;
-  impact: number; // 1-3
-  description: string;
-}
-
-export interface AdvancedAnalysis {
-  grade: TradeGradeResult;
-  scenarios: ScenarioResult[];
+export interface ScanResult {
+  ticker: string;
+  price: number;
+  grade: TradeGrade;
+  gradeResult: TradeGradeResult;
   risk: RiskScore;
+  rsi: number;
+  aboveMA200: boolean;
+  cushionPercent?: number;
+  earningsDays?: number;
+  // Additional context
+  change?: number;
+  changePct?: number;
+  marketCap?: number;
+  iv?: number;
+  spread?: {
+    longStrike: number;
+    shortStrike: number;
+    debit: number;
+    dte: number;
+  };
+}
+
+export interface ScanOptions {
+  minGrade?: TradeGrade;
+  maxRisk?: number;
+  minCushion?: number;
+  requireAboveMA200?: boolean;
+  maxRsi?: number;
+  minRsi?: number;
+  onProgress?: (ticker: string, current: number, total: number) => void;
 }
 
 // ============================================================================
-// GRADE RUBRIC (for transparency)
+// SCAN LISTS
 // ============================================================================
 
+/**
+ * Predefined lists of tickers for scanning
+ */
+export const SCAN_LISTS = {
+  // Main trading universe
+  TECH: [
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'AMZN',
+    'META',
+    'NVDA',
+    'AMD',
+    'CRM',
+    'ORCL',
+    'ADBE',
+    'NOW',
+    'SHOP',
+    'SQ',
+    'PYPL',
+  ],
+
+  SEMIS: [
+    'NVDA',
+    'AMD',
+    'AVGO',
+    'QCOM',
+    'INTC',
+    'MU',
+    'MRVL',
+    'AMAT',
+    'LRCX',
+    'KLAC',
+    'TSM',
+  ],
+
+  MEGACAP: [
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'AMZN',
+    'META',
+    'NVDA',
+    'TSLA',
+    'BRK-B',
+    'JPM',
+    'V',
+    'UNH',
+    'MA',
+  ],
+
+  FINANCIALS: [
+    'JPM',
+    'BAC',
+    'WFC',
+    'GS',
+    'MS',
+    'C',
+    'SCHW',
+    'BLK',
+    'AXP',
+    'COF',
+    'V',
+    'MA',
+  ],
+
+  HEALTHCARE: [
+    'UNH',
+    'JNJ',
+    'PFE',
+    'ABBV',
+    'MRK',
+    'LLY',
+    'TMO',
+    'ABT',
+    'BMY',
+    'AMGN',
+  ],
+
+  CONSUMER: [
+    'HD',
+    'MCD',
+    'NKE',
+    'SBUX',
+    'TGT',
+    'COST',
+    'WMT',
+    'LOW',
+    'DIS',
+    'NFLX',
+  ],
+
+  ENERGY: [
+    'XOM',
+    'CVX',
+    'COP',
+    'SLB',
+    'EOG',
+    'OXY',
+    'PSX',
+    'VLO',
+    'MPC',
+    'HAL',
+  ],
+
+  // Full universe for comprehensive scans
+  FULL: [
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'AMZN',
+    'META',
+    'NVDA',
+    'AMD',
+    'TSLA',
+    'CRM',
+    'ORCL',
+    'ADBE',
+    'NOW',
+    'SHOP',
+    'SQ',
+    'PYPL',
+    'AVGO',
+    'QCOM',
+    'INTC',
+    'MU',
+    'MRVL',
+    'AMAT',
+    'LRCX',
+    'KLAC',
+    'TSM',
+    'JPM',
+    'BAC',
+    'WFC',
+    'GS',
+    'MS',
+    'V',
+    'MA',
+    'UNH',
+    'JNJ',
+    'LLY',
+    'PFE',
+    'ABBV',
+    'HD',
+    'MCD',
+    'NKE',
+    'SBUX',
+    'TGT',
+    'COST',
+    'WMT',
+    'DIS',
+    'NFLX',
+    'XOM',
+    'CVX',
+    'COP',
+  ],
+} as const;
+
+// ============================================================================
+// GRADING SYSTEM
+// ============================================================================
+
+/**
+ * Grade rubric for transparency
+ */
 export const GRADE_RUBRIC = {
   criteria: [
     {
@@ -121,56 +317,11 @@ export const GRADE_RUBRIC = {
     D: { min: 50, recommendation: 'AVOID' },
     F: { min: 0, recommendation: 'AVOID' },
   },
-  riskLevels: {
-    '1-3': 'LOW - Favorable conditions, standard position size',
-    '4-5': 'MODERATE - Some concerns, consider reduced size',
-    '6-7': 'HIGH - Multiple red flags, minimal exposure only',
-    '8-10': 'EXTREME - Avoid trade entirely',
-  },
 };
-
-/**
- * Get human-readable explanation of grade and risk
- */
-export function explainGradeRubric(
-  grade: TradeGradeResult,
-  risk: RiskScore
-): string {
-  const lines: string[] = [];
-
-  lines.push(`GRADE: ${grade.grade} (${grade.score}/${grade.maxScore} points)`);
-  lines.push('');
-  lines.push('Scoring Breakdown:');
-
-  for (const c of grade.criteria) {
-    const status = c.passed ? '✓' : '✗';
-    lines.push(
-      `  ${status} ${c.name}: ${c.points}/${c.maxPoints} - ${c.reason}`
-    );
-  }
-
-  lines.push('');
-  lines.push(`RISK: ${risk.score}/10 (${risk.level})`);
-  lines.push('');
-  lines.push('Risk Factors:');
-
-  for (const f of risk.factors) {
-    const impact = '!'.repeat(f.impact);
-    lines.push(`  ${impact} ${f.name}: ${f.description}`);
-  }
-
-  return lines.join('\n');
-}
-
-// ============================================================================
-// TRADE GRADING
-// ============================================================================
 
 interface GradingInput {
   price: number;
   rsi?: number;
-  ma20?: number;
-  ma50?: number;
   ma200?: number;
   aboveMA200?: boolean;
   earningsDays?: number | null;
@@ -180,6 +331,52 @@ interface GradingInput {
   debit?: number;
 }
 
+function scoreToGrade(percentage: number): TradeGrade {
+  if (percentage >= 95) return 'A+';
+  if (percentage >= 90) return 'A';
+  if (percentage >= 85) return 'A-';
+  if (percentage >= 80) return 'B+';
+  if (percentage >= 75) return 'B';
+  if (percentage >= 70) return 'B-';
+  if (percentage >= 65) return 'C+';
+  if (percentage >= 60) return 'C';
+  if (percentage >= 55) return 'C-';
+  if (percentage >= 50) return 'D';
+  return 'F';
+}
+
+function gradeToRecommendation(
+  grade: TradeGrade
+): TradeGradeResult['recommendation'] {
+  if (grade === 'A+' || grade === 'A') return 'STRONG BUY';
+  if (grade === 'A-' || grade === 'B+' || grade === 'B') return 'BUY';
+  if (grade === 'B-' || grade === 'C+' || grade === 'C') return 'WAIT';
+  return 'AVOID';
+}
+
+/**
+ * Compare grades (returns true if a >= b)
+ */
+export function gradeAtLeast(a: TradeGrade, b: TradeGrade): boolean {
+  const gradeOrder: TradeGrade[] = [
+    'A+',
+    'A',
+    'A-',
+    'B+',
+    'B',
+    'B-',
+    'C+',
+    'C',
+    'C-',
+    'D',
+    'F',
+  ];
+  return gradeOrder.indexOf(a) <= gradeOrder.indexOf(b);
+}
+
+/**
+ * Grade a trade opportunity
+ */
 export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
   const criteria: GradingCriteria[] = [];
   let totalScore = 0;
@@ -384,8 +581,6 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
   const recommendation = gradeToRecommendation(grade);
 
   // Generate summary
-  // passedCount available for detailed reporting
-  const _passedCount = criteria.filter((c) => c.passed).length;
   const failedCriteria = criteria.filter((c) => !c.passed);
 
   let summary = `Score: ${totalScore}/${maxScore} (${percentage.toFixed(0)}%)`;
@@ -404,113 +599,6 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
   };
 }
 
-function scoreToGrade(percentage: number): TradeGrade {
-  if (percentage >= 95) return 'A+';
-  if (percentage >= 90) return 'A';
-  if (percentage >= 85) return 'A-';
-  if (percentage >= 80) return 'B+';
-  if (percentage >= 75) return 'B';
-  if (percentage >= 70) return 'B-';
-  if (percentage >= 65) return 'C+';
-  if (percentage >= 60) return 'C';
-  if (percentage >= 55) return 'C-';
-  if (percentage >= 50) return 'D';
-  return 'F';
-}
-
-function gradeToRecommendation(
-  grade: TradeGrade
-): TradeGradeResult['recommendation'] {
-  if (grade === 'A+' || grade === 'A') return 'STRONG BUY';
-  if (grade === 'A-' || grade === 'B+' || grade === 'B') return 'BUY';
-  if (grade === 'B-' || grade === 'C+' || grade === 'C') return 'WAIT';
-  return 'AVOID';
-}
-
-// ============================================================================
-// SCENARIO ANALYSIS
-// ============================================================================
-
-interface ScenarioInput {
-  currentPrice: number;
-  longStrike: number;
-  shortStrike: number;
-  debit: number;
-}
-
-export function analyzeScenarios(input: ScenarioInput): ScenarioResult[] {
-  const { currentPrice, longStrike, shortStrike, debit } = input;
-  const spreadWidth = shortStrike - longStrike;
-  const maxProfit = (spreadWidth - debit) * 100;
-  const maxLoss = debit * 100;
-  const breakeven = longStrike + debit;
-
-  const scenarios: ScenarioResult[] = [];
-
-  // Define price change scenarios
-  const priceChanges = [
-    { label: 'Up 10%', change: 0.1 },
-    { label: 'Up 5%', change: 0.05 },
-    { label: 'Flat', change: 0 },
-    { label: 'Down 5%', change: -0.05 },
-    { label: 'Down 10%', change: -0.1 },
-    { label: 'Down 15%', change: -0.15 },
-    {
-      label: 'To Breakeven',
-      change: (breakeven - currentPrice) / currentPrice,
-    },
-    {
-      label: 'To Long Strike',
-      change: (longStrike - currentPrice) / currentPrice,
-    },
-  ];
-
-  for (const { label, change } of priceChanges) {
-    const newPrice = currentPrice * (1 + change);
-
-    // Calculate spread value at expiration
-    let spreadValue: number;
-    if (newPrice >= shortStrike) {
-      // Both ITM - max profit
-      spreadValue = spreadWidth;
-    } else if (newPrice >= longStrike) {
-      // Only long call ITM
-      spreadValue = newPrice - longStrike;
-    } else {
-      // Both OTM - max loss
-      spreadValue = 0;
-    }
-
-    const pnl = (spreadValue - debit) * 100;
-    const pnlPercent = (pnl / maxLoss) * 100;
-
-    let outcome: ScenarioResult['outcome'];
-    if (pnl >= maxProfit * 0.99) {
-      outcome = 'MAX PROFIT';
-    } else if (pnl > 0) {
-      outcome = 'PROFIT';
-    } else if (Math.abs(pnl) < 1) {
-      outcome = 'BREAKEVEN';
-    } else if (pnl <= -maxLoss * 0.99) {
-      outcome = 'MAX LOSS';
-    } else {
-      outcome = 'LOSS';
-    }
-
-    scenarios.push({
-      scenario: label,
-      priceChange: change * 100,
-      newPrice: Math.round(newPrice * 100) / 100,
-      spreadValue: Math.round(spreadValue * 100) / 100,
-      pnl: Math.round(pnl),
-      pnlPercent: Math.round(pnlPercent),
-      outcome,
-    });
-  }
-
-  return scenarios;
-}
-
 // ============================================================================
 // RISK SCORING
 // ============================================================================
@@ -520,11 +608,13 @@ interface RiskInput {
   cushionPercent?: number;
   earningsDays?: number | null;
   dte?: number;
-  positionSizePercent?: number; // % of account
+  positionSizePercent?: number;
   aboveMA200?: boolean;
-  volatilityHigh?: boolean;
 }
 
+/**
+ * Calculate risk score for a trade
+ */
 export function calculateRiskScore(input: RiskInput): RiskScore {
   const factors: RiskFactor[] = [];
   let totalRisk = 0;
@@ -535,7 +625,7 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
       factors.push({
         name: 'Overbought RSI',
         impact: 3,
-        description: `RSI at ${input.rsi.toFixed(0)} indicates overbought conditions`,
+        description: `RSI at ${input.rsi.toFixed(0)} indicates overbought`,
       });
       totalRisk += 3;
     } else if (input.rsi > 55) {
@@ -554,7 +644,7 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
       factors.push({
         name: 'Minimal Cushion',
         impact: 3,
-        description: `Only ${input.cushionPercent.toFixed(1)}% cushion - high risk of loss`,
+        description: `Only ${input.cushionPercent.toFixed(1)}% cushion`,
       });
       totalRisk += 3;
     } else if (input.cushionPercent < 5) {
@@ -573,14 +663,14 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
       factors.push({
         name: 'Imminent Earnings',
         impact: 3,
-        description: `Earnings in ${input.earningsDays} days - extreme volatility risk`,
+        description: `Earnings in ${input.earningsDays} days`,
       });
       totalRisk += 3;
     } else if (input.earningsDays <= 14) {
       factors.push({
         name: 'Upcoming Earnings',
         impact: 2,
-        description: `Earnings in ${input.earningsDays} days - elevated volatility`,
+        description: `Earnings in ${input.earningsDays} days`,
       });
       totalRisk += 2;
     }
@@ -592,32 +682,13 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
       factors.push({
         name: 'Short DTE',
         impact: 2,
-        description: `Only ${input.dte} DTE - limited time for recovery`,
+        description: `Only ${input.dte} DTE - limited recovery time`,
       });
       totalRisk += 2;
     }
   }
 
-  // 5. Position Size Risk
-  if (input.positionSizePercent !== undefined) {
-    if (input.positionSizePercent > 30) {
-      factors.push({
-        name: 'Oversized Position',
-        impact: 3,
-        description: `${input.positionSizePercent.toFixed(0)}% of account - too concentrated`,
-      });
-      totalRisk += 3;
-    } else if (input.positionSizePercent > 20) {
-      factors.push({
-        name: 'Large Position',
-        impact: 1,
-        description: `${input.positionSizePercent.toFixed(0)}% of account - above guideline`,
-      });
-      totalRisk += 1;
-    }
-  }
-
-  // 6. Trend Risk
+  // 5. Trend Risk
   if (input.aboveMA200 === false) {
     factors.push({
       name: 'Below MA200',
@@ -639,7 +710,8 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
   const summary =
     factors.length === 0
       ? 'No significant risk factors identified'
-      : `${factors.length} risk factor${factors.length > 1 ? 's' : ''}: ${factors.map((f) => f.name).join(', ')}`;
+      : `${factors.length} risk factor${factors.length > 1 ? 's' : ''}: ` +
+        `${factors.map((f) => f.name).join(', ')}`;
 
   return {
     score,
@@ -650,115 +722,206 @@ export function calculateRiskScore(input: RiskInput): RiskScore {
 }
 
 // ============================================================================
-// COMBINED ANALYSIS
+// SCANNER FUNCTIONS
 // ============================================================================
 
-export interface FullAnalysisInput {
-  ticker: string;
-  price: number;
-  rsi?: number;
-  ma200?: number;
-  aboveMA200?: boolean;
-  earningsDays?: number | null;
-  // Spread details (optional - for existing position or recommendation)
-  longStrike?: number;
-  shortStrike?: number;
-  debit?: number;
-  dte?: number;
-  // Account context
-  accountSize?: number;
-}
+/**
+ * Analyze a single ticker for trade opportunity
+ */
+async function analyzeTicker(ticker: string): Promise<ScanResult | null> {
+  try {
+    const data = await fetchTickerData(ticker);
+    if (!data || !data.price) {
+      return null;
+    }
 
-export function performFullAnalysis(
-  input: FullAnalysisInput
-): AdvancedAnalysis | null {
-  const { price, longStrike, shortStrike, debit } = input;
+    // Extract relevant data
+    const rsi = data.rsi ?? 50;
+    const aboveMA200 = data.aboveMA200 ?? false;
+    const earningsDays = data.earningsDays ?? undefined;
+    const cushionPercent = data.spread?.cushion;
 
-  // Need spread details for full analysis
-  if (!longStrike || !shortStrike || !debit) {
+    // Grade the opportunity
+    const gradeResult = gradeTradeOpportunity({
+      price: data.price,
+      rsi,
+      aboveMA200,
+      earningsDays,
+      cushionPercent,
+      dte: data.spread?.dte,
+      spreadWidth: data.spread
+        ? data.spread.shortStrike - data.spread.longStrike
+        : undefined,
+      debit: data.spread?.estimatedDebit,
+    });
+
+    // Calculate risk
+    const risk = calculateRiskScore({
+      rsi,
+      cushionPercent,
+      earningsDays,
+      dte: data.spread?.dte,
+      aboveMA200,
+    });
+
+    return {
+      ticker,
+      price: data.price,
+      grade: gradeResult.grade,
+      gradeResult,
+      risk,
+      rsi,
+      aboveMA200,
+      cushionPercent,
+      earningsDays,
+      change: data.change,
+      changePct: data.changePct,
+      marketCap: data.marketCap,
+      iv: data.iv?.currentIV,
+      spread:
+        data.spread && data.spread.estimatedDebit && data.spread.dte
+          ? {
+              longStrike: data.spread.longStrike,
+              shortStrike: data.spread.shortStrike,
+              debit: data.spread.estimatedDebit,
+              dte: data.spread.dte,
+            }
+          : undefined,
+    };
+  } catch {
     return null;
   }
+}
 
-  const spreadWidth = shortStrike - longStrike;
-  const breakeven = longStrike + debit;
-  const cushionPercent = ((price - breakeven) / price) * 100;
-  const positionCost = debit * 100;
-  const positionSizePercent = input.accountSize
-    ? (positionCost / input.accountSize) * 100
-    : undefined;
+/**
+ * Quick scan of tickers with basic filtering
+ */
+export async function quickScan(
+  tickers: readonly string[],
+  options: ScanOptions = {}
+): Promise<ScanResult[]> {
+  const {
+    minGrade = 'C',
+    maxRisk = 7,
+    minCushion,
+    requireAboveMA200 = false,
+    maxRsi = 65,
+    minRsi = 30,
+    onProgress,
+  } = options;
 
-  // Grade the trade
-  const grade = gradeTradeOpportunity({
-    price,
-    rsi: input.rsi,
-    ma200: input.ma200,
-    aboveMA200: input.aboveMA200,
-    earningsDays: input.earningsDays,
-    cushionPercent,
-    dte: input.dte,
-    spreadWidth,
-    debit,
+  const results: ScanResult[] = [];
+  const total = tickers.length;
+
+  for (let i = 0; i < tickers.length; i++) {
+    const ticker = tickers[i];
+
+    if (onProgress) {
+      onProgress(ticker, i + 1, total);
+    }
+
+    const result = await analyzeTicker(ticker);
+    if (!result) continue;
+
+    // Apply filters
+    if (!gradeAtLeast(result.grade, minGrade)) continue;
+    if (result.risk.score > maxRisk) continue;
+    if (minCushion && (result.cushionPercent ?? 0) < minCushion) continue;
+    if (requireAboveMA200 && !result.aboveMA200) continue;
+    if (result.rsi > maxRsi || result.rsi < minRsi) continue;
+
+    results.push(result);
+  }
+
+  // Sort by grade (best first)
+  results.sort((a, b) => {
+    if (a.gradeResult.percentage !== b.gradeResult.percentage) {
+      return b.gradeResult.percentage - a.gradeResult.percentage;
+    }
+    return a.risk.score - b.risk.score;
   });
 
-  // Scenario analysis
-  const scenarios = analyzeScenarios({
-    currentPrice: price,
-    longStrike,
-    shortStrike,
-    debit,
-  });
+  return results;
+}
 
-  // Risk score
-  const risk = calculateRiskScore({
-    rsi: input.rsi,
-    cushionPercent,
-    earningsDays: input.earningsDays,
-    dte: input.dte,
-    positionSizePercent,
-    aboveMA200: input.aboveMA200,
+/**
+ * Full scan with all details (slower but comprehensive)
+ */
+export async function fullScan(
+  tickers: readonly string[],
+  options: ScanOptions = {}
+): Promise<ScanResult[]> {
+  // Full scan uses the same logic but with no grade filter by default
+  return quickScan(tickers, {
+    ...options,
+    minGrade: options.minGrade ?? 'F',
   });
-
-  return {
-    grade,
-    scenarios,
-    risk,
-  };
 }
 
 // ============================================================================
-// FORMAT FOR AI CONTEXT
+// FORMATTERS
 // ============================================================================
 
-export function formatAnalysisForAI(analysis: AdvancedAnalysis): string {
-  let output = '';
-
-  // Grade section
-  output += `\n=== TRADE GRADE: ${analysis.grade.grade} ===\n`;
-  output += `Score: ${analysis.grade.score}/${analysis.grade.maxScore} (${analysis.grade.percentage.toFixed(0)}%)\n`;
-  output += `Recommendation: ${analysis.grade.recommendation}\n\n`;
-
-  output += `Criteria breakdown:\n`;
-  for (const c of analysis.grade.criteria) {
-    const icon = c.passed ? '✓' : '✗';
-    output += `  ${icon} ${c.name}: ${c.points}/${c.maxPoints} pts - ${c.reason}\n`;
+/**
+ * Format scan results for AI context
+ */
+export function formatScanResultsForAI(results: ScanResult[]): string {
+  if (results.length === 0) {
+    return 'No opportunities found matching criteria.';
   }
 
-  // Risk section
-  output += `\n=== RISK SCORE: ${analysis.risk.score}/10 (${analysis.risk.level}) ===\n`;
-  if (analysis.risk.factors.length > 0) {
-    for (const f of analysis.risk.factors) {
-      output += `  ⚠ ${f.name} (impact: ${f.impact}/3) - ${f.description}\n`;
+  let output = `\n=== SCAN RESULTS (${results.length} found) ===\n`;
+
+  for (const r of results.slice(0, 10)) {
+    output += `\n${r.ticker} | Grade: ${r.grade} | Risk: ${r.risk.score}/10\n`;
+    output += `  Price: $${r.price.toFixed(2)}`;
+    if (r.changePct !== undefined) {
+      const sign = r.changePct >= 0 ? '+' : '';
+      output += ` (${sign}${r.changePct.toFixed(2)}%)`;
     }
-  } else {
-    output += `  No significant risk factors\n`;
+    output += `\n`;
+    output += `  RSI: ${r.rsi.toFixed(1)} | MA200: ${r.aboveMA200 ? 'Above ✓' : 'Below ✗'}\n`;
+
+    if (r.cushionPercent !== undefined) {
+      output += `  Cushion: ${r.cushionPercent.toFixed(1)}%\n`;
+    }
+    if (r.earningsDays !== undefined) {
+      output += `  Earnings: ${r.earningsDays} days\n`;
+    }
+    if (r.spread) {
+      output += `  Spread: $${r.spread.longStrike}/$${r.spread.shortStrike} `;
+      output += `@ $${r.spread.debit.toFixed(2)} (${r.spread.dte} DTE)\n`;
+    }
+
+    output += `  ${r.gradeResult.recommendation} - ${r.risk.summary}\n`;
   }
 
-  // Scenario section
-  output += `\n=== SCENARIO ANALYSIS ===\n`;
-  for (const s of analysis.scenarios) {
-    const pnlStr = s.pnl >= 0 ? `+$${s.pnl}` : `-$${Math.abs(s.pnl)}`;
-    output += `  ${s.scenario}: $${s.newPrice.toFixed(2)} → ${pnlStr} (${s.outcome})\n`;
+  if (results.length > 10) {
+    output += `\n... and ${results.length - 10} more results\n`;
   }
+
+  output += `\n=== END SCAN ===\n`;
 
   return output;
+}
+
+/**
+ * Encode scan results to TOON format
+ */
+export function encodeScanResultsToTOON(results: ScanResult[]): string {
+  const lines = results.slice(0, 10).map((r) => {
+    const parts = [
+      r.ticker,
+      `G:${r.grade}`,
+      `R:${r.risk.score}`,
+      `$${r.price.toFixed(0)}`,
+      `RSI:${r.rsi.toFixed(0)}`,
+    ];
+    if (r.cushionPercent !== undefined) {
+      parts.push(`C:${r.cushionPercent.toFixed(1)}%`);
+    }
+    return parts.join('|');
+  });
+
+  return `SCAN[${results.length}]:\n${lines.join('\n')}`;
 }

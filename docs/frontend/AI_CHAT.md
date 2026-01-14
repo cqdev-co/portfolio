@@ -21,15 +21,18 @@ frontend/src/
 │   └── chat/
 │       ├── index.ts              # Export barrel
 │       ├── chat-panel.tsx        # Main chat panel with useChat hook
-│       ├── chat-messages.tsx     # Message list with tool data cards
-│       ├── chat-message.tsx      # Individual message bubble
+│       ├── chat-messages.tsx     # Message list with smart scroll
+│       ├── chat-message.tsx      # Individual message bubble + actions
 │       ├── chat-input.tsx        # Input with send/stop functionality
-│       ├── chat-greeting.tsx     # Empty state with suggestions
 │       ├── chat-model-selector.tsx  # Model dropdown selector
+│       ├── chat-context.tsx      # Global state + keyboard shortcuts
+│       ├── typewriter-text.tsx   # Typewriter effect for messages
+│       ├── tool-call-card.tsx    # Animated tool execution cards
+│       ├── stream-progress.tsx   # Circular/linear progress indicators
 │       ├── ticker-data-card.tsx  # Data card for ticker info
-│       └── chat-icons.tsx        # SVG icons (SparklesIcon, etc.)
+│       └── chat-icons.tsx        # SVG icons (Sparkles, Copy, etc.)
 ├── hooks/
-│   └── use-scroll-to-bottom.ts  # Auto-scroll behavior
+│   └── use-scroll-to-bottom.ts  # Smart scroll with momentum detection
 └── lib/ai/
     └── models.ts             # Model type definitions
 ```
@@ -41,7 +44,8 @@ frontend/src/
   "ai": "^6.0.0",
   "@ai-sdk/react": "^3.0.0",
   "react-markdown": "^10.0.0",
-  "remark-gfm": "^4.0.0"
+  "remark-gfm": "^4.0.0",
+  "framer-motion": "^11.0.0"
 }
 ```
 
@@ -69,77 +73,124 @@ OLLAMA_MODEL=llama3.3:70b-cloud
 NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
 ```
 
-## Available Models
+## UI/UX Features (January 2026)
 
-Models are fetched dynamically from the Ollama Cloud API (`/api/tags`).
+### Keyboard Shortcuts
 
-### Model Selector
+| Shortcut        | Action                 |
+| --------------- | ---------------------- |
+| `⌘K` / `Ctrl+K` | Toggle chat open/close |
+| `Escape`        | Close chat panel       |
+| `Enter`         | Send message           |
+| `Shift+Enter`   | New line in input      |
 
-The chat panel includes a dropdown to switch models on-the-fly. Models are
-fetched from `/api/chat/models` which proxies the Ollama API.
+### Fullscreen Mode
 
-### Popular Cloud Models
+ChatGPT-inspired centered layout for distraction-free conversations:
 
-| Model ID                 | Description                           |
-| ------------------------ | ------------------------------------- |
-| `llama3.3:70b-cloud`     | Fast and capable Meta model (default) |
-| `gpt-oss:120b`           | Most capable open-source model        |
-| `qwen3:235b-cloud`       | Large reasoning model                 |
-| `deepseek-r1:671b-cloud` | Advanced reasoning model              |
-| `llama3.1:405b-cloud`    | Largest Llama model                   |
+- **Desktop**: Click the expand icon in header to toggle fullscreen
+- **Mobile**: Automatically fullscreen with swipe-to-close gesture
+- **Centered Content**: Messages and input centered with `max-w-3xl` container
+- **Generous Spacing**: Increased padding (`px-6 py-6 sm:px-8`) for breathing room
+- **Polished Header**: Larger icon and typography, gradient avatar background
 
-See all available models: https://ollama.com/search?c=cloud
+### Token Counter
 
-The model list updates automatically - just open the dropdown to see
-all currently available Ollama Cloud models.
+Always-visible token counter in the header:
+
+- Shows estimated tokens for current conversation
+- Rough estimate: ~4 characters per token
+- Helps track usage for rate limit awareness
+
+### Typewriter Effect
+
+Assistant messages are revealed with a typewriter effect:
+
+- During streaming: Shows content as it arrives (real-time)
+- After streaming: Reveals remaining content character-by-character
+- Smooth cursor animation while typing
+
+### Smart Scroll Momentum
+
+Intelligent auto-scroll behavior:
+
+- Tracks scroll velocity to detect user intent
+- Won't interrupt if user is actively scrolling up
+- Resumes auto-scroll after user stops or scrolls down
+- Uses exponential moving average for smooth velocity detection
+
+### Message Actions
+
+Hover over assistant messages to reveal:
+
+- **Copy**: Copy message content to clipboard (no layout shift)
+
+### Stream Progress Visualization
+
+Circular progress indicator in the header during streaming:
+
+- Spinning arc with variable dash offset
+- Center dot pulse animation
+- Clean, minimal design
+
+### Haptic Feedback
+
+Subtle scale animations on button press:
+
+- Send button: `[1, 0.92, 1.02, 1]` - bounce effect
+- Header buttons: `scale: 0.9` - quick tap feedback
+- Provides tactile feel without being distracting
+
+### Motion & Animations
+
+All animations use Framer Motion with consistent design language:
+
+1. **Panel Animations**
+   - Spring-based open/close (stiffness: 300, damping: 25)
+   - Swipe-to-close with drag physics (mobile, from handle only)
+   - Opacity/scale transforms during drag
+
+2. **Message Animations**
+   - BlurFade entrance (opacity, y, blur)
+   - Typewriter text reveal
+   - No icon pulsing (cleaner)
+
+3. **Tool Status Animations**
+   - Spring spinner for running state
+   - Path animation for checkmark on completion
+   - Bouncing dots with staggered delays
+
+4. **Tool Data Display**
+   - Shows **exact data AI receives** (TOON or text format)
+   - TOON badge indicates token-optimized format (~40% fewer tokens)
+   - Consistent across all tools (no custom formatters needed)
+   - Collapsible cards - click to expand
+
+5. **Scan Results Stagger**
+   - Container uses `staggerChildren: 0.04`
+   - Items animate with spring physics (stiffness: 300, damping: 24)
+   - Grade badges have extra spring bounce (stiffness: 500)
 
 ## Components
-
-### AI Chat in Navbar
-
-The AI Chat button is integrated directly into the main floating navbar alongside
-other navigation items. This provides a unified experience with consistent styling.
-
-Features:
-
-- Part of the main `Dock` component in `navbar.tsx`
-- Magnification effect on hover (same as other navbar icons)
-- Tooltip on hover showing "AI Chat"
-- Uses `SparklesIcon` for AI branding
-- Opens `ChatPanel` when clicked
-
-The navbar manages the chat panel state internally:
-
-```tsx
-// In navbar.tsx
-const [isChatOpen, setIsChatOpen] = useState(false);
-
-// AI Chat button in the Dock
-<DockIcon>
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <button onClick={() => setIsChatOpen(true)}>
-        <SparklesIcon size={16} />
-      </button>
-    </TooltipTrigger>
-    <TooltipContent>AI Chat</TooltipContent>
-  </Tooltip>
-</DockIcon>
-
-// Chat Panel rendered outside the Dock
-<ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-```
 
 ### ChatPanel
 
 Full chat interface with:
 
-- Header with title, model selector, and action buttons
-- "New Chat" button to clear conversation and start fresh
-- Message history with auto-scroll
-- Suggested actions (empty state)
+- Header with title, model selector, expand/close buttons
+- Token counter (always visible)
+- "New Chat" button to clear conversation
+- Message history with smart auto-scroll
 - Input area with send/stop buttons
-- Keyboard shortcuts (Enter to send, Shift+Enter for newline)
+- Mobile: Full-screen with drag handle and swipe-to-close
+- Desktop: Expandable to fullscreen mode
+
+**Fullscreen Layout (ChatGPT-style)**:
+
+- Messages container: `max-w-3xl mx-auto px-6 py-6 sm:px-8`
+- Input container: `max-w-3xl mx-auto` matching messages
+- Header: Larger typography and spacing in fullscreen
+- Passes `isFullscreen` prop to `ChatMessages` and `ChatInput`
 
 Uses the `useChat` hook from `@ai-sdk/react` (v6.0 stable API):
 
@@ -147,78 +198,94 @@ Uses the `useChat` hook from `@ai-sdk/react` (v6.0 stable API):
 - `messages` - array of `UIMessage` objects with `parts` array
 - `status` for loading states (`ready`, `submitted`, `streaming`)
 - `stop` for aborting streams
-- Local `useState` for input management (SDK doesn't provide input state)
 
-### ChatModelSelector
+### ChatContext
 
-Dropdown to select from available Ollama Cloud models:
+Global state provider with:
 
-- Fetches models from `/api/chat/models` on mount
-- Shows model name and size
-- Falls back to defaults if API fails
-- Updates chat body to use selected model
+```typescript
+interface ChatContextValue {
+  isOpen: boolean;
+  isFullscreen: boolean;
+  initialPrompt: string | null;
+  openChat: (prompt?: string) => void;
+  closeChat: () => void;
+  toggleChat: () => void;
+  toggleFullscreen: () => void;
+  clearInitialPrompt: () => void;
+}
+```
+
+Includes:
+
+- Keyboard shortcuts (⌘K, Escape)
+- Fullscreen toggle state
+- Initial prompt for position analysis
+
+### TypewriterText
+
+Typewriter effect component:
+
+```typescript
+interface TypewriterTextProps {
+  content: string; // The text to display
+  isStreaming?: boolean; // If true, shows content immediately
+  speed?: number; // Characters per animation frame (default: 3)
+  className?: string;
+}
+```
+
+Features:
+
+- During streaming: Shows content as it arrives
+- After streaming: Animates remaining characters
+- Includes markdown rendering with all formatting support
+- Animated cursor while typing
 
 ### ChatMessage
 
-Renders individual messages matching the Vercel AI Chatbot template:
+Renders individual messages with:
 
 - **User messages**: Primary color bubble, right-aligned
-- **Assistant messages**: No background, left-aligned with sparkles avatar
-- Full GitHub Flavored Markdown (GFM) via `react-markdown` + `remark-gfm`
-- Extracts text from `UIMessage.parts` array (AI SDK 6.0 format)
-- Streaming cursor animation while loading
+- **Assistant messages**: TypewriterText with sparkles avatar
+- Thinking display (collapsible)
+- Tool call cards embedded
+- Hover actions (copy)
 
-**Supported markdown elements:**
+### StreamProgress
 
-- Tables (with proper borders, headers, and responsive scrolling)
-- Code blocks with syntax highlighting container
-- Inline code with background
-- Lists (ordered and unordered, nested)
-- Blockquotes
-- Headings (h1-h4)
-- Links, images
-- Bold, italic, strikethrough
+Circular progress indicator:
 
-### ChatGreeting
+```typescript
+interface StreamProgressProps {
+  isActive: boolean; // Show/hide the indicator
+  size?: number; // Size in pixels (default: 16)
+  className?: string;
+}
+```
 
-Empty state component with:
+Also exports `StreamProgressBar` for linear progress.
 
-- Welcome message with emoji
-- Grid of 4 suggested prompts
-- Animated entrance with staggered delays
+### useScrollToBottom
 
-## UI/UX Features
+Smart scroll hook with momentum detection:
 
-The chat follows the Vercel AI Chatbot template patterns:
+```typescript
+interface ScrollHookReturn {
+  containerRef: RefObject<HTMLDivElement>;
+  endRef: RefObject<HTMLDivElement>;
+  isAtBottom: boolean;
+  scrollToBottom: (behavior?: ScrollBehavior) => void;
+  getScrollVelocity: () => number;
+  isScrollingUp: () => boolean;
+}
+```
 
-1. **Message Styling**
-   - User: Primary color rounded bubble
-   - Assistant: Clean typography with sparkles avatar in muted circle
+Velocity tracking:
 
-2. **Input**
-   - Auto-resizing textarea (44px → 200px max)
-   - Submit on Enter, newline on Shift+Enter
-   - Stop button during streaming
-   - IME composition support for international keyboards
-   - Subtle border/background changes on focus
-
-3. **Scroll Behavior**
-   - Auto-scroll during streaming
-   - Respects user scroll position
-   - "Scroll to bottom" button when scrolled up
-   - Smooth scroll animations
-
-4. **Animations**
-   - Framer Motion for panel open/close
-   - Fade-in for messages
-   - Staggered suggestions animation
-   - "Thinking" indicator with bouncing dots
-
-5. **Panel Design**
-   - Subtle dark backdrop (20% opacity, no blur)
-   - Click backdrop to close
-   - Rounded 2xl corners with shadow
-   - Responsive width (100vw - 2rem on mobile, 420px on desktop)
+- Positive velocity = scrolling down
+- Negative velocity = scrolling up
+- Threshold: -0.3 px/ms to detect active scroll-up
 
 ## API Route
 
@@ -241,34 +308,57 @@ The AI SDK sends messages in `UIMessage` format with `parts` array:
 }
 ```
 
-The API route extracts content from parts or falls back to direct content.
-
-### Response
-
-The API uses AI SDK 6.0's `createUIMessageStream` and `createUIMessageStreamResponse`
-for proper streaming. The stream format uses `UIMessageChunk` types:
-
-- `text-start` - Begins a new text part
-- `text-delta` - Streams text content incrementally
-- `text-end` - Ends the text part
-
 ### Error Handling
 
-Returns JSON error response with details:
+Returns styled error banners with type-specific colors:
 
-```json
-{
-  "error": "Failed to process chat request",
-  "details": "Error message here"
-}
-```
+| Error Type   | Color  | Example            |
+| ------------ | ------ | ------------------ |
+| `auth`       | Purple | Not authenticated  |
+| `rate_limit` | Amber  | Rate limit reached |
+| `network`    | Blue   | Connection failed  |
+| `server`     | Red    | 500/502/503 errors |
+| `unknown`    | Muted  | Generic errors     |
+
+## Tool Calling
+
+The chat supports tool calling via shared handlers from `lib/ai-agent`.
+
+### Available Tools
+
+| Tool                           | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `get_ticker_data`              | Fetches stock data from Yahoo Finance         |
+| `web_search`                   | Web search with Brave Search API              |
+| `get_financials_deep`          | Income statement, balance sheet, cash flow    |
+| `get_institutional_holdings`   | Top institutional holders and % owned         |
+| `get_unusual_options_activity` | High-grade unusual options signals            |
+| `get_trading_regime`           | Market conditions: GO/CAUTION/NO_TRADE        |
+| `get_iv_by_strike`             | IV analysis for specific strike prices        |
+| `calculate_spread`             | Calculate spread metrics for given strikes    |
+| `scan_opportunities`           | Scan multiple tickers for trade opportunities |
+
+## Mobile Experience
+
+### Full-Screen Mode
+
+On mobile devices (< 640px):
+
+- Panel takes full viewport
+- Drag handle at top for swipe gesture
+- No rounded corners for edge-to-edge feel
+
+### Swipe to Close
+
+- Drag down from **handle only** to dismiss (threshold: 100px or velocity > 500)
+- Opacity fades as dragging down
+- Spring physics for natural feel
+- Text selection works normally (drag listener disabled except on handle)
+- Resets position if not closed
 
 ## Customization
 
 ### System Prompt (Victor Persona)
-
-The chat uses the Victor Chen persona from the shared AI agent library.
-Direct imports work via dual Turbopack/Webpack configuration.
 
 **Source of truth**: `lib/ai-agent/prompts/victor.ts`
 
@@ -276,113 +366,46 @@ To update Victor's behavior:
 
 1. Edit `lib/ai-agent/prompts/victor.ts`
 2. Test with CLI: `cd ai-analyst && bun run chat`
-3. Changes automatically available in frontend! (direct import)
+3. Changes automatically available in frontend!
+
+### Motion Configuration
+
+Animation constants follow the site's design language:
 
 ```typescript
-// src/app/api/chat/route.ts
-import { buildVictorLitePrompt } from '@lib/ai-agent';
+// Spring physics (dock-style)
+{ stiffness: 300, damping: 25 }
 
-const systemPrompt = buildVictorLitePrompt({ accountSize: 1750 });
+// Entrance animations (BlurFade style)
+{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }
+
+// Typewriter speed
+speed: 4 // characters per frame
 ```
-
-### Default Model
-
-Change `NEXT_PUBLIC_OLLAMA_MODEL` environment variable for the frontend:
-
-```bash
-# In .env.local
-NEXT_PUBLIC_OLLAMA_MODEL=llama3.3:70b-cloud
-```
-
-Or update the fallback in `lib/ai/models.ts`:
-
-```typescript
-export const DEFAULT_CHAT_MODEL =
-  process.env.NEXT_PUBLIC_OLLAMA_MODEL || 'llama3.3:70b-cloud';
-```
-
-### Suggested Actions
-
-Edit in `src/components/chat/chat-greeting.tsx`:
-
-```typescript
-const suggestedActions: SuggestedAction[] = [
-  { label: 'Your prompt label', prompt: 'The actual prompt' },
-  // ...
-];
-```
-
-### Styling
-
-All components use Tailwind CSS and respect the app's theme variables:
-
-- `primary` / `primary-foreground` for user messages
-- `muted` / `muted-foreground` for accents
-- `background` / `foreground` for base colors
-
-## Tool Calling
-
-The chat supports tool calling via shared handlers from `lib/ai-agent`:
-
-### Available Tools
-
-| Tool               | Description                                     |
-| ------------------ | ----------------------------------------------- |
-| `get_ticker_data`  | Fetches stock data from Yahoo Finance           |
-| `web_search`       | Web search (requires search function injection) |
-| `analyze_position` | Analyzes existing spread positions              |
-
-### Data Cards
-
-When Victor uses the `get_ticker_data` tool, a data card is displayed showing:
-
-- Price, change, RSI, ADX
-- Moving averages (MA20, MA50, MA200)
-- Market cap, P/E ratio, sector comparison
-- Target prices and analyst ratings
-- Earnings date and warnings
-- IV/HV data
-- Short interest
-- Support/Resistance levels
-- Spread recommendations (if available)
-- Trade grade
-
-### Tool Event Streaming
-
-The API streams data events for tool calls:
-
-```typescript
-// Tool start event
-{ type: "tool-start", tool: "get_ticker_data", args: { ticker: "NVDA" } }
-
-// Tool result event
-{ type: "tool-result", tool: "get_ticker_data", success: true, data: {...} }
-```
-
-The frontend parses these events and renders:
-
-- `ToolStatusIndicator` during tool execution
-- `TickerDataCard` when data is received
 
 ## Future Enhancements
 
-1. **Enhanced Data Parity**
-   - Spread recommendations with full calculations
-   - Psychological Fair Value (PFV) analysis
-   - Options flow data
+1. ~~**Enhanced Data Parity**~~ ✅ **COMPLETED**
+   - ✅ Full tool parity with CLI
+   - ✅ Live market context
 
-2. **Dedicated Chat Page** (Option B)
+2. ~~**UI/UX Improvements**~~ ✅ **COMPLETED**
+   - ✅ Keyboard shortcuts
+   - ✅ Fullscreen mode
+   - ✅ Message actions
+   - ✅ Token counter
+   - ✅ Typewriter effect
+   - ✅ Smart scroll momentum
+   - ✅ Mobile swipe-to-close
+
+3. **Dedicated Chat Page**
    - Full-screen chat at `/chat`
    - Chat history persistence
    - Multiple conversations
 
-3. **Chat Persistence**
+4. **Chat Persistence**
    - Save conversations to Supabase
    - Resume previous chats
-
-4. **File Attachments**
-   - Upload images/documents for analysis
-   - Code file parsing
 
 ## Troubleshooting
 
@@ -392,25 +415,20 @@ The frontend parses these events and renders:
 2. Verify the API key at https://ollama.com/settings/keys
 3. Ensure the key has not expired
 
-### Model not found
-
-1. Verify model ID at https://ollama.com/search?c=cloud
-2. Some models require cloud access (ending in `-cloud`)
-3. Check for typos in model name
-
-### Slow responses
-
-1. Cloud models may have cold start latency
-2. Try a smaller model like `llama3.3:70b-cloud`
-3. Check your network connection
-
 ### Messages not showing
 
 1. Check browser console for API errors
-2. Verify the API route is working: `curl -X POST /api/chat`
-3. Ensure `messages` array format is correct (`{ role, content }`)
+2. Verify the API route is working
+3. Ensure `messages` array format is correct
 
-### CORS errors
+### Keyboard shortcut not working
 
-1. Ensure API calls go through your Next.js API route
-2. Don't call Ollama Cloud directly from the browser
+1. Ensure focus is not in an input field
+2. Check if other extensions intercept ⌘K
+3. Try Ctrl+K on non-Mac devices
+
+### Swipe-to-close not working
+
+1. Only works on mobile (< 640px viewport)
+2. Ensure you're dragging from the main panel
+3. Drag threshold is 100px or high velocity

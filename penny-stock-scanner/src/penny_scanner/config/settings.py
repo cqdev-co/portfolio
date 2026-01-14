@@ -242,23 +242,37 @@ class Settings(BaseSettings):
         default=3.0,
         description="Maximum volume for optimal zone (narrowed from 5.0 per Jan 2026 data)",
     )
+    # Extreme Volume Penalty - ADDED Jan 13, 2026
+    # Data shows: 5x+ volume = 46.1% WR vs 2-3x = 72.5% WR
+    # Extreme volume often signals end of move, not beginning
+    extreme_volume_threshold: float = Field(
+        default=5.0,
+        description="Volume above this gets additional penalty (often late to move)",
+    )
+    extreme_volume_penalty: float = Field(
+        default=0.88,
+        description="Score multiplier for >5x volume (12% penalty)",
+    )
 
-    # Late Entry Penalty - ADDED Jan 2026
-    # Data shows: 0.60-0.69 scores = 56.1% WR vs 0.70-0.79 = 35.4% WR
-    # Higher scores are buying AFTER the move - penalize late entries
+    # Late Entry Penalty - UPDATED Jan 13, 2026
+    # Original thresholds (15%/30%) were too lenient - S-Tier still had +24.5% avg 5d
+    # Data shows: S/A-Tier avg 5d = +17-24%, but they have 11-26% WR (terrible!)
+    # Lowered thresholds and increased penalties to fix score inversion
     late_entry_threshold_5d: float = Field(
-        default=15.0,
-        description="Penalize if price already up this % in 5 days (chasing)",
+        default=10.0,
+        description="Penalize if price already up this % in 5 days (was 15%)",
     )
     late_entry_threshold_10d: float = Field(
-        default=30.0,
-        description="Penalize if price already up this % in 10 days (very late)",
+        default=20.0,
+        description="Penalize if price already up this % in 10 days (was 30%)",
     )
     late_entry_penalty_moderate: float = Field(
-        default=0.85, description="Score multiplier for moderate late entry (15%+ 5d)"
+        default=0.75,
+        description="Score multiplier for moderate late entry (was 0.85)",
     )
     late_entry_penalty_severe: float = Field(
-        default=0.70, description="Score multiplier for severe late entry (30%+ 10d)"
+        default=0.60,
+        description="Score multiplier for severe late entry (was 0.70)",
     )
     early_entry_bonus: float = Field(
         default=1.10, description="Score multiplier for early entry (-5% to +10% 5d)"
@@ -289,10 +303,11 @@ class Settings(BaseSettings):
         description="Score multiplier for 4+ green days (8% penalty - late entry)",
     )
 
-    # 52-Week Position - ADDED Jan 2026
+    # 52-Week Position - UPDATED Jan 13, 2026
     # Data shows: 25-50% from low = 55.1% WR, +5.90% (best!)
     #             <25% from low = 45.3% WR, -3.78% (catching falling knife)
     #             100%+ from low = 48.0% WR, -0.11% (overextended)
+    # NEW: S-Tier signals avg 98% from low (near highs!) - need to penalize this
     position_52w_optimal_min: float = Field(
         default=25.0, description="Optimal min distance from 52w low (%)"
     )
@@ -305,6 +320,15 @@ class Settings(BaseSettings):
     position_52w_near_low_penalty: float = Field(
         default=0.92,
         description="Score multiplier for <25% from low (8% penalty - falling knife)",
+    )
+    # NEW: Penalty for stocks near 52-week highs (overextended)
+    position_52w_near_high_threshold: float = Field(
+        default=75.0,
+        description="Threshold for near-high penalty (>75% from low = near highs)",
+    )
+    position_52w_near_high_penalty: float = Field(
+        default=0.85,
+        description="Score multiplier for >75% from low (15% penalty - overextended)",
     )
 
     # Day of Week - ADDED Jan 2026

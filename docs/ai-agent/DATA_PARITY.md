@@ -2,7 +2,7 @@
 
 **Status**: ✅ FULLY RESOLVED  
 **Priority**: Complete  
-**Last Updated**: January 5, 2026 (v4.0.0 modular architecture, earnings display fix)
+**Last Updated**: January 13, 2026 (AgentSession unified API added)
 
 ## Overview
 
@@ -13,25 +13,36 @@ data fetching logic from the shared `lib/ai-agent/` library. This ensures:
 - Same market regime analysis
 - Same options data (IV, spreads, PFV)
 - Same technical indicators
+- Same calendar context (economic events)
+- Same trade scanning and grading logic
+- Same session management via AgentSession class
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │              lib/ai-agent/ (Source of Truth)                    │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              AgentSession (Unified API)                 │   │
+│  │  • ContextBuilder - calendar, regime, ticker data       │   │
+│  │  • ConversationManager - history, summarization         │   │
+│  │  • Tool execution - all 9 tools unified                 │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
 │  ✅ fetchTickerData() - ALL ticker data fetching                │
 │  ✅ Options data (real IV, spreads from chain)                  │
 │  ✅ PFV (psychological fair value, put/call walls)              │
 │  ✅ Market regime (VIX, SPY trend, sector rotation)             │
-│  ✅ Rich data (options flow, relative strength, earnings hist)  │
+│  ✅ Calendar context (FOMC, CPI, NFP, GDP, holidays)            │
+│  ✅ Scanner & grading (A-F system, risk scoring)                │
 └─────────────────────────────────────────────────────────────────┘
                 │                              │
                 ▼                              ▼
 ┌──────────────────────────┐    ┌──────────────────────────────────┐
 │   CLI (ai-analyst)       │    │   Frontend (portfolio)           │
-│   Uses sharedFetchTicker │    │   Uses fetchTickerData           │
+│   Uses AgentSession      │    │   Uses AgentSession              │
 │   + CLI-specific extras  │    │   @lib/ai-agent import           │
-│   (ownership, analysis)  │    │                                  │
 │   SAME CORE DATA ✅      │    │   SAME CORE DATA ✅              │
 └──────────────────────────┘    └──────────────────────────────────┘
 ```
@@ -96,6 +107,30 @@ CLI-specific additions (not in shared library):
 | Sector Rotation        | `lib/ai-agent/market/index.ts` | Leading/lagging sectors |
 | Trading Recommendation | `lib/ai-agent/market/index.ts` | Based on regime         |
 
+### ✅ Calendar Context (NEW - January 13, 2026)
+
+| Feature         | Shared Module                    | Notes                       |
+| --------------- | -------------------------------- | --------------------------- |
+| FOMC Meetings   | `lib/ai-agent/calendar/index.ts` | 2024-2026 dates             |
+| CPI Reports     | `lib/ai-agent/calendar/index.ts` | Inflation data releases     |
+| Jobs Report     | `lib/ai-agent/calendar/index.ts` | NFP employment data         |
+| GDP Releases    | `lib/ai-agent/calendar/index.ts` | Quarterly growth data       |
+| Market Holidays | `lib/ai-agent/calendar/index.ts` | US market closures          |
+| Quad Witching   | `lib/ai-agent/calendar/index.ts` | Options expiration days     |
+| Market Status   | `lib/ai-agent/calendar/index.ts` | OPEN/PRE-MARKET/AFTER-HRS   |
+| Event Warnings  | `lib/ai-agent/calendar/index.ts` | Upcoming high-impact events |
+
+### ✅ Scanner & Grading (NEW - January 13, 2026)
+
+| Feature       | Shared Module                   | Notes                      |
+| ------------- | ------------------------------- | -------------------------- |
+| Trade Grading | `lib/ai-agent/scanner/index.ts` | A+ to F grading system     |
+| Risk Scoring  | `lib/ai-agent/scanner/index.ts` | 1-10 risk assessment       |
+| Scan Lists    | `lib/ai-agent/scanner/index.ts` | Tech, semis, mega-cap, etc |
+| Quick Scan    | `lib/ai-agent/scanner/index.ts` | Filtered opportunity scan  |
+| Full Scan     | `lib/ai-agent/scanner/index.ts` | Comprehensive scan         |
+| TOON Encoding | `lib/ai-agent/scanner/index.ts` | Token-efficient format     |
+
 ## Types Exported
 
 ```typescript
@@ -120,11 +155,63 @@ type VIXLevel
 type VIXData
 type SPYTrend
 type SectorPerformance
+
+// Calendar types (NEW - January 13, 2026)
+type EventType          // FOMC, CPI, NFP, GDP, FED, HOLIDAY, WITCHING
+type MarketEvent        // Single event with date, name, impact
+type CalendarContext    // Full context with warnings
+
+// Scanner types (NEW - January 13, 2026)
+type ScannerTradeGrade  // A+ to F
+type GradingCriteria    // Individual criterion result
+type TradeGradeResult   // Full grade with breakdown
+type RiskFactor         // Individual risk factor
+type RiskScore          // Full risk assessment
+type ScanResult         // Single scan result
+type ScanOptions        // Scan configuration
+
+// Session types (NEW - January 13, 2026)
+class AgentSession      // Main unified API class
+class ContextBuilder    // Builds market/ticker context
+class ConversationManager // History with summarization
+type SessionMessage     // Message in history
+type SessionConfig      // Session configuration
+type ChatResponse       // Response from chat
+type MarketContext      // Calendar + regime context
+type TickerContext      // Ticker data context
 ```
 
 ## Usage
 
-### CLI
+### Using AgentSession (Recommended)
+
+```typescript
+import { AgentSession } from '@lib/ai-agent';
+
+// Initialize session with config
+const session = new AgentSession({
+  accountSize: 1750,
+  useTOON: true,
+});
+await session.initialize();
+
+// Prepare context for a user message
+const { systemPrompt, messages, classification, tickers } =
+  await session.prepareContext('How does NVDA look?');
+
+// Execute tools as needed
+const result = await session.executeTool({
+  name: 'get_ticker_data',
+  arguments: { ticker: 'NVDA' },
+});
+
+// Add response to history
+session.addAssistantMessage('NVDA looks bullish...', toolCalls, toolResults);
+```
+
+### Direct API Usage
+
+#### CLI
 
 ```typescript
 import {
@@ -137,7 +224,7 @@ const data = await fetchTickerData('NVDA');
 const regime = await getMarketRegime();
 ```
 
-### Frontend
+#### Frontend
 
 ```typescript
 import {
@@ -233,14 +320,18 @@ The `chat-message.tsx` component now shows AI reasoning:
 While CLI and Frontend share the same **data layer**, they have
 different **features**:
 
-| Feature        | CLI      | Frontend                |
-| -------------- | -------- | ----------------------- |
-| Full Scanner   | ✅       | Planned                 |
-| Trade History  | ✅       | Not planned             |
-| TOON Context   | ✅       | ✅ (now shared)         |
-| Interactive UI | ❌       | ✅                      |
-| Data Cards     | ✅ Rich  | ✅ Rich (now identical) |
-| Streaming      | Terminal | Web                     |
+| Feature          | CLI      | Frontend                |
+| ---------------- | -------- | ----------------------- |
+| Full Tools (9)   | ✅       | ✅ (January 2026)       |
+| Calendar Context | ✅       | ✅ (January 2026)       |
+| Market Regime    | ✅       | ✅ (January 2026)       |
+| Scanner Tool     | ✅       | ✅ (January 2026)       |
+| Trade History    | ✅       | Not planned             |
+| TOON Context     | ✅       | ✅ (now shared)         |
+| AgentSession     | Planned  | Planned                 |
+| Interactive UI   | ❌       | ✅                      |
+| Data Cards       | ✅ Rich  | ✅ Rich (now identical) |
+| Streaming        | Terminal | Web                     |
 
 ### ✅ P/E Null Handling (January 5, 2026)
 
@@ -270,15 +361,28 @@ The `ticker-data-card.tsx` component now displays all proxy data:
 | 52-Week Range  | Visual progress bar with current position |
 | Price Change   | Dollar amount + percentage                |
 
-### Caching Strategy (TODO)
+### ✅ Caching Strategy (January 2026)
 
-Consider adding caching for expensive calls:
+Implemented caching via `SessionCache`:
 
-- Options chains (rate limited)
-- PFV calculations (compute intensive)
-- Market regime (can be cached 5 min)
+- **Market regime**: 5-minute TTL (stable data)
+- **Ticker data**: 1-minute TTL (context builder)
+- **Calendar context**: 5-minute TTL (changes daily)
+- **Options chains**: Per-request (rate limited)
+
+### ✅ Architecture Verification (January 13, 2026)
+
+All shared modules compile cleanly:
+
+```bash
+cd lib/ai-agent && npx tsc --noEmit  # ✅ Exit 0
+cd frontend && npx tsc --noEmit       # ✅ Exit 0
+```
+
+Type-safe integration across CLI and Frontend.
 
 ## Related Documentation
 
 - `docs/ai-agent/INTEGRATION_PLAN.md` - Full integration roadmap
 - `docs/ai-agent/SHARED_LIBRARY.md` - Library usage guide
+- `docs/lib/SHARED_SERVICES.md` - Calendar, scanner, and service architecture

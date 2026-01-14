@@ -63,8 +63,7 @@ export async function GET() {
           const quote = await yahooFinance.quote(symbol);
 
           if (quote) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const q = quote as any;
+            const q = quote as Record<string, unknown>;
             const price = (q.regularMarketPrice as number) || 0;
             const previousClose =
               (q.regularMarketPreviousClose as number) || price;

@@ -277,6 +277,60 @@ export const CALCULATE_SPREAD_TOOL: AgentTool = {
   },
 };
 
+/**
+ * Scan opportunities - find trade opportunities across multiple tickers
+ */
+export const SCAN_OPPORTUNITIES_TOOL: AgentTool = {
+  name: 'scan_opportunities',
+  description:
+    'Scan multiple tickers to find trade opportunities. Returns graded ' +
+    'opportunities (A+ to F) with risk scores, cushion analysis, and ' +
+    'spread recommendations. Use this when asked to "find trades", ' +
+    '"scan for opportunities", "what looks good", or "find setups". ' +
+    'Can scan predefined lists (tech, semis, megacap) or specific tickers.',
+  parameters: {
+    type: 'object',
+    required: [],
+    properties: {
+      scanList: {
+        type: 'string',
+        description:
+          'Predefined list to scan: TECH, SEMIS, MEGACAP, FINANCIALS, ' +
+          'HEALTHCARE, CONSUMER, ENERGY, or FULL. Defaults to TECH.',
+        enum: [
+          'TECH',
+          'SEMIS',
+          'MEGACAP',
+          'FINANCIALS',
+          'HEALTHCARE',
+          'CONSUMER',
+          'ENERGY',
+          'FULL',
+        ],
+      },
+      tickers: {
+        type: 'string',
+        description:
+          'Comma-separated list of specific tickers to scan ' +
+          '(e.g. "NVDA,AMD,GOOGL"). Overrides scanList if provided.',
+      },
+      minGrade: {
+        type: 'string',
+        description:
+          'Minimum trade grade to include: A+, A, A-, B+, B, B-, C+, C, ' +
+          "C-, D, F. Defaults to 'B' for quality filtering.",
+        enum: ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'],
+      },
+      maxRisk: {
+        type: 'number',
+        description:
+          'Maximum risk score (1-10) to include. Defaults to 6. ' +
+          'Lower = safer opportunities only.',
+      },
+    },
+  },
+};
+
 // ============================================================================
 // TOOL COLLECTIONS
 // ============================================================================
@@ -293,6 +347,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   GET_TRADING_REGIME_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
+  SCAN_OPPORTUNITIES_TOOL,
 ];
 
 /**
@@ -365,6 +420,7 @@ export default {
   GET_TRADING_REGIME_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
+  SCAN_OPPORTUNITIES_TOOL,
   toOllamaTools,
   getToolByName,
   filterTools,

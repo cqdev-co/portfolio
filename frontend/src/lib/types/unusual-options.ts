@@ -81,6 +81,25 @@ export interface UnusualOptionsSignalDB {
   spread_detection_reason: string | null;
   spread_net_premium: number | null;
 
+  // Signal Classification (Jan 2026 - data-driven approach)
+  signal_classification:
+    | 'high_conviction'
+    | 'moderate'
+    | 'informational'
+    | 'likely_hedge'
+    | 'contrarian'
+    | 'unclassified'
+    | null;
+  classification_reason: string | null;
+  predicted_win_rate: number | null;
+  classification_factors: string[] | null;
+
+  // Performance Tracking (feedback loop)
+  forward_return_1d: number | null;
+  forward_return_5d: number | null;
+  forward_return_30d: number | null;
+  win: boolean | null;
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -120,6 +139,9 @@ export interface UnusualOptionsFilters {
   is_active?: boolean;
   is_new_signal?: boolean;
   min_detection_count?: number;
+  // Classification filters (Jan 2026)
+  signal_classification?: SignalClassificationType[];
+  min_predicted_win_rate?: number;
 }
 
 export interface UnusualOptionsSortConfig {
@@ -281,6 +303,81 @@ export function formatSpreadType(spreadType: string | null): string {
 export function formatSpreadConfidence(confidence: number | null): string {
   if (!confidence) return '';
   return `${Math.round(confidence * 100)}%`;
+}
+
+// Signal Classification types and helpers (Jan 2026)
+export type SignalClassificationType =
+  | 'high_conviction'
+  | 'moderate'
+  | 'informational'
+  | 'likely_hedge'
+  | 'contrarian'
+  | 'unclassified';
+
+// Classification win rates (from historical analysis)
+export const CLASSIFICATION_WIN_RATES: Record<
+  SignalClassificationType,
+  number | null
+> = {
+  high_conviction: 0.6,
+  moderate: 0.4,
+  informational: 0.25,
+  likely_hedge: null,
+  contrarian: 0.09,
+  unclassified: null,
+};
+
+// Helper function to get classification color
+export function getClassificationColor(
+  classification: SignalClassificationType | null
+): string {
+  const colors: Record<SignalClassificationType, string> = {
+    high_conviction: 'bg-green-500/10 text-green-600 border-green-500/20',
+    moderate: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+    informational: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    likely_hedge: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    contrarian: 'bg-red-500/10 text-red-600 border-red-500/20',
+    unclassified: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+  };
+  return colors[classification || 'unclassified'] || colors['unclassified'];
+}
+
+// Helper function to get classification icon/emoji
+export function getClassificationIcon(
+  classification: SignalClassificationType | null
+): string {
+  const icons: Record<SignalClassificationType, string> = {
+    high_conviction: '🟢',
+    moderate: '🟡',
+    informational: '⚪',
+    likely_hedge: '🔵',
+    contrarian: '🔴',
+    unclassified: '⚫',
+  };
+  return icons[classification || 'unclassified'] || icons['unclassified'];
+}
+
+// Helper function to format classification for display
+export function formatClassification(
+  classification: SignalClassificationType | null
+): string {
+  if (!classification) return 'Unclassified';
+
+  const labels: Record<SignalClassificationType, string> = {
+    high_conviction: 'High Conviction',
+    moderate: 'Moderate',
+    informational: 'Informational',
+    likely_hedge: 'Likely Hedge',
+    contrarian: 'Contrarian',
+    unclassified: 'Unclassified',
+  };
+  return labels[classification] || 'Unclassified';
+}
+
+// Helper function to format predicted win rate
+export function formatPredictedWinRate(rate: number | null): string {
+  if (rate === null || rate === undefined) return 'N/A';
+  return `${Math.round(rate * 100)}%`;
 }
 
 // Grouped ticker data for table display

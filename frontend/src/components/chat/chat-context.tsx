@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from 'react';
 
@@ -14,9 +15,12 @@ import {
 
 interface ChatContextValue {
   isOpen: boolean;
+  isFullscreen: boolean;
   initialPrompt: string | null;
   openChat: (prompt?: string) => void;
   closeChat: () => void;
+  toggleChat: () => void;
+  toggleFullscreen: () => void;
   clearInitialPrompt: () => void;
 }
 
@@ -32,6 +36,7 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
 
   const openChat = useCallback((prompt?: string) => {
@@ -43,19 +48,60 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const closeChat = useCallback(() => {
     setIsOpen(false);
+    // Reset fullscreen when closing
+    setIsFullscreen(false);
+  }, []);
+
+  const toggleChat = useCallback(() => {
+    setIsOpen((prev) => {
+      if (prev) {
+        // Closing - reset fullscreen
+        setIsFullscreen(false);
+      }
+      return !prev;
+    });
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev);
   }, []);
 
   const clearInitialPrompt = useCallback(() => {
     setInitialPrompt(null);
   }, []);
 
+  // ========================================
+  // Keyboard Shortcut: ⌘K / Ctrl+K
+  // ========================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ⌘K or Ctrl+K to toggle chat
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleChat();
+      }
+
+      // Escape to close (only when open)
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        closeChat();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, toggleChat, closeChat]);
+
   return (
     <ChatContext.Provider
       value={{
         isOpen,
+        isFullscreen,
         initialPrompt,
         openChat,
         closeChat,
+        toggleChat,
+        toggleFullscreen,
         clearInitialPrompt,
       }}
     >

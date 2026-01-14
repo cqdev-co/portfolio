@@ -14,12 +14,7 @@ import {
   buildTickerTOONContext,
   toonToString,
 } from './toon.ts';
-import type {
-  Trade,
-  TickerHistory,
-  TOONContext,
-  MarketRegime,
-} from '../types/index.ts';
+import type { Trade, TickerHistory, MarketRegime } from '../types/index.ts';
 
 // Default account size - can be overridden
 const DEFAULT_ACCOUNT_SIZE = 1500;

@@ -85,6 +85,7 @@ export {
   GET_UNUSUAL_OPTIONS_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
+  SCAN_OPPORTUNITIES_TOOL,
 
   // Converters
   toOllamaTools,
@@ -187,6 +188,7 @@ export {
   handleGetUnusualOptionsActivity,
   handleGetIVByStrike,
   handleCalculateSpread,
+  handleScanOpportunities,
 
   // Unified executor
   executeToolCall,
@@ -202,6 +204,8 @@ export {
   type UnusualOptionsToolResult,
   type IVByStrikeToolResult,
   type SpreadCalculationToolResult,
+  type ScanOpportunitiesToolResult,
+  type ScanOpportunitiesResult,
   type OutputFormat,
 } from './handlers';
 
@@ -223,6 +227,9 @@ export {
 
   // Scan results encoder
   encodeScanResultsToTOON,
+
+  // Unusual options encoder
+  encodeUnusualOptionsToTOON,
 
   // Generic encoder
   encodeTOON,
@@ -314,6 +321,81 @@ export {
   // Cache class (for custom instances)
   SessionCache,
 } from './cache';
+
+// ============================================================================
+// CALENDAR (Economic Events)
+// ============================================================================
+
+export {
+  // Main functions
+  getCalendarContext,
+  getUpcomingEvents,
+  formatCalendarForAI,
+
+  // TOON encoder
+  encodeCalendarToTOON,
+
+  // Types
+  type EventType,
+  type MarketEvent,
+  type CalendarContext,
+} from './calendar';
+
+// ============================================================================
+// SCANNER (Trade Opportunities)
+// ============================================================================
+
+export {
+  // Scan functions
+  quickScan,
+  fullScan,
+
+  // Scan lists
+  SCAN_LISTS,
+
+  // Grading
+  gradeTradeOpportunity,
+  gradeAtLeast,
+  GRADE_RUBRIC,
+
+  // Risk scoring
+  calculateRiskScore,
+
+  // Formatters
+  formatScanResultsForAI,
+  encodeScanResultsToTOON as encodeScanToTOON,
+
+  // Types
+  type TradeGrade as ScannerTradeGrade,
+  type GradingCriteria,
+  type TradeGradeResult,
+  type RiskFactor,
+  type RiskScore,
+  type ScanResult,
+  type ScanOptions,
+} from './scanner';
+
+// ============================================================================
+// SESSION (Unified API for CLI & Frontend)
+// ============================================================================
+
+export {
+  // Main class
+  AgentSession,
+
+  // Context building
+  ContextBuilder,
+
+  // Conversation management
+  ConversationManager,
+
+  // Types
+  type SessionMessage,
+  type SessionConfig,
+  type ChatResponse,
+  type MarketContext,
+  type TickerContext,
+} from './session';
 
 // ============================================================================
 // UTILITIES

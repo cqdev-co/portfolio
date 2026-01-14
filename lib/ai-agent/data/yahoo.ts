@@ -19,18 +19,22 @@ import { log } from '../utils';
 
 import type {
   TickerData,
-  SpreadRecommendation,
-  IVAnalysis,
   TradeGrade,
   NewsItem,
   DataQuality,
-  AnalystRatings,
-  TargetPrices,
-  PricePerformance,
-  SectorContext,
   OptionsFlow,
   RelativeStrength,
-  EarningsHistory,
+} from './types';
+
+// Reserved type imports for future use
+export type {
+  SpreadRecommendation as _SpreadRecommendation,
+  IVAnalysis as _IVAnalysis,
+  AnalystRatings as _AnalystRatings,
+  TargetPrices as _TargetPrices,
+  PricePerformance as _PricePerformance,
+  SectorContext as _SectorContext,
+  EarningsHistory as _EarningsHistory,
 } from './types';
 
 // Import REAL options functions (same as CLI uses)
@@ -46,9 +50,10 @@ import { getPsychologicalFairValue, extractWallsFromPFV } from '../pfv';
 import { fetchTickerDataFromPolygon } from './polygon';
 
 // Cloudflare Worker proxy (bypasses Yahoo rate limits)
-import {
-  isProxyConfigured,
-  fetchAllViaProxy, // Combined endpoint (5x more efficient)
+import { isProxyConfigured, fetchAllViaProxy } from './yahoo-proxy';
+
+// Re-export proxy functions for external use
+export {
   fetchQuoteViaProxy,
   fetchChartViaProxy,
   fetchOptionsViaProxy,
@@ -910,7 +915,7 @@ const SECTOR_AVG_PE: Record<string, number> = {
 async function fetchSummaryData(
   yahooFinance: InstanceType<typeof import('yahoo-finance2').default>,
   ticker: string,
-  currentPrice: number
+  _currentPrice: number // Reserved for future price-relative calculations
 ): Promise<Partial<TickerData> | null> {
   try {
     const insights = await rateLimitedRequest(() =>
@@ -1139,7 +1144,7 @@ async function fetchNewsData(
  * Fetch options flow (put/call ratio) - same as CLI
  * Analyzes total open interest and volume across all expirations
  */
-async function fetchOptionsFlow(
+async function _fetchOptionsFlow(
   yahooFinance: InstanceType<typeof import('yahoo-finance2').default>,
   ticker: string
 ): Promise<OptionsFlow | null> {

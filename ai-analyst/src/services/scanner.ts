@@ -317,7 +317,7 @@ export async function scanForOpportunities(
       if (result) {
         // Apply filters
         const gradeValue = gradeToValue(result.grade.grade);
-        const minGradeValue = gradeToValue(minGrade as any);
+        const minGradeValue = gradeToValue(minGrade as string);
 
         if (
           gradeValue >= minGradeValue &&

@@ -5,20 +5,19 @@ import type { UIMessage } from 'ai';
 import type { ChatStatus } from 'ai';
 import { ArrowDownIcon } from './chat-icons';
 import { ChatMessage, ThinkingMessage } from './chat-message';
-import { ChatGreeting } from './chat-greeting';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import { cn } from '@/lib/utils';
 
 type ChatMessagesProps = {
   messages: UIMessage[];
   status: ChatStatus;
-  onSuggestionClick: (prompt: string) => void;
+  isFullscreen?: boolean;
 };
 
 function PureChatMessages({
   messages,
   status,
-  onSuggestionClick,
+  isFullscreen,
 }: ChatMessagesProps) {
   const { containerRef, endRef, isAtBottom, scrollToBottom } =
     useScrollToBottom();
@@ -27,23 +26,21 @@ function PureChatMessages({
   const isSubmitted = status === 'submitted';
 
   return (
-    <div className="relative flex-1 min-h-0">
+    <div className="relative flex-1 min-h-0 w-full">
       <div
         ref={containerRef}
-        className="absolute inset-0 overflow-y-auto touch-pan-y"
+        className="absolute inset-0 w-full overflow-y-auto touch-pan-y"
       >
+        {/* Content container - ChatGPT style centered layout */}
         <div
           className={cn(
-            'mx-auto flex min-w-0 max-w-full flex-col gap-5',
-            'px-4 py-4'
+            'flex min-w-0 flex-col gap-5 mx-auto',
+            isFullscreen
+              ? 'max-w-3xl px-6 py-6 sm:px-8'
+              : 'max-w-none px-4 py-4'
           )}
         >
-          {/* Empty state with greeting */}
-          {messages.length === 0 && (
-            <ChatGreeting onSuggestionClick={onSuggestionClick} />
-          )}
-
-          {/* Messages - tool cards are now embedded in ChatMessage */}
+          {/* Messages */}
           {messages.map((message, index) => (
             <ChatMessage
               key={message.id}
@@ -88,6 +85,10 @@ function PureChatMessages({
 export const ChatMessages = memo(PureChatMessages, (prev, next) => {
   // Always re-render during streaming
   if (prev.status === 'streaming' || next.status === 'streaming') {
+    return false;
+  }
+  // Re-render if fullscreen mode changes
+  if (prev.isFullscreen !== next.isFullscreen) {
     return false;
   }
   return (

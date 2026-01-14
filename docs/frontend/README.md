@@ -2,6 +2,190 @@
 
 ## Recent Updates
 
+### FinanceChart Component (January 2026)
+
+Added a new Robinhood-inspired finance chart component for clean, modern financial data visualization.
+
+#### Design Philosophy
+
+Inspired by Robinhood's iconic chart design, focusing on:
+
+- **Minimalism**: No chart clutter - just the line, gradient fill, and essential info
+- **Color Psychology**: Green (#00C805) for gains, orange (#FF5000) for losses
+- **Motion**: Smooth animations and micro-interactions via Framer Motion
+- **Intuitive Hover**: Crosshair cursor with glowing dot and vertical guide line
+- **Responsive**: Works seamlessly across all screen sizes
+
+#### Components
+
+**1. FinanceChart (Main Component)**
+
+Full-featured chart with header, time range selector, and hover interactions.
+
+```typescript
+import { FinanceChart } from '@/components/ui/finance-chart';
+
+<FinanceChart
+  data={priceData}
+  ticker="AAPL"
+  companyName="Apple Inc."
+  selectedRange="1M"
+  onRangeChange={(range) => setRange(range)}
+  height={300}
+  showHeader={true}
+/>
+```
+
+**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `data` | `FinanceDataPoint[]` | required | Array of price data |
+| `ticker` | `string` | - | Stock ticker symbol |
+| `companyName` | `string` | - | Company name |
+| `selectedRange` | `TimeRange` | `'1M'` | Current time range |
+| `onRangeChange` | `(range) => void` | - | Range change callback |
+| `timeRanges` | `TimeRange[]` | `['1D','1W','1M','3M','1Y','ALL']` | Available ranges |
+| `height` | `number` | `300` | Chart height in px |
+| `showHeader` | `boolean` | `true` | Show price header |
+| `loading` | `boolean` | `false` | Loading state |
+| `error` | `string \| null` | `null` | Error message |
+| `forceColor` | `'positive' \| 'negative'` | - | Override gain/loss colors |
+| `showVolume` | `boolean` | `false` | Show volume bars |
+| `currency` | `string` | `'$'` | Currency symbol |
+| `decimals` | `number` | `2` | Price decimal places |
+
+**2. CompactFinanceChart (Widget Variant)**
+
+Minimal sparkline-style chart for cards and list items.
+
+```typescript
+import { CompactFinanceChart } from '@/components/ui/finance-chart';
+
+<CompactFinanceChart
+  data={priceData}
+  height={60}
+  showIndicator={true}
+/>
+```
+
+**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `data` | `FinanceDataPoint[]` | required | Price data array |
+| `height` | `number` | `60` | Chart height |
+| `showIndicator` | `boolean` | `true` | Show pulsing dot |
+| `className` | `string` | - | Additional classes |
+
+#### Data Types
+
+```typescript
+interface FinanceDataPoint {
+  time: string; // ISO timestamp
+  price: number; // Current/close price
+  open?: number; // Open price (optional)
+  high?: number; // High price (optional)
+  low?: number; // Low price (optional)
+  close?: number; // Close price (optional)
+  volume?: number; // Volume (optional)
+}
+
+type TimeRange = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL';
+```
+
+#### Exported Utilities
+
+```typescript
+import {
+  formatFinancePrice, // Format price with currency
+  formatFinanceChange, // Format change with sign
+  calculatePriceChange, // Get change stats from data
+  FINANCE_CHART_COLORS, // Color constants
+} from '@/components/ui/finance-chart';
+```
+
+#### Features
+
+- **Animated Time Range Selector**: Spring-animated pill indicator
+- **Smart Color Theming**: Auto-switches between green/red based on performance
+- **Reference Line**: Dashed line at starting price for visual comparison
+- **Gradient Fill**: Subtle area fill matching the line color
+- **Loading Skeleton**: Animated shimmer effect during data fetch
+- **Error State**: Clean error display with destructive styling
+- **Keyboard Accessible**: Proper focus states and ARIA support
+
+#### Integration with Stock Prices API
+
+Works seamlessly with the existing `/api/stock-prices` endpoint:
+
+```typescript
+import { fetchHistoricalPrices } from '@/lib/api/stock-prices';
+import { FinanceChart } from '@/components/ui/finance-chart';
+
+const [data, setData] = useState([]);
+const [range, setRange] = useState('1M');
+
+useEffect(() => {
+  fetchHistoricalPrices('AAPL', range).then(setData);
+}, [range]);
+
+<FinanceChart
+  data={data}
+  selectedRange={range}
+  onRangeChange={setRange}
+/>
+```
+
+#### Files
+
+- `src/components/ui/finance-chart.tsx` - Main component file
+- `src/app/globals.css` - Added shimmer animation
+
+#### Integration: Unusual Options Scanner
+
+The `price-chart.tsx` component in `src/components/unusual-options/` has been completely refactored to use the Robinhood-inspired design while maintaining its signal detection overlay functionality.
+
+**Key Features Preserved:**
+
+- Signal detection dots on the chart (green for calls, red for puts, purple for mixed)
+- Clickable signal dots with pinned tooltip functionality
+- Signal count badges for multiple detections at same time
+- ESC key to close pinned tooltips
+
+**New Robinhood-Style Updates:**
+
+- Area fill with gradient instead of plain line
+- Spring-animated time range selector
+- Smooth hover transitions with Framer Motion
+- Reference line at starting price
+- Cleaner tooltip design with larger typography
+- Color-matched cursors and indicators
+
+#### Integration: Penny Stock Scanner
+
+Added the `FinanceChart` component to the penny stock scanner's detail sidebar.
+
+```typescript
+// In page.tsx, new state variables:
+const [chartData, setChartData] = useState<PriceDataPoint[]>([]);
+const [chartLoading, setChartLoading] = useState(false);
+const [chartError, setChartError] = useState<string | null>(null);
+const [chartRange, setChartRange] = useState<ChartTimeRange>('1M');
+
+// Auto-fetch when selected signal changes:
+useEffect(() => {
+  fetchHistoricalPrices(selectedSignal.symbol, chartRange).then(setChartData);
+  // ...
+}, [selectedSignal?.symbol, chartRange]);
+```
+
+**Features:**
+
+- Chart appears at top of sidebar when viewing signal details
+- Compact 180px height to fit sidebar
+- Time ranges: 1D, 1W, 1M, 3M, 1Y
+- Header hidden (price already shown in sidebar stats)
+- Auto-fetches data when switching between signals
+
 ### Penny Stock Scanner UI Enhancements (January 2026)
 
 Enhanced the Penny Stock Scanner frontend to display new signal quality indicators based on January 2026 performance analysis. These changes surface the data-driven insights that were added to the backend scoring logic.

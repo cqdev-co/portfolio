@@ -100,7 +100,7 @@ Fetches unusual options activity signals from the database.
 - Signal flags (sweep, block trade, new)
 - Sentiment (bullish/bearish/neutral)
 
-### 6. `get_trading_regime` ✨ NEW
+### 6. `get_trading_regime`
 
 Analyzes current market conditions to determine if trading is advisable.
 
@@ -123,30 +123,94 @@ Analyzes current market conditions to determine if trading is advisable.
 - Contributing factors
 - Actionable recommendation
 
+### 7. `get_iv_by_strike`
+
+Fetches implied volatility for a specific strike and target DTE.
+
+**Parameters**:
+
+- `ticker` (required): Stock symbol
+- `strike` (required): Strike price to check
+- `targetDTE` (optional): Target days to expiration (default: 30)
+
+**Returns**:
+
+- Call IV at strike
+- Put IV at strike
+- Actual DTE of nearest expiration
+- Expiration date
+
+### 8. `calculate_spread`
+
+Calculate exact pricing for a user-specified call debit spread.
+
+**Parameters**:
+
+- `ticker` (required): Stock symbol
+- `longStrike` (required): Long call strike (lower, bought)
+- `shortStrike` (required): Short call strike (higher, sold)
+- `targetDTE` (optional): Target days to expiration (default: 30)
+
+**Returns**:
+
+- Real bid/ask for both legs
+- Estimated debit
+- Max profit and return on risk
+- Breakeven and cushion percentage
+- IV for both legs
+- Open interest for liquidity assessment
+
+### 9. `scan_opportunities` ✨ NEW (January 2026)
+
+Scans multiple tickers to find trade opportunities with grading.
+
+**Parameters**:
+
+- `scanList` (optional): Predefined list to scan
+  - Options: TECH, SEMIS, MEGACAP, FINANCIALS, HEALTHCARE, CONSUMER, ENERGY, FULL
+  - Default: TECH
+- `tickers` (optional): Comma-separated custom tickers (overrides scanList)
+- `minGrade` (optional): Minimum grade (A+, A, A-, B+, B, B-, etc.)
+  - Default: B
+- `maxRisk` (optional): Maximum risk score 1-10
+  - Default: 6
+
+**Returns**:
+
+- Scan list used and tickers scanned count
+- Results array with:
+  - Ticker, price, change %
+  - Trade grade (A+ to F) with scoring breakdown
+  - Risk score (1-10) with factors
+  - RSI, MA200 status, cushion %
+  - Spread recommendation if available
+- Summary stats:
+  - Total opportunities
+  - A-grade and B-grade counts
+  - Low risk count
+  - Average cushion
+
+**Example Usage**:
+
+Ask Victor: "Find me some trade setups" or "Scan tech stocks for opportunities"
+
 **Example Output**:
 
 ```
-=== TRADING REGIME ANALYSIS ===
-🟡 REGIME: CAUTION
-Confidence: 72%
-Primary Reason: SIGNAL CONFLICT
+=== SCAN RESULTS (5 found) ===
 
-📊 METRICS
-• Trend Strength: MODERATE
-• Conflict Score: 45%
-• VIX: 18.5 (NORMAL)
-• SPY: BULLISH
-• ADX: 22.3 (MODERATE)
-• Breadth: 52% (NARROWING)
+NVDA | Grade: A- | Risk: 4/10
+  Price: $135.42 (+1.23%)
+  RSI: 48.2 | MA200: Above ✓
+  Cushion: 12.3%
+  Spread: $125/$130 @ $3.80 (32 DTE)
+  BUY - 1 risk factor: Earnings in 18 days
 
-🎯 FACTORS
-• VIX 18.5 (NORMAL) - Standard volatility
-• ADX 22.3 - moderate trend strength
-• Market breadth 52% - narrowing participation
+GOOGL | Grade: B+ | Risk: 5/10
+  Price: $178.90 (-0.45%)
+  ...
 
-💡 RECOMMENDATION
-Proceed with caution. Net bullish bias detected. Reduce position
-sizes by 50%. Only take Grade A setups. Use tighter stops.
+=== END SCAN ===
 ```
 
 ## Tool Integration
@@ -251,3 +315,5 @@ reduces latency and token usage.
 - [ ] Tool result caching with TTL for repeated queries
 - [ ] Custom tool definitions per user
 - [ ] Tool call rate limiting and quotas
+- [ ] Scanner with custom criteria builder
+- [ ] Watchlist management tool

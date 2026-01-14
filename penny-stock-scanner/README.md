@@ -4,11 +4,22 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 
 ## ⚠️ Recent Updates
 
+### January 13, 2026 - Score Inversion Root Cause Fix
+
+**Critical fixes based on weekly analysis showing S-Tier at 11.8% WR:**
+
+- ✅ **52-week HIGH penalty (NEW)**: S-Tier avg 98% from low - now penalizes >75% from low
+- ✅ **Extreme volume penalty (NEW)**: 5x+ volume = 46.1% WR vs 2-3x = 72.5% WR
+- ✅ **Stronger late entry thresholds**: Lowered from 15%/30% to 10%/20%
+- ✅ **Increased late entry penalties**: 0.85→0.75 (moderate), 0.70→0.60 (severe)
+
+**Root Cause Identified**: S-Tier signals were buying stocks that already ran 25%+ and were at 52-week highs!
+
 ### January 2026 - Score Inversion Fix & Data-Driven Improvements
 
 **Major fixes based on 1,000 signals and 673 closed trades analysis:**
 
-- ✅ **Late entry penalty**: Penalizes signals where price already moved 15%+ (fixes score inversion)
+- ✅ **Late entry penalty**: Penalizes signals where price already moved significantly
 - ✅ **Volume sweet spot narrowed**: 2-3x optimal (was 2-5x), 69% WR vs 47.5%
 - ✅ **Minimum hold period**: 3 days minimum before closing (4-7 day holds = 76.5% WR!)
 - ✅ **BUY criteria fixed**: Was 27.7% WR, now requires sweet spot volume + no late entry

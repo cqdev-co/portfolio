@@ -20,10 +20,7 @@ import {
   type ValuationInputs,
 } from '../engine/fair-value.ts';
 import { selectStrategy } from '../engine/strategy.ts';
-import {
-  getPsychologicalFairValue,
-  type PsychologicalFairValue,
-} from '../services/psychological-fair-value.ts';
+import { getPsychologicalFairValue } from '../services/psychological-fair-value.ts';
 import {
   getIVAnalysis,
   findSpreadWithAlternatives,
@@ -31,11 +28,7 @@ import {
   type SpreadRecommendation,
   type SpreadSelectionContext,
 } from '../services/yahoo.ts';
-import type {
-  MarketRegime,
-  FairValueResult,
-  StrategyRecommendation,
-} from '../types/index.ts';
+import type { MarketRegime } from '../types/index.ts';
 
 // Instantiate yahoo-finance2 (required in v3+)
 const yahooFinance = new YahooFinance({
@@ -257,13 +250,14 @@ interface OptionsFlow {
   totalPutOI: number;
 }
 
-interface RiskReward {
+// Reserved for future spread risk/reward calculations
+type _RiskReward = {
   maxProfit: number; // Max profit in dollars
   maxLoss: number; // Max loss (debit paid)
   breakeven: number; // Breakeven price
   profitPct: number; // Max profit as % of risk
   rrRatio: string; // e.g., "1:2.5"
-}
+};
 
 interface StockData {
   ticker: string;

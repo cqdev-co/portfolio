@@ -5,9 +5,12 @@ import { cookies } from 'next/headers';
 // Shared AI agent library (monorepo root)
 import {
   buildVictorLitePrompt,
-  BASIC_TOOLS,
+  AGENT_TOOLS,
   toOllamaTools,
   executeToolCall,
+  getCalendarContext,
+  getMarketRegime,
+  formatRegimeForAI,
 } from '@lib/ai-agent';
 
 export const maxDuration = 60;
@@ -106,14 +109,63 @@ async function isUserAuthorized(): Promise<{
   }
 }
 
-// Use Victor Lite prompt with tools enabled
-const systemPrompt = buildVictorLitePrompt({
-  accountSize: 1750,
-  withTools: true, // Enable tool instructions
-});
+// Convert full tool set to Ollama format
+// Using AGENT_TOOLS gives Frontend access to all CLI tools:
+// - get_ticker_data, web_search (basic)
+// - get_financials_deep, get_institutional_holdings (research)
+// - get_unusual_options_activity, get_trading_regime (market)
+// - get_iv_by_strike, calculate_spread (options)
+const ollamaTools = toOllamaTools(AGENT_TOOLS);
 
-// Convert tools to Ollama format
-const ollamaTools = toOllamaTools(BASIC_TOOLS);
+/**
+ * Build dynamic system prompt with live market context
+ * This matches the CLI's approach of injecting real-time data
+ */
+async function buildDynamicSystemPrompt(): Promise<string> {
+  try {
+    // Fetch market context in parallel
+    const [calendarCtx, marketRegime] = await Promise.all([
+      Promise.resolve(getCalendarContext()),
+      getMarketRegime().catch(() => null),
+    ]);
+
+    // Build context sections
+    const contextParts: string[] = [];
+
+    // Add calendar warnings if any
+    if (calendarCtx.warnings.length > 0) {
+      contextParts.push(`\n=== MARKET CALENDAR ===`);
+      contextParts.push(`Status: ${calendarCtx.marketStatus}`);
+      contextParts.push(`Warnings:`);
+      calendarCtx.warnings.forEach((w) => contextParts.push(`  ${w}`));
+      contextParts.push(`=== END CALENDAR ===\n`);
+    }
+
+    // Add market regime if available
+    if (marketRegime) {
+      contextParts.push(formatRegimeForAI(marketRegime));
+    }
+
+    // Build the prompt with context
+    const basePrompt = buildVictorLitePrompt({
+      accountSize: 1750,
+      withTools: true,
+    });
+
+    if (contextParts.length > 0) {
+      return `${basePrompt}\n\n=== CURRENT MARKET CONTEXT ===\n${contextParts.join('\n')}\n=== END CONTEXT ===`;
+    }
+
+    return basePrompt;
+  } catch (error) {
+    console.error('[Chat] Error building dynamic prompt:', error);
+    // Fall back to static prompt
+    return buildVictorLitePrompt({
+      accountSize: 1750,
+      withTools: true,
+    });
+  }
+}
 
 // Extract text content from UIMessage parts or direct content
 function extractContent(msg: {
@@ -172,6 +224,9 @@ export async function POST(req: Request) {
 
     // Use provided model or default
     const selectedModel = model || DEFAULT_MODEL;
+
+    // Build dynamic system prompt with live market context
+    const systemPrompt = await buildDynamicSystemPrompt();
 
     // Convert messages to Ollama format
     const ollamaMessages = [
@@ -410,10 +465,14 @@ export async function POST(req: Request) {
                       writer.write({ type: 'text-start', id: markerId });
 
                       if (result.success && result.data) {
-                        // Success - emit full data
+                        // Success - emit data + formatted string
+                        // (formatted is what AI sees - TOON or text)
                         let dataJson: string;
                         try {
-                          dataJson = JSON.stringify(result.data);
+                          dataJson = JSON.stringify({
+                            data: result.data,
+                            formatted: result.formatted || null,
+                          });
                         } catch (e) {
                           console.error(
                             '[Chat] Failed to stringify tool data:',

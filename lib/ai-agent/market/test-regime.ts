@@ -13,11 +13,7 @@
  *   bun run lib/ai-agent/market/test-regime.ts
  */
 
-import {
-  fetchAllViaProxy,
-  isProxyConfigured,
-  checkProxyHealth,
-} from '../data/yahoo-proxy';
+import { isProxyConfigured, checkProxyHealth } from '../data/yahoo-proxy';
 
 import {
   calculateATR,
@@ -689,8 +685,8 @@ async function testFullRegimeAnalysisWithReturn(
   return analysis;
 }
 
-// Keep old function for backwards compatibility
-async function testFullRegimeAnalysis(spyData: ChartData): Promise<void> {
+// Keep old function for backwards compatibility (may be called externally)
+async function _testFullRegimeAnalysis(spyData: ChartData): Promise<void> {
   header('TEST 7: Full Trading Regime Analysis');
 
   // Build price history from SPY data

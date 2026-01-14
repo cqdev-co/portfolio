@@ -5,7 +5,7 @@
  * Free tier: 5 API calls/minute, EOD data, 2 years history.
  */
 
-import type { TickerData, NewsItem } from './types';
+import type { TickerData } from './types';
 import { log } from '../utils';
 
 // ============================================================================
@@ -87,28 +87,17 @@ interface PolygonPrevClose {
   status: string;
 }
 
-interface PolygonSnapshot {
+// Reserved for future snapshot endpoint usage
+type _PolygonSnapshot = {
   ticker?: {
     ticker: string;
     todaysChange: number;
     todaysChangePerc: number;
-    day: {
-      c: number; // close
-      h: number; // high
-      l: number; // low
-      o: number; // open
-      v: number; // volume
-    };
-    prevDay: {
-      c: number;
-      h: number;
-      l: number;
-      o: number;
-      v: number;
-    };
+    day: { c: number; h: number; l: number; o: number; v: number };
+    prevDay: { c: number; h: number; l: number; o: number; v: number };
   };
   status: string;
-}
+};
 
 interface PolygonAggregates {
   results?: Array<{
@@ -122,25 +111,16 @@ interface PolygonAggregates {
   status: string;
 }
 
-interface PolygonRSI {
-  results?: {
-    values?: Array<{
-      timestamp: number;
-      value: number;
-    }>;
-  };
+// Reserved for future technical indicator API usage
+type _PolygonRSI = {
+  results?: { values?: Array<{ timestamp: number; value: number }> };
   status: string;
-}
+};
 
-interface PolygonSMA {
-  results?: {
-    values?: Array<{
-      timestamp: number;
-      value: number;
-    }>;
-  };
+type _PolygonSMA = {
+  results?: { values?: Array<{ timestamp: number; value: number }> };
   status: string;
-}
+};
 
 interface PolygonNews {
   results?: Array<{
@@ -210,7 +190,7 @@ export async function fetchTickerDataFromPolygon(
           };
         }
       }
-    } catch (e) {
+    } catch {
       log.debug(`[Polygon] Could not fetch details for ${symbol}`);
     }
 
@@ -267,7 +247,7 @@ export async function fetchTickerDataFromPolygon(
           };
         }
       }
-    } catch (e) {
+    } catch {
       log.debug(`[Polygon] Could not fetch history for ${symbol}`);
     }
 
@@ -285,7 +265,7 @@ export async function fetchTickerDataFromPolygon(
           source: n.publisher?.name,
         }));
       }
-    } catch (e) {
+    } catch {
       log.debug(`[Polygon] Could not fetch news for ${symbol}`);
     }
 

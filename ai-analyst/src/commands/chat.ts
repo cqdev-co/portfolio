@@ -12,7 +12,6 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import YahooFinance from 'yahoo-finance2';
-import { RSI, SMA, ADX } from 'technicalindicators';
 import {
   validateAIRequirement,
   chatWithTools,
@@ -22,7 +21,6 @@ import {
   type AgentResponse,
   type ToolDefinition,
   type ToolCall,
-  type StreamingAgentChunk,
   type StreamingAgentResult,
 } from '../services/ollama.ts';
 import {
@@ -36,28 +34,19 @@ import {
   detectPatterns,
   toonToString,
   buildTOONContext,
-  getTOONDecoderSpec,
   encodeTickerToTOON,
   summarizeConversation,
   type TickerDataInput,
   type ConversationMessage as TOONConversationMessage,
 } from '../context/toon.ts';
 import {
-  findOptimalSpread,
-  getEarningsInfo,
-  getIVAnalysis,
   calculateSupportResistance,
-  getTickerNews,
-  formatNewsForAI,
   type SpreadRecommendation,
   type IVAnalysis,
   type SupportResistance,
   type NewsItem,
 } from '../services/yahoo.ts';
-import {
-  getCalendarContext,
-  formatCalendarForAI,
-} from '../services/calendar.ts';
+import { getCalendarContext } from '../services/calendar.ts';
 import {
   getMarketRegime as fetchMarketRegime,
   getRegimeBadge,
@@ -76,63 +65,37 @@ import {
 } from '../../../lib/ai-agent/toon/index.ts';
 import { sessionCache } from '../../../lib/ai-agent/cache/index.ts';
 import { log } from '../../../lib/ai-agent/utils/index.ts';
-import {
-  quickScan,
-  fullScan,
-  formatScanResults,
-  type ScanResult,
-} from '../services/scanner.ts';
+import { quickScan, type ScanResult } from '../services/scanner.ts';
 import {
   searchWeb,
   formatSearchForAI,
   needsWebSearch,
   type WebSearchResponse,
 } from '../services/web-search.ts';
-import {
-  getMarketStatus,
-  findSpreadWithAlternatives,
-  analyzePosition,
-  formatPositionAnalysisForAI,
-  type DataQuality,
-  type SpreadAlternatives,
-  type SpreadSelectionContext,
-  type PositionAnalysis,
-} from '../services/yahoo.ts';
+import { getMarketStatus, type DataQuality } from '../services/yahoo.ts';
 import {
   performFullAnalysis,
-  formatAnalysisForAI,
-  explainGradeRubric,
-  GRADE_RUBRIC,
   type AdvancedAnalysis,
 } from '../engine/trade-analyzer.ts';
-import { getPsychologicalFairValue } from '../services/psychological-fair-value.ts';
-import type { PsychologicalFairValue } from '../../../lib/utils/ts/psychological-fair-value/types.ts';
 import type { MarketRegime, Trade } from '../types/index.ts';
+import type { PsychologicalFairValue } from '../../../lib/utils/ts/psychological-fair-value/types.ts';
 
 // Shared AI Agent library (DATA PARITY: CLI uses same data as Frontend)
 import {
   // Prompts
   buildVictorSystemPrompt,
-  TOON_DECODER_SPEC,
   // Tools
   AGENT_TOOLS,
   BASIC_TOOLS,
   toOllamaTools,
-  // Classification
-  classifyQuestion as sharedClassifyQuestion,
-  extractTickers as sharedExtractTickers,
   // DATA FETCHING (shared with Frontend for parity)
   fetchTickerData as sharedFetchTickerData,
-  checkDataStaleness,
   // Tool Handlers (shared implementations)
   handleGetFinancialsDeep,
   handleGetInstitutionalHoldings,
   handleGetUnusualOptionsActivity,
   handleGetIVByStrike,
   handleCalculateSpread,
-  // Types
-  type QuestionClassification as SharedQuestionClassification,
-  type TickerData as SharedTickerData,
 } from '../../../lib/ai-agent/index.ts';
 
 // Instantiate yahoo-finance2
@@ -929,9 +892,9 @@ async function executeToolCall(
 }
 
 /**
- * Format ticker data for AI context
+ * Format ticker data for AI context (exported for tool usage)
  */
-function formatTickerDataForAI(t: TickerData): string {
+export function formatTickerDataForAI(t: TickerData): string {
   let output = `\n=== ${t.ticker} DATA ===\n`;
   output += `Price: $${t.price.toFixed(2)} (${t.change >= 0 ? '+' : ''}${t.change.toFixed(2)}%)\n`;
   output += `RSI: ${t.rsi?.toFixed(1) ?? 'N/A'}\n`;
@@ -2171,7 +2134,8 @@ export async function startChat(options: ChatOptions): Promise<void> {
         let totalToolDuration = 0;
         let toolCallCount = 0;
         let finalContent = '';
-        let finalThinking = '';
+        // finalThinking tracked for potential debugging/logging
+        const _finalThinking = '';
         let modelName = '';
 
         // Status display function
@@ -2325,7 +2289,7 @@ export async function startChat(options: ChatOptions): Promise<void> {
           }
 
           finalContent += currentContent;
-          finalThinking += currentThinking;
+          // finalThinking tracked for potential debugging/logging
 
           // Add assistant message to conversation
           agentMessages.push({

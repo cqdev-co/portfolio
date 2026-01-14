@@ -308,7 +308,8 @@ export function analyzeScenarios(
 
   const scenariosToRun = scenarios ?? defaultScenarios;
   const maxLoss = debit * 100;
-  const maxProfit = (shortStrike - longStrike - debit) * 100;
+  // maxProfit reserved for future scenario analysis
+  const _maxProfit = (shortStrike - longStrike - debit) * 100;
 
   return scenariosToRun.map((scenario) => {
     const newPrice = currentPrice * (1 + scenario.priceChangePct);

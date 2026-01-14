@@ -546,17 +546,17 @@ Run migration 002 to add performance tracking fields:
 # scripts/migrations/002_add_performance_fields.sql
 ```
 
-### Scheduled Validation (Recommended)
+### Scheduled Validation (IMPLEMENTED ✅)
 
-Add to GitHub Actions or cron:
+Weekly validation is now integrated into the GitHub Actions workflow (`uos.yml`):
+
+- **Automatic**: Runs every Sunday at 6 PM ET alongside the performance report
+- **Manual**: Trigger via GitHub Actions → "Unusual Options Scanner" → Run workflow → Select "classification_validation"
 
 ```yaml
-# Run weekly on Sunday
-- name: Validate Classifications
-  run: |
-    cd unusual-options-service
-    poetry run python scripts/classification_validator.py \
-      --report --days 30
+# Runs automatically with weekly performance report (Sundays 6 PM ET)
+# Also available as manual trigger: job_type = classification_validation
+poetry run python scripts/classification_validator.py --validate --days 30
 ```
 
 ### Recalibration Rules
@@ -583,9 +583,12 @@ Add to GitHub Actions or cron:
 
 1. ~~Run database migration in Supabase~~ ✅
 2. ~~Implement feedback loop system~~ ✅
-3. Monitor new signals with classification
-4. Run weekly validation reports
-5. Adjust classification rules based on actual outcomes
+3. ~~Update frontend types for classification~~ ✅
+4. ~~Add weekly validation to GitHub Actions~~ ✅
+5. ~~Add classification badges to UI~~ ✅
+6. Run migration 002 (performance fields) in Supabase
+7. Monitor new signals with classification
+8. Adjust classification rules based on actual outcomes
 
 ---
 

@@ -14,8 +14,9 @@
  */
 
 import { encode } from '@toon-format/toon';
-import type { TickerData } from '../data/types';
+import type { TickerData, UnusualOptionsSignal } from '../data/types';
 import type { MarketRegime } from '../market';
+import { getCalendarContext } from '../calendar';
 
 // ============================================================================
 // TOON DECODER SPEC (for system prompts)
@@ -382,6 +383,114 @@ export function encodeScanResultsToTOON(
   }));
 
   return encode({ scanResults: data });
+}
+
+// ============================================================================
+// UNUSUAL OPTIONS TOON ENCODING
+// ============================================================================
+
+/**
+ * Format premium flow for display
+ */
+function formatPremium(premium: number): string {
+  if (premium >= 1e6) return `${(premium / 1e6).toFixed(1)}M`;
+  if (premium >= 1e3) return `${(premium / 1e3).toFixed(0)}K`;
+  return `${premium}`;
+}
+
+/**
+ * Encode unusual options signals to TOON format
+ * Optimized for token efficiency while preserving key signal data
+ */
+export function encodeUnusualOptionsToTOON(
+  signals: UnusualOptionsSignal[],
+  summary?: {
+    totalSignals: number;
+    bullishCount: number;
+    bearishCount: number;
+    avgScore: number;
+    topGrade: string;
+  }
+): string {
+  // Build summary section
+  const summaryData = summary
+    ? {
+        total: summary.totalSignals,
+        bullish: summary.bullishCount,
+        bearish: summary.bearishCount,
+        topGrade: summary.topGrade,
+      }
+    : null;
+
+  // Build compact signal rows
+  const signalRows = signals.slice(0, 10).map((s) => ({
+    ticker: s.ticker,
+    strike: s.strike,
+    type: s.optionType === 'call' ? 'C' : 'P',
+    expiry: s.expiry.split('T')[0], // Just date part
+    dte: s.daysToExpiry,
+    sentiment: s.sentiment.toLowerCase(),
+    grade: s.grade,
+    score: Math.round(s.overallScore * 100),
+    vol: s.currentVolume,
+    volRatio: `${s.volumeRatio.toFixed(1)}x`,
+    premium: formatPremium(s.premiumFlow),
+    // Compact flags
+    flags:
+      [
+        s.hasSweep ? 'sweep' : null,
+        s.hasBlockTrade ? 'block' : null,
+        s.hasOISpike ? 'oi' : null,
+        s.isNew ? 'new' : null,
+      ]
+        .filter(Boolean)
+        .join(',') || null,
+    moneyness: s.moneyness,
+    risk: s.riskLevel.toLowerCase(),
+  }));
+
+  const data: Record<string, unknown> = {
+    unusualOptions: {
+      summary: summaryData,
+      signals: signalRows,
+    },
+  };
+
+  return encode(data);
+}
+
+// ============================================================================
+// CALENDAR TOON ENCODING
+// ============================================================================
+
+/**
+ * Encode calendar context to TOON format
+ */
+export function encodeCalendarToTOON(): string {
+  const calendar = getCalendarContext();
+
+  const data: Record<string, unknown> = {
+    calendar: {
+      status: calendar.marketStatus,
+      warnings: calendar.warnings,
+      upcoming: calendar.upcomingEvents.slice(0, 5).map((e) => {
+        const days = Math.ceil(
+          (e.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+        return {
+          event: e.name,
+          date: e.date.toISOString().split('T')[0],
+          days,
+        };
+      }),
+    },
+  };
+
+  if (!calendar.isMarketOpen) {
+    (data.calendar as Record<string, unknown>).marketClosed = true;
+  }
+
+  return encode(data);
 }
 
 // ============================================================================

@@ -161,3 +161,94 @@ export const RefreshIcon = ({ size = 16 }: { size?: number }) => (
     <path d="M10.5 4.5L12 3l1.5 1.5M5.5 11.5L4 13l-1.5-1.5" />
   </svg>
 );
+
+export const MaximizeIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    style={{ color: 'currentcolor' }}
+    viewBox="0 0 16 16"
+    width={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
+    <path
+      d="M9.5 1.5H14.5V6.5M6.5 14.5H1.5V9.5M14 2L9.5 6.5M2 14L6.5 9.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const MinimizeIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    style={{ color: 'currentcolor' }}
+    viewBox="0 0 16 16"
+    width={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
+    <path
+      d="M14 6.5H9.5V2M2 9.5H6.5V14M9 6.5L14.5 1M6.5 9.5L1 15"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const CopyIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    style={{ color: 'currentcolor' }}
+    viewBox="0 0 16 16"
+    width={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
+    <rect x="5.5" y="5.5" width="8" height="9" rx="1" />
+    <path
+      d="M10.5 5.5V3.5C10.5 2.94772 10.0523 2.5 9.5 2.5H3.5C2.94772 
+        2.5 2.5 2.94772 2.5 3.5V11.5C2.5 12.0523 2.94772 12.5 3.5 12.5H5.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const CheckIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    style={{ color: 'currentcolor' }}
+    viewBox="0 0 16 16"
+    width={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M3 8L6.5 11.5L13 4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export const RegenerateIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    style={{ color: 'currentcolor' }}
+    viewBox="0 0 16 16"
+    width={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+  >
+    <path
+      d="M1.5 8a6.5 6.5 0 0 1 11.5-4.2M14.5 8a6.5 6.5 0 0 1-11.5 4.2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M11.5 3.5V1M11.5 3.5H14M4.5 12.5V15M4.5 12.5H2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

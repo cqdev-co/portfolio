@@ -202,7 +202,7 @@ Evaluate based on:
  * Build system prompt for analyzing a spread position
  */
 export function buildSpreadAnalysisPrompt(config: SpreadPromptConfig): string {
-  const { spread, accountSize = 1750 } = config;
+  const { spread, accountSize: _accountSize = 1750 } = config; // Reserved for position sizing
 
   // Calculate key metrics
   const profitCaptured =

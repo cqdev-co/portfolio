@@ -63,7 +63,8 @@ export async function GET(request: NextRequest) {
 
       // Process calls
       if (optionChain.calls) {
-        for (const call of optionChain.calls) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const call of optionChain.calls as any[]) {
           if (call.strike && call.bid && call.ask && call.bid > 0) {
             data.push({
               symbol,
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
 
       // Process puts
       if (optionChain.puts) {
-        for (const put of optionChain.puts) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const put of optionChain.puts as any[]) {
           if (put.strike && put.bid && put.ask && put.bid > 0) {
             data.push({
               symbol,

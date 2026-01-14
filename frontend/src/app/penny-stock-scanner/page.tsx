@@ -66,6 +66,12 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { FinanceChart, type TimeRange } from '@/components/ui/finance-chart';
+import {
+  fetchHistoricalPrices,
+  type PriceDataPoint,
+  type TimeRange as ApiTimeRange,
+} from '@/lib/api/stock-prices';
 
 // Helper function to safely parse numeric values
 function safeParseNumber(value: string | number | null | undefined): number {
@@ -240,6 +246,12 @@ export default function PennyStockScanner() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  // Chart state for sidebar
+  const [chartData, setChartData] = useState<PriceDataPoint[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartError, setChartError] = useState<string | null>(null);
+  const [chartRange, setChartRange] = useState<TimeRange>('1M');
+
   // Filter state
   const [selectedRanks, setSelectedRanks] = useState<OpportunityRank[]>([]);
   const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
@@ -380,6 +392,46 @@ export default function PennyStockScanner() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [sidebarOpen, selectedSignal, displaySignals]);
+
+  // Fetch chart data when selected signal changes
+  useEffect(() => {
+    if (!selectedSignal?.symbol) {
+      setChartData([]);
+      return;
+    }
+
+    let isMounted = true;
+    setChartLoading(true);
+    setChartError(null);
+
+    // Convert chart TimeRange to API TimeRange (ALL -> MAX)
+    const apiRange: ApiTimeRange =
+      chartRange === 'ALL' ? 'MAX' : (chartRange as ApiTimeRange);
+
+    fetchHistoricalPrices(selectedSignal.symbol, apiRange)
+      .then((data) => {
+        if (isMounted) {
+          setChartData(data);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setChartError(
+            err instanceof Error ? err.message : 'Failed to load chart'
+          );
+          setChartData([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setChartLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSignal?.symbol, chartRange]);
 
   const handleSort = (field: keyof PennyStockSignal) => {
     setSortConfig((prev) => ({
@@ -1143,6 +1195,21 @@ export default function PennyStockScanner() {
                 className="flex-1 overflow-y-auto p-4 space-y-4 
                   relative"
               >
+                {/* Price Chart */}
+                <FinanceChart
+                  data={chartData}
+                  loading={chartLoading}
+                  error={chartError}
+                  ticker={selectedSignal.symbol}
+                  selectedRange={chartRange}
+                  onRangeChange={setChartRange}
+                  timeRanges={['1D', '1W', '1M', '3M', '1Y']}
+                  height={180}
+                  showHeader={false}
+                />
+
+                <Separator />
+
                 {/* Price & Volume */}
                 <div className="space-y-2">
                   <h3

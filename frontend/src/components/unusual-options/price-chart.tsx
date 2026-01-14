@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Line,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   ComposedChart,
+  ReferenceLine,
 } from 'recharts';
-import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
@@ -17,13 +18,16 @@ import {
   getPriceChange,
   getCurrentPrice,
   formatPrice,
-  formatPriceChange,
   type PriceDataPoint,
   type TimeRange,
 } from '@/lib/api/stock-prices';
 import type { UnusualOptionsSignal } from '@/lib/types/unusual-options';
 import { formatPremiumFlow, getGradeColor } from '@/lib/types/unusual-options';
 import { Activity, X } from 'lucide-react';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 interface PriceChartProps {
   ticker: string;
@@ -38,7 +42,204 @@ interface ChartDataPoint extends PriceDataPoint {
   }>;
 }
 
+// ============================================================================
+// Constants - Robinhood Colors
+// ============================================================================
+
+const COLORS = {
+  positive: {
+    line: '#00C805',
+    glow: 'rgba(0, 200, 5, 0.4)',
+  },
+  negative: {
+    line: '#FF5000',
+    glow: 'rgba(255, 80, 0, 0.4)',
+  },
+  signals: {
+    call: '#00C805',
+    put: '#FF5000',
+    mixed: '#a855f7',
+  },
+};
+
 const TIME_RANGES: TimeRange[] = ['1D', '1W', '1M', '3M', '1Y', '5Y', 'MAX'];
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function formatChange(change: number, percent: number): string {
+  const sign = change >= 0 ? '+' : '';
+  return `${sign}$${Math.abs(change).toFixed(2)} (${sign}${percent.toFixed(2)}%)`;
+}
+
+// ============================================================================
+// Time Range Selector Component
+// ============================================================================
+
+function TimeRangeSelector({
+  ranges,
+  selected,
+  onChange,
+  isPositive,
+}: {
+  ranges: TimeRange[];
+  selected: TimeRange;
+  onChange: (range: TimeRange) => void;
+  isPositive: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-center">
+      <div className="flex items-center gap-1">
+        {ranges.map((range) => {
+          const isSelected = range === selected;
+
+          return (
+            <button
+              key={range}
+              onClick={() => onChange(range)}
+              className={cn(
+                'relative px-3 py-1.5 text-xs font-medium',
+                'transition-colors duration-200',
+                'rounded-full',
+                isSelected
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {isSelected && (
+                <motion.div
+                  layoutId="optionsTimeRangeIndicator"
+                  className={cn(
+                    'absolute inset-0 rounded-full',
+                    isPositive ? 'bg-[#00C805]/10' : 'bg-[#FF5000]/10'
+                  )}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 35,
+                  }}
+                />
+              )}
+              <span className="relative z-10">{range}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Loading Skeleton
+// ============================================================================
+
+function ChartSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="h-8 w-28 bg-muted/20 rounded animate-pulse" />
+        <div className="h-4 w-40 bg-muted/10 rounded animate-pulse" />
+      </div>
+      <div className="relative w-full overflow-hidden rounded-lg h-[260px]">
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-transparent 
+            via-muted/20 to-transparent animate-shimmer"
+        />
+        <svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 400 200"
+          preserveAspectRatio="none"
+          className="text-muted/30"
+        >
+          <path
+            d="M0,150 Q50,120 100,130 T200,100 T300,110 T400,80"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            opacity={0.3}
+          />
+        </svg>
+      </div>
+      <div className="flex justify-center gap-2">
+        {TIME_RANGES.slice(0, 5).map((range) => (
+          <div
+            key={range}
+            className="h-7 w-10 bg-muted/10 rounded-full animate-pulse"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Custom Cursor Component (vertical line only)
+// ============================================================================
+
+function CustomCursor({
+  points,
+  height,
+  color,
+}: {
+  points?: Array<{ x: number; y: number }>;
+  height?: number;
+  color: string;
+}) {
+  if (!points?.length) return null;
+
+  const x = points[0].x;
+
+  return (
+    <g>
+      <line
+        x1={x}
+        y1={0}
+        x2={x}
+        y2={height}
+        stroke={color}
+        strokeWidth={1}
+        strokeDasharray="3 3"
+        opacity={0.4}
+      />
+    </g>
+  );
+}
+
+// ============================================================================
+// Custom Active Dot Component (dot on the line)
+// ============================================================================
+
+function CustomActiveDot({
+  cx,
+  cy,
+  color,
+}: {
+  cx?: number;
+  cy?: number;
+  color: string;
+}) {
+  if (!cx || !cy) return null;
+
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={8} fill={color} opacity={0.2} />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill={color}
+        stroke="white"
+        strokeWidth={2}
+      />
+    </g>
+  );
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 export function PriceChart({
   ticker,
@@ -49,6 +250,7 @@ export function PriceChart({
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredData, setHoveredData] = useState<ChartDataPoint | null>(null);
   const [pinnedTooltip, setPinnedTooltip] = useState<{
     data: ChartDataPoint;
     x: number;
@@ -56,6 +258,7 @@ export function PriceChart({
   } | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
+  // Fetch price data
   useEffect(() => {
     let isMounted = true;
 
@@ -65,7 +268,6 @@ export function PriceChart({
 
       try {
         const data = await fetchHistoricalPrices(ticker, selectedRange);
-
         if (isMounted) {
           setPriceData(data);
         }
@@ -84,44 +286,43 @@ export function PriceChart({
     }
 
     loadPriceData();
-
     return () => {
       isMounted = false;
     };
   }, [ticker, selectedRange]);
 
-  // Clear pinned tooltip when time range changes
+  // Clear states when range changes
   useEffect(() => {
     setPinnedTooltip(null);
+    setHoveredData(null);
   }, [selectedRange]);
 
-  // Handle escape key to close pinned tooltip
+  // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && pinnedTooltip) {
         setPinnedTooltip(null);
       }
     };
-
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [pinnedTooltip]);
 
+  // Process chart data with signal detections
   const chartData = useMemo<ChartDataPoint[]>(() => {
     if (priceData.length === 0) return [];
 
     const dataMap = new Map<string, ChartDataPoint>();
-    priceData.forEach((point: PriceDataPoint) => {
+    priceData.forEach((point) => {
       dataMap.set(point.time, { ...point, detections: [] });
     });
 
     signals.forEach((signal) => {
       const detectionTime = new Date(signal.detection_timestamp).toISOString();
-
       let closestTime: string | null = null;
       let minDiff = Infinity;
 
-      dataMap.forEach((_point: ChartDataPoint, time: string) => {
+      dataMap.forEach((_, time) => {
         const diff = Math.abs(
           new Date(time).getTime() - new Date(detectionTime).getTime()
         );
@@ -134,10 +335,7 @@ export function PriceChart({
       if (closestTime) {
         const point = dataMap.get(closestTime);
         if (point) {
-          if (!point.detections) {
-            point.detections = [];
-          }
-
+          if (!point.detections) point.detections = [];
           point.detections.push({
             signal,
             y: signal.underlying_price || point.price,
@@ -150,219 +348,171 @@ export function PriceChart({
   }, [priceData, signals]);
 
   const priceChange = useMemo(() => getPriceChange(priceData), [priceData]);
-
   const currentPrice = useMemo(() => getCurrentPrice(priceData), [priceData]);
 
-  // Calculate smart tooltip position that stays within chart bounds
+  const lineColor = priceChange.isPositive
+    ? COLORS.positive.line
+    : COLORS.negative.line;
+
+  // Y-axis domain with padding
+  const yDomain = useMemo(() => {
+    if (priceData.length === 0) return [0, 100];
+    const prices = priceData.map((d) => d.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const padding = (max - min) * 0.1;
+    return [min - padding, max + padding];
+  }, [priceData]);
+
+  // Tooltip position calculation
   const tooltipPosition = useMemo(() => {
     if (!pinnedTooltip || !chartContainerRef.current) {
       return { left: 0, top: 0, transform: '', arrowClass: 'bottom' as const };
     }
 
     const container = chartContainerRef.current.getBoundingClientRect();
-    const tooltipWidth = 200; // min-width from tooltip
-    const tooltipHeight = 250; // approximate max height
+    const tooltipWidth = 220;
+    const tooltipHeight = 280;
     const arrowHeight = 12;
     const padding = 16;
-
     const { x, y } = pinnedTooltip;
 
-    // Calculate initial position (above the dot)
     let left = x;
     let top = y - arrowHeight;
     let transform = 'translate(-50%, -100%)';
-    let arrowClass: 'top' | 'bottom' = 'bottom'; // arrow points down by default
+    let arrowClass: 'top' | 'bottom' = 'bottom';
 
-    // Check if tooltip goes off top - flip to bottom
     if (top - tooltipHeight < padding) {
       top = y + arrowHeight;
       transform = 'translate(-50%, 0%)';
-      arrowClass = 'top'; // arrow points up
+      arrowClass = 'top';
     }
 
-    // Check horizontal bounds
     const tooltipLeft = left - tooltipWidth / 2;
     const tooltipRight = left + tooltipWidth / 2;
 
     if (tooltipLeft < padding) {
-      // Too far left
       left = tooltipWidth / 2 + padding;
-      transform = transform.replace('-50%', '0%');
     } else if (tooltipRight > container.width - padding) {
-      // Too far right
       left = container.width - tooltipWidth / 2 - padding;
-      transform = transform.replace('-50%', '-100%');
     }
 
     return { left, top, transform, arrowClass };
   }, [pinnedTooltip]);
 
-  const CustomTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean;
-    payload?: Array<{ payload: ChartDataPoint }>;
-  }) => {
-    // Don't show hover tooltip if something is pinned
-    if (pinnedTooltip !== null) return null;
+  // Display price (hovered or current)
+  const displayPrice = useMemo(() => {
+    if (hoveredData) return hoveredData.price;
+    return currentPrice;
+  }, [hoveredData, currentPrice]);
 
-    if (!active || !payload || payload.length === 0) return null;
+  const handleRangeChange = useCallback((range: TimeRange) => {
+    setSelectedRange(range);
+    setPinnedTooltip(null);
+    setHoveredData(null);
+  }, []);
 
-    const data = payload[0].payload as ChartDataPoint;
-    const hasDetections = data.detections && data.detections.length > 0;
+  // Custom hover tooltip
+  const HoverTooltip = useCallback(
+    ({
+      active,
+      payload,
+    }: {
+      active?: boolean;
+      payload?: Array<{ payload: ChartDataPoint }>;
+    }) => {
+      if (pinnedTooltip !== null) return null;
+      if (!active || !payload || payload.length === 0) return null;
 
-    return (
-      <div className="relative group">
-        {/* Invisible hover zone - extends above and below tooltip */}
-        <div className="absolute inset-0 -inset-y-4 -inset-x-2" />
+      const data = payload[0].payload;
+      const hasDetections = data.detections && data.detections.length > 0;
 
-        <div className="relative bg-background/95 backdrop-blur-lg border border-border/30 rounded shadow-xl p-2 min-w-[150px] animate-in fade-in-0 duration-100">
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="text-[8px] text-muted-foreground/50 font-medium">
-                  {new Date(data.time).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
-                </div>
-                <div className="text-xs font-bold">
-                  {formatPrice(data.price)}
-                </div>
-              </div>
-              {hasDetections && (
-                <div className="text-[7px] text-muted-foreground/40 italic">
-                  Click dot to pin
-                </div>
-              )}
-            </div>
-
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pointer-events-none"
+        >
+          <div className="flex flex-col items-center gap-0.5">
+            <span
+              className="text-lg font-semibold tracking-tight"
+              style={{ color: lineColor }}
+            >
+              {formatPrice(data.price)}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {new Date(data.time).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </span>
             {hasDetections && (
-              <>
-                <div className="pt-1 mt-1 border-t border-border/10">
-                  <div className="text-[8px] font-semibold mb-1 flex items-center gap-1 text-muted-foreground/50 uppercase tracking-wider">
-                    <Activity className="h-1.5 w-1.5" />
-                    <span>
-                      {data.detections!.length} Option
-                      {data.detections!.length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
-                    {data.detections!.map(({ signal }) => (
-                      <button
-                        key={signal.signal_id}
-                        onClick={() => onSignalClick?.(signal.signal_id)}
-                        className="w-full text-xs p-1 bg-muted/5 rounded hover:bg-muted/20 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span
-                            className={cn(
-                              'text-[9px] font-semibold capitalize',
-                              signal.option_type === 'call'
-                                ? 'text-green-500'
-                                : 'text-red-500'
-                            )}
-                          >
-                            ${signal.strike} {signal.option_type}
-                          </span>
-                          <Badge
-                            className={cn(
-                              'text-[7px] px-1 py-0 h-3',
-                              getGradeColor(signal.grade)
-                            )}
-                          >
-                            {signal.grade}
-                          </Badge>
-                        </div>
-                        <div className="text-[8px] font-semibold text-green-600">
-                          {formatPremiumFlow(signal.premium_flow)}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
+              <span className="text-[10px] text-muted-foreground/60 mt-1">
+                Click dot for signal details
+              </span>
             )}
           </div>
-        </div>
-      </div>
-    );
-  };
+        </motion.div>
+      );
+    },
+    [pinnedTooltip, lineColor]
+  );
 
-  const CustomDot = (props: {
-    cx?: number;
-    cy?: number;
-    payload?: ChartDataPoint;
-  }) => {
-    const { cx, cy, payload } = props;
+  // Custom signal dot
+  const SignalDot = useCallback(
+    (props: { cx?: number; cy?: number; payload?: ChartDataPoint }) => {
+      const { cx, cy, payload } = props;
+      if (!cx || !cy || !payload) return null;
 
-    if (!cx || !cy || !payload) return null;
-    const data = payload as ChartDataPoint;
+      const data = payload;
+      if (!data.detections || data.detections.length === 0) return null;
 
-    if (!data.detections || data.detections.length === 0) {
-      return null;
-    }
+      const hasCalls = data.detections.some(
+        (d) => d.signal.option_type === 'call'
+      );
+      const hasPuts = data.detections.some(
+        (d) => d.signal.option_type === 'put'
+      );
 
-    // Determine if this point has calls, puts, or both
-    const hasCalls = data.detections.some(
-      (d) => d.signal.option_type === 'call'
-    );
-    const hasPuts = data.detections.some((d) => d.signal.option_type === 'put');
+      let color: string;
+      if (hasCalls && hasPuts) {
+        color = COLORS.signals.mixed;
+      } else if (hasCalls) {
+        color = COLORS.signals.call;
+      } else {
+        color = COLORS.signals.put;
+      }
 
-    let color: string;
-    if (hasCalls && hasPuts) {
-      // Mixed - both calls and puts at this time
-      color = '#a855f7'; // Purple for mixed
-    } else if (hasCalls) {
-      // Only calls
-      color = '#10b981'; // Green for calls
-    } else {
-      // Only puts
-      color = '#ef4444'; // Red for puts
-    }
+      const baseSize = 4;
+      const size = Math.min(baseSize + data.detections.length * 1, 8);
+      const isPinned =
+        pinnedTooltip !== null && pinnedTooltip.data.time === data.time;
 
-    const baseSize = 4;
-    const size = Math.min(baseSize + data.detections.length * 1, 8);
-
-    // Check if this dot is currently pinned
-    const isPinned =
-      pinnedTooltip !== null && pinnedTooltip.data.time === data.time;
-
-    return (
-      <g
-        style={{ cursor: 'pointer' }}
-        className="transition-all duration-150"
-        onClick={(e) => {
-          e.stopPropagation();
-          // Pin the tooltip at this location
-          if (props.payload && cx && cy) {
-            setPinnedTooltip({
-              data: data,
-              x: cx,
-              y: cy,
-            });
-          }
-        }}
-      >
-        {/* Pinned indicator - pulsing ring */}
-        {isPinned && (
-          <>
+      return (
+        <g
+          style={{ cursor: 'pointer' }}
+          className="transition-all duration-150"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPinnedTooltip({ data, x: cx, y: cy });
+          }}
+        >
+          {isPinned && (
             <circle
               cx={cx}
               cy={cy}
               r={size + 6}
               fill="none"
-              stroke="hsl(var(--primary))"
+              stroke={lineColor}
               strokeWidth={2}
               opacity={0.4}
             >
               <animate
                 attributeName="r"
                 from={size + 4}
-                to={size + 8}
+                to={size + 10}
                 dur="1.5s"
                 repeatCount="indefinite"
               />
@@ -374,321 +524,285 @@ export function PriceChart({
                 repeatCount="indefinite"
               />
             </circle>
-          </>
-        )}
+          )}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={size + 3}
+            fill={color}
+            fillOpacity={isPinned ? 0.2 : 0.1}
+          />
+          <circle cx={cx} cy={cy} r={size} fill={color} />
+          <circle cx={cx} cy={cy} r={size - 1} fill="white" fillOpacity={0.3} />
+          {data.detections.length > 1 && (
+            <>
+              <circle
+                cx={cx + size}
+                cy={cy - size}
+                r={6}
+                fill="white"
+                stroke={color}
+                strokeWidth={1.5}
+              />
+              <text
+                x={cx + size}
+                y={cy - size}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={8}
+                fontWeight="700"
+                fill={color}
+              >
+                {data.detections.length}
+              </text>
+            </>
+          )}
+        </g>
+      );
+    },
+    [pinnedTooltip, lineColor]
+  );
 
-        {/* Outer glow - more subtle */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={size + 2.5}
-          fill={color}
-          fillOpacity={isPinned ? 0.15 : 0.08}
-        />
-        {/* Middle ring - subtle */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={size + 0.8}
-          fill={color}
-          fillOpacity={isPinned ? 0.3 : 0.18}
-        />
-        {/* Inner dot - solid */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={size}
-          fill={color}
-          stroke={isPinned ? 'hsl(var(--primary))' : 'hsl(var(--background))'}
-          strokeWidth={isPinned ? 2 : 1.5}
-        />
-        {/* Badge for multiple detections - smaller */}
-        {data.detections.length > 1 && (
-          <>
-            <circle
-              cx={cx + size}
-              cy={cy - size}
-              r={5}
-              fill="hsl(var(--background))"
-              stroke={color}
-              strokeWidth={1.2}
-            />
-            <text
-              x={cx + size}
-              y={cy - size}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={7}
-              fontWeight="700"
-              fill={color}
-            >
-              {data.detections.length}
-            </text>
-          </>
-        )}
-      </g>
-    );
-  };
-
+  // Loading state
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[320px]">
-        <div className="text-center space-y-2">
-          <div className="relative">
-            <div className="h-8 w-8 rounded-full border-2 border-muted/50 animate-pulse mx-auto" />
-            <Activity className="h-4 w-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50 animate-pulse" />
-          </div>
-          <div className="text-[10px] text-muted-foreground/50 font-medium">
-            Loading {ticker}...
-          </div>
-        </div>
-      </div>
-    );
+    return <ChartSkeleton />;
   }
 
+  // Error state
   if (error) {
     return (
-      <div className="flex items-center justify-center h-[320px]">
-        <div className="text-center space-y-2.5">
-          <div className="text-[10px] text-destructive/70 max-w-[250px] font-medium">
-            {error}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setError(null);
-              setLoading(true);
-              fetchHistoricalPrices(ticker, selectedRange)
-                .then(setPriceData)
-                .catch((err) => setError(err.message))
-                .finally(() => setLoading(false));
-            }}
-            className="text-[10px] h-7 px-3"
-          >
-            Retry
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center h-[320px] gap-3">
+        <p className="text-sm text-destructive">{error}</p>
+        <button
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            fetchHistoricalPrices(ticker, selectedRange)
+              .then(setPriceData)
+              .catch((err) => setError(err.message))
+              .finally(() => setLoading(false));
+          }}
+          className={cn(
+            'px-4 py-2 text-xs font-medium rounded-full',
+            'bg-muted/20 hover:bg-muted/40 transition-colors'
+          )}
+        >
+          Try Again
+        </button>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Price Header */}
-      <div className="space-y-0">
-        <div className="text-2xl font-bold tracking-tight">
-          {formatPrice(currentPrice)}
-        </div>
-        <div
-          className={cn(
-            'text-xs font-medium flex items-center gap-1',
-            priceChange.isPositive ? 'text-green-500' : 'text-red-500'
-          )}
-        >
-          <span>
-            {formatPriceChange(priceChange.change, priceChange.changePercent)}
-          </span>
-          <span className="text-muted-foreground/50 font-normal">Today</span>
-        </div>
+      {/* Price Header - Robinhood Style */}
+      <div className="space-y-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={hoveredData ? 'hovered' : 'current'}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="flex items-baseline gap-3"
+          >
+            <span className="text-3xl font-semibold tracking-tight">
+              {formatPrice(displayPrice)}
+            </span>
+            <span className="text-sm font-medium" style={{ color: lineColor }}>
+              {formatChange(priceChange.change, priceChange.changePercent)}
+            </span>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Chart Container */}
       <div
-        className="relative -mx-4 px-2"
-        style={{
-          backgroundImage: `radial-gradient(circle, hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px)`,
-          backgroundSize: '16px 16px',
-        }}
+        ref={chartContainerRef}
+        className="relative"
+        onMouseLeave={() => setHoveredData(null)}
       >
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart
             data={chartData}
-            margin={{ top: 10, right: 5, left: -20, bottom: 5 }}
+            margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+            onMouseMove={(state) => {
+              const chartState = state as {
+                activePayload?: Array<{ payload: ChartDataPoint }>;
+              };
+              if (chartState?.activePayload?.[0] && !pinnedTooltip) {
+                setHoveredData(chartState.activePayload[0].payload);
+              }
+            }}
           >
             <defs>
-              <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop
-                  offset="0%"
-                  stopColor={priceChange.isPositive ? '#10b981' : '#ef4444'}
-                  stopOpacity={1}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={priceChange.isPositive ? '#10b981' : '#ef4444'}
-                  stopOpacity={1}
-                />
+              <linearGradient
+                id="optionsChartGradient"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor={lineColor} stopOpacity={0.2} />
+                <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            <XAxis
-              dataKey="time"
-              tickFormatter={(time) => {
-                const date = new Date(time);
-                if (selectedRange === '1D') {
-                  return date.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                  });
-                }
-                return date.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                });
-              }}
-              tick={{
-                fontSize: 9,
-                fill: 'hsl(var(--muted-foreground))',
-                opacity: 0.3,
-              }}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={70}
-              height={20}
-            />
+            {/* Reference line at start price */}
+            {priceData.length > 0 && (
+              <ReferenceLine
+                y={priceData[0]?.price}
+                stroke="hsl(var(--border))"
+                strokeDasharray="4 4"
+                strokeOpacity={0.5}
+              />
+            )}
 
-            <YAxis
-              domain={[
-                (dataMin: number) => Math.floor(dataMin * 0.998),
-                (dataMax: number) => Math.ceil(dataMax * 1.002),
-              ]}
-              tickFormatter={(value) => `$${value.toFixed(0)}`}
-              tick={{
-                fontSize: 9,
-                fill: 'hsl(var(--muted-foreground))',
-                opacity: 0.3,
-              }}
-              tickLine={false}
-              axisLine={false}
-              width={45}
-              tickCount={4}
-            />
+            <XAxis dataKey="time" hide />
+            <YAxis domain={yDomain} hide />
 
             <Tooltip
-              content={<CustomTooltip />}
-              cursor={{
-                stroke: 'hsl(var(--muted-foreground))',
-                strokeWidth: 0.5,
-                strokeDasharray: '2 2',
-                opacity: 0.15,
-              }}
-              wrapperStyle={{
-                outline: 'none',
-                pointerEvents: 'auto',
-                zIndex: 50,
-              }}
-              isAnimationActive={false}
-              animationDuration={0}
-              allowEscapeViewBox={{ x: false, y: true }}
-              offset={20}
+              content={<HoverTooltip />}
+              cursor={<CustomCursor height={260} color={lineColor} />}
+              position={{ y: -40 }}
+              allowEscapeViewBox={{ x: true, y: true }}
             />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="price"
-              stroke={priceChange.isPositive ? '#10b981' : '#ef4444'}
-              strokeWidth={1.5}
+              stroke={lineColor}
+              strokeWidth={2}
+              fill="url(#optionsChartGradient)"
               dot={(dotProps) => {
-                // Extract key prop to avoid React warning about spreading keys
                 const { key, ...rest } = dotProps as { key?: string };
-                return <CustomDot key={key} {...rest} />;
+                return <SignalDot key={key} {...rest} />;
               }}
-              activeDot={false}
-              animationDuration={300}
+              activeDot={(props) => (
+                <CustomActiveDot
+                  cx={props.cx}
+                  cy={props.cy}
+                  color={lineColor}
+                />
+              )}
               isAnimationActive={true}
+              animationDuration={500}
+              animationEasing="ease-out"
             />
           </ComposedChart>
         </ResponsiveContainer>
 
-        {/* Previous Close Label (Perplexity-style) */}
-        {priceData.length > 0 && (
-          <div className="absolute top-3 right-8 text-[9px] text-muted-foreground/50 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded border border-border/20">
-            Prev close: {formatPrice(priceData[0]?.price || 0)}
-          </div>
-        )}
-
         {/* Pinned Tooltip Overlay */}
         {pinnedTooltip && (
           <div
-            className="absolute inset-0 bg-background/40 backdrop-blur-[1px] z-40 pointer-events-auto animate-in fade-in-0 duration-200"
+            className="absolute inset-0 bg-background/30 backdrop-blur-[1px] 
+              z-40 animate-in fade-in-0 duration-200"
             onClick={() => setPinnedTooltip(null)}
           />
         )}
 
         {/* Pinned Tooltip */}
-        {pinnedTooltip && (
-          <div
-            className="absolute pointer-events-auto z-50 animate-in fade-in-0 zoom-in-95 duration-200"
-            style={{
-              left: `${tooltipPosition.left}px`,
-              top: `${tooltipPosition.top}px`,
-              transform: tooltipPosition.transform,
-            }}
-          >
-            <div className="relative">
-              {/* Arrow pointing to dot */}
-              {tooltipPosition.arrowClass === 'bottom' ? (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-primary/50"
-                  style={{
-                    bottom: '-8px',
-                  }}
-                />
-              ) : (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[8px] border-l-transparent border-r-transparent border-b-primary/50"
-                  style={{
-                    top: '-8px',
-                  }}
-                />
-              )}
+        <AnimatePresence>
+          {pinnedTooltip && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute pointer-events-auto z-50"
+              style={{
+                left: `${tooltipPosition.left}px`,
+                top: `${tooltipPosition.top}px`,
+                transform: tooltipPosition.transform,
+              }}
+            >
+              <div className="relative">
+                {/* Arrow */}
+                {tooltipPosition.arrowClass === 'bottom' ? (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 w-0 h-0 
+                      border-l-[6px] border-r-[6px] border-t-[8px] 
+                      border-l-transparent border-r-transparent"
+                    style={{
+                      bottom: '-8px',
+                      borderTopColor: lineColor,
+                      opacity: 0.6,
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 w-0 h-0 
+                      border-l-[6px] border-r-[6px] border-b-[8px] 
+                      border-l-transparent border-r-transparent"
+                    style={{
+                      top: '-8px',
+                      borderBottomColor: lineColor,
+                      opacity: 0.6,
+                    }}
+                  />
+                )}
 
-              <div className="bg-background/98 backdrop-blur-lg border-2 border-primary/50 rounded-lg shadow-2xl p-3 min-w-[200px]">
-                <div className="space-y-2">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="text-[10px] text-muted-foreground/60 font-medium mb-0.5">
-                        {new Date(pinnedTooltip.data.time).toLocaleDateString(
-                          'en-US',
-                          {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          }
-                        )}
+                <div
+                  className="bg-background/98 backdrop-blur-xl rounded-xl 
+                    shadow-2xl p-4 min-w-[220px] border-2"
+                  style={{ borderColor: `${lineColor}40` }}
+                >
+                  <div className="space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="text-[11px] text-muted-foreground/70 mb-0.5">
+                          {new Date(pinnedTooltip.data.time).toLocaleDateString(
+                            'en-US',
+                            {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            }
+                          )}
+                        </div>
+                        <div
+                          className="text-xl font-bold"
+                          style={{ color: lineColor }}
+                        >
+                          {formatPrice(pinnedTooltip.data.price)}
+                        </div>
                       </div>
-                      <div className="text-sm font-bold text-foreground">
-                        {formatPrice(pinnedTooltip.data.price)}
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedTooltip(null);
+                        }}
+                        className="text-muted-foreground/50 hover:text-foreground 
+                          transition-colors p-1 rounded-full hover:bg-muted/30"
+                        title="Close (ESC)"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPinnedTooltip(null);
-                      }}
-                      className="text-muted-foreground/50 hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted/20"
-                      title="Close (ESC)"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
 
-                  {pinnedTooltip.data.detections &&
-                    pinnedTooltip.data.detections.length > 0 && (
-                      <>
-                        <div className="border-t border-border/20 pt-2">
-                          <div className="text-[9px] font-semibold mb-2 flex items-center gap-1.5 text-muted-foreground/70 uppercase tracking-wide">
-                            <Activity className="h-2 w-2" />
+                    {/* Signal Details */}
+                    {pinnedTooltip.data.detections &&
+                      pinnedTooltip.data.detections.length > 0 && (
+                        <div className="border-t border-border/30 pt-3">
+                          <div
+                            className="text-[10px] font-semibold mb-2 flex 
+                              items-center gap-1.5 text-muted-foreground/80 
+                              uppercase tracking-wide"
+                          >
+                            <Activity className="h-3 w-3" />
                             <span>
-                              {pinnedTooltip.data.detections.length} Unusual
-                              Option
+                              {pinnedTooltip.data.detections.length} Signal
                               {pinnedTooltip.data.detections.length > 1
                                 ? 's'
                                 : ''}
                             </span>
                           </div>
-                          <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                          <div
+                            className="space-y-2 max-h-[180px] overflow-y-auto 
+                              pr-1 scrollbar-thin"
+                          >
                             {pinnedTooltip.data.detections.map(({ signal }) => (
                               <button
                                 key={signal.signal_id}
@@ -696,78 +810,88 @@ export function PriceChart({
                                   onSignalClick?.(signal.signal_id);
                                   setPinnedTooltip(null);
                                 }}
-                                className="w-full text-left p-2 bg-muted/10 hover:bg-muted/30 rounded-md transition-all cursor-pointer border border-transparent hover:border-primary/30"
+                                className={cn(
+                                  'w-full text-left p-3 rounded-lg',
+                                  'transition-all cursor-pointer',
+                                  'border border-transparent',
+                                  'bg-muted/10 hover:bg-muted/30',
+                                  'hover:border-border/50'
+                                )}
                               >
-                                <div className="flex items-center justify-between mb-1">
+                                <div
+                                  className="flex items-center justify-between 
+                                    mb-1.5"
+                                >
                                   <span
                                     className={cn(
-                                      'text-[11px] font-bold capitalize',
+                                      'text-sm font-bold capitalize',
                                       signal.option_type === 'call'
-                                        ? 'text-green-500'
-                                        : 'text-red-500'
+                                        ? 'text-[#00C805]'
+                                        : 'text-[#FF5000]'
                                     )}
                                   >
                                     ${signal.strike} {signal.option_type}
                                   </span>
                                   <Badge
                                     className={cn(
-                                      'text-[8px] px-1.5 py-0.5 h-4',
+                                      'text-[9px] px-2 py-0.5',
                                       getGradeColor(signal.grade)
                                     )}
                                   >
                                     {signal.grade}
                                   </Badge>
                                 </div>
-                                <div className="text-[9px] font-semibold text-green-600">
+                                <div
+                                  className="text-xs font-semibold"
+                                  style={{ color: COLORS.positive.line }}
+                                >
                                   {formatPremiumFlow(signal.premium_flow)}
                                 </div>
                               </button>
                             ))}
                           </div>
                         </div>
-                      </>
-                    )}
+                      )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Time Range Buttons */}
-      <div className="flex items-center justify-center">
-        <div className="inline-flex items-center gap-0 bg-muted/20 rounded-md p-0.5">
-          {TIME_RANGES.map((range) => (
-            <button
-              key={range}
-              onClick={() => setSelectedRange(range)}
-              className={cn(
-                'text-[10px] font-semibold h-6 px-2.5 rounded transition-all duration-150',
-                selectedRange === range
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-background/50'
-              )}
-            >
-              {range}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Time Range Selector */}
+      <TimeRangeSelector
+        ranges={TIME_RANGES}
+        selected={selectedRange}
+        onChange={handleRangeChange}
+        isPositive={priceChange.isPositive}
+      />
 
-      {/* Legend - Minimal */}
-      <div className="flex items-center justify-center gap-2.5 text-[9px] text-muted-foreground/40">
-        <div className="flex items-center gap-1">
-          <div className="h-0.5 w-0.5 rounded-full bg-green-500/60" />
+      {/* Legend */}
+      <div
+        className="flex items-center justify-center gap-4 text-[10px] 
+          text-muted-foreground/60"
+      >
+        <div className="flex items-center gap-1.5">
+          <div
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: COLORS.signals.call }}
+          />
           <span>Calls</span>
         </div>
-        <span className="text-muted-foreground/20">•</span>
-        <div className="flex items-center gap-1">
-          <div className="h-0.5 w-0.5 rounded-full bg-red-500/60" />
+        <div className="flex items-center gap-1.5">
+          <div
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: COLORS.signals.put }}
+          />
           <span>Puts</span>
         </div>
-        <span className="text-muted-foreground/20">•</span>
-        <div className="flex items-center gap-1">
-          <div className="h-0.5 w-0.5 rounded-full bg-purple-500/60" />
+        <div className="flex items-center gap-1.5">
+          <div
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: COLORS.signals.mixed }}
+          />
           <span>Mixed</span>
         </div>
       </div>

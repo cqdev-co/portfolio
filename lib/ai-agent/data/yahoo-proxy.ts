@@ -5,7 +5,7 @@
  * Falls back to direct Yahoo Finance if proxy not configured.
  */
 
-import type { TickerData, NewsItem } from './types';
+import type { NewsItem } from './types';
 import { log } from '../utils';
 
 // ============================================================================

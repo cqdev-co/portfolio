@@ -22,7 +22,7 @@ const LEVELS: Record<LogLevel, number> = {
 
 // Default to 'error' in production to minimize observability events
 const currentLevel: LogLevel =
-  ((globalThis as any).LOG_LEVEL as LogLevel) || 'error';
+  ((globalThis as Record<string, unknown>).LOG_LEVEL as LogLevel) || 'error';
 
 const shouldLog = (level: LogLevel): boolean => {
   return LEVELS[level] <= LEVELS[currentLevel];

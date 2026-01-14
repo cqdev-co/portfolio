@@ -2,13 +2,26 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  useDragControls,
+  useMotionValue,
+  useTransform,
+  useSpring,
+} from 'framer-motion';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatMessages } from './chat-messages';
 import { ChatInput } from './chat-input';
 import { ChatModelSelector } from './chat-model-selector';
-import { CrossIcon, SparklesIcon, RefreshIcon } from './chat-icons';
+import {
+  CrossIcon,
+  SparklesIcon,
+  RefreshIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+} from './chat-icons';
 import {
   Tooltip,
   TooltipContent,
@@ -16,8 +29,21 @@ import {
 } from '@/components/ui/tooltip';
 import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 import { useGlobalChat } from './chat-context';
+import { StreamProgress } from './stream-progress';
 
-// Parse error message for user-friendly display
+// ============================================================================
+// Token Counter Hook
+// ============================================================================
+
+function useTokenEstimate(text: string): number {
+  // Rough estimate: ~4 chars per token
+  return useMemo(() => Math.ceil(text.length / 4), [text]);
+}
+
+// ============================================================================
+// Error Display Helper
+// ============================================================================
+
 function getErrorDisplay(error: Error | undefined): {
   title: string;
   message: string;
@@ -34,7 +60,6 @@ function getErrorDisplay(error: Error | undefined): {
     msg.includes('not authenticated') ||
     msg.includes('not authorized')
   ) {
-    // Try to extract the actual message from JSON response
     let displayMessage = 'Please sign in to use the AI chat.';
     try {
       const jsonMatch = error.message.match(/\{.*\}/);
@@ -58,7 +83,7 @@ function getErrorDisplay(error: Error | undefined): {
     return {
       title: 'Rate Limit Reached',
       message:
-        "You've reached the hourly usage limit. Please wait a few minutes or try a different model.",
+        "You've reached the hourly usage limit. Please wait a few minutes.",
       type: 'rate_limit',
     };
   }
@@ -71,8 +96,7 @@ function getErrorDisplay(error: Error | undefined): {
   ) {
     return {
       title: 'Connection Error',
-      message:
-        'Unable to reach the AI service. Check your internet connection.',
+      message: 'Unable to reach the AI service. Check your connection.',
       type: 'network',
     };
   }
@@ -86,7 +110,6 @@ function getErrorDisplay(error: Error | undefined): {
     };
   }
 
-  // Generic error
   return {
     title: 'Something went wrong',
     message: error.message.slice(0, 100) || 'An unexpected error occurred.',
@@ -94,19 +117,33 @@ function getErrorDisplay(error: Error | undefined): {
   };
 }
 
+// ============================================================================
+// Main Component
+// ============================================================================
+
 type ChatPanelProps = {
   isOpen: boolean;
   onClose: () => void;
 };
 
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
-  const { initialPrompt, clearInitialPrompt } = useGlobalChat();
+  const { initialPrompt, clearInitialPrompt, isFullscreen, toggleFullscreen } =
+    useGlobalChat();
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(DEFAULT_CHAT_MODEL);
   const [chatKey, setChatKey] = useState(0);
 
-  // Use ref for pending message to avoid timing issues with React batching
+  // Pending message ref for timing issues
   const pendingMessageRef = useRef<string | null>(null);
+
+  // Drag controls for swipe-to-close
+  const dragControls = useDragControls();
+  const y = useMotionValue(0);
+  const springY = useSpring(y, { stiffness: 400, damping: 40 });
+
+  // Opacity based on drag position (fade out as dragging down)
+  const opacity = useTransform(y, [0, 200], [1, 0.3]);
+  const scale = useTransform(y, [0, 200], [1, 0.95]);
 
   // Create transport with API endpoint and model in body
   const transport = useMemo(
@@ -121,67 +158,56 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   const [dismissedError, setDismissedError] = useState(false);
 
   const { messages, sendMessage, status, stop, error } = useChat({
-    // Re-initialize chat when model changes
     id: `chat-${chatKey}-${selectedModel}`,
     transport,
     onError: (err) => {
       console.error('[Chat] Error:', err);
-      setDismissedError(false); // Show new errors
+      setDismissedError(false);
     },
   });
 
-  // Handle initial prompt from context (e.g., position analysis)
-  // Queue the message and reset chat to send it
+  // Token estimate for current conversation
+  const totalContent = messages
+    .map(
+      (m) =>
+        m.parts
+          ?.filter(
+            (p): p is { type: 'text'; text: string } => p.type === 'text'
+          )
+          .map((p) => p.text)
+          .join('') || ''
+    )
+    .join('');
+  const estimatedTokens = useTokenEstimate(totalContent + input);
+
+  // Handle initial prompt from context
   useEffect(() => {
     if (isOpen && initialPrompt) {
-      console.log(
-        '[Chat] Received initial prompt:',
-        initialPrompt.substring(0, 80) + '...'
-      );
-      // Store in ref before resetting chat
       pendingMessageRef.current = initialPrompt;
       clearInitialPrompt();
-      // Reset chat - this creates a fresh instance
-      // Use queueMicrotask to avoid synchronous setState in effect
       queueMicrotask(() => {
         setChatKey((prev) => prev + 1);
       });
     }
   }, [isOpen, initialPrompt, clearInitialPrompt]);
 
-  // Send the pending message once chat is ready
-  // This effect runs whenever status changes, checking if we have a queued message
+  // Send pending message when ready
   useEffect(() => {
     const pendingMsg = pendingMessageRef.current;
-    console.log(
-      '[Chat] Status changed:',
-      status,
-      'pending:',
-      !!pendingMsg,
-      'messages:',
-      messages.length
-    );
-
     if (pendingMsg && status === 'ready' && messages.length === 0) {
-      console.log(
-        '[Chat] Sending queued message:',
-        pendingMsg.substring(0, 80) + '...'
-      );
-      // Clear ref BEFORE sending to prevent re-sends
       pendingMessageRef.current = null;
-      // Send immediately - the chat instance is ready
       sendMessage({ text: pendingMsg });
     }
   }, [status, messages.length, sendMessage]);
 
-  // Start a new chat
+  // New chat handler
   const handleNewChat = useCallback(() => {
     setChatKey((prev) => prev + 1);
     setInput('');
     setDismissedError(false);
   }, []);
 
-  // Parse error for display
+  // Error display
   const errorDisplay = useMemo(() => {
     if (dismissedError) return null;
     return getErrorDisplay(error);
@@ -189,30 +215,43 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
 
   const onSubmit = useCallback(() => {
     if (input.trim()) {
-      // Use sendMessage with text format (AI SDK 3.x API)
       sendMessage({ text: input });
       setInput('');
     }
   }, [input, sendMessage]);
 
-  const handleSuggestionClick = useCallback(
-    (prompt: string) => {
-      sendMessage({ text: prompt });
+  // Handle drag end for swipe-to-close
+  const handleDragEnd = useCallback(
+    (_: unknown, info: { offset: { y: number }; velocity: { y: number } }) => {
+      // Close if dragged down enough or with enough velocity
+      if (info.offset.y > 100 || info.velocity.y > 500) {
+        onClose();
+      }
+      // Reset position
+      y.set(0);
     },
-    [sendMessage]
+    [onClose, y]
   );
+
+  // Streaming state helpers
+  const isStreaming = status === 'streaming';
+  const isSubmitted = status === 'submitted';
+  const isLoading = isStreaming || isSubmitted;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Subtle backdrop - click to close */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-40 bg-black/20"
+            className={cn(
+              'fixed inset-0 z-40',
+              isFullscreen ? 'bg-black/40 backdrop-blur-sm' : 'bg-black/20'
+            )}
             onClick={onClose}
           />
 
@@ -226,51 +265,131 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
               damping: 25,
               stiffness: 300,
             }}
+            style={{
+              y: springY,
+              opacity: isFullscreen ? 1 : opacity,
+              scale: isFullscreen ? 1 : scale,
+            }}
+            drag={!isFullscreen ? 'y' : false}
+            dragControls={dragControls}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.2}
+            dragListener={false}
+            onDragEnd={handleDragEnd}
             className={cn(
               'fixed z-50',
-              'bottom-4 right-4 sm:bottom-6 sm:right-6',
-              'w-[calc(100vw-2rem)] sm:w-[420px]',
-              'h-[min(600px,calc(100vh-8rem))]',
-              'rounded-2xl border bg-background shadow-2xl',
-              'flex flex-col overflow-hidden'
+              'flex flex-col overflow-hidden',
+              'border bg-background shadow-2xl',
+              // Mobile: full screen
+              'inset-0 rounded-none',
+              // Desktop: positioned panel or fullscreen
+              isFullscreen
+                ? 'sm:inset-4 sm:rounded-2xl'
+                : [
+                    'sm:inset-auto',
+                    'sm:bottom-4 sm:right-4',
+                    'sm:w-[420px]',
+                    'sm:h-[min(600px,calc(100vh-8rem))]',
+                    'sm:rounded-2xl',
+                  ]
             )}
           >
+            {/* Drag handle (mobile only) - only this triggers drag */}
+            <div
+              className="sm:hidden flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing"
+              onPointerDown={(e) => dragControls.start(e)}
+            >
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+
             {/* Header */}
             <div
               className={cn(
                 'flex items-center justify-between',
-                'border-b px-4 py-3 shrink-0'
+                'border-b shrink-0',
+                isFullscreen ? 'px-6 py-4' : 'px-4 py-3'
               )}
             >
-              <div className="flex items-center gap-2 min-w-0">
+              {/* Left side - branding */}
+              <div className="flex items-center gap-3 min-w-0">
                 <div
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center',
-                    'rounded-full bg-muted ring-1 ring-border'
+                    'flex shrink-0 items-center justify-center',
+                    'rounded-full bg-gradient-to-br from-primary/20 to-primary/5',
+                    'ring-1 ring-primary/20',
+                    isFullscreen ? 'size-10' : 'size-8'
                   )}
                 >
-                  <SparklesIcon size={14} />
+                  <SparklesIcon size={isFullscreen ? 16 : 14} />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="text-sm font-semibold">AI Assistant</h2>
+                  <div className="flex items-center gap-2">
+                    <h2
+                      className={cn(
+                        'font-semibold',
+                        isFullscreen ? 'text-base' : 'text-sm'
+                      )}
+                    >
+                      AI Assistant
+                    </h2>
                     <ChatModelSelector
                       selectedModel={selectedModel}
                       onModelChange={setSelectedModel}
                     />
                   </div>
-                  <span className="text-[11px] text-muted-foreground">
-                    Powered by Ollama Cloud
-                  </span>
+                  {/* Token counter + stream progress */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'text-muted-foreground/60 font-mono',
+                        isFullscreen ? 'text-xs' : 'text-[10px]'
+                      )}
+                    >
+                      ~{estimatedTokens} tokens
+                    </span>
+                    <StreamProgress isActive={isLoading} size={12} />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              {/* Right side - actions */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Fullscreen toggle (desktop only) */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
+                    <motion.button
+                      type="button"
+                      onClick={toggleFullscreen}
+                      whileTap={{ scale: 0.9 }}
+                      className={cn(
+                        'hidden sm:flex size-8 items-center justify-center',
+                        'rounded-lg transition-colors',
+                        'hover:bg-muted text-muted-foreground',
+                        'hover:text-foreground'
+                      )}
+                      aria-label={
+                        isFullscreen ? 'Exit fullscreen' : 'Fullscreen'
+                      }
+                    >
+                      {isFullscreen ? (
+                        <MinimizeIcon size={15} />
+                      ) : (
+                        <MaximizeIcon size={15} />
+                      )}
+                    </motion.button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>{isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* New chat */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <motion.button
                       type="button"
                       onClick={handleNewChat}
+                      whileTap={{ scale: 0.9 }}
                       className={cn(
                         'flex size-8 items-center justify-center',
                         'rounded-lg transition-colors',
@@ -280,16 +399,18 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                       aria-label="New chat"
                     >
                       <RefreshIcon size={15} />
-                    </button>
+                    </motion.button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
                     <p>New chat</p>
                   </TooltipContent>
                 </Tooltip>
 
-                <button
+                {/* Close button */}
+                <motion.button
                   type="button"
                   onClick={onClose}
+                  whileTap={{ scale: 0.9 }}
                   className={cn(
                     'flex size-8 items-center justify-center',
                     'rounded-lg transition-colors',
@@ -298,7 +419,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                   aria-label="Close"
                 >
                   <CrossIcon size={16} />
-                </button>
+                </motion.button>
               </div>
             </div>
 
@@ -339,7 +460,6 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
-                        {/* Icon */}
                         <div className="mt-0.5">
                           {errorDisplay.type === 'auth' && (
                             <svg
@@ -463,7 +583,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             <ChatMessages
               messages={messages}
               status={status}
-              onSuggestionClick={handleSuggestionClick}
+              isFullscreen={isFullscreen}
             />
 
             {/* Input */}
@@ -473,6 +593,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
               onSubmit={onSubmit}
               onStop={stop}
               status={status}
+              isFullscreen={isFullscreen}
             />
           </motion.div>
         </>

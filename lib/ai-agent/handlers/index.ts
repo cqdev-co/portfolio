@@ -11,7 +11,11 @@ import {
   formatTickerDataForAI,
   formatSearchResultsForAI,
 } from '../data/formatters';
-import { encodeTickerToTOON, encodeSearchToTOON } from '../toon';
+import {
+  encodeTickerToTOON,
+  encodeSearchToTOON,
+  encodeUnusualOptionsToTOON,
+} from '../toon';
 import {
   isProxyConfigured,
   fetchFinancialsViaProxy,
@@ -32,10 +36,20 @@ import type {
 } from '../data/types';
 import {
   analyzeTradingRegime,
-  formatRegimeForAI as formatTradingRegimeForAI,
   getRegimeEmoji,
   type TradingRegimeAnalysis,
 } from '../market';
+
+// Re-export for external consumers
+export { formatRegimeForAI as formatTradingRegimeForAI } from '../market';
+import {
+  quickScan,
+  SCAN_LISTS,
+  formatScanResultsForAI,
+  encodeScanResultsToTOON,
+  type ScanResult,
+  type TradeGrade,
+} from '../scanner';
 
 // ============================================================================
 // RATE LIMITING
@@ -1000,31 +1014,8 @@ export async function handleGetUnusualOptionsActivity(
       },
     };
 
-    // Format for AI
-    const formatted = `
-=== UNUSUAL OPTIONS ACTIVITY${ticker ? `: ${ticker}` : ''} ===
-
-📊 SUMMARY
-Total Signals: ${activity.summary?.totalSignals ?? 0}
-Bullish: ${bullishCount} | Bearish: ${bearishCount}
-Top Grade: ${activity.summary?.topGrade}
-
-🔥 TOP SIGNALS
-${signals
-  .slice(0, 5)
-  .map(
-    (s, i) =>
-      `${i + 1}. [${s.grade}] ${s.ticker} ${s.strike}${
-        s.optionType === 'call' ? 'C' : 'P'
-      } ${s.expiry.split('T')[0]}
-   ${s.sentiment} | Score: ${(s.overallScore * 100).toFixed(0)}%
-   Vol: ${s.currentVolume.toLocaleString()} (${s.volumeRatio}x avg)
-   Premium: ${formatLargeNumber(s.premiumFlow)}${
-     s.hasSweep ? ' 🧹SWEEP' : ''
-   }${s.hasBlockTrade ? ' 📦BLOCK' : ''}${s.isNew ? ' ⭐NEW' : ''}`
-  )
-  .join('\n\n')}
-`.trim();
+    // Format for AI using TOON (token-efficient)
+    const formatted = encodeUnusualOptionsToTOON(signals, activity.summary);
 
     return {
       success: true,
@@ -1410,6 +1401,132 @@ LIQUIDITY
 }
 
 // ============================================================================
+// SCAN OPPORTUNITIES HANDLER
+// ============================================================================
+
+export interface ScanOpportunitiesResult {
+  scanList: string;
+  tickersScanned: number;
+  results: ScanResult[];
+  summary: {
+    total: number;
+    gradeA: number;
+    gradeB: number;
+    lowRisk: number;
+    avgCushion: number;
+  };
+}
+
+export interface ScanOpportunitiesToolResult extends ToolResult {
+  data?: ScanOpportunitiesResult;
+}
+
+/**
+ * Handle scan_opportunities tool call
+ * Scans multiple tickers for trade opportunities
+ */
+export async function handleScanOpportunities(
+  args: {
+    scanList?: string;
+    tickers?: string;
+    minGrade?: string;
+    maxRisk?: number;
+  },
+  options: { format?: OutputFormat; onProgress?: (msg: string) => void } = {}
+): Promise<ScanOpportunitiesToolResult> {
+  const { scanList = 'TECH', tickers, minGrade = 'B', maxRisk = 6 } = args;
+  const format = options.format ?? 'toon';
+
+  log.debug(`[Handler] Scanning for opportunities`, {
+    scanList,
+    tickers,
+    minGrade,
+    maxRisk,
+  });
+
+  try {
+    // Determine which tickers to scan
+    let tickerList: readonly string[];
+
+    if (tickers) {
+      // User specified custom tickers
+      tickerList = tickers
+        .split(',')
+        .map((t) => t.trim().toUpperCase())
+        .filter((t) => t.length > 0);
+      log.debug(`[Handler] Using custom ticker list: ${tickerList.join(', ')}`);
+    } else {
+      // Use predefined scan list
+      const listKey = scanList.toUpperCase() as keyof typeof SCAN_LISTS;
+      tickerList = SCAN_LISTS[listKey] ?? SCAN_LISTS.TECH;
+      log.debug(
+        `[Handler] Using scan list: ${listKey} (${tickerList.length} tickers)`
+      );
+    }
+
+    // Run the scan
+    const results = await quickScan(tickerList, {
+      minGrade: minGrade as TradeGrade,
+      maxRisk,
+      onProgress: (ticker, current, total) => {
+        options.onProgress?.(`Scanning ${ticker} (${current}/${total})`);
+      },
+    });
+
+    // Build summary statistics
+    const gradeACount = results.filter((r) =>
+      ['A+', 'A', 'A-'].includes(r.grade)
+    ).length;
+    const gradeBCount = results.filter((r) =>
+      ['B+', 'B', 'B-'].includes(r.grade)
+    ).length;
+    const lowRiskCount = results.filter((r) => r.risk.score <= 4).length;
+    const avgCushion =
+      results.length > 0
+        ? results.reduce((sum, r) => sum + (r.cushionPercent ?? 0), 0) /
+          results.length
+        : 0;
+
+    const scanResult: ScanOpportunitiesResult = {
+      scanList: tickers ? 'CUSTOM' : scanList.toUpperCase(),
+      tickersScanned: tickerList.length,
+      results,
+      summary: {
+        total: results.length,
+        gradeA: gradeACount,
+        gradeB: gradeBCount,
+        lowRisk: lowRiskCount,
+        avgCushion: Math.round(avgCushion * 10) / 10,
+      },
+    };
+
+    // Format output
+    const formatted =
+      format === 'toon'
+        ? encodeScanResultsToTOON(results)
+        : formatScanResultsForAI(results);
+
+    log.debug(
+      `[Handler] Scan complete: ${results.length} opportunities found ` +
+        `(${gradeACount} A-grade, ${gradeBCount} B-grade)`
+    );
+
+    return {
+      success: true,
+      data: scanResult,
+      formatted,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[Handler] Scan opportunities error:`, errorMsg);
+    return {
+      success: false,
+      error: `Error scanning for opportunities: ${errorMsg}`,
+    };
+  }
+}
+
+// ============================================================================
 // UNIFIED TOOL EXECUTOR
 // ============================================================================
 
@@ -1536,6 +1653,24 @@ export async function executeToolCall(
       result = await handleCalculateSpread(
         { ticker, longStrike, shortStrike, targetDTE },
         { format }
+      );
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'scan_opportunities': {
+      const scanList = (args.scanList as string) ?? 'TECH';
+      const tickers = args.tickers as string | undefined;
+      const minGrade = (args.minGrade as string) ?? 'B';
+      const maxRisk = (args.maxRisk as number) ?? 6;
+      onStatus?.(
+        tickers
+          ? `🔍 Scanning custom tickers...`
+          : `🔍 Scanning ${scanList} for opportunities...`
+      );
+      result = await handleScanOpportunities(
+        { scanList, tickers, minGrade, maxRisk },
+        { format, onProgress: onStatus }
       );
       onToolResult?.(name, result);
       return result;
