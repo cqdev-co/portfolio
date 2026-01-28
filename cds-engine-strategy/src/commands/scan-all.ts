@@ -189,6 +189,7 @@ export interface ScanAllOptions {
   verbose?: boolean;
   summary?: boolean; // v2.6.0: Concise output mode
   skipSpreads?: boolean;
+  store?: boolean; // v2.8.0: Explicitly store signals to DB (for CI)
   noCapture?: boolean; // v2.7.0: Skip signal capture to DB
   watchlist?: boolean; // v2.7.0: Scan watchlist tickers only
   fromSignals?: boolean; // v2.7.0: Scan recent signal tickers only
@@ -425,7 +426,9 @@ export async function scanAll(options: ScanAllOptions): Promise<void> {
   }
 
   // v2.7.0: Auto-capture signals to database
-  if (!options.noCapture && isConfigured()) {
+  // v2.8.0: --store explicitly enables (for CI), default still stores unless --no-capture
+  const shouldStore = options.store || !options.noCapture;
+  if (shouldStore && isConfigured()) {
     await captureSignals(results, marketContext);
   }
 }

@@ -242,16 +242,17 @@ class Settings(BaseSettings):
         default=3.0,
         description="Maximum volume for optimal zone (narrowed from 5.0 per Jan 2026 data)",
     )
-    # Extreme Volume Penalty - ADDED Jan 13, 2026
-    # Data shows: 5x+ volume = 46.1% WR vs 2-3x = 72.5% WR
-    # Extreme volume often signals end of move, not beginning
+    # Extreme Volume Penalty - UPDATED Jan 28, 2026
+    # Original (Jan 13): 0.88 (12% penalty) - may have overcorrected
+    # Data shows C-Tier (70.8% WR) outperforming A-Tier (21% WR)
+    # Softening penalty to 0.92 (8% penalty) to reduce overcorrection
     extreme_volume_threshold: float = Field(
         default=5.0,
         description="Volume above this gets additional penalty (often late to move)",
     )
     extreme_volume_penalty: float = Field(
-        default=0.88,
-        description="Score multiplier for >5x volume (12% penalty)",
+        default=0.92,
+        description="Score multiplier for >5x volume (8% penalty - softened from 12%)",
     )
 
     # Late Entry Penalty - UPDATED Jan 13, 2026
@@ -367,6 +368,29 @@ class Settings(BaseSettings):
     )
     max_position_size_pct: float = Field(
         default=0.08, description="Maximum position size as % of capital"
+    )
+    # Position Concentration Limit - ADDED Jan 28, 2026
+    # MRNO wipeout: 10 positions across tiers ALL hit -25% stop loss on same day
+    # Limiting positions per symbol prevents single-stock catastrophic losses
+    max_positions_per_symbol: int = Field(
+        default=3,
+        description="Maximum active positions per symbol (prevents concentration risk)",
+    )
+
+    # Trailing Stop Settings - ADDED Jan 28, 2026
+    # Data shows: 4-7 day holds = 76.5% WR vs 0-1 days = 43.7% WR
+    # Trailing stops help lock in gains while letting winners run
+    trailing_stop_enabled: bool = Field(
+        default=True,
+        description="Enable trailing stop after position is profitable",
+    )
+    trailing_stop_activation_pct: float = Field(
+        default=5.0,
+        description="Activate trailing stop after this % gain (e.g., 5%)",
+    )
+    trailing_stop_distance_pct: float = Field(
+        default=10.0,
+        description="Trailing stop trails at this % below high watermark",
     )
 
     # System Performance

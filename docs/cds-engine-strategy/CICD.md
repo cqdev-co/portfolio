@@ -164,7 +164,7 @@ bun run briefing
 # Quick scan
 bun run engine  # alias for scan-all --summary
 
-# Full scan with storage
+# Full scan with storage (use --store for explicit DB writes)
 bun run scan-all --store
 
 # Check signal outcomes

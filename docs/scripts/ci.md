@@ -6,8 +6,18 @@ pre-commit validation.
 ## Usage
 
 ```bash
+# Run all checks (report-only mode)
 ./scripts/ci.sh
+
+# Run all checks and auto-fix formatting issues
+./scripts/ci.sh --fix
 ```
+
+## Options
+
+| Flag    | Description                                                     |
+| ------- | --------------------------------------------------------------- |
+| `--fix` | Automatically apply formatting fixes when Prettier or Ruff fail |
 
 ## What It Does
 

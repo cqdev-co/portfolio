@@ -921,6 +921,7 @@ program
   .option('-v, --verbose', 'Verbose output', false)
   .option('-s, --summary', 'Concise summary output', false)
   .option('--skip-spreads', 'Skip spread analysis (just scan)', false)
+  .option('--store', 'Store signals to database (for CI)', false)
   .option('--no-capture', 'Skip auto-capturing signals to DB', false)
   .action(async (opts) => {
     const options: ScanAllOptions = {
@@ -939,6 +940,7 @@ program
       verbose: opts.verbose,
       summary: opts.summary,
       skipSpreads: opts.skipSpreads,
+      store: opts.store,
       noCapture: !opts.capture, // --no-capture sets capture to false
     };
 

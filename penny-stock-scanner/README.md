@@ -4,6 +4,32 @@ Professional-grade penny stock scanner for identifying explosive breakout opport
 
 ## ⚠️ Recent Updates
 
+### January 28, 2026 - Critical Performance Alert
+
+**Last 2 weeks performance is concerning (Jan 14-28, 2026):**
+
+| Metric          | Value  | Target | Status |
+| --------------- | ------ | ------ | ------ |
+| Win Rate        | 40.1%  | >50%   | ❌     |
+| Avg Return      | -3.48% | >0%    | ❌     |
+| Stop Loss Rate  | 29.5%  | <10%   | ❌     |
+| A-Tier Win Rate | 21.0%  | >50%   | ❌     |
+| C-Tier Win Rate | 70.8%  | -      | ✅     |
+
+**Critical Issues Identified:**
+
+1. **MRNO Wipeout (Jan 27)**: Single stock had 10 positions across tiers, ALL hit -25% stop loss
+2. **Score Inversion Persists**: C-Tier (70.8% WR) outperforming A-Tier (21.0% WR)
+3. **No Profit Targets Hit**: 0% hit rate on 10/20/30% targets
+
+**Fixes Implemented (Jan 28, 2026):**
+
+- ✅ **Position concentration limit**: `max_positions_per_symbol: 3` (prevents single-stock wipeouts like MRNO)
+- ✅ **Softened extreme volume penalty**: 0.88 → 0.92 (reduced overcorrection)
+- ✅ **Trailing stop system**: Activates after +5% gain, trails 10% below high watermark
+
+See: [`../docs/penny-stock-scanner/weekly-analysis-jan-28-2026.md`](../docs/penny-stock-scanner/weekly-analysis-jan-28-2026.md)
+
 ### January 13, 2026 - Score Inversion Root Cause Fix
 
 **Critical fixes based on weekly analysis showing S-Tier at 11.8% WR:**

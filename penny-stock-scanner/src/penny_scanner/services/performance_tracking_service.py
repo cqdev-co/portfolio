@@ -25,6 +25,9 @@ class PerformanceTrackingService:
         """
         Track new signals in the performance tracking system.
 
+        UPDATED Jan 28, 2026: Added position limit per symbol.
+        MRNO wipeout showed danger of concentration - 10 positions hit -25% on same day.
+
         Args:
             signals: List of signals to track
             scan_date: Date of the scan (defaults to today)
@@ -41,7 +44,11 @@ class PerformanceTrackingService:
         if scan_date is None:
             scan_date = date.today()
 
+        settings = get_settings()
+        max_positions_per_symbol = settings.max_positions_per_symbol
+
         tracked_count = 0
+        skipped_concentration = 0
 
         for signal in signals:
             try:
@@ -51,6 +58,17 @@ class PerformanceTrackingService:
 
                 # Check if signal is NEW (not continuing)
                 if signal.explosion_signal.signal_status != SignalStatus.NEW:
+                    continue
+
+                # POSITION LIMIT CHECK - ADDED Jan 28, 2026
+                # Prevents single-stock concentration risk (MRNO wipeout prevention)
+                active_positions = await self._count_active_positions(signal.symbol)
+                if active_positions >= max_positions_per_symbol:
+                    logger.debug(
+                        f"{signal.symbol}: Skipping - already have {active_positions} "
+                        f"active positions (max: {max_positions_per_symbol})"
+                    )
+                    skipped_concentration += 1
                     continue
 
                 # Get the signal ID from the database
@@ -86,8 +104,37 @@ class PerformanceTrackingService:
 
         if tracked_count > 0:
             logger.info(f"Started performance tracking for {tracked_count} new signals")
+        if skipped_concentration > 0:
+            logger.info(
+                f"Skipped {skipped_concentration} signals due to position concentration limit"
+            )
 
         return tracked_count
+
+    async def _count_active_positions(self, symbol: str) -> int:
+        """
+        Count active positions for a given symbol.
+
+        ADDED Jan 28, 2026: Supports position concentration limit.
+
+        Args:
+            symbol: Stock symbol to check
+
+        Returns:
+            Number of active positions for this symbol
+        """
+        try:
+            response = (
+                self.database_service.client.table("penny_signal_performance")
+                .select("id", count="exact")
+                .eq("symbol", symbol)
+                .eq("status", "ACTIVE")
+                .execute()
+            )
+            return response.count if response.count else 0
+        except Exception as e:
+            logger.error(f"Error counting active positions for {symbol}: {e}")
+            return 0  # Assume 0 on error to allow tracking
 
     async def close_ended_signals(
         self, ended_symbols: list[str], scan_date: date = None
@@ -152,7 +199,8 @@ class PerformanceTrackingService:
                 exit_date = scan_date
                 exit_reason = "SIGNAL_ENDED"
 
-                # Check if stop loss was hit during the holding period
+                # Check if stop loss (fixed or trailing) was hit during the holding period
+                max_price_reached = None
                 if stop_loss_price and self.data_service:
                     try:
                         # Fetch historical data to check if stop was breached
@@ -168,12 +216,17 @@ class PerformanceTrackingService:
                             symbol, entry_date, scan_date, entry_price, stop_loss_price
                         )
 
+                        # Track max price reached for analytics
+                        max_price_reached = stop_result.get("max_price_reached")
+
                         if stop_result["stop_hit"]:
                             exit_price = stop_result["exit_price"]
                             exit_date = stop_result["exit_date"]
-                            exit_reason = "STOP_LOSS"
+                            exit_reason = stop_result[
+                                "exit_reason"
+                            ]  # STOP_LOSS or TRAILING_STOP
                             logger.info(
-                                f"{symbol}: Stopped out at ${exit_price:.2f} on {exit_date}"
+                                f"{symbol}: {exit_reason} at ${exit_price:.2f} on {exit_date}"
                             )
                     except Exception as e:
                         logger.warning(f"Could not check stop loss for {symbol}: {e}")
@@ -197,6 +250,13 @@ class PerformanceTrackingService:
                     return_absolute = (exit_price - entry_price) * 1000
                     is_winner = exit_price > entry_price
 
+                    # Calculate max gain if we have max price data
+                    max_gain_pct = None
+                    if max_price_reached and max_price_reached > entry_price:
+                        max_gain_pct = (
+                            (max_price_reached - entry_price) / entry_price * 100
+                        )
+
                     # Update with all calculated metrics
                     update_data = {
                         "exit_date": exit_date.isoformat(),
@@ -209,6 +269,12 @@ class PerformanceTrackingService:
                         "is_winner": is_winner,
                         "updated_at": datetime.now(UTC).isoformat(),
                     }
+
+                    # Add max price tracking if available
+                    if max_price_reached:
+                        update_data["max_price_reached"] = max_price_reached
+                    if max_gain_pct is not None:
+                        update_data["max_gain_pct"] = round(max_gain_pct, 4)
 
                     self.database_service.client.table(
                         "penny_signal_performance"
