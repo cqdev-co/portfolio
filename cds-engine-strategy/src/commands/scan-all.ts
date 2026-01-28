@@ -432,6 +432,7 @@ export async function scanAll(options: ScanAllOptions): Promise<void> {
 
 /**
  * v2.7.0: Capture signals to database for performance tracking
+ * v2.8.0: Added upside_potential and target_price for automatic outcome tracking
  */
 async function captureSignals(
   results: SpreadResult[],
@@ -444,6 +445,11 @@ async function captureSignals(
     );
     const rsiMatch = rsiSignal?.name.match(/(\d+)/);
     const rsiValue = rsiMatch?.[1] ? parseFloat(rsiMatch[1]) : null;
+
+    // Calculate target price from upside potential
+    const upsidePotential = r.score.upsidePotential;
+    const targetPrice =
+      upsidePotential > 0 ? r.score.price * (1 + upsidePotential) : null;
 
     return {
       ticker: r.score.ticker,
@@ -467,6 +473,9 @@ async function captureSignals(
       spreadCushion: r.cushion,
       spreadPop: r.pop,
       spreadReturn: r.returnPct,
+      // Target tracking for automatic outcome verification
+      upsidePotential: upsidePotential > 0 ? upsidePotential : null,
+      targetPrice,
     };
   });
 

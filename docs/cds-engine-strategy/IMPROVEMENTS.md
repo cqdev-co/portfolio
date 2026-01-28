@@ -392,10 +392,94 @@ mkdirSync(dir, { recursive: true });
 );
 ```
 
+## Spread Scanner Improvements (v2.7.0) - January 2026
+
+Fixed issue where spread scanner would find stocks with good technical signals but fail to find viable spreads due to overly strict criteria for lower-priced stocks.
+
+### Problem
+
+The spread scanner was looking for deep ITM call spreads with:
+
+- Fixed ITM range: 6-12% below current price (`price * 0.88` to `price * 0.94`)
+- Fixed widths: $5 or $10 only
+- Fixed open interest: minimum 10 OI
+
+For lower-priced stocks like HAFN ($5.83), this meant:
+
+- ITM range of $5.13-$5.48 (impossibly narrow for typical strike increments)
+- $5 spread width on a $5.83 stock (impractical)
+
+### Solution
+
+**Adaptive ITM Range** based on stock price:
+
+| Price Range | ITM Range | Example ($30 stock) |
+| ----------- | --------- | ------------------- |
+| < $15       | 5-20% ITM | $24-$28.50          |
+| $15-$50     | 5-15% ITM | $25.50-$28.50       |
+| > $50       | 6-12% ITM | $26.40-$28.20       |
+
+**Adaptive Widths** based on stock price:
+
+| Price Range | Available Widths |
+| ----------- | ---------------- |
+| < $10       | $1, $2.50        |
+| $10-$25     | $2.50, $5        |
+| $25-$75     | $5, $10          |
+| > $75       | All configured   |
+
+**Relaxed OI** for low-priced stocks:
+
+- Stocks < $15: minimum 5 OI (vs 10 normally)
+
+### Width Presets Updated
+
+```typescript
+const WIDTH_PRESETS = {
+  small: [1, 2.5, 5], // Includes $1 for low-priced stocks
+  medium: [2.5, 5, 10], // Added $2.5
+  large: [5, 10, 20], // Unchanged
+  all: [1, 2.5, 5, 10, 20], // All options
+};
+```
+
+### Better Diagnostics
+
+Added verbose logging to understand why spreads fail:
+
+```bash
+bun run scan-spreads --from-scan --verbose
+```
+
+Output now shows:
+
+- Available strikes vs ITM range needed
+- Which criteria failed (OI, width, debit ratio, cushion, PoP)
+- Closest available strike when no ITM strikes found
+
+### Usage
+
+```bash
+# Standard scan (uses adaptive criteria automatically)
+bun run scan-spreads --from-scan
+
+# With relaxed criteria for more results
+bun run scan-spreads --from-scan --relaxed
+
+# Force smaller widths for low-priced stocks
+bun run scan-spreads --from-scan --widths small
+
+# Verbose mode to debug why spreads fail
+bun run scan-spreads --from-scan --verbose
+```
+
+---
+
 ## Future Improvements
 
 - [ ] Add watch mode with rate-limit-aware polling
 - [x] ~~Expand proxy to include fundamentals~~ (Done in v4.1)
 - [x] ~~Add debug tools~~ (Done in v1.9.1)
+- [x] ~~Fix spread scanner for low-priced stocks~~ (Done in v2.7.0)
 - [ ] Add more divergence types (OBV, MACD histogram)
 - [ ] Backtest divergence signals

@@ -186,21 +186,20 @@ class SignalGrader:
         """
         Calculate conviction-based score adjustment.
 
-        Based on data analysis findings:
-        - Higher premium = more likely correct (7x difference!)
-        - Shorter DTE = more conviction
-        - OTM calls often speculative (lottery tickets)
+        Direction-agnostic factors (market regimes change):
+        - Higher premium = more conviction (institutional size)
+        - Shorter DTE = more conviction (urgency)
+        - Far OTM = speculative (lottery tickets, regardless of call/put)
+        - ATM = highest conviction (real directional bets)
 
         Returns:
             Score adjustment (positive = more conviction, negative = less)
         """
         adjustment = 0.0
-
-        # 1. Premium-based conviction (BIGGEST predictor)
-        # Correct CALL signals avg $23.3M, wrong avg $3.3M
-        # Correct PUT signals avg $7.7M, wrong avg $2.6M
         premium = signal.premium_flow or 0
+        dte = signal.days_to_expiry or 30
 
+        # 1. Premium-based conviction (institutional size matters)
         if premium >= self.HIGH_CONVICTION_PREMIUM:
             adjustment += 0.15  # High conviction bonus
         elif premium >= self.MEDIUM_CONVICTION_PREMIUM:
@@ -208,11 +207,8 @@ class SignalGrader:
         elif premium < 2_000_000:
             adjustment -= 0.05  # Low premium penalty
 
-        # 2. DTE-based conviction
-        # Correct signals: 14-21 DTE avg
-        # Wrong signals: 26-34 DTE avg
-        dte = signal.days_to_expiry or 30
-
+        # 2. DTE-based conviction (urgency signal)
+        # Short-dated = more conviction, long-dated = often hedging
         if dte <= 14:
             adjustment += 0.10  # Short-term = high conviction
         elif dte <= 21:
@@ -220,16 +216,22 @@ class SignalGrader:
         elif dte >= 35:
             adjustment -= 0.08  # Long-dated = lower conviction (more hedge-like)
 
-        # 3. OTM CALL penalty (speculative lottery tickets)
-        # Wrong calls have 34% OTM vs 8% for correct
-        if signal.option_type == "call" and signal.moneyness == "OTM":
+        # 3. Moneyness-based conviction (direction-agnostic)
+        # ATM = highest conviction (real directional bets)
+        # Far OTM = speculative lottery tickets (both calls AND puts)
+        if signal.moneyness == "ATM":
+            adjustment += 0.08  # ATM bonus - real directional conviction
+            # ATM + short DTE = sweet spot for directional bets
+            if 8 <= dte <= 14:
+                adjustment += 0.05  # Sweet spot bonus
+        elif signal.moneyness == "OTM":
             price_diff_pct = (
                 abs(signal.strike - signal.underlying_price) / signal.underlying_price
             )
             if price_diff_pct > 0.10:  # >10% OTM
-                adjustment -= 0.12  # Significant penalty for far OTM calls
+                adjustment -= 0.12  # Significant penalty for far OTM (lottery tickets)
             else:
-                adjustment -= 0.05  # Mild penalty for near OTM calls
+                adjustment -= 0.05  # Mild penalty for near OTM
 
         # 4. High-volume ticker adjustment
         # These tickers have more noise, need higher bar
@@ -237,24 +239,13 @@ class SignalGrader:
             if premium < self.HIGH_CONVICTION_PREMIUM:
                 adjustment -= 0.05  # Extra penalty for low premium on noisy tickers
 
-        # 5. Option type adjustment (Jan 2026 analysis)
-        # PUTS: 60% win rate - BOOST these signals
-        # CALLS: 8.6% win rate - heavy penalty
-        if signal.option_type == "put":
-            adjustment += 0.15  # Bonus for puts (they actually work!)
-            # Additional bonus for ATM puts 8-14 DTE (61.5% win rate sweet spot)
-            if signal.moneyness == "ATM" and 8 <= dte <= 14:
-                adjustment += 0.10  # Sweet spot bonus
-        else:  # call
-            adjustment -= 0.15  # Heavy penalty for calls (8.6% win rate)
-            # Additional penalty for OTM calls (lottery ticket pattern)
-            if signal.moneyness == "OTM":
-                adjustment -= 0.08
+        # NOTE: No PUT/CALL bias - market regimes change and what works in
+        # bearish periods won't work in bullish periods. Stay direction-agnostic.
 
         logger.debug(
             f"Conviction adjustment for {signal.ticker}: {adjustment:+.3f} "
             f"(premium=${premium / 1e6:.1f}M, DTE={dte}, "
-            f"moneyness={signal.moneyness})"
+            f"moneyness={signal.moneyness}, type={signal.option_type})"
         )
 
         return adjustment
@@ -281,26 +272,32 @@ class SignalGrader:
         self, signal: UnusualOptionsSignal
     ) -> tuple[SignalClassification, str, list[str]]:
         """
-        Classify signal based on historical win rate analysis.
+        Classify signal based on direction-agnostic quality factors.
 
-        Jan 2026 Analysis Results:
-        - PUT signals: 60% win rate
-        - CALL signals: 8.6% win rate
-        - PUT ATM 8-14 DTE: 61.5% win rate (sweet spot)
-        - PUT ITM 8-14 DTE: 56.2% win rate
+        Classification is based on:
+        - Premium size (institutional conviction)
+        - Moneyness (ATM = real conviction, far OTM = lottery tickets)
+        - DTE (8-21 DTE sweet spot for directional plays)
+        - Hedge patterns (index/sector ETFs, far-dated, etc.)
+
+        NOTE: We do NOT bias toward calls or puts. Market regimes change
+        and what works in bearish periods won't work in bullish periods.
 
         Returns:
             Tuple of (classification, reason, factors)
         """
         factors = []
         dte = signal.days_to_expiry or 30
+        premium = signal.premium_flow or 0
+        option_type_label = signal.option_type.upper()
 
         # Collect classification factors
         factors.append(f"option_type={signal.option_type}")
         factors.append(f"moneyness={signal.moneyness}")
         factors.append(f"dte={dte}")
+        factors.append(f"premium=${premium / 1e6:.1f}M")
 
-        # Check for hedge patterns first
+        # Check for hedge patterns first (still valid to flag)
         if self._is_likely_hedge_pattern(signal):
             return (
                 SignalClassification.LIKELY_HEDGE,
@@ -308,63 +305,69 @@ class SignalGrader:
                 factors + ["hedge_pattern_detected"],
             )
 
-        # PUT signals - historically 60% win rate
-        if signal.option_type == "put":
-            # Sweet spot: PUT ATM 8-14 DTE (61.5% win rate)
-            if signal.moneyness == "ATM" and 8 <= dte <= 14:
+        # HIGH CONVICTION: ATM/ITM + 8-21 DTE + meaningful premium
+        # This is the sweet spot for directional plays regardless of call/put
+        if signal.moneyness == "ATM" and 8 <= dte <= 14:
+            if premium >= self.MEDIUM_CONVICTION_PREMIUM:
                 return (
                     SignalClassification.HIGH_CONVICTION,
-                    "PUT + ATM + 8-14 DTE (61.5% historical win rate - sweet spot)",
-                    factors + ["put_atm_sweet_spot"],
+                    f"{option_type_label} + ATM + 8-14 DTE + ${premium / 1e6:.1f}M (sweet spot)",
+                    factors + ["atm_sweet_spot", "institutional_size"],
                 )
-
-            # Strong: PUT ITM 8-14 DTE (56.2% win rate)
-            if signal.moneyness == "ITM" and 8 <= dte <= 14:
-                return (
-                    SignalClassification.HIGH_CONVICTION,
-                    "PUT + ITM + 8-14 DTE (56.2% historical win rate)",
-                    factors + ["put_itm_strong"],
-                )
-
-            # Good: PUT ATM/ITM 7-21 DTE
-            if signal.moneyness in ["ATM", "ITM"] and 7 <= dte <= 21:
-                return (
-                    SignalClassification.HIGH_CONVICTION,
-                    f"PUT + {signal.moneyness} + {dte} DTE (~60% historical win rate)",
-                    factors + ["put_favorable_setup"],
-                )
-
-            # Moderate: Other PUT setups
-            if signal.moneyness in ["ATM", "ITM"]:
-                return (
-                    SignalClassification.MODERATE,
-                    f"PUT + {signal.moneyness} (~40-50% win rate, DTE outside sweet spot)",
-                    factors + ["put_moderate_setup"],
-                )
-
-            # OTM puts - less reliable but still puts
-            if signal.moneyness == "OTM":
-                return (
-                    SignalClassification.MODERATE,
-                    "PUT + OTM (speculative, but puts historically outperform calls)",
-                    factors + ["put_otm_speculative"],
-                )
-
-        # CALL signals - historically only 8.6% win rate
-        if signal.option_type == "call":
-            # OTM calls are especially bad
-            if signal.moneyness == "OTM":
-                return (
-                    SignalClassification.CONTRARIAN,
-                    "CALL + OTM (8.6% win rate - consider fading or ignoring)",
-                    factors + ["call_otm_contrarian"],
-                )
-
-            # ATM/ITM calls are slightly less bad
             return (
-                SignalClassification.CONTRARIAN,
-                f"CALL + {signal.moneyness} (8.6% win rate - likely selling/hedging activity)",
-                factors + ["call_contrarian"],
+                SignalClassification.HIGH_CONVICTION,
+                f"{option_type_label} + ATM + 8-14 DTE (directional sweet spot)",
+                factors + ["atm_sweet_spot"],
+            )
+
+        if signal.moneyness == "ITM" and 8 <= dte <= 14:
+            return (
+                SignalClassification.HIGH_CONVICTION,
+                f"{option_type_label} + ITM + 8-14 DTE (strong directional conviction)",
+                factors + ["itm_strong_conviction"],
+            )
+
+        # MODERATE: ATM/ITM with reasonable DTE
+        if signal.moneyness in ["ATM", "ITM"] and 7 <= dte <= 21:
+            return (
+                SignalClassification.MODERATE,
+                f"{option_type_label} + {signal.moneyness} + {dte} DTE (solid setup)",
+                factors + ["favorable_setup"],
+            )
+
+        if signal.moneyness in ["ATM", "ITM"]:
+            return (
+                SignalClassification.MODERATE,
+                f"{option_type_label} + {signal.moneyness} (DTE outside optimal range)",
+                factors + ["moderate_setup"],
+            )
+
+        # OTM signals - treat as speculative/informational
+        # Far OTM = lottery tickets regardless of call or put
+        if signal.moneyness == "OTM":
+            price_diff_pct = (
+                abs(signal.strike - signal.underlying_price) / signal.underlying_price
+            )
+
+            if price_diff_pct > 0.10:  # >10% OTM = lottery ticket
+                return (
+                    SignalClassification.INFORMATIONAL,
+                    f"{option_type_label} + far OTM ({price_diff_pct:.0%} away) - speculative lottery",
+                    factors + ["far_otm_lottery"],
+                )
+
+            # Near OTM with good premium could still be meaningful
+            if premium >= self.HIGH_CONVICTION_PREMIUM:
+                return (
+                    SignalClassification.MODERATE,
+                    f"{option_type_label} + near OTM + ${premium / 1e6:.1f}M (institutional size adds weight)",
+                    factors + ["near_otm_institutional"],
+                )
+
+            return (
+                SignalClassification.INFORMATIONAL,
+                f"{option_type_label} + OTM (speculative, treat as market intel)",
+                factors + ["otm_speculative"],
             )
 
         # Fallback - informational only

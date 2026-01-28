@@ -26,6 +26,7 @@
     "trade": "bun run src/index.ts trade",
     "performance": "bun run src/index.ts performance",
     "backtest": "bun run src/index.ts backtest",
+    "signal-outcomes": "bun run src/index.ts signal-outcomes",
     "trends": "bun run src/index.ts trends",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",

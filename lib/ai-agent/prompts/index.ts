@@ -2,6 +2,7 @@
  * AI Agent Prompts
  *
  * Shared system prompts for CLI and Frontend AI agents.
+ * Now uses strategy.config.yaml for trading rules.
  */
 
 export {
@@ -21,6 +22,7 @@ export {
 
   // Utilities
   buildKeyRules,
+  buildTradingStrategy,
 
   // Types
   type VictorPromptConfig,

@@ -8,40 +8,46 @@ from uuid import uuid4
 
 class SignalClassification(str, Enum):
     """
-    Signal classification based on historical win rate analysis.
+    Signal classification based on direction-agnostic quality factors.
 
-    Jan 2026 Analysis Results:
-    - PUT signals: 60% win rate
-    - CALL signals: 8.6% win rate
-    - PUT ATM 8-14 DTE: 61.5% win rate (sweet spot)
+    Classification criteria (NOT biased toward calls or puts):
+    - Premium size (institutional conviction)
+    - Moneyness (ATM = real conviction, far OTM = lottery)
+    - DTE (8-21 DTE sweet spot for directional plays)
+    - Hedge patterns (index/sector ETFs, far-dated protective positions)
+
+    NOTE: Market regimes change. We do not hardcode PUT/CALL biases.
     """
 
-    # Follow directionally - high historical win rate
+    # Strong setup: ATM/ITM + optimal DTE + institutional size
     HIGH_CONVICTION = "high_conviction"
 
-    # Consider with caution - moderate win rate
+    # Decent setup: ATM/ITM with reasonable parameters
     MODERATE = "moderate"
 
-    # Market intel only - unclear direction
+    # Market intel only: OTM or unclear direction
     INFORMATIONAL = "informational"
 
-    # Institutional hedging activity - not directional
+    # Likely hedging activity: index ETFs, far-dated, protective positions
     LIKELY_HEDGE = "likely_hedge"
 
-    # Consider fading - historically fails as directional play
+    # Low quality: far OTM lottery tickets, noise
     CONTRARIAN = "contrarian"
 
     # Not yet classified
     UNCLASSIFIED = "unclassified"
 
 
-# Historical win rates by classification (updated from analysis)
+# Win rate estimates by classification
+# NOTE: These are NOT hardcoded biases - they should be continuously
+# updated by performance_tracker.py based on actual results.
+# Market regimes change, so these are starting estimates only.
 CLASSIFICATION_WIN_RATES = {
-    SignalClassification.HIGH_CONVICTION: 0.60,
-    SignalClassification.MODERATE: 0.40,
-    SignalClassification.INFORMATIONAL: 0.25,
-    SignalClassification.LIKELY_HEDGE: None,  # Not applicable
-    SignalClassification.CONTRARIAN: 0.09,
+    SignalClassification.HIGH_CONVICTION: None,  # Track via performance
+    SignalClassification.MODERATE: None,  # Track via performance
+    SignalClassification.INFORMATIONAL: None,  # Track via performance
+    SignalClassification.LIKELY_HEDGE: None,  # Not applicable (not directional)
+    SignalClassification.CONTRARIAN: None,  # Track via performance
     SignalClassification.UNCLASSIFIED: None,
 }
 

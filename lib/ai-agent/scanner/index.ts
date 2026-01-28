@@ -9,6 +9,7 @@
  * - Trade grading with A-F system
  * - Risk scoring
  * - Cushion and RSI filtering
+ * - Uses strategy.config.yaml for thresholds (Lesson 001)
  *
  * @example
  * ```typescript
@@ -20,6 +21,7 @@
  */
 
 import { fetchTickerData } from '../data';
+import { getEntryConfig, getSpreadParamsConfig } from '../config';
 
 // ============================================================================
 // TYPES
@@ -269,7 +271,64 @@ export const SCAN_LISTS = {
 // ============================================================================
 
 /**
- * Grade rubric for transparency
+ * Get grade rubric dynamically from config
+ * This ensures grading thresholds match strategy.config.yaml
+ */
+export function getGradeRubric() {
+  const entry = getEntryConfig();
+
+  return {
+    criteria: [
+      {
+        name: 'Above MA200',
+        maxPoints: 25,
+        desc: 'Price above 200-day MA = bullish trend',
+      },
+      {
+        name: 'RSI Zone',
+        maxPoints: 20,
+        desc: `RSI ${entry.momentum.rsi_ideal_min}-${entry.momentum.rsi_ideal_max} = ideal, ${entry.momentum.rsi_ideal_max}-${entry.momentum.rsi_max + 5} = partial, >${entry.momentum.rsi_max + 10} = overbought`,
+      },
+      {
+        name: 'Cushion',
+        maxPoints: 20,
+        desc: `>${entry.cushion.preferred_pct}% = full, ${entry.cushion.minimum_pct}-${entry.cushion.preferred_pct}% = partial, <${entry.cushion.minimum_pct}% = risky`,
+      },
+      {
+        name: 'IV Level',
+        maxPoints: 15,
+        desc: `<${entry.volatility.iv_preferred_max_pct}% = full, ${entry.volatility.iv_preferred_max_pct}-${entry.volatility.iv_max_pct}% = partial, >${entry.volatility.avoid_if_iv_above}% = risky`,
+      },
+      {
+        name: 'Earnings',
+        maxPoints: 10,
+        desc: `>${entry.earnings.preferred_days_until} days = safe, ${entry.earnings.min_days_until}-${entry.earnings.preferred_days_until} = partial, <${entry.earnings.min_days_until} = avoid`,
+      },
+      {
+        name: 'Risk/Reward',
+        maxPoints: 10,
+        desc: `>${entry.spread.preferred_ror_pct}% return = full, ${entry.spread.min_return_on_risk_pct}-${entry.spread.preferred_ror_pct}% = partial, <${entry.spread.min_return_on_risk_pct}% = poor`,
+      },
+    ],
+    grades: {
+      'A+': { min: 95, recommendation: 'STRONG BUY' },
+      A: { min: 90, recommendation: 'STRONG BUY' },
+      'A-': { min: 85, recommendation: 'BUY' },
+      'B+': { min: 80, recommendation: 'BUY' },
+      B: { min: 75, recommendation: 'BUY' },
+      'B-': { min: 70, recommendation: 'WAIT' },
+      'C+': { min: 65, recommendation: 'WAIT' },
+      C: { min: 60, recommendation: 'WAIT' },
+      'C-': { min: 55, recommendation: 'AVOID' },
+      D: { min: 50, recommendation: 'AVOID' },
+      F: { min: 0, recommendation: 'AVOID' },
+    },
+  };
+}
+
+/**
+ * Grade rubric for transparency (static export for backward compatibility)
+ * @deprecated Use getGradeRubric() for dynamic config-based values
  */
 export const GRADE_RUBRIC = {
   criteria: [
@@ -375,9 +434,11 @@ export function gradeAtLeast(a: TradeGrade, b: TradeGrade): boolean {
 }
 
 /**
- * Grade a trade opportunity
+ * Grade a trade opportunity using config-based thresholds
  */
 export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
+  const entry = getEntryConfig();
+  const spreadParams = getSpreadParamsConfig();
   const criteria: GradingCriteria[] = [];
   let totalScore = 0;
   const maxScore = 100;
@@ -398,25 +459,27 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     totalScore += points;
   }
 
-  // 2. RSI Range (20 points)
+  // 2. RSI Range (20 points) - uses config thresholds
   if (input.rsi !== undefined) {
     let points = 0;
     let passed = false;
     let reason = '';
 
-    if (input.rsi >= 35 && input.rsi <= 55) {
+    const { rsi_min, rsi_max, rsi_ideal_min, rsi_ideal_max } = entry.momentum;
+
+    if (input.rsi >= rsi_ideal_min && input.rsi <= rsi_ideal_max) {
       points = 20;
       passed = true;
-      reason = `RSI ${input.rsi.toFixed(1)} in ideal range (35-55)`;
-    } else if (input.rsi > 55 && input.rsi <= 60) {
+      reason = `RSI ${input.rsi.toFixed(1)} in ideal range (${rsi_ideal_min}-${rsi_ideal_max})`;
+    } else if (input.rsi > rsi_ideal_max && input.rsi <= rsi_max + 5) {
       points = 10;
       passed = true;
       reason = `RSI ${input.rsi.toFixed(1)} slightly elevated but acceptable`;
-    } else if (input.rsi > 60) {
+    } else if (input.rsi > rsi_max + 5) {
       points = 0;
       passed = false;
       reason = `RSI ${input.rsi.toFixed(1)} too high - overbought`;
-    } else if (input.rsi < 35) {
+    } else if (input.rsi < rsi_min) {
       points = 5;
       passed = false;
       reason = `RSI ${input.rsi.toFixed(1)} oversold - wait for stabilization`;
@@ -432,25 +495,27 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     totalScore += points;
   }
 
-  // 3. Cushion (20 points)
+  // 3. Cushion (20 points) - uses config thresholds
   if (input.cushionPercent !== undefined) {
     let points = 0;
     let passed = false;
     let reason = '';
 
-    if (input.cushionPercent >= 10) {
+    const { minimum_pct, preferred_pct, excellent_pct } = entry.cushion;
+
+    if (input.cushionPercent >= excellent_pct) {
       points = 20;
       passed = true;
       reason = `${input.cushionPercent.toFixed(1)}% cushion - excellent buffer`;
-    } else if (input.cushionPercent >= 7) {
+    } else if (input.cushionPercent >= preferred_pct) {
       points = 15;
       passed = true;
       reason = `${input.cushionPercent.toFixed(1)}% cushion - good buffer`;
-    } else if (input.cushionPercent >= 5) {
+    } else if (input.cushionPercent >= minimum_pct) {
       points = 10;
       passed = true;
       reason = `${input.cushionPercent.toFixed(1)}% cushion - acceptable`;
-    } else if (input.cushionPercent >= 3) {
+    } else if (input.cushionPercent >= minimum_pct - 2) {
       points = 5;
       passed = false;
       reason = `${input.cushionPercent.toFixed(1)}% cushion - tight margin`;
@@ -470,17 +535,19 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     totalScore += points;
   }
 
-  // 4. Earnings Safety (15 points)
+  // 4. Earnings Safety (15 points) - uses config thresholds
   if (input.earningsDays !== undefined && input.earningsDays !== null) {
     let points = 0;
     let passed = false;
     let reason = '';
 
-    if (input.earningsDays > 30) {
+    const { min_days_until, preferred_days_until } = entry.earnings;
+
+    if (input.earningsDays > preferred_days_until + 10) {
       points = 15;
       passed = true;
       reason = `Earnings ${input.earningsDays} days out - safe`;
-    } else if (input.earningsDays > 14) {
+    } else if (input.earningsDays > min_days_until) {
       points = 10;
       passed = true;
       reason = `Earnings ${input.earningsDays} days out - monitor`;
@@ -504,21 +571,23 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     totalScore += Math.max(0, points);
   }
 
-  // 5. DTE Appropriateness (10 points)
+  // 5. DTE Appropriateness (10 points) - uses config thresholds
   if (input.dte !== undefined) {
     let points = 0;
     let passed = false;
     let reason = '';
 
-    if (input.dte >= 21 && input.dte <= 45) {
+    const { min: dteMin, max: dteMax } = spreadParams.dte;
+
+    if (input.dte >= dteMin && input.dte <= dteMax) {
       points = 10;
       passed = true;
-      reason = `${input.dte} DTE in optimal range (21-45)`;
-    } else if (input.dte > 45 && input.dte <= 60) {
+      reason = `${input.dte} DTE in optimal range (${dteMin}-${dteMax})`;
+    } else if (input.dte > dteMax && input.dte <= dteMax + 15) {
       points = 7;
       passed = true;
       reason = `${input.dte} DTE slightly long but acceptable`;
-    } else if (input.dte > 14 && input.dte < 21) {
+    } else if (input.dte > 14 && input.dte < dteMin) {
       points = 5;
       passed = true;
       reason = `${input.dte} DTE short - less time for recovery`;
@@ -538,7 +607,7 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     totalScore += points;
   }
 
-  // 6. Risk/Reward (10 points)
+  // 6. Risk/Reward (10 points) - uses config thresholds
   if (input.spreadWidth !== undefined && input.debit !== undefined) {
     const maxProfit = input.spreadWidth - input.debit;
     const returnOnRisk = (maxProfit / input.debit) * 100;
@@ -547,15 +616,17 @@ export function gradeTradeOpportunity(input: GradingInput): TradeGradeResult {
     let passed = false;
     let reason = '';
 
-    if (returnOnRisk >= 20) {
+    const { min_return_on_risk_pct, preferred_ror_pct } = entry.spread;
+
+    if (returnOnRisk >= preferred_ror_pct) {
       points = 10;
       passed = true;
       reason = `${returnOnRisk.toFixed(0)}% return on risk - excellent`;
-    } else if (returnOnRisk >= 15) {
+    } else if (returnOnRisk >= min_return_on_risk_pct) {
       points = 7;
       passed = true;
       reason = `${returnOnRisk.toFixed(0)}% return on risk - good`;
-    } else if (returnOnRisk >= 10) {
+    } else if (returnOnRisk >= min_return_on_risk_pct - 5) {
       points = 5;
       passed = true;
       reason = `${returnOnRisk.toFixed(0)}% return on risk - acceptable`;

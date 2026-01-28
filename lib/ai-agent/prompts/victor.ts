@@ -95,8 +95,43 @@ formatting.`;
 // TRADING STRATEGY
 // ============================================================================
 
+import {
+  getEntryConfig,
+  getExitConfig,
+  getSpreadParamsConfig,
+  getPositionSizingConfig,
+  getLessonsLearned,
+} from '../config';
+
+/**
+ * Build trading strategy description from config
+ * This ensures prompts always reflect current strategy.config.yaml
+ */
+export function buildTradingStrategy(): string {
+  try {
+    const entry = getEntryConfig();
+    const spread = getSpreadParamsConfig();
+
+    return `## Strategy: Deep ITM Call Debit Spreads (CDS)
+Buy deep ITM call (6-12% ITM, δ~0.80+), sell $5 higher strike. \
+Target ${spread.dte.min}-${spread.dte.max} DTE.
+
+Entry Rules (RSI-based with ADX flexibility):
+- BASE: RSI ${entry.momentum.rsi_ideal_min}-${entry.momentum.rsi_ideal_max} = ideal entry zone
+- EXCEPTION: In STRONG trends (ADX >40), RSI up to 65 is acceptable
+- Above MA200, no earnings within ${entry.earnings.min_days_until}d
+
+CDS Math: BUY LOWER strike / SELL HIGHER strike. \
+Max Loss = Debit. Breakeven = Long Strike + Debit.`;
+  } catch {
+    // Fallback if config loading fails
+    return TRADING_STRATEGY;
+  }
+}
+
 /**
  * Deep ITM Call Debit Spread strategy rules
+ * @deprecated Use buildTradingStrategy() for config-based values
  */
 export const TRADING_STRATEGY = `## Strategy: Deep ITM Call Debit Spreads (CDS)
 Buy deep ITM call (6-12% ITM, δ~0.80+), sell $5 higher strike. \
@@ -115,16 +150,45 @@ Max Loss = Debit. Breakeven = Long Strike + Debit.`;
 // ============================================================================
 
 /**
- * Build key trading rules based on account size
+ * Build key trading rules based on account size and config
+ * Now includes exit rules from Lesson 001
  */
 export function buildKeyRules(accountSize: number): string {
-  const maxPosition = Math.round(accountSize * 0.2);
+  try {
+    const sizing = getPositionSizingConfig();
+    const entry = getEntryConfig();
+    const exit = getExitConfig();
+    const lessons = getLessonsLearned();
 
-  return `## Key Rules
+    const maxPositionPct = sizing.max_single_position_pct;
+    const maxPosition = Math.round(accountSize * (maxPositionPct / 100));
+
+    // Build lesson reminders
+    const lessonReminders =
+      lessons.length > 0
+        ? `\n• LESSON 001: Close at ${exit.profit.target_pct}% profit OR ${exit.time.forced_exit_dte} DTE (whichever first)`
+        : '';
+
+    return `## Key Rules
+• Max position: $${maxPosition} (${maxPositionPct}% of account) | WHOLE CONTRACTS ONLY
+• RSI > ${entry.momentum.rsi_max + 5} = wait for pullback | FOMC/CPI within 3d = WAIT or reduce size
+• IV HIGH (>${entry.volatility.avoid_if_iv_above}%) = spreads expensive, wait | IV LOW (<20%) = good entry
+• Always compare breakeven to support levels${lessonReminders}
+
+## Exit Rules (from strategy.config.yaml)
+• Target: ${exit.profit.target_pct}% of max profit
+• Greed Limit: ${exit.profit.greed_limit_pct}% - NEVER hold past this
+• Forced Exit: ${exit.time.forced_exit_dte} DTE - close regardless of P&L
+• Pin Risk: Exit if cushion < ${exit.pin_risk.cushion_exit_pct}% within ${exit.pin_risk.dte_threshold} DTE`;
+  } catch {
+    // Fallback if config loading fails
+    const maxPosition = Math.round(accountSize * 0.2);
+    return `## Key Rules
 • Max position: $${maxPosition} (20% of account) | WHOLE CONTRACTS ONLY
 • RSI > 60 = wait for pullback | FOMC/CPI within 3d = WAIT or reduce size
 • IV HIGH (>50%) = spreads expensive, wait | IV LOW (<20%) = good entry
 • Always compare breakeven to support levels`;
+  }
 }
 
 // ============================================================================
@@ -267,12 +331,16 @@ deeper on that"`;
  *
  * Used by: CLI (ai-analyst)
  * Includes: Full persona, strategy, tools, TOON spec, live data
+ * Strategy rules now pulled from strategy.config.yaml
  */
 export function buildVictorSystemPrompt(config: VictorPromptConfig): string {
+  // Use config-based strategy, fallback to static if config fails
+  const tradingStrategy = buildTradingStrategy();
+
   const parts: string[] = [
     VICTOR_PERSONA,
     '',
-    TRADING_STRATEGY,
+    tradingStrategy,
     '',
     buildKeyRules(config.accountSize),
     '',
@@ -307,11 +375,40 @@ export function buildVictorSystemPrompt(config: VictorPromptConfig): string {
  * Used by: Frontend (portfolio website chat)
  * Includes: Core persona, basic strategy, response style
  * Optional: Tool instructions (when withTools: true)
+ * Now uses strategy.config.yaml for rules
  */
 export function buildVictorLitePrompt(config?: VictorLiteConfig): string {
   const accountSize = config?.accountSize ?? 1750;
-  const maxPosition = Math.round(accountSize * 0.2);
   const withTools = config?.withTools ?? false;
+
+  // Try to use config values, fallback to defaults
+  let maxPosition: number;
+  let rsiRange: string;
+  let earningsDays: number;
+  let exitRules: string;
+
+  try {
+    const sizing = getPositionSizingConfig();
+    const entry = getEntryConfig();
+    const exit = getExitConfig();
+
+    maxPosition = Math.round(
+      accountSize * (sizing.max_single_position_pct / 100)
+    );
+    rsiRange = `${entry.momentum.rsi_ideal_min}-${entry.momentum.rsi_ideal_max}`;
+    earningsDays = entry.earnings.min_days_until;
+    exitRules = `
+## Exit Rules (Lesson 001)
+- Close at ${exit.profit.target_pct}% of max profit (target)
+- NEVER hold past ${exit.profit.greed_limit_pct}% (greed limit)
+- MUST close by ${exit.time.forced_exit_dte} DTE regardless of P&L`;
+  } catch {
+    // Fallback values if config fails
+    maxPosition = Math.round(accountSize * 0.2);
+    rsiRange = '35-55';
+    earningsDays = 14;
+    exitRules = '';
+  }
 
   const toolSection = withTools
     ? `
@@ -338,10 +435,11 @@ When using web_search:
 ## Trading Focus
 I specialize in Deep ITM Call Debit Spreads - conservative, \
 high-probability trades. I look for:
-- RSI 35-55 (or up to 65 in strong trends)
+- RSI ${rsiRange} (or up to 65 in strong trends)
 - Price above 200-day moving average
-- No earnings within 14 days
+- No earnings within ${earningsDays} days
 - IV not elevated (premium should be reasonable)
+${exitRules}
 
 ## Account Context
 Managing a $${accountSize} account. Max position: \
@@ -376,6 +474,7 @@ export default {
   buildVictorSystemPrompt,
   buildVictorLitePrompt,
   buildVictorMinimalPrompt,
+  buildTradingStrategy,
   VICTOR_PERSONA,
   TRADING_STRATEGY,
   TOON_DECODER_SPEC,

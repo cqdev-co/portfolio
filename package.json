@@ -54,19 +54,21 @@
     "py:unusual-options": "cd unusual-options-service && poetry run unusual-options",
     "py:penny-scanner": "cd penny-stock-scanner && poetry run penny-scanner scan-all --min-score 0.70",
     "py:wp-service": "cd wp-service && poetry run wp-service",
-    "py:install": "cd unusual-options-service && poetry install && cd ../penny-stock-scanner && poetry install && cd ../wp-service && poetry install"
+    "py:install": "cd unusual-options-service && poetry install && cd ../penny-stock-scanner && poetry install && cd ../wp-service && poetry install",
+    "audit": "bun audit",
+    "audit:fix": "bun audit --fix"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/bun": "latest",
-    "@types/node": "^25.0.3",
+    "@types/node": "^25.0.10",
     "eslint": "^9.39.2",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
-    "prettier": "^3.7.4",
-    "turbo": "^2.7.3",
+    "prettier": "^3.8.1",
+    "turbo": "^2.7.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.52.0"
+    "typescript-eslint": "^8.54.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -87,5 +89,8 @@
   "packageManager": "bun@1.2.5",
   "dependencies": {
     "yaml": "^2.8.2"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
   }
 }

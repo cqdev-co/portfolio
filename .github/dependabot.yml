@@ -1,32 +1,45 @@
 version: 2
 updates:
-  # Configure updates for npm dependencies
-  - package-ecosystem: 'bun'
-    directory: '/frontend' # Location of package manifests
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
       interval: 'weekly'
-    # Set reviewers for pull requests
     reviewers:
       - 'cqdev-co'
-    # Only detect vulnerabilities, don't open PRs
     open-pull-requests-limit: 0
+    groups:
+      all-dependencies:
+        patterns:
+          - '*'
 
   - package-ecosystem: 'pip'
     directory: '/unusual-options-service'
     schedule:
       interval: 'weekly'
-    # Set reviewers for pull requests
     reviewers:
       - 'cqdev-co'
-    # Only detect vulnerabilities, don't open PRs
     open-pull-requests-limit: 0
 
   - package-ecosystem: 'pip'
-    directory: '/rds-ticker-analysis'
+    directory: '/penny-stock-scanner'
     schedule:
       interval: 'weekly'
-    # Set reviewers for pull requests
     reviewers:
       - 'cqdev-co'
-    # Only detect vulnerabilities, don't open PRs
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: 'pip'
+    directory: '/wp-service'
+    schedule:
+      interval: 'weekly'
+    reviewers:
+      - 'cqdev-co'
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    reviewers:
+      - 'cqdev-co'
     open-pull-requests-limit: 0

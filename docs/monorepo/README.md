@@ -30,6 +30,12 @@ bun run format
 
 # Check formatting
 bun run format:check
+
+# Security audit (all workspaces via shared lockfile)
+bun audit
+
+# Auto-fix vulnerabilities
+bun run audit:fix
 ```
 
 ## CI/CD
@@ -237,6 +243,8 @@ Run from the repository root:
 | `bun run dev:cloudflare` | Start Cloudflare worker locally            |
 | `bun run clean`          | Remove all node_modules                    |
 | `bun run clean:turbo`    | Clear Turbo cache                          |
+| `bun run audit`          | Security audit (all workspaces)            |
+| `bun run audit:fix`      | Auto-fix security vulnerabilities          |
 
 \*Frontend uses `--webpack` flag for dev mode due to Turbopack limitations
 with monorepo imports. Use `cd frontend && bun run dev:turbo` for Turbopack
@@ -502,6 +510,69 @@ cd penny-stock-scanner && poetry run pytest tests/ -v
 **Note**: `wp-service` does not have a test suite yet. CI runs tests for
 `unusual-options-service` and `penny-stock-scanner` only.
 
+## Security Audits
+
+The monorepo uses a single `bun.lock` lockfile at the root, which includes all
+dependencies from all workspaces. This means:
+
+- **One audit covers everything**: Running `bun audit` from the root checks all
+  dependencies across all workspaces in a single command
+- **No per-package audits needed**: Unlike npm/yarn workspaces that may have
+  separate lockfiles, Bun workspaces are truly unified
+- **Consistent versions**: Shared dependencies are deduplicated, reducing the
+  attack surface
+
+```bash
+# Audit all dependencies (all workspaces)
+bun run audit
+
+# Auto-fix vulnerabilities where possible
+bun run audit:fix
+```
+
+### Handling Transitive Vulnerabilities
+
+When vulnerabilities exist in transitive dependencies (dependencies of your
+dependencies), you can use the `overrides` field in the root `package.json` to
+force a specific version:
+
+```json
+{
+  "overrides": {
+    "esbuild": "^0.25.0"
+  }
+}
+```
+
+This forces all packages in the monorepo to use the specified version,
+regardless of what their `package.json` specifies. Use with caution as it may
+cause compatibility issues.
+
+**Note**: The audit commands only cover JavaScript/TypeScript dependencies.
+Python services (Poetry) should be audited separately using tools like
+`pip-audit` or `safety`:
+
+```bash
+# Example: Audit Python dependencies
+cd unusual-options-service && poetry run pip-audit
+```
+
+### Dependabot Integration
+
+Dependabot is configured in `.github/dependabot.yml` to scan:
+
+| Ecosystem        | Directory                  | Coverage                                 |
+| ---------------- | -------------------------- | ---------------------------------------- |
+| `npm`            | `/` (root)                 | All Bun workspaces via shared `bun.lock` |
+| `pip`            | `/unusual-options-service` | Poetry dependencies                      |
+| `pip`            | `/penny-stock-scanner`     | Poetry dependencies                      |
+| `pip`            | `/wp-service`              | Poetry dependencies                      |
+| `github-actions` | `/`                        | CI workflow actions                      |
+
+**Note**: Since Bun workspaces use a single `bun.lock` at the root, scanning `/`
+covers all TypeScript packages (frontend, ai-analyst, cds-engine-strategy,
+cloudflare, lib/\*). Individual workspace directories don't need separate entries.
+
 ## Best Practices
 
 1. **Keep packages independent**: Each package should work standalone
@@ -514,7 +585,8 @@ cd penny-stock-scanner && poetry run pytest tests/ -v
 8. **Format before commit**: Pre-commit hooks handle this automatically
 9. **Pass CI locally**: Run `bun run typecheck && bun run lint` before pushing
 10. **Use ruff for Python**: All Python services use ruff for consistency
+11. **Audit regularly**: Run `bun run audit` to check for security vulnerabilities
 
 ---
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-27

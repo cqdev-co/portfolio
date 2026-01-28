@@ -8,7 +8,7 @@
 #
 # RULE: If ANY entry criterion is not met, DO NOT TRADE.
 #
-# Last Updated: 2026-01-06
+# Last Updated: 2026-01-23
 # =============================================================================
 
 strategy:
@@ -72,31 +72,65 @@ entry:
     preferred_ror_pct: 20 # Preferred return on risk
     min_open_interest: 50 # Both legs must have OI
     max_bid_ask_spread_pct: 5 # Avoid illiquid strikes
+    min_pop_pct: 60 # Minimum probability of profit
+    min_debit_ratio_pct: 55 # Minimum debit as % of width (avoid "too good to be true")
+    max_debit_ratio_pct: 80 # Maximum debit as % of width (maintain profit potential)
 
 # =============================================================================
 # EXIT RULES
 # =============================================================================
+# LESSON 001 (AVGO Jan 2026): Never hold spreads to expiration for max profit.
+# A 28-day winner became a -$200 loss by holding through final week.
+# =============================================================================
 exit:
-  # --- Profit Taking ---
+  # --- Profit Taking (% of MAX PROFIT, not debit paid) ---
+  # Max profit = spread width - debit paid
+  # Example: $5 spread, $3.50 debit → max profit = $1.50
   profit:
-    target_pct: 35 # Take profits at 35%
-    early_exit_pct: 50 # If hits 50%+ quickly, consider exit
+    # Tiered exit targets (choose based on conviction & time remaining)
+    min_acceptable_pct: 50 # Floor - always accept 50% of max profit
+    target_pct: 75 # Standard target - CLOSE HERE (Lesson 001)
+    greed_limit_pct: 80 # HARD CEILING - never hold past 80%
+
+    # Quick profit rules
+    early_exit_threshold_pct: 50 # If 50%+ in first 7 days, consider exit
+    early_exit_days: 7 # Window for early exit consideration
+
+    # CRITICAL: Max profit chasing is FORBIDDEN
+    # See: docs/lessons/001-holding-till-max-profit.md
+    never_chase_max_profit: true # Psychological reminder
+
     scale_out: false # Full exit (don't partial)
 
   # --- Stop Loss ---
   stop_loss:
-    max_loss_pct: 40 # Hard stop at -40%
+    max_loss_pct: 40 # Hard stop at -40% of debit
     time_stop_days: null # Optional: exit after N days regardless
 
-  # --- Time-Based ---
+  # --- Time-Based (CRITICAL - Lesson 001) ---
   time:
-    max_hold_days: 30 # Reassess if held this long
-    exit_before_expiry_days: 7 # Don't hold to expiration
+    max_hold_days: 25 # Start looking for exits
+
+    # GAMMA RISK ZONE - mandatory exit triggers
+    # Gamma explodes in final week, small moves = big P&L swings
+    gamma_risk_zone_dte: 7 # Enter danger zone at 7 DTE
+    forced_exit_dte: 5 # MANDATORY EXIT by 5 DTE regardless of P&L
+
+    # The rule: Close at 75% profit OR 5 DTE, WHICHEVER COMES FIRST
+    exit_rule: 'CLOSE_AT_75_OR_5DTE_FIRST'
 
   # --- Event-Based ---
   events:
     exit_before_earnings: true
     exit_on_major_news: true # Fed, CPI, etc.
+
+  # --- Pin Risk Warning ---
+  # If stock approaches short strike with >3 DTE, EXIT IMMEDIATELY
+  pin_risk:
+    enabled: true
+    cushion_warning_pct: 3 # Warn if cushion drops below 3%
+    cushion_exit_pct: 2 # Force exit if cushion drops below 2%
+    dte_threshold: 3 # Only applies within 3 DTE
 
 # =============================================================================
 # POSITION SIZING
@@ -299,3 +333,25 @@ validation:
 
   # Require human confirmation above this $ amount
   human_confirm_above: 500
+
+# =============================================================================
+# LESSONS LEARNED
+# =============================================================================
+# This config evolves based on real trading lessons. Each lesson that changes
+# a rule is documented here for context and accountability.
+# Full lesson details: docs/lessons/
+# =============================================================================
+lessons:
+  - id: '001'
+    title: "Don't Hold Spreads to Expiration for Max Profit"
+    date: '2026-01-23'
+    ticker: AVGO
+    cost: -200
+    rules_changed:
+      - 'exit.profit.target_pct: 35 → 75 (of max profit)'
+      - 'exit.profit.greed_limit_pct: NEW at 80%'
+      - 'exit.time.forced_exit_dte: NEW at 5 DTE'
+      - 'exit.pin_risk: NEW section added'
+    summary: |
+      Held winning spread for 28 days, lost $200 by holding to DTE.
+      Rule: Close at 75% profit OR 5 DTE, whichever comes first.

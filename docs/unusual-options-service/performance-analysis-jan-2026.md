@@ -6,27 +6,44 @@
 
 ---
 
+## ⚠️ Important Update (Jan 2026)
+
+**The PUT/CALL bias identified in this analysis has been REMOVED from the scoring
+system.** While the data showed PUTs outperforming CALLs during this period, this
+is **regime-dependent** and will change with market conditions.
+
+**What changed:**
+
+- Removed +0.15 PUT bonus and -0.15 CALL penalty from scoring
+- Classification system is now direction-agnostic
+- Focus on quality factors: premium size, moneyness, DTE
+- Win rates are tracked dynamically, not hardcoded
+
+**Why:** In a bullish market, CALL signals will outperform. Hardcoding bias from
+a bearish/sideways period = overfitting. The system should adapt to regimes.
+
+---
+
 ## Executive Summary
 
 The unusual options service has been actively detecting and storing signals.
-**Deep analysis reveals the critical success factor is option type (puts vs calls),
-NOT premium size or grade.**
+Analysis from this period revealed PUT signals outperformed CALLs, but this is
+**regime-dependent** and not a reliable permanent predictor.
 
-### Key Findings
+### Key Findings (Historical - Regime Dependent)
 
-| Factor           | Win Rate         | Insight                     |
-| ---------------- | ---------------- | --------------------------- |
-| **PUT signals**  | **60.0%**        | ✅ RELIABLE - These work!   |
-| CALL signals     | 8.6%             | ❌ Avoid or invert          |
-| PUT ATM 8-14 DTE | **61.5%**        | ✅ SWEET SPOT               |
-| PUT ITM 8-14 DTE | 56.2%            | ✅ Also strong              |
-| S-Grade          | 0%               | ❌ Grade system broken      |
-| B-Grade          | 26.5%            | Best grade (ironic)         |
-| Premium <$2M     | Similar to >$10M | Premium size doesn't matter |
+| Factor         | Win Rate | Status                               |
+| -------------- | -------- | ------------------------------------ |
+| PUT signals    | 60.0%    | ⚠️ Regime-dependent, not hardcoded   |
+| CALL signals   | 8.6%     | ⚠️ Regime-dependent, not hardcoded   |
+| ATM 8-14 DTE   | 61.5%    | ✅ Direction-agnostic sweet spot     |
+| ITM 8-14 DTE   | 56.2%    | ✅ Direction-agnostic quality factor |
+| Premium $5-10M | 24.6%    | ✅ Institutional conviction matters  |
+| Premium >$10M  | 21.9%    | ⚠️ Bigger isn't always better        |
 
-### Critical Insight
+### Critical Insight (Still Valid)
 
-**Premium size does NOT predict winners:**
+**Premium size does NOT linearly predict winners:**
 
 - <$2M: 0% (small sample)
 - $2-5M: 18.2%
@@ -37,23 +54,25 @@ NOT premium size or grade.**
 
 ---
 
-## Critical Findings
+## Historical Findings (Context Only)
 
-### 1. Option Type is THE Predictor
+### Option Type Performance (This Period)
 
 ```
-WIN RATE BY OPTION TYPE:
-├── PUTS:  60.0% win rate  ✅ RELIABLE
-└── CALLS:  8.6% win rate  ❌ AVOID
+WIN RATE BY OPTION TYPE (Nov 2025 - Jan 2026):
+├── PUTS:  60.0% win rate  (bearish/sideways market)
+└── CALLS:  8.6% win rate  (likely hedging/selling activity)
 ```
 
-**This is the single most important factor.** Puts work 7x better than calls.
+**IMPORTANT:** This was during a specific market regime. In a bull market,
+these numbers would likely flip. The system now tracks PUT/CALL performance
+dynamically without hardcoded bias.
 
-**Why calls fail:**
+**Why calls underperformed in this period:**
 
 - Many calls are being sold (not bought) - inverse interpretation
 - Premium flow doesn't distinguish buy vs sell side
-- Market bias doesn't fully explain 8.6% vs 60%
+- Bearish market regime punished bullish bets
 
 ### 2. Premium Size Does NOT Predict Winners
 
@@ -189,24 +208,35 @@ tickers work. This suggests we're detecting hedging/selling activity.
 
 ## Recommended Optimizations
 
-### Priority 1: Heavily Favor PUTs Over CALLs (IMPLEMENTED ✅)
+### Priority 1: Direction-Agnostic Scoring (UPDATED Jan 2026)
 
-**Data-Driven Insight**: PUTs have 60% win rate, CALLs have 8.6%.
+**Original Implementation**: PUT +0.15 bonus, CALL -0.15 penalty
 
-**Changes Made:**
+**Status**: ❌ REMOVED - This was regime-dependent overfitting.
+
+**Current Implementation (Direction-Agnostic):**
 
 ```python
-# In grader.py - conviction adjustment
-if signal.option_type == "put":
-    adjustment += 0.15  # Bonus for puts (they work!)
-    # Additional bonus for ATM puts 8-14 DTE (61.5% sweet spot)
-    if signal.moneyness == "ATM" and 8 <= dte <= 14:
-        adjustment += 0.10
-else:  # call
-    adjustment -= 0.15  # Heavy penalty (8.6% win rate)
-    if signal.moneyness == "OTM":
-        adjustment -= 0.08  # Additional OTM call penalty
+# In grader.py - conviction adjustment is now direction-agnostic
+# Premium size, moneyness, and DTE matter - NOT call vs put
+
+if signal.moneyness == "ATM":
+    adjustment += 0.08  # ATM = real directional conviction
+    if 8 <= dte <= 14:
+        adjustment += 0.05  # Sweet spot bonus
+
+elif signal.moneyness == "OTM":
+    price_diff_pct = abs(signal.strike - signal.underlying_price) / signal.underlying_price
+    if price_diff_pct > 0.10:  # >10% OTM
+        adjustment -= 0.12  # Lottery ticket penalty (both calls AND puts)
+    else:
+        adjustment -= 0.05  # Mild OTM penalty
+
+# NO PUT/CALL bias - market regimes change
 ```
+
+**Rationale**: Market regimes change. What worked in bearish Nov 2025 - Jan 2026
+won't work in a bull market. The system should adapt, not overfit.
 
 ### Priority 2: LOWER Premium Thresholds (IMPLEMENTED ✅)
 
@@ -285,35 +315,36 @@ This could help rehabilitate call signals if we can identify true buying.
 
 ---
 
-## Trading Strategy Based on Data
+## Trading Strategy (Direction-Agnostic)
 
-### HIGH CONVICTION PLAYS (Focus Here)
+### HIGH CONVICTION SETUPS (Direction-Agnostic)
 
-| Setup            | Win Rate | Sample Size | Action          |
-| ---------------- | -------- | ----------- | --------------- |
-| PUT ATM 8-14 DTE | 61.5%    | 26          | ✅ FOLLOW       |
-| PUT ITM 8-14 DTE | 56.2%    | 16          | ✅ FOLLOW       |
-| PUT ITM 0-7 DTE  | 100%     | 3           | ⚠️ Small sample |
+| Setup          | Historical Win Rate | Action                          |
+| -------------- | ------------------- | ------------------------------- |
+| ATM 8-14 DTE   | ~60%                | ✅ FOLLOW (both calls and puts) |
+| ITM 8-14 DTE   | ~56%                | ✅ FOLLOW (both calls and puts) |
+| Premium $5-10M | 24.6%               | ✅ Institutional conviction     |
 
-### AVOID
+### AVOID (Direction-Agnostic)
 
-| Setup           | Win Rate | Reason          |
-| --------------- | -------- | --------------- |
-| ANY CALL        | 8.6%     | Inverse signals |
-| >30 DTE         | 0%       | Too far out     |
-| S-Grade signals | 0%       | Grade broken    |
+| Setup          | Reason                                     |
+| -------------- | ------------------------------------------ |
+| Far OTM (>10%) | Lottery tickets - applies to both call/put |
+| >30 DTE        | Often hedging activity                     |
+| <$500K premium | Retail noise                               |
 
 ### ALERTS CONFIGURATION
 
-For Discord/notification alerts, focus on:
+For Discord/notification alerts, focus on quality factors:
 
 ```python
-# Alert criteria based on data
+# Alert criteria - direction-agnostic
 ALERT_CRITERIA = {
-    "option_type": "put",      # Only puts
-    "moneyness": ["ATM", "ITM"],  # Not OTM
-    "dte_range": (7, 21),      # Sweet spot
-    "min_premium": 500_000,    # $500K floor
+    # NO option_type filter - treat calls/puts equally
+    "moneyness": ["ATM", "ITM"],  # Not far OTM
+    "dte_range": (7, 21),         # Sweet spot
+    "min_premium": 500_000,       # $500K floor
+    "max_premium": 20_000_000,    # $20M cap (bigger isn't always better)
 }
 ```
 
@@ -365,49 +396,49 @@ ORDER BY grade, option_type;
 
 ### What We Learned
 
-The data analysis revealed a simple but powerful insight:
+The data analysis revealed important insights about signal quality:
 
-**PUT signals work (60% win rate). CALL signals don't (8.6%).**
+1. **Premium size doesn't linearly predict winners** - $5-10M range is optimal
+2. **ATM/ITM 8-14 DTE is the sweet spot** - applies to both calls and puts
+3. **Far OTM options are lottery tickets** - regardless of call or put
+4. **Market regime affects PUT/CALL performance** - don't hardcode bias
 
-Premium size, grade, and multi-factor detection are all secondary to this
-fundamental divide. The system was generating signals across both types equally,
-diluting the good PUT signals with bad CALL signals.
+### Changes Implemented (Final - Direction-Agnostic)
 
-### Changes Implemented
+| Change                       | Old   | New   | Rationale                       |
+| ---------------------------- | ----- | ----- | ------------------------------- |
+| Premium threshold (normal)   | $1M   | $500K | Capture more mid-range winners  |
+| Premium threshold (high-vol) | $5M   | $3M   | $5-10M range is sweet spot      |
+| ATM bonus                    | 0     | +0.08 | Real directional conviction     |
+| ATM 8-14 DTE bonus           | 0     | +0.05 | Sweet spot (direction-agnostic) |
+| Far OTM penalty              | 0     | -0.12 | Lottery tickets (both call/put) |
+| PUT/CALL bias                | ±0.15 | **0** | ❌ REMOVED - regime dependent   |
 
-| Change                       | Old  | New   | Rationale                      |
-| ---------------------------- | ---- | ----- | ------------------------------ |
-| Premium threshold (normal)   | $1M  | $500K | Capture more mid-range winners |
-| Premium threshold (high-vol) | $5M  | $3M   | $5-10M range is sweet spot     |
-| PUT score adjustment         | 0    | +0.15 | 60% win rate deserves boost    |
-| CALL score adjustment        | 0    | -0.15 | 8.6% win rate needs penalty    |
-| ATM PUT 8-14 DTE bonus       | 0    | +0.10 | 61.5% win rate sweet spot      |
-| Single-factor penalty        | 0.10 | 0.08  | Option type matters more       |
+### Direction-Agnostic Approach
 
-### Expected Outcomes
+The system no longer favors PUTs over CALLs. Instead, it focuses on:
 
-By focusing on PUT signals and lowering thresholds:
-
-- Overall win rate should improve from ~24% to >50%
-- PUT signals (now favored) will dominate high-grade alerts
-- More signals captured in the winning $5-10M range
-- CALL signals will receive lower grades, reducing false positives
+- **Quality factors**: Premium size, moneyness, DTE
+- **Institutional conviction**: Larger premium (but not too large)
+- **Actionable timeframes**: 8-21 DTE sweet spot
+- **Avoiding lottery tickets**: Penalize far OTM (both calls and puts)
 
 ### Simple Trading Rule
 
-Based on 60 days of data (200 classified signals):
+Based on analysis and regime awareness:
 
-> **Follow PUT signals, especially ATM/ITM with 8-14 DTE.**
-> **Ignore or invert CALL signals until order-side inference is implemented.**
+> **Follow ATM/ITM signals with 8-14 DTE and institutional premium.**
+> **Treat both CALLs and PUTs equally - market regimes change.**
+> **Use hedge_analyzer.py to filter likely hedging activity.**
 
 ### Monitoring
 
 Track these weekly:
 
-1. PUT vs CALL win rate ratio (target: >5x)
-2. ATM PUT 8-14 DTE win rate (target: >55%)
+1. Win rate by moneyness (target: ATM > OTM)
+2. Win rate by DTE bucket (target: 8-14d > others)
 3. Overall signal win rate (target: >40%)
-4. Grade accuracy (S should outperform B)
+4. PUT vs CALL performance ratio (track for regime detection, not bias)
 
 ---
 
@@ -416,22 +447,23 @@ Track these weekly:
 ### Completed ✅
 
 1. **SignalClassification enum** - Added to `storage/models.py`
-   - `HIGH_CONVICTION` - 60% win rate (PUT + ATM/ITM + 8-21 DTE)
-   - `MODERATE` - 40% win rate (PUT + other setups)
-   - `INFORMATIONAL` - 25% win rate (unclear direction)
-   - `LIKELY_HEDGE` - N/A (institutional hedging)
-   - `CONTRARIAN` - 9% win rate (CALL signals)
+   - `HIGH_CONVICTION` - ATM/ITM + 8-21 DTE + institutional size (direction-agnostic)
+   - `MODERATE` - ATM/ITM with reasonable parameters
+   - `INFORMATIONAL` - OTM or unclear direction
+   - `LIKELY_HEDGE` - N/A (institutional hedging patterns)
+   - `CONTRARIAN` - Far OTM lottery tickets
 
 2. **Classification fields** - Added to signal model
    - `signal_classification` - The classification value
    - `classification_reason` - Human-readable explanation
-   - `predicted_win_rate` - Historical win rate for this type
+   - `predicted_win_rate` - Now tracked dynamically (not hardcoded)
    - `classification_factors` - Contributing factors list
 
-3. **Classification logic** - Added to `scoring/grader.py`
-   - `_classify_signal()` - Main classification method
+3. **Classification logic** - Updated in `scoring/grader.py` (Direction-Agnostic)
+   - `_classify_signal()` - Main classification method (no PUT/CALL bias)
    - `_is_likely_hedge_pattern()` - Hedge detection
    - `_get_hedge_reason()` - Hedge explanation
+   - `_calculate_conviction_adjustment()` - Quality factors only (no call/put bias)
 
 4. **Database persistence** - Updated `storage/database.py`
    - Store classification fields on insert
@@ -440,15 +472,15 @@ Track these weekly:
 5. **Database migration** - Created SQL script
    - `scripts/migrations/001_add_classification_fields.sql`
 
-### Testing Results
+### Testing Results (Direction-Agnostic)
 
 ```
-NVDA PUT ATM 10d  → HIGH_CONVICTION (60%)
-AAPL PUT ITM 12d  → HIGH_CONVICTION (60%)
-TSLA PUT OTM 45d  → LIKELY_HEDGE (N/A)
-AMD CALL ATM 14d  → CONTRARIAN (9%)
-META CALL OTM 10d → CONTRARIAN (9%)
-SPY PUT OTM 30d   → LIKELY_HEDGE (N/A)
+NVDA PUT ATM 10d   → HIGH_CONVICTION (ATM + sweet spot DTE)
+AAPL PUT ITM 12d   → HIGH_CONVICTION (ITM + sweet spot DTE)
+TSLA PUT OTM 45d   → LIKELY_HEDGE (far-dated mega-cap)
+AMD CALL ATM 14d   → HIGH_CONVICTION (ATM + sweet spot DTE) ← Now treated equally
+META CALL OTM 10d  → INFORMATIONAL (OTM - speculative)
+SPY PUT OTM 30d    → LIKELY_HEDGE (index ETF put)
 ```
 
 ---

@@ -78,6 +78,7 @@ import {
 import { showDailyBriefing } from './commands/briefing.ts';
 import { createTradeCommand } from './commands/trade.ts';
 import { createPerformanceCommand } from './commands/performance.ts';
+import { checkSignalOutcomes } from './commands/signal-outcomes.ts';
 import { yahooProvider } from './providers/yahoo.ts';
 // import { getProxyStats, getCacheStats } from './providers/shared-yahoo.ts'; // Currently unused
 
@@ -733,6 +734,12 @@ program
     'Width preset: small ($2.5,$5), medium ($5,$10), large ($5,$10,$20), all',
     'medium'
   )
+  .option(
+    '--dte <days>',
+    'Target DTE - use 60+ for more cushion (default: 30)',
+    '30'
+  )
+  .option('--pop <percent>', 'Minimum PoP% (default: 70 strict, 55 relaxed)')
   .action(async (opts) => {
     const options: ScanSpreadsOptions = {
       list: opts.list,
@@ -742,6 +749,8 @@ program
       fromScan: opts.fromScan,
       minScore: parseInt(opts.minScore, 10),
       widths: opts.widths,
+      dte: parseInt(opts.dte, 10),
+      pop: opts.pop ? parseInt(opts.pop, 10) : undefined,
     };
 
     try {
@@ -1011,6 +1020,30 @@ program
       await showDailyBriefing({ verbose: opts.verbose });
     } catch (error) {
       logger.error(`Briefing failed: ${error}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * Signal Outcomes - check and update signal accuracy (for CI/CD)
+ */
+program
+  .command('signal-outcomes')
+  .description('Check and update signal outcomes for accuracy tracking')
+  .option('--min-age <days>', 'Minimum signal age to check (default: 7)', '7')
+  .option('--max-age <days>', 'Maximum signal age to check (default: 60)', '60')
+  .option('--dry-run', 'Check outcomes without updating database')
+  .option('-v, --verbose', 'Show detailed output including misses')
+  .action(async (opts) => {
+    try {
+      await checkSignalOutcomes({
+        minAgeDays: parseInt(opts.minAge, 10),
+        maxAgeDays: parseInt(opts.maxAge, 10),
+        dryRun: opts.dryRun ?? false,
+        verbose: opts.verbose ?? false,
+      });
+    } catch (error) {
+      logger.error(`Signal outcomes check failed: ${error}`);
       process.exit(1);
     }
   });

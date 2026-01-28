@@ -31,6 +31,30 @@ export interface MarketRegimeConfig {
   adjustments: RegimeAdjustments;
 }
 
+export interface SpreadParamsConfig {
+  dte: {
+    target: number;
+    min: number;
+    max: number;
+  };
+  strikes: {
+    long_strike_delta_min: number;
+    long_strike_delta_max: number;
+    short_strike_delta_min: number;
+    short_strike_delta_max: number;
+  };
+}
+
+export interface SpreadEntryConfig {
+  min_return_on_risk_pct: number;
+  preferred_ror_pct: number;
+  min_open_interest: number;
+  max_bid_ask_spread_pct: number;
+  min_pop_pct?: number;
+  min_debit_ratio_pct?: number;
+  max_debit_ratio_pct?: number;
+}
+
 export interface StrategyConfig {
   entry: {
     trend: {
@@ -49,7 +73,9 @@ export interface StrategyConfig {
       preferred_pct: number;
       excellent_pct: number;
     };
+    spread?: SpreadEntryConfig;
   };
+  spread_params?: SpreadParamsConfig;
   market_regime: {
     bull: MarketRegimeConfig;
     neutral: MarketRegimeConfig;
@@ -87,6 +113,28 @@ const DEFAULT_CONFIG: StrategyConfig = {
       minimum_pct: 7.0,
       preferred_pct: 10.0,
       excellent_pct: 15.0,
+    },
+    spread: {
+      min_return_on_risk_pct: 15,
+      preferred_ror_pct: 20,
+      min_open_interest: 50,
+      max_bid_ask_spread_pct: 5,
+      min_pop_pct: 60,
+      min_debit_ratio_pct: 55,
+      max_debit_ratio_pct: 80,
+    },
+  },
+  spread_params: {
+    dte: {
+      target: 30,
+      min: 21,
+      max: 45,
+    },
+    strikes: {
+      long_strike_delta_min: 0.7,
+      long_strike_delta_max: 0.85,
+      short_strike_delta_min: 0.5,
+      short_strike_delta_max: 0.6,
     },
   },
   market_regime: {
@@ -165,18 +213,39 @@ export function loadStrategyConfig(): StrategyConfig {
         const parsed = parse(content) as Partial<StrategyConfig>;
 
         // Merge with defaults to fill any missing fields
+        // Use type assertion since we're spreading defaults first (guaranteed all fields)
         cachedConfig = {
           ...DEFAULT_CONFIG,
           ...parsed,
           entry: {
             ...DEFAULT_CONFIG.entry,
             ...parsed.entry,
+            cushion: {
+              ...DEFAULT_CONFIG.entry.cushion,
+              ...(parsed.entry?.cushion ?? {}),
+            },
+            spread: {
+              ...DEFAULT_CONFIG.entry.spread!,
+              ...(parsed.entry?.spread ?? {}),
+            },
+          },
+          spread_params: {
+            ...DEFAULT_CONFIG.spread_params!,
+            ...(parsed.spread_params ?? {}),
+            dte: {
+              ...DEFAULT_CONFIG.spread_params!.dte,
+              ...(parsed.spread_params?.dte ?? {}),
+            },
+            strikes: {
+              ...DEFAULT_CONFIG.spread_params!.strikes,
+              ...(parsed.spread_params?.strikes ?? {}),
+            },
           },
           market_regime: {
             ...DEFAULT_CONFIG.market_regime,
-            ...parsed.market_regime,
+            ...(parsed.market_regime ?? {}),
           },
-        };
+        } as StrategyConfig;
 
         return cachedConfig;
       } catch (error) {
@@ -244,4 +313,44 @@ export function checkNoTradeConditions(
  */
 export function clearConfigCache(): void {
   cachedConfig = null;
+}
+
+/**
+ * Get spread scanner criteria from config
+ * Returns values suitable for the scan-spreads command
+ */
+export function getSpreadCriteria(): {
+  minCushion: number;
+  preferredCushion: number;
+  excellentCushion: number;
+  minReturn: number;
+  preferredReturn: number;
+  minOI: number;
+  minPoP: number;
+  minDebitRatio: number;
+  maxDebitRatio: number;
+  targetDTE: number;
+  minDTE: number;
+  maxDTE: number;
+  longDeltaMin: number;
+  longDeltaMax: number;
+} {
+  const config = loadStrategyConfig();
+
+  return {
+    minCushion: config.entry.cushion.minimum_pct,
+    preferredCushion: config.entry.cushion.preferred_pct,
+    excellentCushion: config.entry.cushion.excellent_pct,
+    minReturn: (config.entry.spread?.min_return_on_risk_pct ?? 15) / 100,
+    preferredReturn: (config.entry.spread?.preferred_ror_pct ?? 20) / 100,
+    minOI: config.entry.spread?.min_open_interest ?? 50,
+    minPoP: config.entry.spread?.min_pop_pct ?? 60,
+    minDebitRatio: (config.entry.spread?.min_debit_ratio_pct ?? 55) / 100,
+    maxDebitRatio: (config.entry.spread?.max_debit_ratio_pct ?? 80) / 100,
+    targetDTE: config.spread_params?.dte.target ?? 30,
+    minDTE: config.spread_params?.dte.min ?? 21,
+    maxDTE: config.spread_params?.dte.max ?? 45,
+    longDeltaMin: config.spread_params?.strikes.long_strike_delta_min ?? 0.7,
+    longDeltaMax: config.spread_params?.strikes.long_strike_delta_max ?? 0.85,
+  };
 }

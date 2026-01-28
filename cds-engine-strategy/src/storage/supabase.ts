@@ -282,6 +282,9 @@ export interface SignalData {
   spreadCushion: number | null;
   spreadPop: number | null;
   spreadReturn: number | null;
+  // Target tracking (for automatic outcome verification)
+  upsidePotential: number | null;
+  targetPrice: number | null;
 }
 
 /**
@@ -311,6 +314,8 @@ export async function saveSignal(signal: SignalData): Promise<string | null> {
       p_spread_pop: signal.spreadPop,
       p_spread_return: signal.spreadReturn,
       p_sector: signal.sector,
+      p_upside_potential: signal.upsidePotential,
+      p_target_price: signal.targetPrice,
     });
 
     if (error) {
@@ -910,6 +915,247 @@ export async function getPerformanceByRegime(): Promise<
     }));
   } catch (error) {
     logger.error(`Regime performance error: ${error}`);
+    return [];
+  }
+}
+
+// ============================================================
+// Signal Outcome Tracking (for CI/CD automation)
+// ============================================================
+
+export interface PendingSignal {
+  id: string;
+  ticker: string;
+  signalDate: string;
+  signalScore: number;
+  signalGrade: string;
+  regime: string | null;
+  priceAtSignal: number;
+  targetPrice: number | null;
+  upsidePotential: number | null;
+  maxPriceSeen: number | null;
+  maxGainPct: number | null;
+}
+
+/**
+ * Get pending signals that need outcome checking
+ * @param minAgeDays Minimum age of signal to check (default 7 days)
+ * @param maxAgeDays Maximum age to consider (default 60 days)
+ */
+export async function getPendingSignals(
+  minAgeDays = 7,
+  maxAgeDays = 60
+): Promise<PendingSignal[]> {
+  try {
+    const client = getClient();
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() - maxAgeDays);
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() - minAgeDays);
+
+    const { data, error } = await client
+      .from('cds_signals')
+      .select('*')
+      .eq('outcome_status', 'pending')
+      .gte('signal_date', minDate.toISOString().split('T')[0])
+      .lte('signal_date', maxDate.toISOString().split('T')[0])
+      .not('target_price', 'is', null)
+      .order('signal_date', { ascending: true });
+
+    if (error) {
+      logger.debug(`Failed to fetch pending signals: ${error.message}`);
+      return [];
+    }
+
+    return (data ?? []).map((d) => ({
+      id: d.id,
+      ticker: d.ticker,
+      signalDate: d.signal_date,
+      signalScore: d.signal_score,
+      signalGrade: d.signal_grade,
+      regime: d.regime,
+      priceAtSignal: d.price_at_signal,
+      targetPrice: d.target_price,
+      upsidePotential: d.upside_potential,
+      maxPriceSeen: d.max_price_seen,
+      maxGainPct: d.max_gain_pct,
+    }));
+  } catch (error) {
+    logger.debug(`Pending signals error: ${error}`);
+    return [];
+  }
+}
+
+/**
+ * Update signal outcome status
+ */
+export async function updateSignalOutcome(
+  signalId: string,
+  outcome: {
+    status: 'target_hit' | 'target_missed' | 'expired';
+    outcomeDate: Date;
+    outcomePrice: number;
+    maxPriceSeen: number;
+    maxGainPct: number;
+  }
+): Promise<boolean> {
+  try {
+    const client = getClient();
+
+    // Try RPC first, fall back to direct update
+    const { error: rpcError } = await client.rpc('update_signal_outcome', {
+      p_signal_id: signalId,
+      p_outcome_status: outcome.status,
+      p_outcome_date: outcome.outcomeDate.toISOString().split('T')[0],
+      p_outcome_price: outcome.outcomePrice,
+      p_max_price_seen: outcome.maxPriceSeen,
+      p_max_gain_pct: outcome.maxGainPct,
+    });
+
+    if (rpcError) {
+      // Fallback to direct update
+      const { error } = await client
+        .from('cds_signals')
+        .update({
+          outcome_status: outcome.status,
+          outcome_date: outcome.outcomeDate.toISOString().split('T')[0],
+          outcome_price: outcome.outcomePrice,
+          max_price_seen: outcome.maxPriceSeen,
+          max_gain_pct: outcome.maxGainPct,
+          last_updated_at: new Date().toISOString(),
+        })
+        .eq('id', signalId)
+        .eq('outcome_status', 'pending');
+
+      if (error) {
+        logger.debug(`Failed to update outcome: ${error.message}`);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logger.debug(`Outcome update error: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Get signal accuracy statistics by grade
+ */
+export async function getSignalAccuracy(): Promise<
+  Array<{
+    grade: string;
+    regime: string | null;
+    totalSignals: number;
+    hits: number;
+    misses: number;
+    pending: number;
+    accuracyPct: number | null;
+    avgDaysToTarget: number | null;
+    avgMaxGainPct: number | null;
+  }>
+> {
+  try {
+    const client = getClient();
+
+    // Try the view first
+    const { data: viewData, error: viewError } = await client
+      .from('cds_signal_accuracy')
+      .select('*');
+
+    if (!viewError && viewData) {
+      return viewData.map((d) => ({
+        grade: d.signal_grade,
+        regime: d.regime,
+        totalSignals: d.total_signals,
+        hits: d.hits,
+        misses: d.misses,
+        pending: d.pending,
+        accuracyPct: d.accuracy_pct,
+        avgDaysToTarget: d.avg_days_to_target,
+        avgMaxGainPct: d.avg_max_gain_pct,
+      }));
+    }
+
+    // Fallback: manual aggregation
+    const { data, error } = await client
+      .from('cds_signals')
+      .select('*')
+      .not('target_price', 'is', null);
+
+    if (error || !data) return [];
+
+    // Group by grade and regime
+    const groups = new Map<
+      string,
+      {
+        grade: string;
+        regime: string | null;
+        total: number;
+        hits: number;
+        misses: number;
+        pending: number;
+        daysToTarget: number[];
+        maxGains: number[];
+      }
+    >();
+
+    for (const d of data) {
+      const key = `${d.signal_grade}-${d.regime ?? 'unknown'}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          grade: d.signal_grade,
+          regime: d.regime,
+          total: 0,
+          hits: 0,
+          misses: 0,
+          pending: 0,
+          daysToTarget: [],
+          maxGains: [],
+        });
+      }
+      const g = groups.get(key)!;
+      g.total++;
+      if (d.outcome_status === 'target_hit') {
+        g.hits++;
+        if (d.days_to_outcome) g.daysToTarget.push(d.days_to_outcome);
+      } else if (d.outcome_status === 'target_missed') {
+        g.misses++;
+      } else {
+        g.pending++;
+      }
+      if (d.max_gain_pct) g.maxGains.push(d.max_gain_pct);
+    }
+
+    return Array.from(groups.values()).map((g) => ({
+      grade: g.grade,
+      regime: g.regime,
+      totalSignals: g.total,
+      hits: g.hits,
+      misses: g.misses,
+      pending: g.pending,
+      accuracyPct:
+        g.hits + g.misses > 0
+          ? Math.round((g.hits / (g.hits + g.misses)) * 1000) / 10
+          : null,
+      avgDaysToTarget:
+        g.daysToTarget.length > 0
+          ? Math.round(
+              (g.daysToTarget.reduce((a, b) => a + b, 0) /
+                g.daysToTarget.length) *
+                10
+            ) / 10
+          : null,
+      avgMaxGainPct:
+        g.maxGains.length > 0
+          ? Math.round(
+              (g.maxGains.reduce((a, b) => a + b, 0) / g.maxGains.length) * 1000
+            ) / 10
+          : null,
+    }));
+  } catch (error) {
+    logger.debug(`Accuracy query error: ${error}`);
     return [];
   }
 }

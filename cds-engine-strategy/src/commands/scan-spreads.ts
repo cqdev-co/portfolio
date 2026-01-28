@@ -2,17 +2,17 @@
  * Spread Scanner Command
  *
  * Scans tickers to find those with viable deep ITM call spreads
- * meeting our conservative criteria:
- * - Debit: 55-80% of width
- * - Cushion: ≥5%
- * - PoP: ≥70%
- * - Return: ≥20%
+ * meeting criteria from strategy.config.yaml:
+ * - Cushion: ≥7% (from entry.cushion.minimum_pct)
+ * - Return: ≥15% (from entry.spread.min_return_on_risk_pct)
+ * - DTE: 21-45 days (from spread_params.dte)
  *
  * Two-stage workflow:
  * 1. Run `bun run scan` to find technically sound stocks (ENTER decisions)
  * 2. Run `bun run scan-spreads --from-scan` to find viable spreads
  *
  * v1.9.0: Uses YahooProvider with proxy support to avoid rate limiting
+ * v2.8.0: Reads criteria from strategy.config.yaml
  */
 
 import chalk from 'chalk';
@@ -24,6 +24,7 @@ import {
 } from '../providers/tickers.ts';
 import { createClient } from '@supabase/supabase-js';
 import { yahooProvider } from '../providers/yahoo.ts';
+import { getSpreadCriteria } from '../config/strategy.ts';
 
 // Ticker lists
 const TICKER_LISTS: Record<string, string[]> = {
@@ -150,7 +151,7 @@ async function fetchEnterTickersFromScan(minScore = 70): Promise<string[]> {
   }
 }
 
-// Spread criteria (matches lib/ai-agent)
+// Spread criteria interface
 interface Criteria {
   minDebitRatio: number;
   maxDebitRatio: number;
@@ -162,38 +163,78 @@ interface Criteria {
   widths: number[]; // v2.6.0: Support multiple spread widths
 }
 
-const STRICT_CRITERIA: Criteria = {
-  minDebitRatio: 0.55, // Minimum debit as % of width
-  maxDebitRatio: 0.8, // Maximum debit as % of width
-  minCushion: 5, // Minimum % cushion
-  minPoP: 70, // Minimum probability of profit
-  minReturn: 0.2, // Minimum return on risk
-  targetDTE: 30, // Target days to expiration
-  minOI: 10, // Minimum open interest
-  widths: [5, 10], // Default widths
-};
+/**
+ * v2.8.0: Build criteria from strategy.config.yaml
+ * This ensures we follow the documented strategy rules
+ */
+function buildCriteriaFromConfig(): Criteria {
+  const configCriteria = getSpreadCriteria();
+
+  return {
+    minDebitRatio: configCriteria.minDebitRatio, // From config: 55%
+    maxDebitRatio: configCriteria.maxDebitRatio, // From config: 80%
+    minCushion: configCriteria.minCushion,
+    minPoP: configCriteria.minPoP,
+    minReturn: configCriteria.minReturn,
+    targetDTE: configCriteria.targetDTE,
+    minOI: configCriteria.minOI,
+    widths: [5, 10],
+  };
+}
 
 // Relaxed criteria for showing "close" setups
-const RELAXED_CRITERIA: Criteria = {
-  minDebitRatio: 0.5, // Slightly wider range
-  maxDebitRatio: 0.85,
-  minCushion: 3, // Lower cushion acceptable
-  minPoP: 60, // Lower PoP acceptable
-  minReturn: 0.15, // Lower return acceptable
-  targetDTE: 30,
-  minOI: 5,
-  widths: [2.5, 5, 10, 20], // v2.6.0: More width options in relaxed mode
-};
+function buildRelaxedCriteria(): Criteria {
+  const configCriteria = getSpreadCriteria();
 
-let CRITERIA = STRICT_CRITERIA;
+  return {
+    minDebitRatio: configCriteria.minDebitRatio - 0.1, // 10% below config
+    maxDebitRatio: configCriteria.maxDebitRatio + 0.1, // 10% above config
+    minCushion: Math.max(2, configCriteria.minCushion - 2), // 2% below config minimum
+    minPoP: Math.max(50, configCriteria.minPoP - 10), // 10% below config
+    minReturn: configCriteria.minReturn * 0.75, // 75% of config minimum
+    targetDTE: configCriteria.maxDTE, // Use max DTE from config
+    minOI: Math.max(5, Math.floor(configCriteria.minOI / 10)), // Relaxed OI
+    widths: [1, 2.5, 5, 10, 20], // Include all widths
+  };
+}
+
+// Active criteria (will be set at runtime from config)
+let CRITERIA: Criteria;
 
 // v2.6.0: Width presets for different account sizes
+// v2.7.0: Added $1 width for very low-priced stocks
 const WIDTH_PRESETS: Record<string, number[]> = {
-  small: [2.5, 5], // Small accounts ($1-5k)
-  medium: [5, 10], // Medium accounts ($5-25k)
+  small: [1, 2.5, 5], // Small accounts ($1-5k) - includes $1 for low-priced stocks
+  medium: [2.5, 5, 10], // Medium accounts ($5-25k)
   large: [5, 10, 20], // Large accounts ($25k+)
-  all: [2.5, 5, 10, 20], // Show all options
+  all: [1, 2.5, 5, 10, 20], // Show all options
 };
+
+/**
+ * v2.7.0: Get adaptive widths based on stock price
+ * Lower-priced stocks need smaller widths to be viable
+ * Always includes smaller widths for flexibility
+ */
+function getAdaptiveWidths(price: number, baseWidths: number[]): number[] {
+  // Start with base widths and add smaller ones for lower-priced stocks
+  const allWidths = new Set(baseWidths);
+
+  if (price < 10) {
+    // Very low-priced: add $1, $2.5 widths, filter out anything > $5
+    allWidths.add(1);
+    allWidths.add(2.5);
+    return [...allWidths].filter((w) => w <= 5).sort((a, b) => a - b);
+  } else if (price < 25) {
+    // Low-priced: add $2.5, use up to $5
+    allWidths.add(2.5);
+    return [...allWidths].filter((w) => w <= 5).sort((a, b) => a - b);
+  } else if (price < 75) {
+    // Medium-priced: use up to $10
+    return [...allWidths].filter((w) => w <= 10).sort((a, b) => a - b);
+  }
+  // High-priced: use all configured widths
+  return [...allWidths].sort((a, b) => a - b);
+}
 
 interface SpreadResult {
   ticker: string;
@@ -292,12 +333,63 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
       return result;
     }
 
-    // Look for deep ITM calls (6-12% ITM)
-    const minITM = price * 0.88;
-    const maxITM = price * 0.94;
-
     // Sort by strike
     const sortedCalls = [...calls].sort((a, b) => a.strike - b.strike);
+
+    // v2.7.1: Much wider ITM range - any ITM strike is acceptable
+    // The cushion check will filter out strikes that are too close to ATM
+    // For deep ITM spreads, we want delta > 0.7 which means roughly 5%+ ITM
+    let itmLowPct: number;
+    let itmHighPct: number;
+
+    if (price < 15) {
+      // Very low-priced: 3-25% ITM (very wide range)
+      itmLowPct = 0.75;
+      itmHighPct = 0.97;
+    } else if (price < 50) {
+      // Low-priced: 3-20% ITM
+      itmLowPct = 0.8;
+      itmHighPct = 0.97;
+    } else if (price < 150) {
+      // Medium-priced: 3-15% ITM
+      itmLowPct = 0.85;
+      itmHighPct = 0.97;
+    } else {
+      // High-priced: 3-12% ITM
+      itmLowPct = 0.88;
+      itmHighPct = 0.97;
+    }
+
+    const minITM = price * itmLowPct;
+    const maxITM = price * itmHighPct;
+
+    // v2.7.0: Get adaptive widths based on stock price
+    const adaptiveWidths = getAdaptiveWidths(price, CRITERIA.widths);
+
+    // v2.7.0: Log available strikes in verbose mode
+    logger.debug(
+      `  ${ticker}: Price $${price.toFixed(2)}, ITM range $${minITM.toFixed(2)}-$${maxITM.toFixed(2)}, widths: $${adaptiveWidths.join('/$')}`
+    );
+    logger.debug(
+      `  ${ticker}: Available strikes: ${sortedCalls.map((c) => `$${c.strike}`).join(', ')}`
+    );
+
+    // v2.7.0: Track rejection reasons for diagnostics
+    const rejectionStats = {
+      notInITMRange: 0,
+      lowOI: 0,
+      noShortStrike: 0,
+      debitTooHigh: 0,
+      debitTooLow: 0,
+      invalidDebit: 0,
+      lowCushion: 0,
+      lowReturn: 0,
+      lowPoP: 0,
+      evaluated: 0,
+    };
+
+    // v2.7.0: Relaxed OI requirement for low-priced stocks
+    const minOI = price < 15 ? Math.min(5, CRITERIA.minOI) : CRITERIA.minOI;
 
     // Find viable spreads
     let bestSpread: {
@@ -310,18 +402,44 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
       returnPct: number;
     } | null = null;
 
+    // v2.7.0: Track best near-miss for diagnostics
+    let bestNearMiss: {
+      long: number;
+      short: number;
+      debit: number;
+      width: number;
+      cushion: number;
+      pop: number;
+      returnPct: number;
+      failReason: string;
+    } | null = null;
+
     for (const longCall of sortedCalls) {
       // Must be in ITM range
-      if (longCall.strike < minITM || longCall.strike > maxITM) continue;
+      if (longCall.strike < minITM || longCall.strike > maxITM) {
+        rejectionStats.notInITMRange++;
+        continue;
+      }
       // Must have liquidity
-      if ((longCall.openInterest || 0) < CRITERIA.minOI) continue;
+      if ((longCall.openInterest || 0) < minOI) {
+        rejectionStats.lowOI++;
+        continue;
+      }
 
-      // v2.6.0: Try all configured widths
-      for (const width of CRITERIA.widths) {
+      // v2.7.0: Try adaptive widths based on stock price
+      for (const width of adaptiveWidths) {
         const shortStrike = longCall.strike + width;
         const shortCall = sortedCalls.find((c) => c.strike === shortStrike);
-        if (!shortCall) continue;
-        if ((shortCall.openInterest || 0) < 5) continue;
+        if (!shortCall) {
+          rejectionStats.noShortStrike++;
+          continue;
+        }
+        if ((shortCall.openInterest || 0) < 5) {
+          rejectionStats.lowOI++;
+          continue;
+        }
+
+        rejectionStats.evaluated++;
 
         // Calculate market debit
         const marketDebit = (longCall.ask || 0) - (shortCall.bid || 0);
@@ -334,7 +452,13 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
 
         let debit: number | null = null;
         if (marketDebit > 0 && isFinite(marketDebit)) {
-          if (marketRatio > CRITERIA.maxDebitRatio) continue;
+          if (marketRatio > CRITERIA.maxDebitRatio) {
+            rejectionStats.debitTooHigh++;
+            logger.debug(
+              `    ${ticker} $${longCall.strike}/$${shortStrike}: Debit too high - $${marketDebit.toFixed(2)} (${(marketRatio * 100).toFixed(0)}% > ${CRITERIA.maxDebitRatio * 100}%)`
+            );
+            continue;
+          }
           if (
             marketRatio >= CRITERIA.minDebitRatio &&
             marketRatio <= CRITERIA.maxDebitRatio
@@ -342,11 +466,17 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
             debit = marketDebit;
           } else if (marketRatio < CRITERIA.minDebitRatio && midDebit > 0) {
             debit = midDebit * 1.1;
-            if (debit / width > CRITERIA.maxDebitRatio) continue;
+            if (debit / width > CRITERIA.maxDebitRatio) {
+              rejectionStats.debitTooLow++;
+              continue;
+            }
           }
         }
 
-        if (!debit) continue;
+        if (!debit) {
+          rejectionStats.invalidDebit++;
+          continue;
+        }
 
         // Calculate metrics
         const breakeven = longCall.strike + debit;
@@ -354,15 +484,71 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
         const maxProfit = width - debit;
         const returnOnRisk = maxProfit / debit;
 
-        // Check cushion and return
-        if (cushion < CRITERIA.minCushion) continue;
-        if (returnOnRisk < CRITERIA.minReturn) continue;
-
-        // Calculate PoP
+        // Calculate PoP early so we can track near-misses
         const iv = longCall.impliedVolatility || 0.3;
         const pop = calculatePoP(price, breakeven, iv, dte);
 
-        if (pop < CRITERIA.minPoP) continue;
+        // Track this as a potential near-miss before checking criteria
+        const spreadCandidate = {
+          long: longCall.strike,
+          short: shortStrike,
+          debit,
+          width,
+          cushion,
+          pop,
+          returnPct: returnOnRisk * 100,
+        };
+
+        // Check cushion and return
+        if (cushion < CRITERIA.minCushion) {
+          rejectionStats.lowCushion++;
+          logger.debug(
+            `    ${ticker} $${longCall.strike}/$${shortStrike}: Low cushion - ${cushion.toFixed(1)}% < ${CRITERIA.minCushion}% (BE: $${breakeven.toFixed(2)}, price: $${price.toFixed(2)})`
+          );
+          // Track as near-miss if cushion is close (within 3%)
+          if (
+            cushion >= CRITERIA.minCushion - 3 &&
+            (!bestNearMiss || cushion > bestNearMiss.cushion)
+          ) {
+            bestNearMiss = {
+              ...spreadCandidate,
+              failReason: `cushion ${cushion.toFixed(1)}%`,
+            };
+          }
+          continue;
+        }
+        if (returnOnRisk < CRITERIA.minReturn) {
+          rejectionStats.lowReturn++;
+          logger.debug(
+            `    ${ticker} $${longCall.strike}/$${shortStrike}: Low return - ${(returnOnRisk * 100).toFixed(0)}% < ${CRITERIA.minReturn * 100}%`
+          );
+          // Track as near-miss
+          if (!bestNearMiss || cushion > bestNearMiss.cushion) {
+            bestNearMiss = {
+              ...spreadCandidate,
+              failReason: `return ${(returnOnRisk * 100).toFixed(0)}%`,
+            };
+          }
+          continue;
+        }
+
+        if (pop < CRITERIA.minPoP) {
+          rejectionStats.lowPoP++;
+          logger.debug(
+            `    ${ticker} $${longCall.strike}/$${shortStrike}: Low PoP - ${pop.toFixed(0)}% < ${CRITERIA.minPoP}%`
+          );
+          // Track as near-miss if PoP is close (within 10%)
+          if (
+            pop >= CRITERIA.minPoP - 10 &&
+            (!bestNearMiss || cushion > bestNearMiss.cushion)
+          ) {
+            bestNearMiss = {
+              ...spreadCandidate,
+              failReason: `PoP ${pop.toFixed(0)}%`,
+            };
+          }
+          continue;
+        }
 
         // Found a viable spread!
         if (!bestSpread || cushion > bestSpread.cushion) {
@@ -390,7 +576,65 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
       result.viable = true;
       result.reason = '✅ Viable';
     } else {
-      result.reason = 'No spread meets criteria';
+      // v2.7.0: Better diagnostic for why no spread was found
+      const itmCalls = sortedCalls.filter(
+        (c) => c.strike >= minITM && c.strike <= maxITM
+      );
+
+      // Build detailed reason
+      if (rejectionStats.evaluated === 0) {
+        if (itmCalls.length === 0) {
+          const closestStrike =
+            sortedCalls.length > 0
+              ? sortedCalls.reduce((closest, c) => {
+                  const targetMid = (minITM + maxITM) / 2;
+                  return Math.abs(c.strike - targetMid) <
+                    Math.abs(closest.strike - targetMid)
+                    ? c
+                    : closest;
+                }, sortedCalls[0]!)
+              : undefined;
+          result.reason = `No ITM strikes ($${minITM.toFixed(0)}-$${maxITM.toFixed(0)}), closest: $${closestStrike?.strike}`;
+        } else if (rejectionStats.lowOI > 0) {
+          result.reason = `Low OI on ${rejectionStats.lowOI} strikes (need ${minOI}+)`;
+        } else if (rejectionStats.noShortStrike > 0) {
+          result.reason = `No short strikes at $${adaptiveWidths.join('/$')} widths`;
+        } else {
+          result.reason = 'No spreads to evaluate';
+        }
+      } else {
+        // We evaluated spreads but all failed criteria
+        const failures: string[] = [];
+        if (rejectionStats.debitTooHigh > 0)
+          failures.push(
+            `debit>${CRITERIA.maxDebitRatio * 100}%: ${rejectionStats.debitTooHigh}`
+          );
+        if (rejectionStats.lowCushion > 0)
+          failures.push(
+            `cushion<${CRITERIA.minCushion}%: ${rejectionStats.lowCushion}`
+          );
+        if (rejectionStats.lowPoP > 0)
+          failures.push(`PoP<${CRITERIA.minPoP}%: ${rejectionStats.lowPoP}`);
+        if (rejectionStats.lowReturn > 0)
+          failures.push(
+            `return<${CRITERIA.minReturn * 100}%: ${rejectionStats.lowReturn}`
+          );
+        if (rejectionStats.invalidDebit > 0)
+          failures.push(`bad debit: ${rejectionStats.invalidDebit}`);
+        result.reason = `${rejectionStats.evaluated} spreads failed: ${failures.join(', ')}`;
+      }
+
+      logger.debug(`  ${ticker}: ${result.reason}`);
+      logger.debug(
+        `    Stats: ITM=${itmCalls.length}, evaluated=${rejectionStats.evaluated}, noShort=${rejectionStats.noShortStrike}, highDebit=${rejectionStats.debitTooHigh}, lowCushion=${rejectionStats.lowCushion}, lowPoP=${rejectionStats.lowPoP}`
+      );
+
+      // v2.7.0: Show best near-miss if we evaluated any spreads
+      if (bestNearMiss) {
+        logger.debug(
+          `    Near-miss: $${bestNearMiss.long}/$${bestNearMiss.short} ($${bestNearMiss.width}w) - debit $${bestNearMiss.debit.toFixed(2)}, cushion ${bestNearMiss.cushion.toFixed(1)}%, PoP ${bestNearMiss.pop.toFixed(0)}%, return ${bestNearMiss.returnPct.toFixed(0)}% [FAILED: ${bestNearMiss.failReason}]`
+        );
+      }
     }
 
     return result;
@@ -408,17 +652,39 @@ export interface ScanSpreadsOptions {
   fromScan?: boolean; // Use tickers from today's scan (ENTER decisions)
   minScore?: number; // Minimum score for --from-scan (default: 70)
   widths?: string; // v2.6.0: Width preset (small, medium, large, all) or comma-separated
+  dte?: number; // v2.7.1: Target DTE (default: 30, use 60+ for more cushion)
+  pop?: number; // v2.7.1: Minimum PoP override (default: 70 strict, 55 relaxed)
 }
 
 /**
  * Main scan-spreads command
  * v2.6.0: Added width presets support
+ * v2.7.1: Added DTE option for longer-dated spreads with more cushion
+ * v2.8.0: Reads criteria from strategy.config.yaml
  */
 export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   logger.setVerbose(options.verbose ?? false);
 
-  // Set criteria based on mode
-  CRITERIA = options.relaxed ? RELAXED_CRITERIA : STRICT_CRITERIA;
+  // v2.8.0: Set criteria based on mode (config values vs relaxed)
+  CRITERIA = options.relaxed
+    ? buildRelaxedCriteria()
+    : buildCriteriaFromConfig();
+
+  // v2.7.1: Override DTE if specified (otherwise use config)
+  if (options.dte) {
+    CRITERIA = { ...CRITERIA, targetDTE: options.dte };
+  }
+
+  // v2.7.1: Override PoP if specified
+  if (options.pop) {
+    CRITERIA = { ...CRITERIA, minPoP: options.pop };
+  }
+
+  // Log config source
+  logger.debug(`Loaded criteria from strategy.config.yaml:`);
+  logger.debug(
+    `  cushion: ${CRITERIA.minCushion}% | return: ${(CRITERIA.minReturn * 100).toFixed(0)}% | DTE: ${CRITERIA.targetDTE} | OI: ${CRITERIA.minOI}`
+  );
 
   // v2.6.0: Handle width option
   if (options.widths) {
@@ -492,12 +758,13 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
   console.log();
   console.log(chalk.bold.cyan('  🔍 Deep ITM Spread Scanner'));
   console.log(chalk.gray(`  Source: ${sourceDescription}`));
+  console.log(chalk.gray('  Config: strategy.config.yaml'));
   if (options.relaxed) {
     console.log(
       chalk.yellow('  Mode: RELAXED (showing close-to-viable setups)')
     );
   } else {
-    console.log(chalk.gray('  Mode: STRICT (conservative criteria)'));
+    console.log(chalk.green('  Mode: STRICT (from strategy.config.yaml)'));
   }
   console.log();
   console.log(chalk.gray('  Criteria:'));
@@ -506,12 +773,27 @@ export async function scanSpreads(options: ScanSpreadsOptions): Promise<void> {
       `    • Debit: ${(CRITERIA.minDebitRatio * 100).toFixed(0)}-${(CRITERIA.maxDebitRatio * 100).toFixed(0)}% of width`
     )
   );
-  console.log(chalk.gray(`    • Cushion: ≥${CRITERIA.minCushion}%`));
+  console.log(
+    chalk.gray(
+      `    • Cushion: ≥${CRITERIA.minCushion}% (config: entry.cushion.minimum_pct)`
+    )
+  );
   console.log(chalk.gray(`    • PoP: ≥${CRITERIA.minPoP}%`));
   console.log(
-    chalk.gray(`    • Return: ≥${(CRITERIA.minReturn * 100).toFixed(0)}%`)
+    chalk.gray(
+      `    • Return: ≥${(CRITERIA.minReturn * 100).toFixed(0)}% (config: entry.spread.min_return_on_risk_pct)`
+    )
   );
-  console.log(chalk.gray(`    • Target DTE: ~${CRITERIA.targetDTE} days`));
+  console.log(
+    chalk.gray(
+      `    • Target DTE: ~${CRITERIA.targetDTE} days (config: spread_params.dte)`
+    )
+  );
+  console.log(
+    chalk.gray(
+      `    • Min OI: ${CRITERIA.minOI} (config: entry.spread.min_open_interest)`
+    )
+  );
   // v2.6.0: Show widths being scanned
   console.log(chalk.gray(`    • Widths: $${CRITERIA.widths.join(', $')}`));
   console.log();

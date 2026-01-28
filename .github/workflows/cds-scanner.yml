@@ -1,0 +1,190 @@
+name: CDS Engine Scanner
+
+on:
+  schedule:
+    # Morning briefing - 9:00 AM ET (Mon-Fri)
+    - cron: '0 14 * * 1-5' # 9:00 AM EDT (14:00 UTC)
+
+    # Opportunity scans during market hours (Mon-Fri)
+    - cron: '0 15 * * 1-5' # 10:00 AM EDT (15:00 UTC)
+    - cron: '0 18 * * 1-5' # 1:00 PM EDT (18:00 UTC)
+    - cron: '30 19 * * 1-5' # 3:30 PM EDT (19:30 UTC)
+
+    # Weekly report - Sunday 6 PM ET
+    - cron: '0 23 * * 0' # Sunday 6 PM EDT (23:00 UTC)
+
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Job to run'
+        required: false
+        default: 'scan'
+        type: choice
+        options:
+          - briefing
+          - scan
+          - scan_universe
+          - signal_outcomes
+          - weekly_report
+      min_score:
+        description: 'Minimum score for scan (default: 70)'
+        required: false
+        default: '70'
+        type: string
+      dry_run:
+        description: 'Dry run (no database updates)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  BUN_VERSION: '1.1.38'
+
+jobs:
+  cds-scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            cds-engine-strategy/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('cds-engine-strategy/bun.lockb', 'cds-engine-strategy/package.json') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: cds-engine-strategy
+        run: bun install
+
+      # ============================================================
+      # Morning Briefing (9:00 AM ET or manual)
+      # ============================================================
+      - name: Run morning briefing
+        if: |
+          github.event.inputs.job_type == 'briefing' ||
+          github.event.schedule == '0 14 * * 1-5'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📅 Morning Briefing - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          bun run briefing --verbose
+
+      # ============================================================
+      # Opportunity Scan (market hours or manual)
+      # ============================================================
+      - name: Run opportunity scan
+        if: |
+          github.event.inputs.job_type == 'scan' ||
+          github.event.schedule == '0 15 * * 1-5' ||
+          github.event.schedule == '0 18 * * 1-5' ||
+          github.event.schedule == '30 19 * * 1-5'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🔍 Opportunity Scan - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          MIN_SCORE="${{ github.event.inputs.min_score || '70' }}"
+
+          # Run scan with summary mode and store results
+          bun run scan-all --summary --min-score "$MIN_SCORE" --store
+
+      # ============================================================
+      # Universe Scan (manual only - resource intensive)
+      # ============================================================
+      - name: Run full universe scan
+        if: github.event.inputs.job_type == 'scan_universe'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🌐 Full Universe Scan - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          bun run scan-universe --store
+
+      # ============================================================
+      # Signal Outcomes Check (manual)
+      # ============================================================
+      - name: Check signal outcomes
+        if: github.event.inputs.job_type == 'signal_outcomes'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📊 Signal Outcomes Check - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          DRY_RUN_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          bun run signal-outcomes --verbose $DRY_RUN_FLAG
+
+      # ============================================================
+      # Weekly Report (Sunday 6 PM ET)
+      # ============================================================
+      - name: Run weekly report
+        if: |
+          github.event.inputs.job_type == 'weekly_report' ||
+          github.event.schedule == '0 23 * * 0'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📈 Weekly Report - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          echo ""
+
+          echo "=== Signal Outcomes (checking 7-60 day old signals) ==="
+          bun run signal-outcomes --verbose
+          echo ""
+
+          echo "=== Performance Summary ==="
+          bun run performance
+          echo ""
+
+          echo "=== Top Opportunities (Universe Scan) ==="
+          bun run scan-db --min-score 75 --limit 20 --summary
+
+      # ============================================================
+      # Discord Notifications (future enhancement)
+      # ============================================================
+      - name: Send Discord notification
+        if: |
+          always() &&
+          (github.event.schedule == '0 14 * * 1-5' ||
+           github.event.schedule == '0 23 * * 0')
+        continue-on-error: true
+        env:
+          DISCORD_CDS_WEBHOOK_URL: ${{ secrets.DISCORD_CDS_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_CDS_WEBHOOK_URL" ]; then
+            JOB_STATUS="${{ job.status }}"
+            if [ "$JOB_STATUS" == "success" ]; then
+              EMOJI="✅"
+            else
+              EMOJI="❌"
+            fi
+            
+            curl -H "Content-Type: application/json" \
+              -d "{\"content\": \"$EMOJI CDS Scanner completed: $JOB_STATUS\"}" \
+              "$DISCORD_CDS_WEBHOOK_URL"
+          fi

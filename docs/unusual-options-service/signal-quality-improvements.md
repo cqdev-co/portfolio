@@ -4,41 +4,64 @@
 
 Based on analysis of signals over multiple weeks, several improvements were made.
 
-### Latest Update: Performance-Based Filtering (Dec 20)
+### Latest Update: Direction-Agnostic Scoring (Jan 2026)
 
-After one week of collecting signals with the new algorithm, we analyzed actual
-performance and made further refinements.
+**Important change**: We removed PUT/CALL bias from the scoring system.
 
-#### Performance Analysis Results
+#### Why Direction-Agnostic?
 
-| Segment                    | Win Rate  | Avg Return | Action                |
-| -------------------------- | --------- | ---------- | --------------------- |
-| **Mid DTE CALLS (11-21d)** | **60.0%** | +0.83%     | ✅ EDGE - Focus here  |
-| Short DTE CALLS (≤10d)     | 27.3%     | -0.43%     | ❌ NOISE - Filtered   |
-| All PUT signals            | 16.7%     | +1.23%\*   | ❌ HEDGING - Excluded |
+Market regimes change. Historical win rates from a specific period (e.g., Jan 2026
+showing 60% PUT win rate vs 8.6% CALL win rate) are regime-dependent:
 
-\*PUTs showed inverse returns: stock went UP when PUTs were detected (hedging)
+- In bearish periods, PUT signals outperform
+- In bullish periods, CALL signals outperform
+- Hardcoding bias = overfitting to recent conditions
 
-#### Key Findings
+The system now scores signals based on **direction-agnostic quality factors**:
 
-1. **PUT signals are 73% hedging activity** - Excluded by default
-2. **Short DTE (≤10d) = noise** - Filtered out (27% win rate)
-3. **Mid DTE (11-21d) = edge** - 60% win rate, focus here
-4. **TSLA dominated but underperformed** - Capped to 3 signals
+1. **Premium size** - Institutional conviction (larger = higher quality)
+2. **Moneyness** - ATM = real conviction, far OTM = lottery tickets
+3. **DTE** - 8-21 DTE sweet spot for directional plays
+4. **Multi-factor detection** - Multiple signals > single factor
 
-#### New Filter Settings
+#### Current Filter Settings
 
 ```python
 MIN_DTE_ALL_TICKERS = 10        # Filter all < 10 DTE
 MIN_DTE_HIGH_0DTE_TICKERS = 14  # Filter TSLA/SPY < 14 DTE
-EXCLUDE_PUT_SIGNALS = False     # Keep PUTs - they may be edge in bearish weeks
+EXCLUDE_PUT_SIGNALS = False     # Keep both - market regimes change
 FLAG_LIKELY_HEDGES = True       # Flag hedges instead of excluding
 MAX_SIGNALS_PER_TICKER = 3      # Prevent single ticker domination
 ```
 
-**Note**: We don't exclude PUTs by default. Market conditions vary - in bearish
-weeks, PUT signals could be the edge. Use `hedge_analyzer.py` to filter hedges
-when analyzing, and track CALL vs PUT performance separately over time.
+**Note**: We treat CALLs and PUTs equally. Use `hedge_analyzer.py` to filter
+likely hedging activity, but don't assume one direction is "better" than the
+other - that changes with market conditions.
+
+---
+
+### Previous Update: Performance-Based Filtering (Dec 20)
+
+After one week of collecting signals with the new algorithm, we analyzed actual
+performance and made further refinements.
+
+#### Performance Analysis Results (Historical - Regime Dependent)
+
+| Segment              | Win Rate  | Avg Return | Note                         |
+| -------------------- | --------- | ---------- | ---------------------------- |
+| **Mid DTE (11-21d)** | **60.0%** | +0.83%     | Sweet spot - applies to both |
+| Short DTE (≤10d)     | 27.3%     | -0.43%     | Filtered (noise)             |
+| Hedge patterns       | N/A       | N/A        | Flagged, not directional     |
+
+**Note**: These results were from a specific market period. Don't assume they
+apply universally.
+
+#### Key Findings (Direction-Agnostic)
+
+1. **Short DTE (≤10d) = noise** - Filtered out (applies to both calls and puts)
+2. **Mid DTE (11-21d) = edge** - Better signal quality
+3. **TSLA dominated but underperformed** - Capped to 3 signals
+4. **Hedge patterns flagged** - Use hedge_analyzer.py to filter
 
 ---
 

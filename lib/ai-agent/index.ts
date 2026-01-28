@@ -52,6 +52,7 @@ export {
   DATA_RULES,
   RESPONSE_STYLE,
   buildKeyRules,
+  buildTradingStrategy,
 
   // Position analysis prompts
   buildPositionAnalysisPrompt,
@@ -357,6 +358,7 @@ export {
   gradeTradeOpportunity,
   gradeAtLeast,
   GRADE_RUBRIC,
+  getGradeRubric,
 
   // Risk scoring
   calculateRiskScore,
@@ -405,3 +407,48 @@ export {
   // Logger (DEBUG mode support)
   log,
 } from './utils';
+
+// ============================================================================
+// STRATEGY CONFIG (Single Source of Truth)
+// ============================================================================
+
+export {
+  // Main config loader
+  getStrategyConfig,
+  clearConfigCache,
+  setConfigPath,
+
+  // Section getters
+  getEntryConfig,
+  getExitConfig,
+  getPositionSizingConfig,
+  getSpreadParamsConfig,
+  getRiskManagementConfig,
+  getMarketRegimeConfig,
+  getLessonsLearned,
+
+  // Position size helpers
+  getMaxPositionSize,
+  getSpreadWidth,
+
+  // Exit rule helpers
+  shouldCloseOnProfit,
+  shouldCloseOnDTE,
+  checkPinRisk,
+  getExitRecommendation,
+
+  // Entry validation helpers
+  isRSIValid,
+  isCushionValid,
+  isEarningsSafe,
+
+  // Types
+  type StrategyConfig,
+  type EntryConfig,
+  type ExitConfig,
+  type PositionSizingConfig,
+  type SpreadParamsConfig,
+  type RiskManagementConfig,
+  type MarketRegimeConfig,
+  type LessonReference,
+} from './config';
