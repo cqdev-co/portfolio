@@ -24,6 +24,14 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
+import { validateStrategyConfig } from './schema';
+
+// Re-export schema validation utilities
+export {
+  strategyConfigSchema,
+  validateStrategyConfig,
+  assertValidStrategyConfig,
+} from './schema';
 
 // ============================================================================
 // TYPES
@@ -329,7 +337,20 @@ export function getStrategyConfig(forceReload = false): StrategyConfig {
   }
 
   const yaml = readFileSync(configPath, 'utf-8');
-  cachedConfig = parseYaml(yaml) as StrategyConfig;
+  const parsed = parseYaml(yaml);
+
+  // Validate config at load time to fail fast on bad config
+  const result = validateStrategyConfig(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
+    throw new Error(
+      `Invalid strategy.config.yaml:\n${issues}\n\nFix the config file before continuing.`
+    );
+  }
+
+  cachedConfig = parsed as StrategyConfig;
 
   return cachedConfig;
 }

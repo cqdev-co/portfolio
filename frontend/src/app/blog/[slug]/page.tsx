@@ -8,7 +8,7 @@ import BlurFade from '@/components/magicui/blur-fade';
 import { Clock } from 'lucide-react';
 import TableOfContents from '@/components/toc';
 import CodeBlockEnhancer from '@/components/code-block';
-import { BlogPostSchema } from '@/components/schema';
+import { BlogPostSchema, BreadcrumbSchema } from '@/components/schema';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { globalComponents } from '@/components/mdx';
@@ -83,6 +83,16 @@ export default async function Blog({
         slug={post.slug}
         publishedAt={post.metadata.publishedAt as string}
         updatedAt={post.metadata.updatedAt as string | undefined}
+      />
+      <BreadcrumbSchema
+        items={[
+          { name: 'Home', url: 'https://conorq.com' },
+          { name: 'Blog', url: 'https://conorq.com/blog' },
+          {
+            name: post.metadata.title as string,
+            url: `https://conorq.com/blog/${post.slug}`,
+          },
+        ]}
       />
 
       <CodeBlockEnhancer />

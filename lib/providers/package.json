@@ -1,0 +1,27 @@
+{
+  "name": "@portfolio/providers",
+  "version": "1.0.0",
+  "description": "Shared market data providers (Yahoo Finance, proxy, ticker management)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.0",
+    "chalk": "^5.6.2",
+    "cheerio": "^1.1.2",
+    "technicalindicators": "^3.1.0",
+    "yahoo-finance2": "^3.10.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

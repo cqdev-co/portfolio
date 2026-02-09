@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BreadcrumbSchema } from '@/components/schema';
 
 export const metadata: Metadata = {
   title: 'Penny Stock Scanner | Explosion Setup Detection | ' + 'Conor Quinlan',
@@ -40,5 +41,19 @@ export default function PennyStockScannerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <>
+      <BreadcrumbSchema
+        items={[
+          { name: 'Home', url: 'https://conorq.com' },
+          { name: 'Scanners', url: 'https://conorq.com/scanners' },
+          {
+            name: 'Penny Stock Scanner',
+            url: 'https://conorq.com/penny-stock-scanner',
+          },
+        ]}
+      />
+      {children}
+    </>
+  );
 }

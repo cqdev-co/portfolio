@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { createMetadata } from '@/lib/utils';
+import { BreadcrumbSchema } from '@/components/schema';
 
 export const metadata: Metadata = createMetadata({
   title: 'Unusual Options Scanner - Detect Insider Trading Activity',
@@ -38,5 +39,19 @@ export default function UnusualOptionsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      <BreadcrumbSchema
+        items={[
+          { name: 'Home', url: 'https://conorq.com' },
+          { name: 'Scanners', url: 'https://conorq.com/scanners' },
+          {
+            name: 'Unusual Options Scanner',
+            url: 'https://conorq.com/unusual-options-scanner',
+          },
+        ]}
+      />
+      {children}
+    </>
+  );
 }

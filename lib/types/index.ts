@@ -5,3 +5,4 @@
 
 export * from './ticker';
 export * from './positions';
+export * from './market-data';

@@ -206,8 +206,7 @@ function Blockquote(props: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const globalComponents: any = {
+export const globalComponents: Record<string, React.ComponentType<any>> = {
   h1: createHeading(1),
   h2: createHeading(2),
   h3: createHeading(3),

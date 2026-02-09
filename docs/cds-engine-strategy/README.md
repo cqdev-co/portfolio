@@ -6,13 +6,14 @@ to identify high-conviction entry points for Credit/Debit Spread trading.
 
 ## Version History
 
-| Version | Date     | Changes                                                            |
-| ------- | -------- | ------------------------------------------------------------------ |
-| v2.2.0  | Jan 2026 | Fixed briefing regime detection using shared lib, VIX display      |
-| v2.1.0  | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads         |
-| v1.7.1  | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps) |
-| v1.7.0  | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest        |
-| v2.0.0  | Nov 2024 | AI-first architecture, cloud mode                                  |
+| Version | Date     | Changes                                                                      |
+| ------- | -------- | ---------------------------------------------------------------------------- |
+| v2.9.0  | Feb 2026 | Fixed viable spread criteria — mid-market debit fallback, relaxed thresholds |
+| v2.2.0  | Jan 2026 | Fixed briefing regime detection using shared lib, VIX display                |
+| v2.1.0  | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads                   |
+| v1.7.1  | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps)           |
+| v1.7.0  | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest                  |
+| v2.0.0  | Nov 2024 | AI-first architecture, cloud mode                                            |
 
 ## Documentation
 
@@ -74,10 +75,16 @@ Best results with the **two-stage workflow**:
 
 | Criteria | Strict (default) | Relaxed (`--relaxed`) |
 | -------- | ---------------- | --------------------- |
-| Debit    | 55-80% of width  | 50-85% of width       |
+| Debit    | 55-85% of width  | 45-95% of width       |
 | Cushion  | ≥5%              | ≥3%                   |
-| PoP      | ≥70%             | ≥60%                  |
-| Return   | ≥20%             | ≥15%                  |
+| PoP      | ≥60%             | ≥50%                  |
+| Return   | ≥15%             | ≥11%                  |
+
+> **v2.9.0 (Feb 2026):** Raised max debit ratio from 80% to 85% and lowered
+> minimum cushion from 7% to 5%. The scanner now also tries mid-market pricing
+> when the natural (ask/bid) debit exceeds the max ratio — deep ITM spreads
+> are routinely fillable at mid-market with limit orders. See
+> [Lesson 002](../lessons/002-viable-spread-criteria-too-restrictive.md).
 
 Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 
@@ -105,4 +112,4 @@ Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 
 ---
 
-_Last Updated: January 2026_
+_Last Updated: February 2026_

@@ -288,8 +288,70 @@ export interface SignalData {
 }
 
 /**
+ * Compute CDS signal grade from score (mirrors the DB generated column logic)
+ */
+function computeCdsGrade(score: number): string {
+  if (score >= 80) return 'A';
+  if (score >= 70) return 'B';
+  if (score >= 60) return 'C';
+  return 'D';
+}
+
+/**
+ * Write a normalized signal to the unified `signals` table.
+ * This is the dual-write companion to the detail table insert.
+ */
+async function upsertUnifiedSignal(
+  signal: SignalData,
+  detailId: string
+): Promise<void> {
+  try {
+    const client = getClient();
+    const grade = computeCdsGrade(signal.signalScore);
+    const signalDate = signal.signalDate.toISOString().split('T')[0] ?? '';
+    const topSignalsArray = signal.topSignals
+      ? signal.topSignals.split(', ').filter(Boolean)
+      : [];
+
+    const { error } = await client.from('signals').upsert(
+      {
+        strategy: 'cds',
+        ticker: signal.ticker,
+        signal_date: signalDate,
+        score_normalized: signal.signalScore,
+        grade,
+        direction: 'bullish',
+        price: signal.price,
+        regime: signal.regime,
+        sector: signal.sector,
+        detail_id: detailId,
+        detail_table: 'cds_signals',
+        headline: `${signal.ticker}: Grade ${grade} CDS (score ${signal.signalScore})`,
+        top_signals: topSignalsArray,
+        metadata: {
+          spread_viable: signal.spreadViable,
+          spread_strikes: signal.spreadStrikes,
+          spread_return: signal.spreadReturn,
+          upside_potential: signal.upsidePotential,
+        },
+      },
+      { onConflict: 'strategy,ticker,signal_date' }
+    );
+
+    if (error) {
+      logger.debug(
+        `Failed to upsert unified signal for ${signal.ticker}: ${error.message}`
+      );
+    }
+  } catch (error) {
+    logger.debug(`Unified signal upsert error: ${error}`);
+  }
+}
+
+/**
  * Save a signal to the cds_signals table (auto-capture)
- * Uses upsert to handle multiple scans per day
+ * Uses upsert to handle multiple scans per day.
+ * Also dual-writes to the unified `signals` table.
  */
 export async function saveSignal(signal: SignalData): Promise<string | null> {
   try {
@@ -323,7 +385,12 @@ export async function saveSignal(signal: SignalData): Promise<string | null> {
       return null;
     }
 
-    return data as string;
+    const detailId = data as string;
+
+    // Dual-write: also upsert into the unified signals table
+    await upsertUnifiedSignal(signal, detailId);
+
+    return detailId;
   } catch (error) {
     logger.debug(`Signal save error: ${error}`);
     return null;

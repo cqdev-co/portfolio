@@ -1,243 +1,101 @@
 /**
- * Strategy Configuration Loader
+ * Strategy Configuration - Re-export from canonical source
  *
- * Loads and validates the centralized strategy.config.yaml file.
- * Used by ai-analyst, screen-ticker, and other TypeScript services.
+ * The canonical strategy config types and loader live in @portfolio/ai-agent.
+ * This file re-exports everything for backward compatibility and adds
+ * the comprehensive `validateEntry` helper.
+ *
+ * @example
+ * ```typescript
+ * import { getStrategyConfig, validateEntry } from '@portfolio/utils/strategy-config';
+ * ```
+ *
+ * @see {@link ../ai-agent/config/index.ts} for the canonical source
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { parse } from 'yaml';
-
 // =============================================================================
-// TYPES
+// RE-EXPORTS FROM CANONICAL SOURCE (@portfolio/ai-agent config)
 // =============================================================================
 
-export interface EntryTrend {
-  above_ma200: boolean;
-  above_ma50: boolean;
-  ma50_above_ma200: boolean;
-}
+export {
+  // Config loader
+  getStrategyConfig,
+  clearConfigCache,
+  setConfigPath,
+  // Convenience getters
+  getEntryConfig,
+  getExitConfig,
+  getPositionSizingConfig,
+  getSpreadParamsConfig,
+  getRiskManagementConfig,
+  getMarketRegimeConfig,
+  getLessonsLearned,
+  // Helpers
+  getMaxPositionSize,
+  getSpreadWidth,
+  shouldCloseOnProfit,
+  shouldCloseOnDTE,
+  checkPinRisk,
+  getExitRecommendation,
+  isRSIValid,
+  isCushionValid,
+  isEarningsSafe,
+  // Types
+  type StrategyConfig,
+  type EntryConfig,
+  type ExitConfig,
+  type PositionSizingConfig,
+  type SpreadParamsConfig,
+  type RiskManagementConfig,
+  type MarketRegimeConfig,
+  type TrendConfig,
+  type MomentumConfig,
+  type CushionConfig,
+  type VolatilityConfig,
+  type EarningsConfig,
+  type SentimentConfig,
+  type FundamentalsConfig,
+  type SpreadEntryConfig,
+  type ProfitConfig,
+  type StopLossConfig,
+  type TimeExitConfig,
+  type EventExitConfig,
+  type PinRiskConfig,
+  type DTEConfig,
+  type SpreadWidthConfig,
+  type StrikeConfig,
+  type CircuitBreakerConfig,
+  type CorrelationConfig,
+  type BlacklistConfig,
+  type UniverseConfig,
+  type RegimeAdjustments,
+  type LessonReference,
+} from '../ai-agent/config/index.ts';
 
-export interface EntryMomentum {
-  rsi_min: number;
-  rsi_max: number;
-  rsi_ideal_min: number;
-  rsi_ideal_max: number;
-}
-
-export interface EntryCushion {
-  minimum_pct: number;
-  preferred_pct: number;
-  excellent_pct: number;
-}
-
-export interface EntryVolatility {
-  iv_max_pct: number;
-  iv_preferred_max_pct: number;
-  iv_rank_max: number;
-  avoid_if_iv_above: number;
-}
-
-export interface EntryEarnings {
-  min_days_until: number;
-  preferred_days_until: number;
-  never_hold_through: boolean;
-}
-
-export interface EntrySentiment {
-  analyst_bullish_min_pct: number;
-  analyst_bullish_preferred: number;
-  analyst_count_min: number;
-}
-
-export interface EntryFundamentals {
-  require_positive_eps: boolean;
-  max_pe_ratio: number;
-  min_market_cap_b: number;
-}
-
-export interface EntrySpread {
-  min_return_on_risk_pct: number;
-  preferred_ror_pct: number;
-  min_open_interest: number;
-  max_bid_ask_spread_pct: number;
-}
-
-export interface EntryCriteria {
-  trend: EntryTrend;
-  momentum: EntryMomentum;
-  cushion: EntryCushion;
-  volatility: EntryVolatility;
-  earnings: EntryEarnings;
-  sentiment: EntrySentiment;
-  fundamentals: EntryFundamentals;
-  spread: EntrySpread;
-}
-
-export interface ExitProfit {
-  target_pct: number;
-  early_exit_pct: number;
-  scale_out: boolean;
-}
-
-export interface ExitStopLoss {
-  max_loss_pct: number;
-  time_stop_days: number | null;
-}
-
-export interface ExitTime {
-  max_hold_days: number;
-  exit_before_expiry_days: number;
-}
-
-export interface ExitEvents {
-  exit_before_earnings: boolean;
-  exit_on_major_news: boolean;
-}
-
-export interface ExitRules {
-  profit: ExitProfit;
-  stop_loss: ExitStopLoss;
-  time: ExitTime;
-  events: ExitEvents;
-}
-
-export interface ScalingRule {
-  account_min: number;
-  account_max: number;
-  max_position_pct: number;
-  max_positions: number;
-}
-
-export interface PositionSizing {
-  max_single_position_pct: number;
-  preferred_position_pct: number;
-  min_position_pct: number;
-  max_total_deployed_pct: number;
-  preferred_deployed_pct: number;
-  max_concurrent_positions: number;
-  scaling: ScalingRule[];
-}
-
-export interface CircuitBreakers {
-  consecutive_losses_pause: number;
-  pause_duration_hours: number;
-  monthly_drawdown_reduce_pct: number;
-  monthly_drawdown_stop_pct: number;
-}
-
-export interface RiskManagement {
-  circuit_breakers: CircuitBreakers;
-  correlation: {
-    max_same_sector: number;
-    max_correlated_positions: number;
-  };
-  blacklist: {
-    tickers: string[];
-    sectors: string[];
-  };
-}
-
-export interface StrategyConfig {
-  strategy: {
-    name: string;
-    version: string;
-    description: string;
-  };
-  entry: EntryCriteria;
-  exit: ExitRules;
-  position_sizing: PositionSizing;
-  spread_params: {
-    dte: { target: number; min: number; max: number };
-    width: Array<{
-      account_max: number;
-      width: number;
-      typical_debit: number;
-    }>;
-    strikes: {
-      long_strike_delta_min: number;
-      long_strike_delta_max: number;
-      short_strike_delta_min: number;
-      short_strike_delta_max: number;
-    };
-  };
-  risk_management: RiskManagement;
-  universe: {
-    tier1: string[];
-    tier2: string[];
-    tier3: string[];
-    scanner: {
-      min_price: number;
-      max_price: number;
-      min_volume: number;
-      min_market_cap_b: number;
-    };
-  };
-  validation: {
-    min_ai_score: number;
-    min_confidence: number;
-    human_confirm_above: number;
-  };
-}
+import {
+  getStrategyConfig,
+  type StrategyConfig,
+} from '../ai-agent/config/index.ts';
 
 // =============================================================================
-// LOADER
+// TYPE ALIASES (backward compatibility)
 // =============================================================================
 
-let cachedConfig: StrategyConfig | null = null;
-
-/**
- * Load the strategy configuration from YAML
- */
-export function loadStrategyConfig(configPath?: string): StrategyConfig {
-  if (cachedConfig) {
-    return cachedConfig;
-  }
-
-  const path = configPath ?? findConfigPath();
-
-  if (!existsSync(path)) {
-    throw new Error(
-      `Strategy config not found at ${path}. ` +
-        'Create strategy.config.yaml in the repository root.'
-    );
-  }
-
-  const content = readFileSync(path, 'utf-8');
-  cachedConfig = parse(content) as StrategyConfig;
-
-  return cachedConfig;
-}
-
-/**
- * Find the config file by walking up from cwd
- */
-function findConfigPath(): string {
-  const possiblePaths = [
-    join(process.cwd(), 'strategy.config.yaml'),
-    join(process.cwd(), '..', 'strategy.config.yaml'),
-    join(process.cwd(), '..', '..', 'strategy.config.yaml'),
-  ];
-
-  for (const p of possiblePaths) {
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-
-  return possiblePaths[0]; // Will throw in loadStrategyConfig
-}
-
-/**
- * Clear cached config (useful for testing)
- */
-export function clearConfigCache(): void {
-  cachedConfig = null;
-}
+// These aliases preserve the old naming convention for any future consumers
+// that may reference the previous type names from this module.
+export type { EntryConfig as EntryCriteria } from '../ai-agent/config/index.ts';
+export type { ExitConfig as ExitRules } from '../ai-agent/config/index.ts';
+export type { TrendConfig as EntryTrend } from '../ai-agent/config/index.ts';
+export type { MomentumConfig as EntryMomentum } from '../ai-agent/config/index.ts';
+export type { CushionConfig as EntryCushion } from '../ai-agent/config/index.ts';
+export type { VolatilityConfig as EntryVolatility } from '../ai-agent/config/index.ts';
+export type { EarningsConfig as EntryEarnings } from '../ai-agent/config/index.ts';
+export type { SentimentConfig as EntrySentiment } from '../ai-agent/config/index.ts';
+export type { FundamentalsConfig as EntryFundamentals } from '../ai-agent/config/index.ts';
+export type { SpreadEntryConfig as EntrySpread } from '../ai-agent/config/index.ts';
 
 // =============================================================================
-// VALIDATION HELPERS
+// COMPREHENSIVE ENTRY VALIDATION
 // =============================================================================
 
 export interface EntryValidation {
@@ -248,7 +106,11 @@ export interface EntryValidation {
 }
 
 /**
- * Validate a potential trade against entry criteria
+ * Validate a potential trade against all entry criteria at once.
+ *
+ * Unlike the individual validators in @portfolio/ai-agent/config (isRSIValid,
+ * isCushionValid, etc.), this function runs ALL checks and returns a
+ * comprehensive score with pass/fail status.
  */
 export function validateEntry(
   data: {
@@ -268,7 +130,7 @@ export function validateEntry(
   },
   config?: StrategyConfig
 ): EntryValidation {
-  const cfg = config ?? loadStrategyConfig();
+  const cfg = config ?? getStrategyConfig();
   const failures: string[] = [];
   const warnings: string[] = [];
   let score = 100;
@@ -302,7 +164,7 @@ export function validateEntry(
       data.rsi >= cfg.entry.momentum.rsi_ideal_min &&
       data.rsi <= cfg.entry.momentum.rsi_ideal_max
     ) {
-      score += 5; // Bonus for ideal range
+      score += 5;
     }
   }
 
@@ -314,9 +176,9 @@ export function validateEntry(
       );
       score -= 20;
     } else if (data.cushion_pct >= cfg.entry.cushion.excellent_pct) {
-      score += 10; // Excellent cushion bonus
+      score += 10;
     } else if (data.cushion_pct >= cfg.entry.cushion.preferred_pct) {
-      score += 5; // Good cushion bonus
+      score += 5;
     }
   }
 
@@ -333,7 +195,7 @@ export function validateEntry(
       );
       score -= 10;
     } else if (data.iv <= cfg.entry.volatility.iv_preferred_max_pct) {
-      score += 5; // Low IV bonus
+      score += 5;
     }
   }
 
@@ -348,7 +210,7 @@ export function validateEntry(
     } else if (
       data.days_to_earnings >= cfg.entry.earnings.preferred_days_until
     ) {
-      score += 5; // Comfortable earnings buffer
+      score += 5;
     }
   }
 
@@ -365,7 +227,7 @@ export function validateEntry(
     } else if (
       data.analyst_bullish_pct >= cfg.entry.sentiment.analyst_bullish_preferred
     ) {
-      score += 5; // Strong analyst support
+      score += 5;
     }
   }
 
@@ -378,7 +240,7 @@ export function validateEntry(
       );
       score -= 10;
     } else if (data.return_on_risk_pct >= cfg.entry.spread.preferred_ror_pct) {
-      score += 5; // Good R/R bonus
+      score += 5;
     }
   }
 
@@ -392,6 +254,8 @@ export function validateEntry(
 
 /**
  * Get position sizing based on account size
+ *
+ * @deprecated Use getMaxPositionSize() from @portfolio/ai-agent/config instead
  */
 export function getPositionSizing(
   accountSize: number,
@@ -402,38 +266,24 @@ export function getPositionSizing(
   maxPositions: number;
   maxDeployed: number;
 } {
-  const cfg = config ?? loadStrategyConfig();
+  const cfg = config ?? getStrategyConfig();
 
-  // Find matching scaling rule
   const rule =
     cfg.position_sizing.scaling.find(
       (r) => accountSize >= r.account_min && accountSize < r.account_max
     ) ?? cfg.position_sizing.scaling[cfg.position_sizing.scaling.length - 1];
 
   return {
-    maxPositionPct: rule.max_position_pct,
-    maxPositionDollars: (accountSize * rule.max_position_pct) / 100,
-    maxPositions: rule.max_positions,
+    maxPositionPct:
+      rule?.max_position_pct ?? cfg.position_sizing.max_single_position_pct,
+    maxPositionDollars:
+      (accountSize *
+        (rule?.max_position_pct ??
+          cfg.position_sizing.max_single_position_pct)) /
+      100,
+    maxPositions:
+      rule?.max_positions ?? cfg.position_sizing.max_concurrent_positions,
     maxDeployed:
       (accountSize * cfg.position_sizing.max_total_deployed_pct) / 100,
-  };
-}
-
-/**
- * Get spread width recommendation based on account size
- */
-export function getSpreadWidth(
-  accountSize: number,
-  config?: StrategyConfig
-): { width: number; typicalDebit: number } {
-  const cfg = config ?? loadStrategyConfig();
-
-  const rule =
-    cfg.spread_params.width.find((w) => accountSize <= w.account_max) ??
-    cfg.spread_params.width[cfg.spread_params.width.length - 1];
-
-  return {
-    width: rule.width,
-    typicalDebit: rule.typical_debit,
   };
 }

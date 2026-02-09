@@ -34,6 +34,7 @@ class DatabaseService:
     async def store_signal(self, result: AnalysisResult, scan_date: date) -> bool:
         """
         Store a penny stock signal in the database.
+        Also dual-writes to the unified `signals` table.
 
         Args:
             result: Analysis result to store
@@ -50,11 +51,17 @@ class DatabaseService:
             signal_data = self._convert_to_db_format(result, scan_date)
 
             # Upsert (insert or update if exists)
-            (
+            response = (
                 self.client.table("penny_stock_signals")
                 .upsert(signal_data, on_conflict="symbol,scan_date")
+                .select("id")
                 .execute()
             )
+
+            # Dual-write to unified signals table
+            if response.data:
+                detail_id = response.data[0]["id"]
+                self._upsert_unified_signal(result, scan_date, detail_id)
 
             logger.debug(f"Stored signal for {result.symbol} on {scan_date}")
             return True
@@ -68,6 +75,7 @@ class DatabaseService:
     ) -> int:
         """
         Store multiple signals in batch.
+        Also dual-writes to the unified `signals` table.
 
         Args:
             results: List of analysis results
@@ -89,15 +97,23 @@ class DatabaseService:
                 self._convert_to_db_format(result, scan_date) for result in results
             ]
 
-            # Batch upsert
+            # Batch upsert — return IDs for dual-write
             response = (
                 self.client.table("penny_stock_signals")
                 .upsert(signal_data_list, on_conflict="symbol,scan_date")
+                .select("id, symbol")
                 .execute()
             )
 
             count = len(response.data) if response.data else 0
             logger.info(f"Stored {count} signals in batch for {scan_date}")
+
+            # Dual-write to unified signals table
+            if response.data:
+                # Build a symbol -> detail_id map from the response
+                detail_map = {row["symbol"]: row["id"] for row in response.data}
+                self._upsert_unified_signals_batch(results, scan_date, detail_map)
+
             return count
 
         except Exception as e:
@@ -235,6 +251,118 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error fetching actionable signals: {e}")
             return []
+
+    @staticmethod
+    def _compute_penny_grade(overall_score: float) -> str:
+        """Compute penny signal grade from overall_score (0.0-1.0)."""
+        if overall_score >= 0.85:
+            return "S"
+        if overall_score >= 0.70:
+            return "A"
+        if overall_score >= 0.55:
+            return "B"
+        if overall_score >= 0.40:
+            return "C"
+        return "D"
+
+    def _upsert_unified_signal(
+        self,
+        result: AnalysisResult,
+        scan_date: date,
+        detail_id: str,
+    ) -> None:
+        """Dual-write a single signal to the unified `signals` table."""
+        try:
+            signal = result.explosion_signal
+            grade = self._compute_penny_grade(result.overall_score)
+            score_normalized = round(result.overall_score * 100, 2)
+
+            self.client.table("signals").upsert(
+                {
+                    "strategy": "penny",
+                    "ticker": result.symbol,
+                    "signal_date": scan_date.isoformat(),
+                    "score_normalized": score_normalized,
+                    "grade": grade,
+                    "direction": "bullish",
+                    "price": signal.close_price,
+                    "regime": None,
+                    "sector": None,
+                    "detail_id": detail_id,
+                    "detail_table": "penny_stock_signals",
+                    "headline": (
+                        f"{result.symbol}: Rank {result.opportunity_rank.value} "
+                        f"Penny Signal (score {score_normalized})"
+                    ),
+                    "top_signals": [],
+                    "metadata": {
+                        "is_breakout": signal.is_breakout,
+                        "volume_ratio": signal.volume_ratio,
+                        "volume_spike_factor": signal.volume_spike_factor,
+                        "is_consolidating": signal.is_consolidating,
+                        "recommendation": result.recommendation,
+                    },
+                },
+                on_conflict="strategy,ticker,signal_date",
+            ).execute()
+        except Exception as e:
+            logger.debug(f"Unified signal upsert error for {result.symbol}: {e}")
+
+    def _upsert_unified_signals_batch(
+        self,
+        results: list[AnalysisResult],
+        scan_date: date,
+        detail_map: dict[str, str],
+    ) -> None:
+        """Dual-write a batch of signals to the unified `signals` table."""
+        try:
+            unified_rows: list[dict[str, Any]] = []
+            for result in results:
+                detail_id = detail_map.get(result.symbol)
+                if not detail_id:
+                    continue
+
+                signal = result.explosion_signal
+                grade = self._compute_penny_grade(result.overall_score)
+                score_normalized = round(result.overall_score * 100, 2)
+
+                unified_rows.append(
+                    {
+                        "strategy": "penny",
+                        "ticker": result.symbol,
+                        "signal_date": scan_date.isoformat(),
+                        "score_normalized": score_normalized,
+                        "grade": grade,
+                        "direction": "bullish",
+                        "price": signal.close_price,
+                        "regime": None,
+                        "sector": None,
+                        "detail_id": detail_id,
+                        "detail_table": "penny_stock_signals",
+                        "headline": (
+                            f"{result.symbol}: Rank {result.opportunity_rank.value} "
+                            f"Penny Signal (score {score_normalized})"
+                        ),
+                        "top_signals": [],
+                        "metadata": {
+                            "is_breakout": signal.is_breakout,
+                            "volume_ratio": signal.volume_ratio,
+                            "volume_spike_factor": signal.volume_spike_factor,
+                            "is_consolidating": signal.is_consolidating,
+                            "recommendation": result.recommendation,
+                        },
+                    }
+                )
+
+            if unified_rows:
+                self.client.table("signals").upsert(
+                    unified_rows,
+                    on_conflict="strategy,ticker,signal_date",
+                ).execute()
+                logger.debug(f"Dual-wrote {len(unified_rows)} signals to unified table")
+
+        except Exception as e:
+            logger.debug(f"Unified signals batch upsert error: {e}")
 
     def _convert_to_db_format(
         self, result: AnalysisResult, scan_date: date

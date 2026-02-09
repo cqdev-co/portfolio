@@ -82,17 +82,20 @@ export function calculateSpreadQualityScore(
   }
 
   // 2. Cushion (0-20 pts) - MOST IMPORTANT for safety
-  // 7%+ cushion = 20 pts, 5% = 16 pts, 3% = 10 pts, 1% = 5 pts
-  if (spread.cushionPct >= 7) {
+  // v2.9.0: Aligned with updated config (min 5%, preferred 8%, excellent 12%)
+  // 12%+ cushion = 20 pts, 8% = 16 pts, 5% = 12 pts, 3% = 8 pts
+  if (spread.cushionPct >= 12) {
     breakdown.cushion = 20;
+  } else if (spread.cushionPct >= 8) {
+    breakdown.cushion = 16 + ((spread.cushionPct - 8) / 4) * 4;
   } else if (spread.cushionPct >= 5) {
-    breakdown.cushion = 16 + ((spread.cushionPct - 5) / 2) * 4;
+    breakdown.cushion = 12 + ((spread.cushionPct - 5) / 3) * 4;
   } else if (spread.cushionPct >= 3) {
-    breakdown.cushion = 10 + ((spread.cushionPct - 3) / 2) * 6;
+    breakdown.cushion = 8 + ((spread.cushionPct - 3) / 2) * 4;
   } else if (spread.cushionPct >= 1) {
-    breakdown.cushion = 5 + ((spread.cushionPct - 1) / 2) * 5;
+    breakdown.cushion = 4 + ((spread.cushionPct - 1) / 2) * 4;
   } else if (spread.cushionPct > 0) {
-    breakdown.cushion = spread.cushionPct * 5;
+    breakdown.cushion = spread.cushionPct * 4;
   }
 
   // 3. Delta Alignment (0-10 pts)

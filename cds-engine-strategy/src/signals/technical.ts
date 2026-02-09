@@ -1,7 +1,14 @@
-import { RSI, SMA, MACD, OBV, ADX, BollingerBands } from 'technicalindicators';
+import { RSI, SMA, MACD, ADX, BollingerBands } from 'technicalindicators';
 import type { Signal, HistoricalData, QuoteData } from '../types/index.ts';
 import { defaultThresholds, defaultWeights } from '../config/thresholds.ts';
 import { isNearSupport } from '../utils/support-resistance.ts';
+import {
+  checkGoldenCross as sharedCheckGoldenCross,
+  checkVolumeSurge as sharedCheckVolumeSurge,
+  checkOBVTrend as sharedCheckOBVTrend,
+  checkMACD as sharedCheckMACD,
+  applySignalGroupCaps,
+} from '@portfolio/providers';
 
 interface TechnicalResult {
   score: number;
@@ -184,51 +191,10 @@ function checkPullbackInUptrend(
 }
 
 /**
- * Check for Golden Cross (50 SMA > 200 SMA)
+ * Check for Golden Cross - delegates to shared implementation
  */
 function checkGoldenCross(closes: number[]): Signal | null {
-  if (closes.length < 200) return null;
-
-  const sma50 = SMA.calculate({ values: closes, period: 50 });
-  const sma200 = SMA.calculate({ values: closes, period: 200 });
-
-  const currentSMA50 = sma50[sma50.length - 1];
-  const currentSMA200 = sma200[sma200.length - 1];
-  const prevSMA50 = sma50[sma50.length - 2];
-  const prevSMA200 = sma200[sma200.length - 2];
-
-  if (
-    currentSMA50 === undefined ||
-    currentSMA200 === undefined ||
-    prevSMA50 === undefined ||
-    prevSMA200 === undefined
-  ) {
-    return null;
-  }
-
-  // Recent golden cross (within last few days)
-  if (currentSMA50 > currentSMA200 && prevSMA50 <= prevSMA200) {
-    return {
-      name: 'Golden Cross',
-      category: 'technical',
-      points: defaultWeights.technical.goldenCross,
-      description: '50 SMA crossed above 200 SMA',
-      value: true,
-    };
-  }
-
-  // Already in golden cross territory
-  if (currentSMA50 > currentSMA200) {
-    return {
-      name: 'Golden Cross Active',
-      category: 'technical',
-      points: Math.floor(defaultWeights.technical.goldenCross * 0.6),
-      description: '50 SMA above 200 SMA (bullish structure)',
-      value: currentSMA200,
-    };
-  }
-
-  return null;
+  return sharedCheckGoldenCross(closes, defaultWeights.technical.goldenCross);
 }
 
 /**
@@ -442,32 +408,18 @@ function checkMAProximity(
 }
 
 /**
- * Check for volume surge
+ * Check for volume surge - delegates to shared implementation
  */
 function checkVolumeSurge(
   _volumes: number[],
   quote: QuoteData,
   thresholds = defaultThresholds.technical
 ): Signal | null {
-  if (!quote.regularMarketVolume || !quote.averageDailyVolume10Day) {
-    return null;
-  }
-
-  const ratio = quote.regularMarketVolume / quote.averageDailyVolume10Day;
-
-  if (ratio >= thresholds.volumeSurgeMultiplier) {
-    return {
-      name: 'Volume Surge',
-      category: 'technical',
-      points: defaultWeights.technical.volumeSurge,
-      description: `Volume ${ratio.toFixed(1)}x avg (${(
-        quote.regularMarketVolume / 1_000_000
-      ).toFixed(1)}M)`,
-      value: ratio,
-    };
-  }
-
-  return null;
+  return sharedCheckVolumeSurge(
+    quote,
+    thresholds.volumeSurgeMultiplier,
+    defaultWeights.technical.volumeSurge
+  );
 }
 
 /**
@@ -494,90 +446,21 @@ function checkNearSupport(
 }
 
 /**
- * Check OBV (On-Balance Volume) trend
+ * Check OBV trend - delegates to shared implementation
  */
 function checkOBVTrend(closes: number[], volumes: number[]): Signal | null {
-  if (closes.length < 20 || volumes.length < 20) return null;
-
-  const obvResult = OBV.calculate({
-    close: closes,
-    volume: volumes,
-  });
-
-  if (obvResult.length < 10) return null;
-
-  // Check if OBV is trending up (compare last 5 to previous 5)
-  const recent = obvResult.slice(-5);
-  const previous = obvResult.slice(-10, -5);
-
-  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
-  const prevAvg = previous.reduce((a, b) => a + b, 0) / previous.length;
-
-  if (recentAvg > prevAvg * 1.05) {
-    return {
-      name: 'OBV Uptrend',
-      category: 'technical',
-      points: defaultWeights.technical.obvTrend,
-      description: 'On-Balance Volume trending higher',
-      value: true,
-    };
-  }
-
-  return null;
+  return sharedCheckOBVTrend(
+    closes,
+    volumes,
+    defaultWeights.technical.obvTrend
+  );
 }
 
 /**
- * Check MACD for bullish crossover
+ * Check MACD - delegates to shared implementation
  */
 function checkMACD(closes: number[]): Signal | null {
-  if (closes.length < 35) return null;
-
-  const macdResult = MACD.calculate({
-    values: closes,
-    fastPeriod: 12,
-    slowPeriod: 26,
-    signalPeriod: 9,
-    SimpleMAOscillator: false,
-    SimpleMASignal: false,
-  });
-
-  if (macdResult.length < 2) return null;
-
-  const current = macdResult[macdResult.length - 1];
-  const previous = macdResult[macdResult.length - 2];
-
-  if (
-    !current?.MACD ||
-    !current?.signal ||
-    !previous?.MACD ||
-    !previous?.signal
-  ) {
-    return null;
-  }
-
-  // Bullish crossover
-  if (current.MACD > current.signal && previous.MACD <= previous.signal) {
-    return {
-      name: 'MACD Bullish',
-      category: 'technical',
-      points: 5,
-      description: 'MACD crossed above signal line',
-      value: true,
-    };
-  }
-
-  // MACD above signal (continuation)
-  if (current.MACD > current.signal && current.MACD > 0) {
-    return {
-      name: 'MACD Positive',
-      category: 'technical',
-      points: 3,
-      description: 'MACD above signal and positive',
-      value: current.MACD,
-    };
-  }
-
-  return null;
+  return sharedCheckMACD(closes);
 }
 
 /**
@@ -940,83 +823,6 @@ function checkBollingerBands(
   }
 
   return null;
-}
-
-/**
- * Signal group caps to prevent excessive scoring from related signals
- * v1.7.1: Added to prevent MA-related signal stacking
- * v2.5.0: Added pullback group for entry setup signals
- * v2.6.0: Added recovery group for MA200 reclaim scenarios
- */
-const SIGNAL_GROUP_CAPS: Record<
-  string,
-  { keywords: string[]; maxPoints: number }
-> = {
-  movingAverage: {
-    keywords: ['ma', 'golden', 'sma', 'moving average'],
-    maxPoints: 15, // Cap MA-related signals at 15 points
-  },
-  momentum: {
-    keywords: ['rsi', 'macd', 'obv'],
-    maxPoints: 12, // Cap momentum indicators at 12 points
-  },
-  pricePosition: {
-    keywords: ['52-week', 'support', 'bollinger'],
-    maxPoints: 12, // Cap price position signals at 12 points
-  },
-  pullback: {
-    keywords: ['pullback', 'pulled back'],
-    maxPoints: 15, // Cap pullback signals (can overlap with entry setup)
-  },
-  recovery: {
-    keywords: ['reclaim', 'recovery', 'recovering'],
-    maxPoints: 10, // Cap recovery signals at 10 points
-  },
-};
-
-/**
- * Apply signal group caps to prevent related signals from stacking excessively
- */
-function applySignalGroupCaps(signals: Signal[]): number {
-  let totalScore = 0;
-  const groupScores: Record<string, number> = {};
-
-  // Initialize group scores
-  for (const group of Object.keys(SIGNAL_GROUP_CAPS)) {
-    groupScores[group] = 0;
-  }
-
-  for (const signal of signals) {
-    const signalNameLower = signal.name.toLowerCase();
-    let assignedToGroup = false;
-
-    // Check which group this signal belongs to
-    for (const [groupName, config] of Object.entries(SIGNAL_GROUP_CAPS)) {
-      const belongsToGroup = config.keywords.some((kw) =>
-        signalNameLower.includes(kw)
-      );
-
-      if (belongsToGroup) {
-        // Add points up to the group cap
-        const currentGroupScore = groupScores[groupName] ?? 0;
-        const pointsToAdd = Math.min(
-          signal.points,
-          config.maxPoints - currentGroupScore
-        );
-        groupScores[groupName] = currentGroupScore + pointsToAdd;
-        totalScore += pointsToAdd;
-        assignedToGroup = true;
-        break;
-      }
-    }
-
-    // If signal doesn't belong to any capped group, add full points
-    if (!assignedToGroup) {
-      totalScore += signal.points;
-    }
-  }
-
-  return totalScore;
 }
 
 /**

@@ -264,12 +264,23 @@ export function PositionsPageClient() {
       });
 
       if (hasBidAsk && longLeg && shortLeg) {
-        // BEST: Use natural spread pricing (what you'd actually get closing)
-        // To close debit spread: sell long (at bid), buy back short (at ask)
-        netCurrentPrice = longLeg.bid! - shortLeg.ask!;
+        // Use spread mid: average of natural close (bid-ask) and natural open (ask-bid)
+        // Natural close alone is too pessimistic for deep ITM spreads with wide bid/ask
+        const spreadBid = longLeg.bid! - shortLeg.ask!; // worst case (closing)
+        const hasFullBidAsk =
+          longLeg.ask !== undefined &&
+          longLeg.ask > 0 &&
+          shortLeg.bid !== undefined &&
+          shortLeg.bid > 0;
+        if (hasFullBidAsk) {
+          const spreadAsk = longLeg.ask! - shortLeg.bid!; // best case
+          netCurrentPrice = (spreadBid + spreadAsk) / 2; // spread mid
+        } else {
+          netCurrentPrice = spreadBid;
+        }
         console.log(
-          `[Spreads] ${legs[0]?.symbol}: natural price = ` +
-            `$${longLeg.bid} (long bid) - $${shortLeg.ask} (short ask) = $${netCurrentPrice.toFixed(2)}`
+          `[Spreads] ${legs[0]?.symbol}: spread mid = $${netCurrentPrice.toFixed(2)} ` +
+            `(bid=$${longLeg.bid} - ask=$${shortLeg.ask} = $${(longLeg.bid! - shortLeg.ask!).toFixed(2)})`
         );
       } else if (hasMidPrices && longLeg && shortLeg) {
         // Fallback: use mid-prices (less accurate but better than nothing)
@@ -287,6 +298,34 @@ export function PositionsPageClient() {
       const longStrike = longLeg?.strike_price || 0;
       const shortStrike = shortLeg?.strike_price || 0;
       const spreadWidth = Math.abs(shortStrike - longStrike);
+
+      // If netCurrentPrice exceeds spread width, one leg likely has intrinsic-only
+      // pricing (missing time value). Estimate using the other leg's time value.
+      if (
+        netCurrentPrice > spreadWidth &&
+        longLeg &&
+        shortLeg &&
+        underlyingPrice > 0 &&
+        longLeg.bid !== undefined &&
+        longLeg.bid > 0
+      ) {
+        const longIntrinsic = Math.max(0, underlyingPrice - longStrike);
+        const longTimeValue = Math.max(
+          0,
+          longLeg.current_price - longIntrinsic
+        );
+        const shortIntrinsic = Math.max(0, underlyingPrice - shortStrike);
+        const timeValueRatio =
+          longIntrinsic > 0 ? shortIntrinsic / longIntrinsic : 0.9;
+        const estimatedShortPrice =
+          shortIntrinsic + longTimeValue * timeValueRatio;
+        netCurrentPrice = longLeg.current_price - estimatedShortPrice;
+        console.warn(
+          `[Spreads] ${legs[0]?.symbol}: time-value estimation ` +
+            `long=$${longLeg.current_price.toFixed(2)} short~=$${estimatedShortPrice.toFixed(2)} ` +
+            `net=$${netCurrentPrice.toFixed(2)}`
+        );
+      }
 
       if (netCurrentPrice > spreadWidth) {
         console.warn(

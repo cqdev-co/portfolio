@@ -74,12 +74,20 @@ export async function GET(request: NextRequest) {
       }) => point.price > 0 && !isNaN(point.price)
     );
 
-    return NextResponse.json({
-      ticker,
-      range,
-      interval,
-      data: validData,
-    });
+    return NextResponse.json(
+      {
+        ticker,
+        range,
+        interval,
+        data: validData,
+      },
+      {
+        headers: {
+          // Cache for 2 minutes — stock prices are semi-real-time
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error) {
     console.error('Error fetching stock prices:', error);
     return NextResponse.json(

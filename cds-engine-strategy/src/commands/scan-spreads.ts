@@ -21,83 +21,11 @@ import { logger } from '../utils/logger.ts';
 import {
   fetchSP500Tickers,
   isTickerDBConfigured,
-} from '../providers/tickers.ts';
+  TICKER_LISTS,
+} from '@portfolio/providers';
 import { createClient } from '@supabase/supabase-js';
 import { yahooProvider } from '../providers/yahoo.ts';
 import { getSpreadCriteria } from '../config/strategy.ts';
-
-// Ticker lists
-const TICKER_LISTS: Record<string, string[]> = {
-  // Most liquid, best for spreads
-  mega: [
-    'AAPL',
-    'MSFT',
-    'NVDA',
-    'GOOGL',
-    'AMZN',
-    'META',
-    'TSLA',
-    'AMD',
-    'NFLX',
-    'AVGO',
-  ],
-
-  // Broader tech + growth
-  growth: [
-    'AAPL',
-    'MSFT',
-    'NVDA',
-    'GOOGL',
-    'AMZN',
-    'META',
-    'TSLA',
-    'AMD',
-    'NFLX',
-    'AVGO',
-    'CRM',
-    'ADBE',
-    'ORCL',
-    'NOW',
-    'SNOW',
-    'PLTR',
-    'UBER',
-    'ABNB',
-    'DDOG',
-    'MDB',
-    'SHOP',
-    'SQ',
-    'COIN',
-    'HOOD',
-    'SOFI',
-    'NET',
-    'CRWD',
-    'ZS',
-    'PANW',
-    'OKTA',
-  ],
-
-  // ETFs - often best liquidity
-  etf: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLE', 'XLK', 'ARKK', 'SMH', 'SOXX'],
-
-  // Value/dividend stocks
-  value: [
-    'JPM',
-    'BAC',
-    'WFC',
-    'GS',
-    'MS',
-    'XOM',
-    'CVX',
-    'COP',
-    'SLB',
-    'HAL',
-    'UNH',
-    'JNJ',
-    'PFE',
-    'MRK',
-    'ABBV',
-  ],
-};
 
 /**
  * Fetch ENTER tickers from today's scan results
@@ -188,7 +116,7 @@ function buildRelaxedCriteria(): Criteria {
 
   return {
     minDebitRatio: configCriteria.minDebitRatio - 0.1, // 10% below config
-    maxDebitRatio: configCriteria.maxDebitRatio + 0.1, // 10% above config
+    maxDebitRatio: Math.min(0.95, configCriteria.maxDebitRatio + 0.1), // 10% above config, cap at 95%
     minCushion: Math.max(2, configCriteria.minCushion - 2), // 2% below config minimum
     minPoP: Math.max(50, configCriteria.minPoP - 10), // 10% below config
     minReturn: configCriteria.minReturn * 0.75, // 75% of config minimum
@@ -452,24 +380,45 @@ async function findViableSpread(ticker: string): Promise<SpreadResult> {
 
         let debit: number | null = null;
         if (marketDebit > 0 && isFinite(marketDebit)) {
-          if (marketRatio > CRITERIA.maxDebitRatio) {
-            rejectionStats.debitTooHigh++;
-            logger.debug(
-              `    ${ticker} $${longCall.strike}/$${shortStrike}: Debit too high - $${marketDebit.toFixed(2)} (${(marketRatio * 100).toFixed(0)}% > ${CRITERIA.maxDebitRatio * 100}%)`
-            );
-            continue;
-          }
           if (
             marketRatio >= CRITERIA.minDebitRatio &&
             marketRatio <= CRITERIA.maxDebitRatio
           ) {
+            // Market debit in acceptable range — use as-is
             debit = marketDebit;
+          } else if (marketRatio > CRITERIA.maxDebitRatio && midDebit > 0) {
+            // v2.9.0: Market debit too high — try mid-market pricing
+            // Deep ITM spreads naturally have inflated market debit due to
+            // bid-ask spread on both legs. Mid-market is a fairer estimate
+            // of the actual fill price with a limit order.
+            const midRatio = midDebit / width;
+            if (
+              midRatio >= CRITERIA.minDebitRatio &&
+              midRatio <= CRITERIA.maxDebitRatio
+            ) {
+              debit = midDebit;
+              logger.debug(
+                `    ${ticker} $${longCall.strike}/$${shortStrike}: Market debit $${marketDebit.toFixed(2)} (${(marketRatio * 100).toFixed(0)}%) too high, using mid $${midDebit.toFixed(2)} (${(midRatio * 100).toFixed(0)}%)`
+              );
+            } else {
+              rejectionStats.debitTooHigh++;
+              logger.debug(
+                `    ${ticker} $${longCall.strike}/$${shortStrike}: Debit too high - market $${marketDebit.toFixed(2)} (${(marketRatio * 100).toFixed(0)}%), mid $${midDebit.toFixed(2)} (${(midRatio * 100).toFixed(0)}%) > ${CRITERIA.maxDebitRatio * 100}%`
+              );
+              continue;
+            }
           } else if (marketRatio < CRITERIA.minDebitRatio && midDebit > 0) {
             debit = midDebit * 1.1;
             if (debit / width > CRITERIA.maxDebitRatio) {
               rejectionStats.debitTooLow++;
               continue;
             }
+          } else if (marketRatio > CRITERIA.maxDebitRatio) {
+            rejectionStats.debitTooHigh++;
+            logger.debug(
+              `    ${ticker} $${longCall.strike}/$${shortStrike}: Debit too high - $${marketDebit.toFixed(2)} (${(marketRatio * 100).toFixed(0)}% > ${CRITERIA.maxDebitRatio * 100}%), no mid-market available`
+            );
+            continue;
           }
         }
 

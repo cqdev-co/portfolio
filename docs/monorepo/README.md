@@ -42,30 +42,31 @@ bun run audit:fix
 
 GitHub Actions runs on every push and PR to `main`:
 
-| Job           | Description                                      | Blocking |
-| ------------- | ------------------------------------------------ | -------- |
-| `typecheck`   | Type-check all TypeScript packages               | Yes      |
-| `lint`        | Lint all packages with ESLint + check formatting | Yes      |
-| `lint-python` | Lint Python services with ruff                   | Yes      |
-| `test`        | Run all TypeScript test suites                   | Yes      |
-| `test-python` | Run Python test suites with pytest               | No\*     |
-| `build`       | Build all packages (after lint jobs pass)        | Yes      |
-
-\*Python tests are currently non-blocking (`|| true`) to allow gradual test coverage improvements.
+| Job               | Description                                      | Blocking |
+| ----------------- | ------------------------------------------------ | -------- |
+| `typecheck`       | Type-check all TypeScript packages               | Yes      |
+| `lint`            | Lint all packages with ESLint + check formatting | Yes      |
+| `lint-python`     | Lint Python services with ruff                   | Yes      |
+| `validate-config` | Validate strategy.config.yaml with Zod schema    | Yes      |
+| `test`            | Run all TypeScript test suites                   | Yes      |
+| `test-python`     | Run Python test suites with pytest               | Yes      |
+| `build`           | Build all packages (after lint + validation)     | Yes      |
 
 Configuration: `.github/workflows/ci.yml`
 
 ### CI Job Dependencies
 
 ```
-typecheck ──┐
-            ├──> build
-lint ───────┤
-            │
-lint-python ┘
+typecheck ──────┐
+                │
+lint ───────────┤
+                ├──> build
+lint-python ────┤
+                │
+validate-config ┘
 
 test ──────────> (independent)
-test-python ───> (independent, non-blocking)
+test-python ───> (independent)
 ```
 
 ### Turborepo Remote Caching
@@ -160,15 +161,18 @@ bun run format:py:check
 
 All TypeScript packages use the `@portfolio/` scope:
 
-| Package                       | Location         | Purpose                   |
-| ----------------------------- | ---------------- | ------------------------- |
-| `@portfolio/web`              | `frontend/`      | Next.js portfolio website |
-| `@portfolio/ai-analyst`       | `ai-analyst/`    | AI ticker analysis CLI    |
-| `@portfolio/screen-ticker`    | `screen-ticker/` | Stock opportunity scanner |
-| `@portfolio/cloudflare-proxy` | `cloudflare/`    | Yahoo Finance API proxy   |
-| `@portfolio/ai-agent`         | `lib/ai-agent/`  | Shared AI agent logic     |
-| `@portfolio/types`            | `lib/types/`     | Shared type definitions   |
-| `@portfolio/utils`            | `lib/utils/`     | Shared utility functions  |
+| Package                          | Location               | Purpose                                    |
+| -------------------------------- | ---------------------- | ------------------------------------------ |
+| `@portfolio/web`                 | `frontend/`            | Next.js portfolio website + fund dashboard |
+| `@portfolio/ai-analyst`          | `ai-analyst/`          | AI ticker analysis CLI                     |
+| `@portfolio/cds-engine-strategy` | `cds-engine-strategy/` | Call Debit Spread trading engine           |
+| `@portfolio/pcs-engine-strategy` | `pcs-engine-strategy/` | Put Credit Spread trading engine           |
+| `@portfolio/cloudflare-proxy`    | `cloudflare/`          | Yahoo Finance API proxy                    |
+| `@portfolio/ai-agent`            | `lib/ai-agent/`        | Shared AI agent logic                      |
+| `@portfolio/core`                | `lib/core/`            | Shared trading infrastructure              |
+| `@portfolio/providers`           | `lib/providers/`       | Shared data providers (signals, tickers)   |
+| `@portfolio/types`               | `lib/types/`           | Shared type definitions                    |
+| `@portfolio/utils`               | `lib/utils/`           | Shared utility functions                   |
 
 ## Workspaces
 
@@ -179,7 +183,8 @@ The monorepo uses Bun workspaces defined in the root `package.json`:
   "workspaces": [
     "frontend",
     "lib/*",
-    "screen-ticker",
+    "cds-engine-strategy",
+    "pcs-engine-strategy",
     "ai-analyst",
     "cloudflare"
   ]
@@ -198,28 +203,30 @@ The monorepo uses Bun workspaces defined in the root `package.json`:
 
 ```
 portfolio/
-├── .github/workflows/     # CI/CD configuration
-├── .husky/                # Git hooks (pre-commit)
-├── frontend/              # @portfolio/web
-├── ai-analyst/            # @portfolio/ai-analyst
-├── screen-ticker/         # @portfolio/screen-ticker
-├── cloudflare/            # @portfolio/cloudflare-proxy
-├── unusual-options-service/  # Python (Poetry)
-├── penny-stock-scanner/   # Python (Poetry)
-├── wp-service/            # Python (Poetry)
-├── lib/                   # Shared TypeScript libraries
-│   ├── ai-agent/         # @portfolio/ai-agent
-│   ├── types/            # @portfolio/types
-│   └── utils/            # @portfolio/utils
-├── db/                    # Database schemas
-├── docs/                  # Documentation
-├── scripts/               # Standalone scripts
-├── data/                  # Data exports
-├── turbo.json            # Turborepo configuration
-├── tsconfig.json         # Root TypeScript config
-├── eslint.config.mjs     # Shared ESLint config
-├── .prettierrc           # Shared Prettier config
-└── .pre-commit-config.yaml  # Pre-commit hooks config
+├── .github/workflows/         # CI/CD configuration
+├── .husky/                    # Git hooks (pre-commit)
+├── frontend/                  # @portfolio/web
+├── ai-analyst/                # @portfolio/ai-analyst
+├── cds-engine-strategy/       # @portfolio/cds-engine-strategy
+├── cloudflare/                # @portfolio/cloudflare-proxy
+├── unusual-options-service/   # Python (Poetry)
+├── penny-stock-scanner/       # Python (Poetry)
+├── wp-service/                # Python (Poetry)
+├── lib/                       # Shared TypeScript libraries
+│   ├── ai-agent/             # @portfolio/ai-agent
+│   ├── core/                 # @portfolio/core
+│   ├── types/                # @portfolio/types
+│   └── utils/                # @portfolio/utils
+├── db/                        # Database schemas & migrations
+├── docs/                      # Documentation
+├── scripts/                   # Standalone scripts
+├── data/                      # Data exports
+├── strategy.config.yaml       # Centralized strategy rules (SSOT)
+├── turbo.json                 # Turborepo configuration
+├── tsconfig.json              # Root TypeScript config
+├── eslint.config.mjs          # Shared ESLint config
+├── .prettierrc                # Shared Prettier config
+└── .pre-commit-config.yaml    # Pre-commit hooks config
 ```
 
 ## Root Scripts
@@ -318,21 +325,76 @@ import {
 } from '@portfolio/ai-agent';
 ```
 
+**Canonical modules:**
+
+- `config/` — Strategy config loader and types (single source of truth)
+- `market/` — Market regime detection (VIX, SPY, sectors) with caching
+- `tools/` — Agent tool definitions and handler execution
+- `session/` — Unified API for CLI and Frontend
+- `toon/` — TOON token encoding (40% fewer tokens)
+
+### @portfolio/core
+
+Shared trading infrastructure for strategy engines:
+
+```typescript
+import { detectMarketRegime } from '@portfolio/core/regime';
+import { calculateRisk } from '@portfolio/core/risk';
+```
+
 ### @portfolio/types
 
 Shared TypeScript type definitions:
 
 ```typescript
-import type { TickerInfo, Position } from '@portfolio/types';
+import type { Ticker, Position } from '@portfolio/types';
 ```
 
 ### @portfolio/utils
 
-Shared utility functions:
+Shared utility functions. Re-exports strategy config from `@portfolio/ai-agent`
+for convenience:
 
 ```typescript
 import { calculateEntryGrade } from '@portfolio/utils/entry-grade';
 import { calculatePFV } from '@portfolio/utils/pfv';
+import { validateEntry } from '@portfolio/utils/strategy-config';
+```
+
+## Strategy Config Architecture
+
+All trading strategy rules live in `strategy.config.yaml` at the repo root.
+This is the **single source of truth** for entry criteria, exit rules, position
+sizing, spread parameters, risk management, and market regime adjustments.
+
+**Canonical loader:** `@portfolio/ai-agent/config`
+
+```typescript
+import { getStrategyConfig, isRSIValid } from '@portfolio/ai-agent/config';
+```
+
+The `@portfolio/utils/strategy-config` module re-exports everything from the
+canonical source and adds a comprehensive `validateEntry()` helper.
+
+## Market Regime Architecture
+
+Two regime systems serve different purposes, unified by a bridge layer:
+
+| System                       | Types                                        | Purpose                                |
+| ---------------------------- | -------------------------------------------- | -------------------------------------- |
+| `@portfolio/core/regime`     | `bull`, `neutral`, `bear`, `caution`         | Strategy adjustments (config-driven)   |
+| `@portfolio/ai-agent/market` | `RISK_ON`, `RISK_OFF`, `NEUTRAL`, `HIGH_VOL` | Real-time AI context (VIX/SPY/sectors) |
+
+- **Strategy regime** drives position sizing and score thresholds from `strategy.config.yaml`
+- **Market regime** provides live market context for AI chat and analyst tools
+- **Bridge layer** (`mapToStrategyRegime`, `mapToAIRegime`) in `@portfolio/core/regime`
+  converts between the two systems for consistent behavior
+
+```typescript
+import { mapToStrategyRegime } from '@portfolio/core/regime';
+
+// RISK_ON → bull, RISK_OFF → bear, HIGH_VOL → caution, NEUTRAL → neutral
+const strategyRegime = mapToStrategyRegime(aiRegime);
 ```
 
 ## Python Services
@@ -421,7 +483,9 @@ indent-style = "space"
 
 ## Cross-Package Dependencies
 
-TypeScript packages can import from each other:
+TypeScript packages **must** declare explicit workspace dependencies in their
+`package.json`. This enables Turborepo to infer the correct dependency graph
+for caching and task ordering.
 
 ```json
 // ai-analyst/package.json
@@ -438,18 +502,50 @@ Then import:
 import { buildVictorSystemPrompt } from '@portfolio/ai-agent';
 ```
 
+### Current Dependency Graph
+
+```
+@portfolio/web ──────────> @portfolio/ai-agent
+@portfolio/ai-analyst ───> @portfolio/ai-agent
+@portfolio/ai-agent ─────> (standalone, no @portfolio/* deps)
+@portfolio/core ─────────> (standalone, no @portfolio/* deps)
+@portfolio/types ────────> (standalone, no deps)
+@portfolio/utils ────────> @portfolio/ai-agent (re-exports config)
+@portfolio/cds-engine ───> @portfolio/providers
+@portfolio/pcs-engine ───> @portfolio/providers
+@portfolio/providers ────> (standalone, no @portfolio/* deps)
+@portfolio/cloudflare ───> (standalone, no @portfolio/* deps)
+```
+
+### Import Patterns
+
+The frontend uses `@lib/*` path aliases (configured in `tsconfig.json` and
+`next.config.js`) alongside the workspace dependency:
+
+```typescript
+// frontend imports use @lib/* path alias
+import { AGENT_TOOLS } from '@lib/ai-agent';
+
+// ai-analyst uses relative paths (with ../../../lib/)
+import { sessionCache } from '../../../lib/ai-agent/cache/index.ts';
+```
+
+**Note**: While the codebase uses `@lib/*` path aliases for imports, the
+`workspace:*` declarations in `package.json` are still required for
+Turborepo's dependency graph.
+
 ## Environment Variables
 
 Each service may require different environment variables.
 Create `.env` files per service (not committed to git):
 
-| Service       | Env File               | Description                     |
-| ------------- | ---------------------- | ------------------------------- |
-| Frontend      | `frontend/.env.local`  | Next.js environment vars        |
-| AI Analyst    | `ai-analyst/.env`      | CLI environment                 |
-| Screen Ticker | `screen-ticker/.env`   | Scanner environment             |
-| Cloudflare    | `cloudflare/.dev.vars` | Worker secrets (local dev)      |
-| Root (shared) | `.env`                 | Shared across multiple services |
+| Service       | Env File                   | Description                     |
+| ------------- | -------------------------- | ------------------------------- |
+| Frontend      | `frontend/.env.local`      | Next.js environment vars        |
+| AI Analyst    | `ai-analyst/.env`          | CLI environment                 |
+| CDS Engine    | `cds-engine-strategy/.env` | Strategy engine environment     |
+| Cloudflare    | `cloudflare/.dev.vars`     | Worker secrets (local dev)      |
+| Root (shared) | `.env`                     | Shared across multiple services |
 
 ### Required Variables
 
@@ -573,6 +669,108 @@ Dependabot is configured in `.github/dependabot.yml` to scan:
 covers all TypeScript packages (frontend, ai-analyst, cds-engine-strategy,
 cloudflare, lib/\*). Individual workspace directories don't need separate entries.
 
+## Strategy Config Validation
+
+The `strategy.config.yaml` is validated at load time using a comprehensive Zod schema
+(`lib/ai-agent/config/schema.ts`). This catches misconfigurations before they affect
+real trading decisions.
+
+**What it validates:**
+
+- All required fields are present
+- Numeric fields are within sane ranges (0-100 for percentages)
+- Relational constraints hold (e.g., `rsi_min < rsi_max`, `cushion.minimum < cushion.preferred`)
+- Arrays are non-empty where required (scaling tiers, ticker universe)
+
+**CI integration:** The `validate-config` job in `.github/workflows/ci.yml`
+runs the schema validation tests on every push and PR. The build job depends on
+this validation passing.
+
+```bash
+# Run config validation locally
+bun test lib/ai-agent/config/schema.test.ts
+```
+
+## Error Boundaries
+
+React Error Boundaries prevent runtime errors from crashing the entire page:
+
+| Location                | File                                                 | Purpose                        |
+| ----------------------- | ---------------------------------------------------- | ------------------------------ |
+| Global                  | `frontend/src/app/error.tsx`                         | Catch-all for unhandled errors |
+| Unusual Options Scanner | `frontend/src/app/unusual-options-scanner/error.tsx` | Scanner-specific recovery      |
+| Penny Stock Scanner     | `frontend/src/app/penny-stock-scanner/error.tsx`     | Scanner-specific recovery      |
+| Position Tracker        | `frontend/src/app/positions/error.tsx`               | Positions-specific recovery    |
+
+A reusable `ErrorBoundary` class component is also available:
+
+```typescript
+import { ErrorBoundary } from '@/components/error-boundary';
+
+<ErrorBoundary section="My Feature">
+  <MyComponent />
+</ErrorBoundary>
+```
+
+## Rate Limiting
+
+API route rate limiting is implemented via an in-memory sliding window
+(`frontend/src/lib/rate-limit.ts`):
+
+| Route       | Limit      | Key        |
+| ----------- | ---------- | ---------- |
+| `/api/chat` | 20 req/60s | User email |
+
+Rate limits are configurable via environment variables:
+
+- `AI_CHAT_RATE_LIMIT` — Max requests per window (default: 20)
+- `AI_CHAT_RATE_WINDOW_MS` — Window duration in ms (default: 60000)
+
+## Database Migrations
+
+Migration tooling is provided via `db/migrate.sh`:
+
+```bash
+# Run pending migrations
+bun run db:migrate
+
+# Check migration status
+bun run db:migrate:status
+
+# Preview what would run
+bun run db:migrate:dry-run
+
+# Create a new migration
+bun run db:migrate:new my_description
+```
+
+Migrations are tracked in a `_migrations` table in Supabase PostgreSQL.
+Migration files live in `db/migrations/` and are executed in lexicographic order.
+
+## Python Shared Library
+
+`lib/py-core/` provides shared Python utilities for all trading services:
+
+```python
+from portfolio_core import get_service_client, setup_logging, safe_divide
+
+# Consistent Supabase client
+client = get_service_client()
+
+# Standard logging
+setup_logging(level="DEBUG", service_name="my-scanner")
+
+# Safe math
+result = safe_divide(profit, cost, default=0.0)
+```
+
+Install in a service:
+
+```bash
+cd unusual-options-service
+poetry add portfolio-core --path ../lib/py-core
+```
+
 ## Best Practices
 
 1. **Keep packages independent**: Each package should work standalone
@@ -586,7 +784,20 @@ cloudflare, lib/\*). Individual workspace directories don't need separate entrie
 9. **Pass CI locally**: Run `bun run typecheck && bun run lint` before pushing
 10. **Use ruff for Python**: All Python services use ruff for consistency
 11. **Audit regularly**: Run `bun run audit` to check for security vulnerabilities
+12. **Validate config**: Run `bun test lib/ai-agent/config/schema.test.ts` after editing strategy.config.yaml
+13. **Use Python shared lib**: Import from `portfolio_core` instead of duplicating Supabase client setup
+
+## Root Scripts (updated)
+
+New scripts added:
+
+| Script                       | Description                     |
+| ---------------------------- | ------------------------------- |
+| `bun run db:migrate`         | Run pending database migrations |
+| `bun run db:migrate:status`  | Show migration status           |
+| `bun run db:migrate:dry-run` | Preview pending migrations      |
+| `bun run db:migrate:new`     | Create a new migration file     |
 
 ---
 
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-02-09

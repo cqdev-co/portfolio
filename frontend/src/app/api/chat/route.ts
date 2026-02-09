@@ -1,6 +1,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { chatRateLimiter } from '@/lib/rate-limit';
 
 // Shared AI agent library (monorepo root)
 import {
@@ -21,14 +22,13 @@ const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.3:70b-cloud';
 
 // ============================================================================
 // AI CHAT WHITELIST
-// Only these email addresses can use the AI chat feature
+// Only these email addresses can use the AI chat feature.
+// Configured via environment variable (comma-separated) for security.
 // ============================================================================
-const AI_CHAT_WHITELIST: string[] = [
-  'melonshd88@gmail.com',
-  'conorquinlan@icloud.com',
-  'conor.quinlan@cyera.io',
-  // Add more emails here as needed
-];
+const AI_CHAT_WHITELIST: string[] = (process.env.AI_CHAT_WHITELIST || '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 /**
  * Check if a user is authorized to use the AI chat
@@ -192,6 +192,109 @@ interface OllamaToolCall {
   };
 }
 
+// ============================================================================
+// XML TOOL CALL PARSER
+// Some models (e.g. llama3.3) output tool calls as XML text instead of using
+// Ollama's native structured tool_calls format. This parser detects and
+// converts those XML-style calls so they can be executed normally.
+// ============================================================================
+
+/**
+ * Parse XML-style function calls from model text output.
+ * Handles patterns like:
+ *   <function_calls>
+ *     <invoke name="get_ticker_data">
+ *       <parameter name="ticker">MSFT</parameter>
+ *     </invoke>
+ *   </function_calls>
+ */
+function parseXMLToolCalls(text: string): OllamaToolCall[] {
+  const toolCalls: OllamaToolCall[] = [];
+
+  // Match <invoke name="...">...</invoke> blocks
+  const invokePattern = /<invoke\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/invoke>/g;
+  let match;
+
+  while ((match = invokePattern.exec(text)) !== null) {
+    const name = match[1];
+    const body = match[2];
+    const args: Record<string, unknown> = {};
+
+    // Extract <parameter name="...">value</parameter>
+    const paramPattern =
+      /<parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/parameter>/g;
+    let paramMatch;
+
+    while ((paramMatch = paramPattern.exec(body)) !== null) {
+      const paramName = paramMatch[1];
+      const rawValue = paramMatch[2].trim();
+
+      // Parse value types
+      if (/^-?\d+\.?\d*$/.test(rawValue)) {
+        args[paramName] = parseFloat(rawValue);
+      } else if (rawValue === 'true') {
+        args[paramName] = true;
+      } else if (rawValue === 'false') {
+        args[paramName] = false;
+      } else {
+        args[paramName] = rawValue;
+      }
+    }
+
+    toolCalls.push({
+      function: { name, arguments: args },
+    });
+  }
+
+  return toolCalls;
+}
+
+/**
+ * Strip XML function call blocks from text content.
+ * Used to clean assistant content before sending it back to the model
+ * so it doesn't see its own XML tool call output in conversation history.
+ */
+function stripXMLToolCalls(text: string): string {
+  return text
+    .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '')
+    .replace(/<invoke\s+name="[^"]*"[^>]*>[\s\S]*?<\/invoke>/g, '')
+    .replace(/<\/?(?:function(?:_calls)?|invoke|parameter)\b[^>]*>?/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Detect the start of an XML function call pattern in accumulated text.
+ * Returns the index where the XML starts, or -1 if not found.
+ */
+function findXMLToolCallStart(text: string): number {
+  const patterns = ['<function_calls>', '<invoke '];
+  let earliest = -1;
+  for (const p of patterns) {
+    const idx = text.indexOf(p);
+    if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+      earliest = idx;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Clean partial XML tag fragments from a streamed text chunk.
+ * Some models output incomplete XML tags like "<function" when
+ * attempting tool calls in follow-up responses. This strips those
+ * fragments before they reach the client UI.
+ *
+ * Uses word boundary (\b) to avoid false positives on words like
+ * "<functionality>" or "<functional>".
+ */
+function cleanPartialXMLTags(text: string): string {
+  return text.replace(
+    /<\/?(?:function(?:_calls)?|invoke|parameter)\b[^>]*>?/g,
+    ''
+  );
+}
+
 export async function POST(req: Request) {
   try {
     // ============================================
@@ -216,6 +319,36 @@ export async function POST(req: Request) {
     }
 
     console.log(`[Chat] Authorized user: ${authResult.email}`);
+
+    // ============================================
+    // RATE LIMITING
+    // ============================================
+    const rateLimitKey = authResult.email || 'unknown';
+    const rateLimit = chatRateLimiter.check(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      console.log(
+        `[Chat] Rate limited: ${rateLimitKey} (resets at ${new Date(rateLimit.resetAt).toISOString()})`
+      );
+      return new Response(
+        JSON.stringify({
+          error: 'Rate limit exceeded',
+          message:
+            'Too many requests. Please wait a moment before sending another message.',
+          resetAt: rateLimit.resetAt,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(
+              Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+            ),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
 
     // ============================================
     // PROCESS CHAT REQUEST
@@ -307,6 +440,7 @@ export async function POST(req: Request) {
           let buffer = '';
           let pendingToolCalls: OllamaToolCall[] = [];
           let assistantContent = '';
+          let xmlToolCallDetected = false; // Suppresses XML text from streaming to client
 
           while (true) {
             const { done, value } = await reader.read();
@@ -373,32 +507,71 @@ export async function POST(req: Request) {
                 if (content) {
                   assistantContent += content;
 
-                  // Start text if not started
-                  if (!textId) {
-                    textId = crypto.randomUUID();
-                    writer.write({ type: 'text-start', id: textId });
+                  // Detect XML function calls in accumulated content
+                  // Some models output tool calls as XML text instead of
+                  // using structured tool_calls - suppress this from the UI
+                  if (
+                    !xmlToolCallDetected &&
+                    findXMLToolCallStart(assistantContent) !== -1
+                  ) {
+                    xmlToolCallDetected = true;
+                    console.log(
+                      '[Chat] XML tool call detected in text output - suppressing from stream'
+                    );
                   }
 
-                  // Close thinking mode ONCE when we get actual content
-                  if (globalThinkingMode) {
-                    globalThinkingMode = false;
-                    writer.write({
-                      type: 'text-delta',
-                      id: textId,
-                      delta: '<!--THINKING_END-->',
-                    });
-                  }
+                  // Don't stream XML function call text to the client
+                  if (!xmlToolCallDetected) {
+                    // Clean partial XML tag fragments (e.g., "<function")
+                    // that models output when attempting tool calls as text
+                    const cleanedContent = cleanPartialXMLTags(content);
 
-                  // Write text delta
-                  writer.write({
-                    type: 'text-delta',
-                    id: textId,
-                    delta: content,
-                  });
+                    if (cleanedContent.trim()) {
+                      // Start text if not started
+                      if (!textId) {
+                        textId = crypto.randomUUID();
+                        writer.write({ type: 'text-start', id: textId });
+                      }
+
+                      // Close thinking mode ONCE when we get actual content
+                      if (globalThinkingMode) {
+                        globalThinkingMode = false;
+                        writer.write({
+                          type: 'text-delta',
+                          id: textId,
+                          delta: '<!--THINKING_END-->',
+                        });
+                      }
+
+                      // Write cleaned text delta
+                      writer.write({
+                        type: 'text-delta',
+                        id: textId,
+                        delta: cleanedContent,
+                      });
+                    }
+                  }
                 }
 
                 // End of stream - handle tool calls if any
                 if (json.done) {
+                  // Fallback: parse XML-style tool calls from text output
+                  // Models like llama3.3 sometimes emit tool calls as XML
+                  // text instead of using Ollama's structured tool_calls
+                  if (pendingToolCalls.length === 0 && assistantContent) {
+                    const xmlToolCalls = parseXMLToolCalls(assistantContent);
+                    if (xmlToolCalls.length > 0) {
+                      console.log(
+                        `[Chat] Parsed ${xmlToolCalls.length} XML tool call(s) from text output:`,
+                        xmlToolCalls.map((tc) => tc.function.name)
+                      );
+                      pendingToolCalls = xmlToolCalls;
+                      // Clean XML from assistant content for conversation
+                      // history so model doesn't see its own XML output
+                      assistantContent = stripXMLToolCalls(assistantContent);
+                    }
+                  }
+
                   console.log(
                     `[Chat] Stream done. Pending tools: ${pendingToolCalls.length}`
                   );

@@ -85,6 +85,15 @@ export const metadata: Metadata = {
     images: ['/logos/cgq.png'],
     creator: '@cqdev_co',
   },
+  // Search engine verification - replace with your actual verification codes
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION,
+    // yahoo: process.env.NEXT_PUBLIC_YAHOO_VERIFICATION,
+    // other: {
+    //   'msvalidate.01': process.env.NEXT_PUBLIC_BING_VERIFICATION,
+    // },
+  },
 };
 
 export default function RootLayout({

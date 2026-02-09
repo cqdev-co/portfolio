@@ -1,5 +1,201 @@
 # Frontend Documentation
 
+## SEO Implementation
+
+The portfolio frontend implements comprehensive SEO optimizations using Next.js App Router metadata features.
+
+### Core SEO Features
+
+#### Metadata Configuration
+
+**Root Layout (`src/app/layout.tsx`)**:
+
+- Title template with `%s | cgq` format
+- OpenGraph and Twitter card configurations
+- Search engine verification (Google, Yandex, Bing)
+- Format detection disabled for cleaner display
+
+**`createMetadata()` Utility (`src/lib/utils.ts`)**:
+
+- Reusable metadata generator for consistent SEO across pages
+- Supports: title, description, pageUrl, type (website/article/profile), imagePath, keywords
+- Generates canonical URLs and robots directives
+
+#### Dynamic Sitemap (`src/app/sitemap.ts`)
+
+Automatically generates sitemap including:
+
+- Static routes (home, about, blog, scanners)
+- Dynamic blog post routes with featured post prioritization
+- Scanner pages (penny-stock-scanner, unusual-options-scanner, positions)
+- Error handling with fallback to static routes
+
+#### Robots Configuration (`src/app/robots.ts`)
+
+- Rules for all user agents
+- Specific crawl delays for Googlebot and Bingbot
+- Disallows private, API, and Next.js internal routes
+- References sitemap URL
+
+#### Structured Data (JSON-LD)
+
+Located in `src/components/schema.tsx`:
+
+| Schema             | Usage                                         |
+| ------------------ | --------------------------------------------- |
+| `PersonSchema`     | Root layout - author/person information       |
+| `WebsiteSchema`    | Root layout - website metadata                |
+| `BlogPostSchema`   | Blog posts - article structured data          |
+| `BreadcrumbSchema` | Blog posts, scanners - navigation breadcrumbs |
+
+#### Dynamic OpenGraph Images
+
+- Root OG image (`src/app/opengraph-image.tsx`)
+- Blog post OG images (`src/app/blog/[slug]/opengraph-image.tsx`)
+- About page OG image (`src/app/about/opengraph-image.tsx`)
+- Penny Stock Scanner OG image (`src/app/penny-stock-scanner/opengraph-image.tsx`)
+
+### Search Engine Verification
+
+Add verification codes via environment variables:
+
+```bash
+# .env.local
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=your_google_code
+NEXT_PUBLIC_YANDEX_VERIFICATION=your_yandex_code
+```
+
+### Breadcrumb Schema Implementation
+
+Breadcrumbs are implemented on:
+
+- **Blog posts**: Home → Blog → Post Title
+- **Scanners page**: Home → Scanners
+- **Penny Stock Scanner**: Home → Scanners → Penny Stock Scanner
+- **Unusual Options Scanner**: Home → Scanners → Unusual Options Scanner
+
+### Adding SEO to New Pages
+
+1. **Server Components**: Export metadata object or use `generateMetadata()` for dynamic pages
+2. **Use `createMetadata()` utility**: For consistent metadata structure
+3. **Add to sitemap**: Include new routes in `src/app/sitemap.ts`
+4. **Add BreadcrumbSchema**: For hierarchical pages
+
+Example for a new page:
+
+```typescript
+// src/app/new-page/layout.tsx
+import type { Metadata } from 'next';
+import { BreadcrumbSchema } from '@/components/schema';
+
+export const metadata: Metadata = {
+  title: 'New Page Title',
+  description: 'Page description for search engines',
+  keywords: ['keyword1', 'keyword2'],
+  openGraph: {
+    title: 'New Page Title',
+    description: 'OpenGraph description',
+    type: 'website',
+  },
+};
+
+export default function NewPageLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <BreadcrumbSchema
+        items={[
+          { name: 'Home', url: 'https://conorq.com' },
+          { name: 'New Page', url: 'https://conorq.com/new-page' },
+        ]}
+      />
+      {children}
+    </>
+  );
+}
+```
+
+---
+
+## Error Boundaries
+
+The frontend implements React Error Boundaries at multiple levels to prevent
+runtime errors from crashing the page:
+
+### Next.js Route-Level Error Boundaries
+
+Each major section has a dedicated `error.tsx` file that catches errors within
+that route segment:
+
+| Route                   | File                                        |
+| ----------------------- | ------------------------------------------- |
+| Global (all pages)      | `src/app/error.tsx`                         |
+| Unusual Options Scanner | `src/app/unusual-options-scanner/error.tsx` |
+| Penny Stock Scanner     | `src/app/penny-stock-scanner/error.tsx`     |
+| Position Tracker        | `src/app/positions/error.tsx`               |
+
+Each error boundary:
+
+- Displays a user-friendly error message specific to the section
+- Provides "Try again" and "Reload page" buttons for recovery
+- Shows error details in development mode only
+- Logs errors to the console with section context
+
+### Reusable ErrorBoundary Component
+
+For wrapping specific component trees within a page:
+
+```typescript
+import { ErrorBoundary } from '@/components/error-boundary';
+
+<ErrorBoundary section="Options Chain">
+  <OptionsChainTable data={data} />
+</ErrorBoundary>
+```
+
+## API Rate Limiting
+
+The chat API endpoint (`/api/chat`) includes per-user rate limiting to prevent
+abuse and excessive Ollama API calls.
+
+### Configuration
+
+```bash
+# .env.local
+AI_CHAT_RATE_LIMIT=20          # Max requests per window
+AI_CHAT_RATE_WINDOW_MS=60000   # Window duration (ms)
+```
+
+### AI Chat Authorization
+
+The chat feature is restricted to whitelisted email addresses configured via
+the `AI_CHAT_WHITELIST` environment variable (comma-separated):
+
+```bash
+# .env.local
+AI_CHAT_WHITELIST=user1@example.com,user2@example.com
+```
+
+### Rate Limiter Implementation
+
+Located in `src/lib/rate-limit.ts`, the rate limiter uses an in-memory sliding
+window approach. Pre-configured limiters:
+
+- `chatRateLimiter` — 20 requests/60s per user email
+- `apiRateLimiter` — 60 requests/60s per IP (available for other routes)
+
+### API Response Caching
+
+API routes include HTTP cache headers for CDN and browser caching:
+
+| Route                      | Cache Strategy                               |
+| -------------------------- | -------------------------------------------- |
+| `/api/stock-prices`        | 2 min s-maxage, 1 min stale-while-revalidate |
+| `/api/odyssey/market-data` | 2 min s-maxage, 3 min stale-while-revalidate |
+| `/api/odyssey/sector-data` | 3 min s-maxage, 2 min stale-while-revalidate |
+| `/api/chat/models`         | 5 min Next.js revalidate                     |
+
+---
+
 ## Recent Updates
 
 ### FinanceChart Component (January 2026)
@@ -290,6 +486,287 @@ function getDayOfWeekStatus(dateStr: string): 'bonus' | 'penalty' | 'neutral';
 - Tooltips explain what each indicator means
 - Compact layout to avoid overwhelming users
 - Information hierarchy: Most actionable info (recommendation) shown first
+
+### Dashboard CI Fixes (February 2026)
+
+Fixed multiple typecheck, lint, and build errors in dashboard components:
+
+- **`daily-briefing.tsx`**: Fixed `changePct` → `changePercent` to match `MarketDataPoint` type from `market-pulse.tsx`. Also fixed `usePositionAnnotations()` hook — moved sessionStorage read from a synchronous `setState` inside `useEffect` to a lazy `useState` initializer, resolving the `react-hooks/set-state-in-effect` lint error.
+- **`positions-overview.tsx`**: Fixed conditional `useMemo` hook call — moved `useMemo` above the early `if (loading)` return to comply with React's rules of hooks.
+- **`performance-section.tsx`**: Removed unused `totalPnl` variable in `TradeStats` component.
+- **`options-chain/route.ts`**: Removed unused `eslint-disable-next-line @typescript-eslint/no-explicit-any` directives.
+- **`mdx.tsx`**: Removed unused eslint-disable directive and improved type from `any` to `Record<string, React.ComponentType<any>>`.
+
+### Fund Dashboard (February 2026)
+
+A private, auth-gated dashboard at `/dashboard` designed as an **AI-native morning brief** for the hedge fund. The layout follows a narrative flow — not a data-dense terminal — using progressive disclosure to prevent information overload while ensuring everything you need is immediately accessible.
+
+Access is restricted to the fund owner (configured via `DASHBOARD_OWNER_EMAIL` constant in `dashboard-client.tsx`).
+
+#### Design Philosophy
+
+The dashboard answers three questions in order:
+
+1. **"What's happening?"** — Market regime, VIX, circuit breaker status (Status Bar)
+2. **"What should I do?"** — AI briefing with interactive action items (Daily Briefing)
+3. **"What needs my attention?"** — Positions filtered by urgency (Attention Required)
+
+Everything else (raw market data, full signal lists, trade history) is available on demand via collapsible sections. The goal is **zero scroll for the 80% case** — status bar + briefing + urgent positions fits on one screen most mornings.
+
+#### Route & Auth
+
+- **Route**: `/dashboard` with `layout.tsx` (metadata, `robots: noindex`)
+- **Auth Gating**: Client-side email check via `useAuth()` hook against `DASHBOARD_OWNER_EMAIL` constant
+- **States**: Loading spinner, sign-in prompt, access denied, and full dashboard
+
+#### Dashboard Layout (top to bottom)
+
+**1. Status Bar** (`status-bar.tsx`) — **NEW**
+
+- Single compact header line replacing the old header + Market Pulse + Risk Status
+- Shows: title, market open/closed badge, regime badge (RISK_ON / RISK_OFF / NEUTRAL / HIGH_VOL), VIX regime badge (CALM / NORMAL / ELEVATED / HIGH / EXTREME)
+- **Circuit breaker indicator**: Colored dot (green/yellow-pulse/red-pulse) with label (All Clear / Reduce Size / Pause Trading)
+- Last refresh timestamp, Refresh button, Ask Victor button
+- Regime detection: SPY % change + VIX price → market regime classification
+- Circuit breaker logic: portfolio drawdown + positions-at-risk count → green/yellow/red
+
+**2. AI Daily Briefing** (`daily-briefing.tsx`) — **Hero Section**
+
+- Auto-generated morning briefing by Victor (AI analyst persona) on dashboard load
+- Gathers context: market data, positions, spreads, unified signals, economic calendar, regime
+- Calls `/api/dashboard/briefing` (POST) which sends context to Ollama for structured analysis
+- Returns JSON with: `briefing`, `positionNotes`, `actionItems`, `riskAlerts`, `signalHighlights`
+- **Interactive action items** with checkboxes — check off items as you act on them during the session
+  - Checked state persisted in sessionStorage
+  - Progress counter ("2/4 done")
+  - Checked items reset when a new briefing is generated
+- Typewriter animation for briefing text display
+- Collapsible sections: Action Items (checkboxes), Risk Alerts, Signal Highlights, Upcoming Events
+- Caches in sessionStorage (30-minute TTL) to avoid re-generation on refresh
+- Position annotations surfaced via `usePositionAnnotations()` hook
+
+**3. Attention Required** (`attention-required.tsx`) — **NEW**
+
+- Replaces the old Portfolio Summary + full Positions Overview table
+- Filters all positions for **urgency**, showing only those needing a decision:
+  - **EXPIRED** (DTE ≤ 0) — highest priority
+  - **Expiring Soon** (DTE ≤ 7) — needs roll or expiry decision
+  - **Review** (P&L ≤ -30%) — significant loss, needs evaluation
+  - **Take Profit** (P&L ≥ 50%) — profit target hit
+- Each urgent item renders as a compact card with: symbol, strategy detail, DTE, P&L, and action badge
+- AI position annotations (from briefing) shown inline on urgent cards
+- When no positions need attention: green "All X positions on track" banner
+- **Collapsible full positions table**: "N positions on track" toggle expands to the full `PositionsOverview` component with all spread/standalone tables
+- Section header shows total open positions count + attention-needed count
+
+**4. Market Context** (`market-context.tsx`) — **NEW (collapsible, collapsed by default)**
+
+- Wraps existing `MarketPulse` + `SectorHeatmap` in a collapsible section
+- **Collapsed state**: Shows inline summary — "SPY +0.82% · QQQ +1.2% · VIX 14.2"
+- **Expanded state**: Full Market Pulse cards (SPY, QQQ, DIA, IWM, VIX) + Sector Heatmap grid
+- Default collapsed because the AI briefing already synthesizes this data into a narrative
+
+**5. Signal Highlights** (`signal-highlights.tsx`) — **NEW (replaces SignalFeed + SignalsPanel)**
+
+- Single unified signal section replacing the old two separate signal components
+- Fetches from unified `signals` table (last 7 days, ordered by score)
+- **Compact view** (default):
+  - Multi-strategy convergence alerts (purple card with ticker + strategy combinations)
+  - Top 5 S/A-grade signals as compact rows with grade badge, ticker, strategy, direction, score, date
+- **Expanded view** (toggle):
+  - Strategy filter tabs (All / CDS / PCS / PENNY)
+  - Full signal list with all grades
+  - Convergence highlighting preserved
+
+**6. Trade Journal** (collapsible, collapsed by default)
+
+- Inline collapsible toggle in `dashboard-client.tsx`
+- Expands to render the existing `PerformanceSection` component
+- Trade stats: Total Trades, Win Rate, Avg Win %, Avg Loss %
+- Recent trades list with outcome, P&L, strategy, date
+
+#### Components Retained (used internally)
+
+These components are no longer rendered directly by `dashboard-client.tsx` but are used internally by the new wrapper components:
+
+| Component                 | Used By                               |
+| ------------------------- | ------------------------------------- |
+| `market-pulse.tsx`        | `MarketContext` (expanded state)      |
+| `sector-heatmap.tsx`      | `MarketContext` (expanded state)      |
+| `positions-overview.tsx`  | `AttentionRequired` (expanded state)  |
+| `performance-section.tsx` | Trade Journal toggle (expanded state) |
+
+#### Components Superseded
+
+These components are no longer rendered in the dashboard layout but remain in the codebase:
+
+| Component               | Replaced By                                         |
+| ----------------------- | --------------------------------------------------- |
+| `portfolio-summary.tsx` | Removed — Robinhood handles portfolio value display |
+| `signal-feed.tsx`       | `SignalHighlights` (merged)                         |
+| `signals-panel.tsx`     | `SignalHighlights` (merged)                         |
+| `risk-status.tsx`       | `StatusBar` (circuit breaker moved to header)       |
+
+#### Data Sources
+
+| Section           | API / Data Source                                                            |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Status Bar        | Client-side calculation from market data + positions                         |
+| AI Briefing       | `/api/dashboard/briefing` (POST) → Ollama + all context sources              |
+| Market Context    | `/api/odyssey/market-data`, `/api/odyssey/sector-data` (Yahoo Finance)       |
+| Positions         | `/api/positions` + `/api/positions/prices` + `/api/positions/options-prices` |
+| Signal Highlights | Supabase direct: `signals` (unified table)                                   |
+| Events            | `/api/odyssey/economic-calendar`                                             |
+| Trade Journal     | Supabase direct: `analyst_trades`                                            |
+
+#### Auto-Refresh
+
+- Market data refreshes every 60 seconds during market hours (Mon-Fri, 9:30 AM - 4:00 PM EST)
+- Positions auto-refresh with market data on initial load
+- Manual refresh button available at all times
+- Market hours detection uses EST timezone
+
+#### AI Integration
+
+- **Daily Briefing** (proactive): Auto-generates on dashboard load with typewriter animation
+  - Gathers: market indices, regime, positions, spreads, unified signals, economic calendar
+  - Calls `/api/dashboard/briefing` which sends structured context to Ollama (non-streaming, temperature 0.3)
+  - Returns structured JSON: briefing text, per-position annotations, action items, risk alerts, signal highlights
+  - **Interactive action items**: Checkboxes to track completion during the session
+  - Annotations flow to Attention Required cards + Positions Overview via `usePositionAnnotations()` hook + sessionStorage
+  - Cached 30 minutes in sessionStorage; regenerate button available
+- **Ask Victor** (reactive): Button in status bar opens AI chat pre-loaded with full portfolio context
+  - Builds prompt with all position data, spread details, and summary metrics
+  - Uses existing `buildPortfolioPrompt` from chat component library
+
+#### Files
+
+```
+src/app/dashboard/
+├── layout.tsx               # Metadata (noindex, nofollow)
+└── page.tsx                 # Entry point
+
+src/app/api/dashboard/
+└── briefing/route.ts       # AI briefing generation endpoint (POST)
+
+src/components/dashboard/
+├── dashboard-client.tsx     # Main orchestrator — narrative layout
+├── status-bar.tsx           # Compact header: regime, VIX, circuit breaker, actions
+├── daily-briefing.tsx       # AI briefing with interactive action item checkboxes
+├── attention-required.tsx   # Urgent position cards + collapsible full table
+├── market-context.tsx       # Collapsible wrapper: MarketPulse + SectorHeatmap
+├── signal-highlights.tsx    # Convergence + top signals, expandable full list
+├── market-pulse.tsx         # Market indices + regime badges (used by MarketContext)
+├── sector-heatmap.tsx       # Sector performance grid (used by MarketContext)
+├── positions-overview.tsx   # Full positions table (used by AttentionRequired)
+├── performance-section.tsx  # Trade journal + stats (used by Trade Journal toggle)
+├── portfolio-summary.tsx    # [Superseded] Summary metric cards
+├── signal-feed.tsx          # [Superseded] Full signal feed with filters
+├── signals-panel.tsx        # [Superseded] Live scanner signals feed
+└── risk-status.tsx          # [Superseded] Circuit breaker + risk metrics
+```
+
+#### Options Pricing & Strike Interpolation
+
+Yahoo Finance's v7 API returns a limited subset of strikes per expiration (~30 per side), which means specific strikes may be absent from the chain data. The `/api/positions/options-prices` route handles this with a multi-layer matching strategy:
+
+1. **Exact match**: `c.strike === requestedStrike`
+2. **Tolerance match**: Within $0.50 to handle floating-point differences
+3. **Linear interpolation**: When the target strike is missing, finds the two nearest available strikes (one above, one below) and linearly interpolates bid, ask, lastPrice, and IV
+
+This is critical for accurate spread P&L calculation — without interpolation, a missing short leg would fall back to intrinsic value (no time value), inflating the apparent spread value and showing false "max profit" signals.
+
+#### Spread Mid Pricing
+
+The spread calculation (`dashboard-client.tsx` and `positions-page-client.tsx`) uses **spread mid** pricing for P&L display. When full bid/ask data is available for both legs:
+
+- **Spread bid** = long bid - short ask (worst case / natural close)
+- **Spread ask** = long ask - short bid (best case)
+- **Spread mid** = (spread bid + spread ask) / 2
+
+This is more accurate than natural close (bid-ask) alone, which is too pessimistic for deep ITM spreads with wide bid/ask spreads. For example, a deep ITM $290/$295 call spread might show:
+
+- Natural close: $2.50 (misleadingly negative P&L)
+- Spread mid: $3.975 (accurate representation of current value)
+
+The code also includes a safety-net estimation: if mid-price spread value exceeds spread width (indicating an intrinsic-only fallback), it estimates the missing leg using the known leg's time value ratio.
+
+#### AI Briefing JSON Parsing
+
+The `/api/dashboard/briefing` route handles two key DeepSeek quirks:
+
+- **Thinking-only responses**: The model puts its entire response in `message.thinking` and leaves `message.content` empty. The route detects this and falls back to the thinking field automatically
+- **Thinking mode disabled**: The request sets `think: false` to force the model to output directly into `content`, avoiding the empty-content issue entirely. If thinking content is still returned as plain prose (no JSON), it's used directly as the briefing text
+
+It then uses a 4-strategy JSON extraction pipeline to handle extra text, `<think>` blocks, or malformed wrappers around the JSON:
+
+1. **Strategy 1 — Direct parse**: Strip markdown fences, closed `<think>...</think>` tags, and unclosed `<think>` tags (anchoring on `{` after the tag), then `JSON.parse()`
+2. **Strategy 2 — Anchor on `"briefing"` key**: Find `"briefing"` in the raw content, walk backward to the opening `{`, forward to the last `}`, then parse the extracted substring. This bypasses any thinking text that contains JSON-like characters
+3. **Strategy 3 — Regex value extraction**: Extract individual values (`briefing`, `positionNotes`, `actionItems`, etc.) using targeted regex patterns, avoiding full JSON parse entirely
+4. **Final fallback**: Return a graceful error message with an action item to review positions manually
+
+Each strategy logs its success/failure for debugging. The raw content preview is also logged to help diagnose model output issues
+
+#### Design
+
+- Consistent with existing portfolio UI (shadcn/ui, Tailwind, Lucide icons)
+- Loading skeletons for every section (progressive loading)
+- Dark mode support throughout
+- Compact typography with monospace for financial data
+- Color-coded badges and metrics (green/red/amber)
+
+---
+
+### XML Tool Call Fallback Parser (February 2026)
+
+Some LLM models (notably llama3.3 via Ollama) output tool calls as XML text in their response instead of using Ollama's native structured `tool_calls` JSON format. This caused tool calls to appear as raw XML in the chat UI and never actually execute.
+
+**The Problem:**
+
+When asked "Tell me what you think of MSFT", the model would output:
+
+```xml
+<function_calls>
+<invoke name="get_ticker_data">
+<parameter name="ticker">MSFT</parameter>
+</invoke>
+</function_calls>
+```
+
+This XML text was streamed to the client as visible content and the tool never executed, so the model couldn't complete its analysis.
+
+**The Fix (3 layers):**
+
+1. **XML Tool Call Parser** (`route.ts`): Added `parseXMLToolCalls()` that detects `<invoke>` / `<parameter>` patterns in the model's text output and converts them to the same `OllamaToolCall` format used by native tool calls. At stream completion, if no structured tool calls were detected but XML tool calls exist in the text, they are parsed and executed through the normal tool execution pipeline.
+
+2. **Stream Suppression** (`route.ts`): Two layers of XML suppression in the streaming handler:
+   - **Full-block suppression**: An `xmlToolCallDetected` flag detects complete XML patterns (`<function_calls>` or `<invoke `) in accumulated content. Once detected, all further text deltas from that streaming round are suppressed.
+   - **Per-chunk cleaning**: `cleanPartialXMLTags()` strips partial/incomplete XML tag fragments (e.g., `<function`, `</invoke>`, `<parameter>`) from each text chunk before streaming. Uses word boundary (`\b`) to avoid false positives on words like `<functionality>`. This handles the case where models output partial XML in follow-up responses after tool execution (e.g., attempting additional tool calls but only emitting truncated tags).
+
+3. **System Prompt Guidance** (`victor.ts`): Added an explicit instruction in the `buildVictorLitePrompt` tool section telling the model to use the native function/tool calling mechanism and NOT write out function calls as XML/JSON/text. This is a preventive measure — models don't always follow this, which is why the parser exists as a safety net.
+
+**Helper Functions Added:**
+
+```typescript
+// Parse XML-style function calls from model text output
+function parseXMLToolCalls(text: string): OllamaToolCall[];
+
+// Strip XML function call blocks from text for clean conversation history
+function stripXMLToolCalls(text: string): string;
+
+// Detect start of XML function call pattern in accumulated text
+function findXMLToolCallStart(text: string): number;
+
+// Clean partial XML tag fragments from streamed chunks (e.g., "<function")
+function cleanPartialXMLTags(text: string): string;
+```
+
+**Files Changed:**
+
+- `src/app/api/chat/route.ts` — Parser, stream suppression, fallback execution
+- `lib/ai-agent/prompts/victor.ts` — System prompt native tool call guidance
+
+---
 
 ### Chat Component Fix (December 2025)
 

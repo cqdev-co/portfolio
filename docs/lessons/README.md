@@ -11,9 +11,10 @@ A collection of lessons learned from real trades - both wins and losses. Each le
 
 ## Lessons Index
 
-| #                                       | Title                            | Date     | Ticker | Core Lesson                                       |
-| --------------------------------------- | -------------------------------- | -------- | ------ | ------------------------------------------------- |
-| [001](./001-holding-till-max-profit.md) | Don't Hold Spreads to Expiration | Jan 2026 | AVGO   | Take profits at 50-80%, never hold for max profit |
+| #                                                      | Title                                  | Date     | Ticker | Core Lesson                                                     |
+| ------------------------------------------------------ | -------------------------------------- | -------- | ------ | --------------------------------------------------------------- |
+| [001](./001-holding-till-max-profit.md)                | Don't Hold Spreads to Expiration       | Jan 2026 | AVGO   | Take profits at 50-80%, never hold for max profit               |
+| [002](./002-viable-spread-criteria-too-restrictive.md) | Viable Spread Criteria Too Restrictive | Feb 2026 | ALL    | Cushion + debit ratio were contradictory — zero trades surfaced |
 
 ## Lesson Template
 
@@ -33,6 +34,12 @@ When adding new lessons, include:
 - Close at 50-75% of max profit
 - Never hold past 5-7 DTE
 - Define exit rules BEFORE entering
+
+### From Lesson 002: Viable Spread Criteria
+
+- Cushion minimum: 5% (not 7% — conflicts with deep ITM debit ratio)
+- Max debit ratio: 85% (not 80% — deep ITM naturally has higher ratios)
+- Always try mid-market pricing before rejecting a spread on debit ratio
 
 ## Integration with Strategy Config
 

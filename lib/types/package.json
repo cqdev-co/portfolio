@@ -13,6 +13,9 @@
     ".": "./index.ts",
     "./*": "./*.ts"
   },
+  "dependencies": {
+    "@portfolio/providers": "workspace:*"
+  },
   "peerDependencies": {
     "typescript": "^5.0.0"
   }

@@ -95,6 +95,9 @@ async function fetchOptionsChain(
 
 /**
  * Find a specific contract in the options chain data
+ *
+ * Uses tolerance-based matching (within $0.50) because Yahoo Finance
+ * sometimes returns strikes with slight floating-point differences.
  */
 function findContract(
   chain: OptionsChainData,
@@ -102,10 +105,108 @@ function findContract(
   type: 'call' | 'put'
 ): OptionContract | null {
   const contracts = type === 'call' ? chain.calls : chain.puts;
-  if (!contracts) return null;
+  if (!contracts || contracts.length === 0) {
+    console.log(`[Options] No ${type}s in chain`);
+    return null;
+  }
 
-  // Find contract with matching strike
-  return contracts.find((c) => c.strike === strike) || null;
+  // Try exact match first
+  const exact = contracts.find((c) => c.strike === strike);
+  if (exact) return exact;
+
+  // Try tolerance match (within $0.50 to handle floating-point quirks)
+  const TOLERANCE = 0.5;
+  const toleranceMatch = contracts.find(
+    (c) => Math.abs(c.strike - strike) <= TOLERANCE
+  );
+
+  if (toleranceMatch) {
+    console.log(
+      `[Options] Tolerance match: requested $${strike}, found $${toleranceMatch.strike}`
+    );
+    return toleranceMatch;
+  }
+
+  // Not found - log nearby strikes for debugging
+  const nearby = contracts
+    .map((c) => ({ strike: c.strike, diff: Math.abs(c.strike - strike) }))
+    .sort((a, b) => a.diff - b.diff)
+    .slice(0, 5);
+  console.log(
+    `[Options] Strike $${strike} ${type} NOT FOUND. ` +
+      `Chain has ${contracts.length} ${type}s. ` +
+      `Nearest strikes: ${nearby.map((n) => `$${n.strike} (diff: ${n.diff.toFixed(2)})`).join(', ')}`
+  );
+
+  return null;
+}
+
+/**
+ * Interpolate a missing strike from the two nearest available strikes.
+ *
+ * Yahoo Finance v7 API returns a limited subset of strikes (~30 per side),
+ * so intermediate strikes (e.g. $165 between $160 and $170) are often missing.
+ * Linear interpolation of bid/ask/lastPrice provides a reasonable estimate.
+ */
+function interpolateContract(
+  chain: OptionsChainData,
+  strike: number,
+  type: 'call' | 'put'
+): (OptionContract & { interpolated: true }) | null {
+  const contracts = type === 'call' ? chain.calls : chain.puts;
+  if (!contracts || contracts.length < 2) return null;
+
+  // Sort by strike
+  const sorted = [...contracts].sort((a, b) => a.strike - b.strike);
+
+  // Find the two nearest strikes that bracket the target
+  let lower: OptionContract | null = null;
+  let upper: OptionContract | null = null;
+
+  for (const c of sorted) {
+    if (c.strike <= strike) lower = c;
+    if (c.strike >= strike && !upper) upper = c;
+  }
+
+  // Need both sides for interpolation
+  if (!lower || !upper || lower.strike === upper.strike) return null;
+
+  // Both sides must have some price data
+  const lowerHasData = lower.bid > 0 || lower.ask > 0 || lower.lastPrice > 0;
+  const upperHasData = upper.bid > 0 || upper.ask > 0 || upper.lastPrice > 0;
+  if (!lowerHasData || !upperHasData) return null;
+
+  // Linear interpolation factor (0 = lower, 1 = upper)
+  const t = (strike - lower.strike) / (upper.strike - lower.strike);
+
+  const lerp = (a: number, b: number) => a + (b - a) * t;
+
+  const bid = lerp(lower.bid, upper.bid);
+  const ask = lerp(lower.ask, upper.ask);
+  const lastPrice = lerp(lower.lastPrice, upper.lastPrice);
+  const iv = lerp(lower.impliedVolatility, upper.impliedVolatility);
+
+  console.log(
+    `[Options] Interpolating $${strike} ${type} from ` +
+      `$${lower.strike} (bid=${lower.bid}, ask=${lower.ask}) and ` +
+      `$${upper.strike} (bid=${upper.bid}, ask=${upper.ask}) → ` +
+      `bid=${bid.toFixed(2)}, ask=${ask.toFixed(2)}, t=${t.toFixed(2)}`
+  );
+
+  return {
+    strike,
+    lastPrice: Math.round(lastPrice * 100) / 100,
+    bid: Math.round(bid * 100) / 100,
+    ask: Math.round(ask * 100) / 100,
+    volume: 0,
+    openInterest: 0,
+    impliedVolatility: Math.round(iv * 10000) / 10000,
+    inTheMoney:
+      type === 'call'
+        ? (chain.underlyingPrice || 0) > strike
+        : strike > (chain.underlyingPrice || 0),
+    interpolated: true,
+  };
 }
 
 /**
@@ -196,7 +297,21 @@ export async function GET(request: NextRequest) {
 
     // Find each requested contract
     for (const contract of contractsForKey) {
-      const found = findContract(chain, contract.strike, contract.type);
+      let found = findContract(chain, contract.strike, contract.type);
+      let isInterpolated = false;
+
+      // If exact/tolerance match not found, try interpolation from nearby strikes
+      if (!found) {
+        const interpolated = interpolateContract(
+          chain,
+          contract.strike,
+          contract.type
+        );
+        if (interpolated) {
+          found = interpolated;
+          isInterpolated = true;
+        }
+      }
 
       if (!found) {
         results.push({
@@ -224,8 +339,9 @@ export async function GET(request: NextRequest) {
         price = found.lastPrice;
       }
 
+      const tag = isInterpolated ? ' (interpolated)' : '';
       console.log(
-        `[Options] ${contract.symbol} ${contract.type} $${contract.strike}: ` +
+        `[Options] ${contract.symbol} ${contract.type} $${contract.strike}${tag}: ` +
           `bid=${bid}, ask=${ask}, last=${found.lastPrice}, price=${price}`
       );
 

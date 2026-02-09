@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { yahooFinance } from '@/lib/yahoo-finance';
 
 // Simple in-memory cache
 const cache = new Map<string, { data: OptionsData[]; timestamp: number }>();
@@ -31,13 +32,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Import dynamically
-    const { default: yahooFinance } = await import('yahoo-finance2');
-
     const data: OptionsData[] = [];
 
     // Fetch options data from Yahoo Finance
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await yahooFinance.options(symbol, {})) as any;
 
     const optionsData = result?.options;
@@ -63,7 +60,6 @@ export async function GET(request: NextRequest) {
 
       // Process calls
       if (optionChain.calls) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const call of optionChain.calls as any[]) {
           if (call.strike && call.bid && call.ask && call.bid > 0) {
             data.push({
@@ -84,7 +80,6 @@ export async function GET(request: NextRequest) {
 
       // Process puts
       if (optionChain.puts) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const put of optionChain.puts as any[]) {
           if (put.strike && put.bid && put.ask && put.bid > 0) {
             data.push({

@@ -122,16 +122,32 @@ jobs:
 
       - name: Run unusual-options tests
         working-directory: unusual-options-service
-        run: poetry run pytest tests/ -v --tb=short || true
+        run: poetry run pytest tests/ -v --tb=short
 
       - name: Run penny-scanner tests
         working-directory: penny-stock-scanner
-        run: poetry run pytest tests/ -v --tb=short || true
+        run: poetry run pytest tests/ -v --tb=short
+
+  validate-config:
+    name: Validate Strategy Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate strategy.config.yaml
+        run: bun test lib/ai-agent/config/schema.test.ts
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [typecheck, lint, lint-python]
+    needs: [typecheck, lint, lint-python, validate-config]
     steps:
       - uses: actions/checkout@v4
 

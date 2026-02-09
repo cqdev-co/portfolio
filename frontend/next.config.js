@@ -5,10 +5,6 @@ const nextConfig = {
   reactStrictMode: true,
   // Output in the 'standalone' mode which ensures better compatibility
   output: 'standalone',
-  // Ignore TypeScript errors during build to fix the issue with PageProps
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   // Turbopack configuration for monorepo imports (build only)
   // Note: Dev uses --webpack flag due to node_modules resolution issues
   turbopack: {

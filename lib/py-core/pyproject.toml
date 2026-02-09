@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "portfolio-core"
+version = "0.1.0"
+description = "Shared Python library for portfolio trading services"
+authors = ["Conor Quinlan"]
+readme = "README.md"
+packages = [{ include = "portfolio_core" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+supabase = "^2.18.1"
+loguru = "^0.7.2"
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+python-dotenv = "^1.0.0"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

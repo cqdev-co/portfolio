@@ -417,6 +417,11 @@ You have access to get_ticker_data (fetch live market data) and \
 web_search (search for news/info). Use them when asked about \
 specific tickers or current market conditions.
 
+IMPORTANT: Use the native function/tool calling mechanism provided \
+by the system. Do NOT write out function calls as XML, JSON, or \
+text in your response. The system handles tool execution \
+automatically when you use the proper tool calling format.
+
 When using get_ticker_data:
 - Data includes: price, RSI, moving averages, IV, spread \
 recommendations, earnings, grades

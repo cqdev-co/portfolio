@@ -36,10 +36,14 @@ entry:
     rsi_ideal_max: 50 # Sweet spot upper bound
 
   # --- Cushion (distance from breakeven to current price) ---
+  # v2.9.0: Lowered minimum from 7% to 5%. The 7% floor was too aggressive
+  # for deep ITM spreads — it conflicted with debit ratio limits, causing
+  # zero viable trades. 5% still provides meaningful downside protection
+  # (~$5 buffer on a $100 stock) while allowing the scanner to surface setups.
   cushion:
-    minimum_pct: 7.0 # Hard floor - never go below
-    preferred_pct: 10.0 # Ideal cushion
-    excellent_pct: 15.0 # Strong conviction level
+    minimum_pct: 5.0 # Hard floor - never go below (was 7.0)
+    preferred_pct: 8.0 # Ideal cushion (was 10.0)
+    excellent_pct: 12.0 # Strong conviction level (was 15.0)
 
   # --- Volatility ---
   volatility:
@@ -74,7 +78,7 @@ entry:
     max_bid_ask_spread_pct: 5 # Avoid illiquid strikes
     min_pop_pct: 60 # Minimum probability of profit
     min_debit_ratio_pct: 55 # Minimum debit as % of width (avoid "too good to be true")
-    max_debit_ratio_pct: 80 # Maximum debit as % of width (maintain profit potential)
+    max_debit_ratio_pct: 85 # Maximum debit as % of width (was 80; raised for deep ITM realism)
 
 # =============================================================================
 # EXIT RULES
@@ -355,3 +359,208 @@ lessons:
     summary: |
       Held winning spread for 28 days, lost $200 by holding to DTE.
       Rule: Close at 75% profit OR 5 DTE, whichever comes first.
+
+  - id: '002'
+    title: 'Viable Spread Criteria Too Restrictive — Zero Trades'
+    date: '2026-02-09'
+    ticker: ALL
+    cost: 0
+    rules_changed:
+      - 'entry.cushion.minimum_pct: 7.0 → 5.0'
+      - 'entry.cushion.preferred_pct: 10.0 → 8.0'
+      - 'entry.cushion.excellent_pct: 15.0 → 12.0'
+      - 'entry.spread.max_debit_ratio_pct: 80 → 85'
+      - 'scan-spreads: Try mid-market debit when market debit exceeds max ratio'
+    summary: |
+      Cushion ≥7% and debit ratio ≤80% were structurally contradictory for 
+      deep ITM spreads. Deeper strikes give better cushion but higher debit 
+      ratios (bid-ask inflates market debit). Scanner also hard-rejected 
+      spreads above max debit without trying mid-market pricing. Three fixes:
+      (1) lower cushion floor to 5%, (2) raise debit cap to 85%, 
+      (3) fall back to mid-market debit before rejecting.
+
+# =============================================================================
+# PUT CREDIT SPREAD (PCS) STRATEGY CONFIGURATION
+# =============================================================================
+#
+# Bullish/neutral defined-risk options strategy selling OTM put credit spreads
+# on quality stocks with strong support levels and elevated IV.
+#
+# Key differences from CDS:
+# - SELL premium (receive credit) instead of buying
+# - Profits from theta decay and stock staying above short strike
+# - IV preference is INVERTED: higher IV = better (more premium)
+# - RSI ideal zone: 40-55 (neutral/slightly bullish)
+# - Short strike placed BELOW support for protection
+#
+# =============================================================================
+
+pcs_strategy:
+  name: 'Put Credit Spread'
+  version: '1.0.0'
+  description: |
+    Bullish/neutral defined-risk options strategy selling OTM put
+    credit spreads on quality stocks with strong support levels.
+
+# =============================================================================
+# PCS ENTRY CRITERIA
+# =============================================================================
+pcs_entry:
+  # --- Trend ---
+  trend:
+    above_ma50: true # Primary requirement (less strict than CDS)
+    above_ma200: false # Preferred but not required
+
+  # --- Momentum ---
+  momentum:
+    rsi_min: 35 # Not deeply oversold (falling knife risk)
+    rsi_max: 65 # Not extremely overbought
+    rsi_ideal_min: 40 # Sweet spot lower (shifted up from CDS)
+    rsi_ideal_max: 55 # Sweet spot upper
+
+  # --- Implied Volatility (INVERTED from CDS) ---
+  iv:
+    iv_rank_min: 20 # Minimum to make credit worthwhile
+    iv_rank_preferred: 40 # Good premium level
+    iv_rank_ideal: 50 # Sweet spot for selling
+    iv_rank_caution: 80 # Extreme IV — may signal danger
+
+  # --- Cushion (distance of short strike below current price) ---
+  cushion:
+    minimum_pct: 5.0 # Hard floor for distance OTM
+    preferred_pct: 8.0 # Ideal distance
+    excellent_pct: 12.0 # Very comfortable
+
+  # --- Earnings ---
+  earnings:
+    min_days_until: 14 # Buffer before earnings
+    preferred_days_until: 21
+    never_hold_through: true
+
+  # --- Fundamentals ---
+  fundamentals:
+    require_positive_eps: true
+    max_pe_ratio: 100
+    min_market_cap_b: 5
+
+  # --- Spread-Specific ---
+  spread:
+    min_credit_ratio_pct: 20 # Minimum credit as % of width
+    max_credit_ratio_pct: 45 # Max (too high = too risky)
+    ideal_credit_ratio_pct: 30 # Sweet spot
+    min_return_on_risk_pct: 20
+    min_open_interest: 50
+    max_bid_ask_spread_pct: 5
+    min_pop_pct: 65 # Higher than CDS since OTM
+
+# =============================================================================
+# PCS EXIT RULES
+# =============================================================================
+pcs_exit:
+  # --- Profit Taking (% of CREDIT RECEIVED) ---
+  profit:
+    target_pct: 50 # Standard: close at 50% of credit
+    greed_limit_pct: 75 # Set trailing stop at 75%
+    early_exit_threshold_pct: 40 # Quick profit in first week
+    early_exit_days: 5
+    never_chase_max_profit: true
+
+  # --- Stop Loss ---
+  stop_loss:
+    max_loss_multiplier: 2.0 # Close if loss = 2x credit received
+    max_loss_pct_of_width: 75 # Or 75% of width, whichever first
+    support_breach_exit: true # Exit if support breaks
+
+  # --- Time-Based ---
+  time:
+    max_hold_days: 30
+    gamma_risk_zone_dte: 7
+    forced_exit_dte: 7 # Less urgent than CDS (theta helps PCS)
+    exit_rule: 'CLOSE_AT_50_OR_7DTE_FIRST'
+
+  # --- Event-Based ---
+  events:
+    exit_before_earnings: true
+    exit_on_major_news: true
+
+  # --- Pin Risk ---
+  pin_risk:
+    enabled: true
+    cushion_warning_pct: 3
+    cushion_exit_pct: 1.5
+    dte_threshold: 5
+
+  # --- Roll Rules ---
+  roll:
+    enabled: true
+    roll_if_tested: true # Short strike tested (price approaches)
+    roll_dte_trigger: 10 # Roll when DTE < 10 if still open
+    roll_target_dte: 30 # Roll to 30 DTE
+    same_or_lower_strike: true # Never roll UP
+
+# =============================================================================
+# PCS SPREAD PARAMETERS
+# =============================================================================
+pcs_spread_params:
+  # --- Days to Expiration ---
+  dte:
+    target: 35 # Target DTE (slightly longer than CDS)
+    min: 21
+    max: 45
+
+  # --- Spread Width ---
+  width:
+    - account_max: 5000
+      width: 5
+      typical_credit: 100
+    - account_max: 10000
+      width: 5
+      typical_credit: 125
+    - account_max: 25000
+      width: 10
+      typical_credit: 250
+    - account_max: 100000
+      width: 10
+      typical_credit: 300
+
+  # --- Strike Selection ---
+  strikes:
+    short_put_delta_min: 0.20 # Floor (far OTM)
+    short_put_delta_max: 0.35 # Ceiling (getting closer to ATM)
+    short_put_delta_ideal: 0.25 # Sweet spot
+    long_put_offset: 5 # Width in dollars below short
+
+# =============================================================================
+# PCS POSITION SIZING
+# =============================================================================
+pcs_position_sizing:
+  max_single_position_pct: 15 # More conservative than CDS
+  preferred_position_pct: 10
+  min_position_pct: 5
+  max_total_deployed_pct: 50 # Lower cap than CDS
+  preferred_deployed_pct: 35
+  max_concurrent_positions: 5
+
+# =============================================================================
+# PCS MARKET REGIME ADJUSTMENTS
+# =============================================================================
+pcs_market_regime:
+  bull:
+    adjustments:
+      min_score: 60
+      rsi_max: 65
+      position_size_multiplier: 1.0
+      max_concurrent_positions: 5
+  neutral:
+    adjustments:
+      min_score: 70
+      rsi_max: 60
+      position_size_multiplier: 0.65
+      max_concurrent_positions: 3
+  bear:
+    adjustments:
+      min_score: 999 # Effectively no new positions
+      rsi_max: 50
+      position_size_multiplier: 0.0
+      max_concurrent_positions: 0
+      note: 'Do NOT sell puts in a bear market'

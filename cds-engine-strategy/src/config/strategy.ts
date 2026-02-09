@@ -110,9 +110,9 @@ const DEFAULT_CONFIG: StrategyConfig = {
       rsi_ideal_max: 50,
     },
     cushion: {
-      minimum_pct: 7.0,
-      preferred_pct: 10.0,
-      excellent_pct: 15.0,
+      minimum_pct: 5.0,
+      preferred_pct: 8.0,
+      excellent_pct: 12.0,
     },
     spread: {
       min_return_on_risk_pct: 15,
@@ -121,7 +121,7 @@ const DEFAULT_CONFIG: StrategyConfig = {
       max_bid_ask_spread_pct: 5,
       min_pop_pct: 60,
       min_debit_ratio_pct: 55,
-      max_debit_ratio_pct: 80,
+      max_debit_ratio_pct: 85,
     },
   },
   spread_params: {

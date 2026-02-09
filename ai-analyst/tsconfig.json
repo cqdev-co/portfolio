@@ -19,7 +19,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@screen-ticker/*": ["../screen-ticker/src/*"]
+      "@lib/*": ["../lib/*"]
     }
   },
   "include": ["src/**/*.ts", "../lib/**/*.ts"],
