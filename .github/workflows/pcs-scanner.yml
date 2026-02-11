@@ -1,0 +1,201 @@
+name: PCS Engine Scanner
+
+on:
+  schedule:
+    # Morning briefing - 9:30 AM ET (Mon-Fri) — offset from CDS (9:00 AM)
+    - cron: '30 14 * * 1-5' # 9:30 AM EDT (14:30 UTC)
+
+    # Opportunity scans during market hours (Mon-Fri)
+    - cron: '30 15 * * 1-5' # 10:30 AM EDT (15:30 UTC)
+    - cron: '30 18 * * 1-5' # 1:30 PM EDT (18:30 UTC)
+    - cron: '45 19 * * 1-5' # 3:45 PM EDT (19:45 UTC)
+
+    # Weekly report - Sunday 7 PM ET
+    - cron: '0 0 * * 1' # Sunday 7 PM EDT (00:00 UTC Monday)
+
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Job to run'
+        required: false
+        default: 'scan'
+        type: choice
+        options:
+          - briefing
+          - scan
+          - scan_spreads
+          - weekly_report
+      min_score:
+        description: 'Minimum score for scan (default: 65)'
+        required: false
+        default: '65'
+        type: string
+      tickers:
+        description: 'Custom tickers (comma-separated, e.g. AAPL,MSFT,NVDA)'
+        required: false
+        default: ''
+        type: string
+      list:
+        description: 'Ticker list to scan'
+        required: false
+        default: 'mega'
+        type: choice
+        options:
+          - mega
+          - growth
+          - value
+          - etf
+          - sp500
+
+env:
+  BUN_VERSION: '1.1.38'
+
+jobs:
+  pcs-scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            pcs-engine-strategy/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('pcs-engine-strategy/bun.lockb', 'pcs-engine-strategy/package.json') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: pcs-engine-strategy
+        run: bun install
+
+      # ============================================================
+      # Morning Briefing (9:30 AM ET or manual)
+      # ============================================================
+      - name: Run morning briefing
+        if: |
+          github.event.inputs.job_type == 'briefing' ||
+          github.event.schedule == '30 14 * * 1-5'
+        working-directory: pcs-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📅 PCS Morning Briefing - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          bun run briefing --verbose
+
+      # ============================================================
+      # Opportunity Scan (market hours or manual)
+      # ============================================================
+      - name: Run opportunity scan
+        if: |
+          github.event.inputs.job_type == 'scan' ||
+          github.event.schedule == '30 15 * * 1-5' ||
+          github.event.schedule == '30 18 * * 1-5' ||
+          github.event.schedule == '45 19 * * 1-5'
+        working-directory: pcs-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🔍 PCS Opportunity Scan - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          MIN_SCORE="${{ github.event.inputs.min_score || '65' }}"
+          LIST="${{ github.event.inputs.list || 'mega' }}"
+          TICKERS="${{ github.event.inputs.tickers }}"
+
+          TICKER_FLAG=""
+          if [ -n "$TICKERS" ]; then
+            TICKER_FLAG="--tickers $TICKERS"
+          else
+            TICKER_FLAG="--list $LIST"
+          fi
+
+          # Run scan-all with summary mode (auto-stores to DB)
+          bun run scan-all --summary --min-score "$MIN_SCORE" $TICKER_FLAG
+
+      # ============================================================
+      # Spread Scan (manual only - finds specific put credit spreads)
+      # ============================================================
+      - name: Run spread scan
+        if: github.event.inputs.job_type == 'scan_spreads'
+        working-directory: pcs-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📐 PCS Spread Scan - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          LIST="${{ github.event.inputs.list || 'mega' }}"
+          TICKERS="${{ github.event.inputs.tickers }}"
+
+          TICKER_FLAG=""
+          if [ -n "$TICKERS" ]; then
+            TICKER_FLAG="--tickers $TICKERS"
+          else
+            TICKER_FLAG="--list $LIST"
+          fi
+
+          bun run scan-spreads --verbose $TICKER_FLAG
+
+      # ============================================================
+      # Weekly Report (Sunday 7 PM ET)
+      # ============================================================
+      - name: Run weekly report
+        if: |
+          github.event.inputs.job_type == 'weekly_report' ||
+          github.event.schedule == '0 0 * * 1'
+        working-directory: pcs-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📈 PCS Weekly Report - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          echo ""
+
+          echo "=== Market Regime Analysis ==="
+          bun run regime --verbose
+          echo ""
+
+          echo "=== Performance Summary ==="
+          bun run performance --verbose
+          echo ""
+
+          echo "=== Top PCS Opportunities (Full Scan) ==="
+          bun run scan-all --min-score 70 --summary
+
+      # ============================================================
+      # Discord Notifications
+      # ============================================================
+      - name: Send Discord notification
+        if: |
+          always() &&
+          (github.event.schedule == '30 14 * * 1-5' ||
+           github.event.schedule == '0 0 * * 1')
+        continue-on-error: true
+        env:
+          DISCORD_PCS_WEBHOOK_URL: ${{ secrets.DISCORD_PCS_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DISCORD_PCS_WEBHOOK_URL" ]; then
+            JOB_STATUS="${{ job.status }}"
+            if [ "$JOB_STATUS" == "success" ]; then
+              EMOJI="✅"
+            else
+              EMOJI="❌"
+            fi
+            
+            curl -H "Content-Type: application/json" \
+              -d "{\"content\": \"$EMOJI PCS Scanner completed: $JOB_STATUS\"}" \
+              "$DISCORD_PCS_WEBHOOK_URL"
+          fi

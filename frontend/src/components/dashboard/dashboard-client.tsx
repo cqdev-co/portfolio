@@ -40,9 +40,15 @@ import { PerformanceSection } from './performance-section';
 import { useGlobalChat, buildPortfolioPrompt } from '@/components/chat';
 
 // ============================================================================
-// Auth: Only the fund owner can see this page
+// Auth: Only whitelisted emails can see this page
+// Configured via NEXT_PUBLIC_WHITELISTED_EMAILS in .env.local (comma-separated)
 // ============================================================================
-const DASHBOARD_OWNER_EMAIL = 'melonshd88@gmail.com';
+const WHITELISTED_EMAILS: string[] = (
+  process.env.NEXT_PUBLIC_WHITELISTED_EMAILS || ''
+)
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 // ============================================================================
 // Market hours check (EST)
@@ -455,7 +461,7 @@ export function DashboardClient() {
     );
   }
 
-  if (user.email?.toLowerCase() !== DASHBOARD_OWNER_EMAIL) {
+  if (!WHITELISTED_EMAILS.includes(user.email?.toLowerCase() || '')) {
     return (
       <div className="flex flex-col gap-5">
         <header className="space-y-2">

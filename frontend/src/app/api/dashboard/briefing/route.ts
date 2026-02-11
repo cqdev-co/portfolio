@@ -8,7 +8,12 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://ollama.com/api';
 const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.3:70b-cloud';
 
-const DASHBOARD_OWNER_EMAIL = 'melonshd88@gmail.com';
+const WHITELISTED_EMAILS: string[] = (
+  process.env.NEXT_PUBLIC_WHITELISTED_EMAILS || ''
+)
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 // ============================================================================
 // Types
@@ -102,7 +107,7 @@ async function authorizeOwner(): Promise<boolean> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    return user?.email?.toLowerCase() === DASHBOARD_OWNER_EMAIL;
+    return WHITELISTED_EMAILS.includes(user?.email?.toLowerCase() || '');
   } catch {
     return false;
   }

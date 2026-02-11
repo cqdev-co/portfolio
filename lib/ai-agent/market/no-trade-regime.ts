@@ -297,8 +297,16 @@ function determineRegime(
         primaryReason = 'LOW_TREND_STRENGTH';
       } else if (adx && adx.strength === 'WEAK') {
         primaryReason = 'LOW_TREND_STRENGTH';
-      } else {
+      } else if (breadth && breadth.level === 'NARROWING') {
+        primaryReason = 'WEAK_BREADTH';
+      } else if (reversals >= 3) {
+        primaryReason = 'WHIPSAW';
+      } else if (vix && vix.level === 'ELEVATED') {
         primaryReason = 'HIGH_VOLATILITY';
+      } else if (spy && spy.trend === 'BEARISH' && !spy.aboveMA200) {
+        primaryReason = 'SIGNAL_CONFLICT';
+      } else {
+        primaryReason = 'MULTIPLE_FACTORS';
       }
     }
   } else {

@@ -38,7 +38,16 @@ Call Debit Spread trading engine - finds optimal entry opportunities.
 - **Strategy**: Technical + Fundamental + Analyst confluence scoring
 - **Key Features**: Market regime awareness, sector rotation, spread finding
 - **Status**: Production-ready
-- [README](cds-engine-strategy/README.md) | [Process Flow](cds-engine-strategy/PROCESS_FLOW.md)
+- [README](cds-engine-strategy/README.md) | [Process Flow](cds-engine-strategy/PROCESS_FLOW.md) | [CI/CD](cds-engine-strategy/CICD.md)
+
+#### [PCS Engine Strategy](pcs-engine/)
+
+Put Credit Spread trading engine - finds optimal OTM put credit spread opportunities.
+
+- **Strategy**: IV rank + Technical + Fundamental confluence scoring
+- **Key Features**: IV analysis, spread quality scoring, regime-aware sizing, trade tracking
+- **Status**: Production-ready
+- [README](pcs-engine/README.md) | [CI/CD](pcs-engine/CICD.md)
 
 #### [Cloudflare Yahoo Proxy](../cloudflare/README.md)
 
@@ -126,6 +135,7 @@ Monorepo architecture and Turborepo configuration.
 | ------------------- | ----------------- | ---------- | ---------------- |
 | AI Analyst          | Entry decisions   | TypeScript | On-demand        |
 | CDS Engine Strategy | CDS opportunities | TypeScript | Daily            |
+| PCS Engine Strategy | PCS opportunities | TypeScript | Daily            |
 | Unusual Options     | Options flow      | Python     | Real-time        |
 | Penny Scanner       | Penny breakouts   | Python     | Daily            |
 | Frontend            | Web interface     | TypeScript | -                |
@@ -147,6 +157,16 @@ cd ai-analyst && bun run chat
 ```bash
 bun run cds              # Full engine briefing
 bun run cds:scan-all     # Scan + find spreads
+```
+
+### "I want to find PCS (put credit spread) opportunities"
+
+→ Use **[PCS Engine Strategy](pcs-engine/)**
+
+```bash
+bun run pcs:scan-all     # Screen stocks + find spreads
+bun run pcs:briefing     # Daily PCS briefing
+bun run pcs:spreads      # Scan for put credit spreads
 ```
 
 ### "I want to track unusual options"
@@ -196,4 +216,4 @@ All service documentation includes:
 
 ---
 
-**Last Updated**: 2026-01-07
+**Last Updated**: 2026-02-09

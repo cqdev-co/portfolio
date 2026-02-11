@@ -17,6 +17,10 @@ YAHOO_PROXY_URL=https://yahoo-proxy.yourname.workers.dev \
 
 > **Note**: Deploy the updated Cloudflare proxy to support `^VIX` index symbols.
 
+## What's New (v2.2)
+
+- **Fixed CAUTION primaryReason assignment** - Single caution reason now correctly identifies the actual cause (e.g., `WEAK_BREADTH` for narrowing breadth) instead of incorrectly defaulting to `HIGH_VOLATILITY`. The fallback chain now checks: conflict score > chop transitional > weak ADX > narrowing breadth > reversals > elevated VIX > bearish SPY > generic `MULTIPLE_FACTORS`.
+
 ## What's New (v2.1)
 
 - **Integrated ADX & Breadth** - ADX and breadth now part of main regime analysis
@@ -115,6 +119,45 @@ const analysis = await analyzeTradingRegime(priceHistory, {
 │    - Narrow leadership (SPY >> RSP)                 │
 └─────────────────────────────────────────────────────┘
 ```
+
+### CAUTION Triggers (Yellow Light)
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 1. TRANSITIONAL CHOP INDEX                          │
+│    - Chop Index 38.2-61.8 (market transitioning)    │
+│    → primaryReason: LOW_TREND_STRENGTH              │
+├─────────────────────────────────────────────────────┤
+│ 2. MODERATE SIGNAL CONFLICT                         │
+│    - Conflict score 40-60%                          │
+│    → primaryReason: SIGNAL_CONFLICT                 │
+├─────────────────────────────────────────────────────┤
+│ 3. ELEVATED VIX                                     │
+│    - VIX 20-30 (ELEVATED level)                     │
+│    → primaryReason: HIGH_VOLATILITY                 │
+├─────────────────────────────────────────────────────┤
+│ 4. DIRECTION REVERSALS                              │
+│    - 3+ direction reversals in 5 days               │
+│    → primaryReason: WHIPSAW                         │
+├─────────────────────────────────────────────────────┤
+│ 5. BEARISH SPY TREND                                │
+│    - SPY bearish AND below MA200                    │
+│    → primaryReason: SIGNAL_CONFLICT                 │
+├─────────────────────────────────────────────────────┤
+│ 6. WEAK ADX                                         │
+│    - ADX < 20 or WEAK strength                      │
+│    → primaryReason: LOW_TREND_STRENGTH              │
+├─────────────────────────────────────────────────────┤
+│ 7. NARROWING BREADTH                                │
+│    - Breadth score 45-65% (NARROWING)               │
+│    → primaryReason: WEAK_BREADTH                    │
+└─────────────────────────────────────────────────────┘
+```
+
+**Regime offset rules:**
+- 1 caution reason + 2 go reasons → upgraded to **GO**
+- 1 caution reason + <2 go reasons → stays **CAUTION**
+- 2+ caution reasons → **CAUTION** (primaryReason = MULTIPLE_FACTORS if >2)
 
 ### GO Boosters (Can Offset Caution Signals)
 

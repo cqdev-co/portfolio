@@ -21,11 +21,13 @@ const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.3:70b-cloud';
 
 // ============================================================================
-// AI CHAT WHITELIST
+// WHITELISTED EMAILS
 // Only these email addresses can use the AI chat feature.
-// Configured via environment variable (comma-separated) for security.
+// Configured via NEXT_PUBLIC_WHITELISTED_EMAILS in .env.local (comma-separated)
 // ============================================================================
-const AI_CHAT_WHITELIST: string[] = (process.env.AI_CHAT_WHITELIST || '')
+const WHITELISTED_EMAILS: string[] = (
+  process.env.NEXT_PUBLIC_WHITELISTED_EMAILS || ''
+)
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
@@ -86,9 +88,7 @@ async function isUserAuthorized(): Promise<{
     }
 
     // Check whitelist
-    const isWhitelisted = AI_CHAT_WHITELIST.some(
-      (whitelistedEmail) => whitelistedEmail.toLowerCase() === email
-    );
+    const isWhitelisted = WHITELISTED_EMAILS.includes(email);
 
     if (!isWhitelisted) {
       return {

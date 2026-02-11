@@ -165,15 +165,22 @@ AI_CHAT_RATE_LIMIT=20          # Max requests per window
 AI_CHAT_RATE_WINDOW_MS=60000   # Window duration (ms)
 ```
 
-### AI Chat Authorization
+### Email Whitelist (AI Chat + Dashboard)
 
-The chat feature is restricted to whitelisted email addresses configured via
-the `AI_CHAT_WHITELIST` environment variable (comma-separated):
+Both the AI chat feature and the private fund dashboard are restricted to
+whitelisted email addresses configured via a single environment variable
+(comma-separated):
 
 ```bash
 # .env.local
-AI_CHAT_WHITELIST=user1@example.com,user2@example.com
+NEXT_PUBLIC_WHITELISTED_EMAILS=user1@example.com,user2@example.com
 ```
+
+This variable controls access to:
+
+- **AI Chat** (`/api/chat`) — only whitelisted emails can use the chat
+- **Dashboard** (`/dashboard`) — only whitelisted emails can view the dashboard
+- **Dashboard Briefing API** (`/api/dashboard/briefing`) — only whitelisted emails can generate briefings
 
 ### Rate Limiter Implementation
 
@@ -501,7 +508,7 @@ Fixed multiple typecheck, lint, and build errors in dashboard components:
 
 A private, auth-gated dashboard at `/dashboard` designed as an **AI-native morning brief** for the hedge fund. The layout follows a narrative flow — not a data-dense terminal — using progressive disclosure to prevent information overload while ensuring everything you need is immediately accessible.
 
-Access is restricted to the fund owner (configured via `DASHBOARD_OWNER_EMAIL` constant in `dashboard-client.tsx`).
+Access is restricted to whitelisted emails (configured via `NEXT_PUBLIC_WHITELISTED_EMAILS` in `.env.local`).
 
 #### Design Philosophy
 
@@ -516,7 +523,7 @@ Everything else (raw market data, full signal lists, trade history) is available
 #### Route & Auth
 
 - **Route**: `/dashboard` with `layout.tsx` (metadata, `robots: noindex`)
-- **Auth Gating**: Client-side email check via `useAuth()` hook against `DASHBOARD_OWNER_EMAIL` constant
+- **Auth Gating**: Client-side email check via `useAuth()` hook against `NEXT_PUBLIC_WHITELISTED_EMAILS` whitelist
 - **States**: Loading spinner, sign-in prompt, access denied, and full dashboard
 
 #### Dashboard Layout (top to bottom)
