@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": [
     "frontend",
+    "budgetflow",
     "lib/*",
     "cds-engine-strategy",
     "pcs-engine-strategy",
@@ -11,6 +12,7 @@
   ],
   "scripts": {
     "dev": "bun run --cwd frontend dev",
+    "dev:budget": "bun run --cwd budgetflow dev",
     "build": "turbo run build",
     "build:frontend": "bun run --cwd frontend build",
     "build:cloudflare": "bun run --cwd cloudflare deploy --dry-run",

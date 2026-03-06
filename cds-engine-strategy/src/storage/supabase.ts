@@ -289,11 +289,13 @@ export interface SignalData {
 
 /**
  * Compute CDS signal grade from score (mirrors the DB generated column logic)
+ * v3.0.0: Raised thresholds — 80+ was producing 100% Grade A signals.
+ *         New tiers create meaningful differentiation.
  */
 function computeCdsGrade(score: number): string {
-  if (score >= 80) return 'A';
-  if (score >= 70) return 'B';
-  if (score >= 60) return 'C';
+  if (score >= 92) return 'A';
+  if (score >= 85) return 'B';
+  if (score >= 78) return 'C';
   return 'D';
 }
 
@@ -713,6 +715,42 @@ export async function getPerformanceByGrade(): Promise<
 /**
  * Get tickers from recent signals (for re-scanning)
  */
+/**
+ * Get recent signal tickers with their latest signal dates (for cooldown logic)
+ * Returns a map of ticker -> most recent signal date string
+ */
+export async function getRecentSignalTickersWithDates(
+  days = 5
+): Promise<Map<string, string>> {
+  try {
+    const client = getClient();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const { data, error } = await client
+      .from('cds_signals')
+      .select('ticker, signal_date')
+      .gte('signal_date', cutoff.toISOString().split('T')[0])
+      .order('signal_date', { ascending: false });
+
+    if (error) {
+      logger.debug(`Failed to fetch signal dates: ${error.message}`);
+      return new Map();
+    }
+
+    const result = new Map<string, string>();
+    for (const d of data ?? []) {
+      if (!result.has(d.ticker)) {
+        result.set(d.ticker, d.signal_date);
+      }
+    }
+    return result;
+  } catch (error) {
+    logger.debug(`Signal dates error: ${error}`);
+    return new Map();
+  }
+}
+
 export async function getRecentSignalTickers(
   days = 7,
   minScore = 60

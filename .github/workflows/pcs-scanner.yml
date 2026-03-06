@@ -63,6 +63,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+          bun-download-url: 'https://github.com/oven-sh/bun/releases/download/bun-v${{ env.BUN_VERSION }}/bun-linux-x64.zip'
 
       - name: Cache Bun dependencies
         uses: actions/cache@v4

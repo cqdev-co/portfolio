@@ -53,6 +53,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+          bun-download-url: 'https://github.com/oven-sh/bun/releases/download/bun-v${{ env.BUN_VERSION }}/bun-linux-x64.zip'
 
       - name: Cache Bun dependencies
         uses: actions/cache@v4
@@ -104,6 +105,20 @@ jobs:
 
           # Run scan with summary mode and store results
           bun run scan-all --summary --min-score "$MIN_SCORE" --store
+
+      # ============================================================
+      # Daily Signal Outcomes (after last scan of the day)
+      # ============================================================
+      - name: Check signal outcomes (daily)
+        if: github.event.schedule == '30 19 * * 1-5'
+        working-directory: cds-engine-strategy
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📊 Daily Signal Outcomes - $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "════════════════════════════════════════════════════"
+          bun run signal-outcomes --min-age 3 --max-age 60 --verbose
 
       # ============================================================
       # Universe Scan (manual only - resource intensive)
@@ -162,7 +177,7 @@ jobs:
           echo ""
 
           echo "=== Top Opportunities (Universe Scan) ==="
-          bun run scan-db --min-score 75 --limit 20 --summary
+          bun run scan-db --min-score 75 --top-n 20 --summary
 
       # ============================================================
       # Discord Notifications (future enhancement)

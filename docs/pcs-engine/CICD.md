@@ -10,11 +10,11 @@ The PCS Engine Strategy includes automated CI/CD capabilities via GitHub Actions
 
 ## Workflow Schedule
 
-| Job              | Schedule                           | Description                              |
-| ---------------- | ---------------------------------- | ---------------------------------------- |
-| Morning Briefing | 9:30 AM ET (Mon-Fri)              | Market regime, IV environment, PCS setup |
-| Opportunity Scan | 10:30 AM, 1:30 PM, 3:45 PM ET    | Scan for high-score PCS opportunities    |
-| Weekly Report    | Sunday 7:00 PM ET                 | Regime, performance, top picks           |
+| Job              | Schedule                      | Description                              |
+| ---------------- | ----------------------------- | ---------------------------------------- |
+| Morning Briefing | 9:30 AM ET (Mon-Fri)          | Market regime, IV environment, PCS setup |
+| Opportunity Scan | 10:30 AM, 1:30 PM, 3:45 PM ET | Scan for high-score PCS opportunities    |
+| Weekly Report    | Sunday 7:00 PM ET             | Regime, performance, top picks           |
 
 > **Note:** PCS scans are offset by 30 minutes from CDS scans to avoid concurrent API calls and GitHub Actions resource contention.
 
@@ -133,7 +133,7 @@ ORDER BY scan_date DESC
 LIMIT 20;
 
 -- Trade performance
-SELECT ticker, status, credit, debit, 
+SELECT ticker, status, credit, debit,
        (credit - COALESCE(debit, 0)) as pnl
 FROM pcs_signal_outcomes
 WHERE status = 'closed'
@@ -142,17 +142,23 @@ ORDER BY exit_date DESC;
 
 ## CDS vs PCS Workflow Comparison
 
-| Feature          | CDS Scanner               | PCS Scanner                |
-| ---------------- | ------------------------- | -------------------------- |
-| Briefing Time    | 9:00 AM ET                | 9:30 AM ET                 |
-| Scan Times       | 10:00, 1:00, 3:30 PM     | 10:30, 1:30, 3:45 PM      |
-| Weekly Report    | Sunday 6 PM ET            | Sunday 7 PM ET             |
-| Default Min Score| 70                        | 65                         |
-| Auto-Store       | Requires `--store` flag   | Automatic                  |
-| Signal Outcomes  | Yes (7-60 day tracking)   | Not yet implemented        |
-| Universe Scan    | Yes (manual, ~2000 tickers)| Not yet implemented       |
-| Spread Scanning  | N/A                       | Yes (manual `scan_spreads`)|
-| Discord Webhook  | `DISCORD_CDS_WEBHOOK_URL` | `DISCORD_PCS_WEBHOOK_URL`  |
+| Feature           | CDS Scanner                 | PCS Scanner                 |
+| ----------------- | --------------------------- | --------------------------- |
+| Briefing Time     | 9:00 AM ET                  | 9:30 AM ET                  |
+| Scan Times        | 10:00, 1:00, 3:30 PM        | 10:30, 1:30, 3:45 PM        |
+| Weekly Report     | Sunday 6 PM ET              | Sunday 7 PM ET              |
+| Default Min Score | 70                          | 65                          |
+| Auto-Store        | Requires `--store` flag     | Automatic                   |
+| Signal Outcomes   | Yes (7-60 day tracking)     | Not yet implemented         |
+| Universe Scan     | Yes (manual, ~2000 tickers) | Not yet implemented         |
+| Spread Scanning   | N/A                         | Yes (manual `scan_spreads`) |
+| Discord Webhook   | `DISCORD_CDS_WEBHOOK_URL`   | `DISCORD_PCS_WEBHOOK_URL`   |
+
+## Troubleshooting
+
+### `setup-bun` 401 Unauthorized
+
+If the workflow fails at the "Setup Bun" step with a 401 error fetching tags from the GitHub API, the `bun-download-url` override in the workflow bypasses the API entirely by downloading directly from GitHub Releases. If you change `BUN_VERSION`, the download URL updates automatically since it references `${{ env.BUN_VERSION }}`.
 
 ## Future Enhancements
 
@@ -164,4 +170,4 @@ ORDER BY exit_date DESC;
 
 ---
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-02-28

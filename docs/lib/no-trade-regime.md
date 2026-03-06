@@ -155,6 +155,7 @@ const analysis = await analyzeTradingRegime(priceHistory, {
 ```
 
 **Regime offset rules:**
+
 - 1 caution reason + 2 go reasons → upgraded to **GO**
 - 1 caution reason + <2 go reasons → stays **CAUTION**
 - 2+ caution reasons → **CAUTION** (primaryReason = MULTIPLE_FACTORS if >2)

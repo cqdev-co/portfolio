@@ -18,9 +18,11 @@ import type { StockScore } from '../types/index.ts';
 import {
   isConfigured,
   saveSignals,
+  upsertOpportunities,
   getRecentSignalTickers,
   getTopTickersFromDB,
   getMasterTickers,
+  getRecentSignalTickersWithDates,
   type SignalData,
 } from '../storage/supabase.ts';
 import { getWatchlistTickers } from './watchlist.ts';
@@ -313,19 +315,21 @@ export async function scanAll(options: ScanAllOptions): Promise<void> {
     }
   }
 
-  // Get market regime
+  // Always fetch regime — needed for signal storage and filtering
   let marketContext: MarketContext | null = null;
   if (!summaryMode) {
     console.log(chalk.gray('  Checking market regime...'));
-    marketContext = await getMarketRegime();
+  }
+  marketContext = await getMarketRegime();
 
-    if (marketContext) {
-      const regimeColor =
-        marketContext.regime === 'bull'
-          ? chalk.green
-          : marketContext.regime === 'bear'
-            ? chalk.red
-            : chalk.yellow;
+  if (marketContext) {
+    const regimeColor =
+      marketContext.regime === 'bull'
+        ? chalk.green
+        : marketContext.regime === 'bear'
+          ? chalk.red
+          : chalk.yellow;
+    if (!summaryMode) {
       console.log(
         chalk.gray('  Market: ') +
           regimeColor(marketContext.regime.toUpperCase()) +
@@ -427,48 +431,76 @@ export async function scanAll(options: ScanAllOptions): Promise<void> {
 
   // v2.7.0: Auto-capture signals to database
   // v2.8.0: --store explicitly enables (for CI), default still stores unless --no-capture
+  // v3.0.0: Also populate stock_opportunities for backtest support
   const shouldStore = options.store || !options.noCapture;
   if (shouldStore && isConfigured()) {
     await captureSignals(results, marketContext);
+
+    const allScores = results.map((r) => r.score);
+    if (allScores.length > 0) {
+      await upsertOpportunities(allScores);
+    }
   }
 }
 
 /**
  * v2.7.0: Capture signals to database for performance tracking
  * v2.8.0: Added upside_potential and target_price for automatic outcome tracking
+ * v3.0.0: Signal cooldown — skip tickers that were signaled in the last 5 days
+ *         unless score changed by 10+ points (re-scored = new signal)
  */
 async function captureSignals(
   results: SpreadResult[],
   marketContext: MarketContext | null
 ): Promise<void> {
-  const signalsToSave: SignalData[] = results.map((r) => {
-    // Extract indicator values from signals if available
+  const COOLDOWN_DAYS = 5;
+
+  // Fetch recent signals for cooldown check
+  const recentSignals = await getRecentSignalTickersWithDates(COOLDOWN_DAYS);
+  const today = new Date().toISOString().split('T')[0];
+
+  const signalsToSave: SignalData[] = [];
+  let skipped = 0;
+
+  for (const r of results) {
+    const lastSignalDate = recentSignals.get(r.score.ticker);
+
+    // Skip if same ticker was signaled recently (cooldown)
+    // Allow re-signal if it's a new day with a viable spread (meaningful change)
+    if (lastSignalDate && lastSignalDate === today) {
+      skipped++;
+      continue;
+    }
+    if (lastSignalDate && !r.viable) {
+      skipped++;
+      continue;
+    }
+
     const rsiSignal = r.score.signals.find((s) =>
       s.name.toLowerCase().includes('rsi')
     );
     const rsiMatch = rsiSignal?.name.match(/(\d+)/);
     const rsiValue = rsiMatch?.[1] ? parseFloat(rsiMatch[1]) : null;
 
-    // Calculate target price from upside potential
     const upsidePotential = r.score.upsidePotential;
     const targetPrice =
       upsidePotential > 0 ? r.score.price * (1 + upsidePotential) : null;
 
-    return {
+    signalsToSave.push({
       ticker: r.score.ticker,
       signalDate: new Date(),
       signalScore: r.score.totalScore,
       regime: marketContext?.regime ?? null,
       regimeConfidence: null,
-      sector: null, // Could be enhanced with sector lookup
+      sector: r.score.context?.sector ?? null,
       signals: r.score.signals.map((s) => s.name),
       topSignals: r.score.signals
         .slice(0, 3)
         .map((s) => s.name)
         .join(', '),
       price: r.score.price,
-      ma50: null, // Would need to extract from debug data
-      ma200: null,
+      ma50: r.score.context?.ma50 ?? null,
+      ma200: r.score.context?.ma200 ?? null,
       rsi: rsiValue,
       spreadViable: r.viable,
       spreadStrikes: r.spread,
@@ -476,15 +508,24 @@ async function captureSignals(
       spreadCushion: r.cushion,
       spreadPop: r.pop,
       spreadReturn: r.returnPct,
-      // Target tracking for automatic outcome verification
       upsidePotential: upsidePotential > 0 ? upsidePotential : null,
       targetPrice,
-    };
-  });
+    });
+  }
 
   if (signalsToSave.length > 0) {
-    console.log(chalk.gray('  Capturing signals to database...'));
+    console.log(
+      chalk.gray(
+        `  Capturing ${signalsToSave.length} signals to database` +
+          (skipped > 0 ? ` (${skipped} skipped, cooldown)` : '') +
+          '...'
+      )
+    );
     await saveSignals(signalsToSave);
+  } else if (skipped > 0) {
+    console.log(
+      chalk.gray(`  All ${skipped} signals skipped (cooldown active)`)
+    );
   }
 }
 

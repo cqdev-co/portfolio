@@ -21,12 +21,13 @@ CREATE TABLE IF NOT EXISTS cds_signals (
   signal_date DATE NOT NULL,
 
   -- Score and grade
+  -- v3.0.0: Raised thresholds (80+ was 100% Grade A, no differentiation)
   signal_score INTEGER NOT NULL,
   signal_grade VARCHAR(1) GENERATED ALWAYS AS (
     CASE
-      WHEN signal_score >= 80 THEN 'A'
-      WHEN signal_score >= 70 THEN 'B'
-      WHEN signal_score >= 60 THEN 'C'
+      WHEN signal_score >= 92 THEN 'A'
+      WHEN signal_score >= 85 THEN 'B'
+      WHEN signal_score >= 78 THEN 'C'
       ELSE 'D'
     END
   ) STORED,

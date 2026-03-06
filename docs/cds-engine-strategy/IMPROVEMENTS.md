@@ -475,11 +475,166 @@ bun run scan-spreads --from-scan --verbose
 
 ---
 
+## Performance Improvements (v3.0.0) — March 2026
+
+Based on a 3-week performance analysis (Feb 13–Mar 5, 2026) that revealed several critical issues.
+See [PERFORMANCE_ANALYSIS_2026_FEB_MAR.md](PERFORMANCE_ANALYSIS_2026_FEB_MAR.md) for the full analysis.
+
+### Issues Found
+
+| Issue                                       | Severity | Impact                                   |
+| ------------------------------------------- | -------- | ---------------------------------------- |
+| Regime never stored on CI/CD scans          | Critical | 100% of 380 signals had regime="unknown" |
+| All signals Grade A (no differentiation)    | High     | Grading system was useless               |
+| Same tickers signaled daily (14x for GOOGL) | High     | Polluted accuracy metrics                |
+| Signal outcomes checked weekly only         | Medium   | 98% of signals still pending             |
+| stock_opportunities table empty             | Medium   | Backtest command non-functional          |
+
+### Changes
+
+#### 1. Fix Regime Storage (Critical Bug)
+
+**Problem:** CI/CD runs `scan-all --summary` which skipped `getMarketRegime()` due to `if (!summaryMode)` guard. All signals stored with `regime: null`.
+
+**Fix:** Regime is now always fetched regardless of summary mode. The `--summary` flag only suppresses verbose output, not data collection.
+
+**Files:** `src/commands/scan-all.ts`
+
+#### 2. Signal Cooldown (Deduplication)
+
+**Problem:** GOOGL appeared 14 times, AVGO 12 times, ANET 12 times — same tickers re-signaled daily because their technical setups persist across days.
+
+**Fix:** Added 5-day cooldown per ticker. Signals are skipped if the same ticker was signaled within the last 5 trading days, UNLESS:
+
+- It's the first signal of the day (same-day dedup)
+- The new signal has a viable spread (meaningful change)
+
+**Files:** `src/commands/scan-all.ts`, `src/storage/supabase.ts` (new `getRecentSignalTickersWithDates`)
+
+#### 3. Tighter Scoring & Grade Thresholds
+
+**Problem:** 100% of signals were Grade A (score 80+). Overlapping technical signals for the same market condition stacked to 35+ points.
+
+**Fix — Grade thresholds raised:**
+
+| Grade | Old   | New   |
+| ----- | ----- | ----- |
+| A     | 80+   | 92+   |
+| B     | 70–79 | 85–91 |
+| C     | 60–69 | 78–84 |
+| D     | <60   | <78   |
+
+**Fix — CDS-specific signal group caps:**
+
+Merged the `movingAverage` and `pullback` groups into a single `trendEntry` group capped at 18 points (was 15+15 = 30 combined). These all describe the same thesis: "stock is in uptrend and has pulled back."
+
+| Group         | Signals                                               | Old Cap                    | New Cap |
+| ------------- | ----------------------------------------------------- | -------------------------- | ------- |
+| trendEntry    | MA position, golden cross, pullback, healthy pullback | 30 (split across 2 groups) | 18      |
+| momentum      | RSI, MACD, OBV                                        | 12                         | 10      |
+| pricePosition | 52-week, support, bollinger                           | 12                         | 10      |
+| trendStrength | ADX, consolidating                                    | uncapped                   | 5       |
+| recovery      | MA200 reclaim                                         | 10                         | 8       |
+
+**Files:** `src/signals/technical.ts`, `src/storage/supabase.ts`, `db/schema/02_cds_signals.sql`
+
+**Note:** The DB `signal_grade` is a `GENERATED ALWAYS` column with dependent views. Apply this migration:
+
+```sql
+-- Drop dependent views first
+DROP VIEW IF EXISTS cds_signal_accuracy;
+DROP VIEW IF EXISTS cds_signal_performance;
+
+-- Recreate the generated column with new thresholds
+ALTER TABLE cds_signals DROP COLUMN signal_grade;
+ALTER TABLE cds_signals ADD COLUMN signal_grade VARCHAR(1) GENERATED ALWAYS AS (
+  CASE
+    WHEN signal_score >= 92 THEN 'A'
+    WHEN signal_score >= 85 THEN 'B'
+    WHEN signal_score >= 78 THEN 'C'
+    ELSE 'D'
+  END
+) STORED;
+
+-- Recreate index
+CREATE INDEX IF NOT EXISTS idx_cds_signals_grade ON cds_signals(signal_grade);
+
+-- Recreate views (same definitions as before)
+CREATE OR REPLACE VIEW cds_signal_performance AS
+SELECT
+  s.id, s.ticker, s.signal_date, s.signal_score, s.signal_grade,
+  s.regime, s.price_at_signal, s.top_signals, s.spread_viable,
+  CASE
+    WHEN o.id IS NULL THEN 'no_trade'
+    WHEN o.exit_date IS NULL THEN 'open'
+    ELSE 'closed'
+  END AS status,
+  o.entry_date, o.entry_debit, o.exit_date, o.exit_credit,
+  o.exit_reason, o.pnl_dollars, o.pnl_percent, o.days_held,
+  CASE
+    WHEN o.pnl_percent IS NULL THEN NULL
+    WHEN o.pnl_percent > 0 THEN 'win'
+    ELSE 'loss'
+  END AS result
+FROM cds_signals s
+LEFT JOIN cds_signal_outcomes o ON s.id = o.signal_id
+ORDER BY s.signal_date DESC, s.signal_score DESC;
+
+CREATE OR REPLACE VIEW cds_signal_accuracy AS
+SELECT
+  signal_grade, regime,
+  COUNT(*) AS total_signals,
+  SUM(CASE WHEN outcome_status = 'target_hit' THEN 1 ELSE 0 END) AS hits,
+  SUM(CASE WHEN outcome_status = 'target_missed' THEN 1 ELSE 0 END) AS misses,
+  SUM(CASE WHEN outcome_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+  ROUND(
+    100.0 * SUM(CASE WHEN outcome_status = 'target_hit' THEN 1 ELSE 0 END) /
+    NULLIF(SUM(CASE WHEN outcome_status IN ('target_hit', 'target_missed') THEN 1 ELSE 0 END), 0),
+    1
+  ) AS accuracy_pct,
+  ROUND(AVG(days_to_outcome) FILTER (WHERE outcome_status = 'target_hit'), 1) AS avg_days_to_target,
+  ROUND(AVG(max_gain_pct) FILTER (WHERE outcome_status != 'pending') * 100, 1) AS avg_max_gain_pct
+FROM cds_signals
+WHERE target_price IS NOT NULL
+GROUP BY signal_grade, regime
+ORDER BY signal_grade, regime;
+```
+
+#### 4. Daily Signal Outcomes in CI/CD
+
+**Problem:** Signal outcomes were only checked on Sundays (weekly report). 98% of signals were still pending resolution.
+
+**Fix:** Added a daily signal-outcomes check that runs after the last scan of the day (3:30 PM ET). Minimum signal age lowered from 7 to 3 days to catch fast-hitting targets (MNST hit target in 1 day).
+
+**Files:** `.github/workflows/cds-scanner.yml`
+
+#### 5. Populate stock_opportunities (Enable Backtest)
+
+**Problem:** The `scan-all` command only saved to `cds_signals`, not `stock_opportunities`. The backtest command depends on `stock_opportunities` and returned "No historical scan data found."
+
+**Fix:** `scan-all` now also calls `upsertOpportunities()` to populate `stock_opportunities` alongside signal capture.
+
+**Files:** `src/commands/scan-all.ts`
+
+#### 6. Enhanced Signal Data
+
+**Previously missing, now captured:**
+
+- `sector` — extracted from stock context
+- `ma50` — from 52-week context
+- `ma200` — from 52-week context
+
+---
+
 ## Future Improvements
 
 - [ ] Add watch mode with rate-limit-aware polling
 - [x] ~~Expand proxy to include fundamentals~~ (Done in v4.1)
 - [x] ~~Add debug tools~~ (Done in v1.9.1)
 - [x] ~~Fix spread scanner for low-priced stocks~~ (Done in v2.7.0)
+- [x] ~~Fix regime storage, scoring, cooldown~~ (Done in v3.0.0)
+- [ ] Add negative scoring signals (declining earnings, rising short interest)
+- [ ] Expand spread criteria (multiple DTE cycles, $2.50 widths)
+- [ ] Auto paper-trade A-grade signals for simulated P&L tracking
 - [ ] Add more divergence types (OBV, MACD histogram)
 - [ ] Backtest divergence signals

@@ -15,7 +15,12 @@ The CDS Engine Strategy includes automated CI/CD capabilities via GitHub Actions
 | ---------------- | ----------------------------- | ----------------------------------------- |
 | Morning Briefing | 9:00 AM ET (Mon-Fri)          | Market regime, watchlist alerts, earnings |
 | Opportunity Scan | 10:00 AM, 1:00 PM, 3:30 PM ET | Scan for high-score opportunities         |
+| Daily Outcomes   | 3:30 PM ET (Mon-Fri)          | Check signal accuracy (after last scan)   |
 | Weekly Report    | Sunday 6:00 PM ET             | Signal outcomes, performance, top picks   |
+
+> **v3.0.0:** Signal outcome checks now run daily after the last scan (3:30 PM ET)
+> with `--min-age 3` instead of only weekly. This resolves the issue where 98%
+> of signals were stuck as "pending".
 
 ## Manual Triggers
 
@@ -167,6 +172,9 @@ bun run engine  # alias for scan-all --summary
 # Full scan with storage (use --store for explicit DB writes)
 bun run scan-all --store
 
+# Top opportunities from DB (mirrors weekly report)
+bun run scan-db --min-score 75 --top-n 20 --summary
+
 # Check signal outcomes
 bun run signal-outcomes --verbose
 
@@ -212,6 +220,12 @@ WHERE outcome_status = 'pending'
   AND target_price IS NOT NULL
 ORDER BY signal_date DESC;
 ```
+
+## Troubleshooting
+
+### `setup-bun` 401 Unauthorized
+
+If the workflow fails at the "Setup Bun" step with a 401 error fetching tags from the GitHub API, the `bun-download-url` override in the workflow bypasses the API entirely by downloading directly from GitHub Releases. If you change `BUN_VERSION`, the download URL updates automatically since it references `${{ env.BUN_VERSION }}`.
 
 ## Future Enhancements
 

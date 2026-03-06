@@ -826,9 +826,49 @@ function checkBollingerBands(
 }
 
 /**
+ * CDS-specific signal group caps (tighter than shared defaults).
+ * v3.0.0: Pullback + MA signals capped together since they describe
+ * the same thesis ("uptrend with pullback"). Prevents 35+ point stacking
+ * from one market condition.
+ */
+const CDS_SIGNAL_GROUP_CAPS: Record<
+  string,
+  { keywords: string[]; maxPoints: number }
+> = {
+  trendEntry: {
+    keywords: [
+      'ma',
+      'golden',
+      'sma',
+      'moving average',
+      'pullback',
+      'pulled back',
+    ],
+    maxPoints: 18,
+  },
+  momentum: {
+    keywords: ['rsi', 'macd', 'obv'],
+    maxPoints: 10,
+  },
+  pricePosition: {
+    keywords: ['52-week', 'support', 'bollinger', 'bb'],
+    maxPoints: 10,
+  },
+  recovery: {
+    keywords: ['reclaim', 'recovery', 'recovering'],
+    maxPoints: 8,
+  },
+  trendStrength: {
+    keywords: ['adx', 'strong trend', 'trending', 'consolidat'],
+    maxPoints: 5,
+  },
+};
+
+/**
  * Calculate all technical signals for a stock
  * v1.7.0: Added ADX trend strength and Bollinger Band signals
  * v1.7.1: Added signal group caps to prevent stacking
+ * v3.0.0: Tighter CDS-specific group caps — merged pullback + MA groups
  */
 export function calculateTechnicalSignals(
   quote: QuoteData,
@@ -844,94 +884,78 @@ export function calculateTechnicalSignals(
   const volumes = historical.map((d) => d.volume);
   const currentPrice = quote.regularMarketPrice ?? closes[closes.length - 1];
 
-  // RSI (v2.5.0: rewards ideal entry zone 35-50)
   const rsiSignal = checkRSI(closes);
   if (rsiSignal) {
     signals.push(rsiSignal);
   }
 
-  // v2.5.0: Pullback-in-uptrend detection (core CDS entry signal)
   const pullbackSignals = checkPullbackInUptrend(currentPrice ?? 0, closes);
   for (const signal of pullbackSignals) {
     signals.push(signal);
   }
 
-  // Golden Cross
   const goldenCrossSignal = checkGoldenCross(closes);
   if (goldenCrossSignal) {
     signals.push(goldenCrossSignal);
   }
 
-  // MA Position (graduated based on how many MAs price is above)
   const maPositionSignals = checkMAPosition(currentPrice ?? 0, closes);
   for (const signal of maPositionSignals) {
     signals.push(signal);
   }
 
-  // MA Proximity (near key MA levels)
   const maProximitySignal = checkMAProximity(currentPrice ?? 0, closes);
   if (maProximitySignal) {
     signals.push(maProximitySignal);
   }
 
-  // Volume Surge
   const volumeSignal = checkVolumeSurge(volumes, quote);
   if (volumeSignal) {
     signals.push(volumeSignal);
   }
 
-  // Near Support
   const supportSignal = checkNearSupport(currentPrice ?? 0, historical);
   if (supportSignal) {
     signals.push(supportSignal);
   }
 
-  // OBV Trend
   const obvSignal = checkOBVTrend(closes, volumes);
   if (obvSignal) {
     signals.push(obvSignal);
   }
 
-  // MACD
   const macdSignal = checkMACD(closes);
   if (macdSignal) {
     signals.push(macdSignal);
   }
 
-  // 52-Week Position
   const weekPositionSignal = check52WeekPosition(currentPrice ?? 0, historical);
   if (weekPositionSignal) {
     signals.push(weekPositionSignal);
   }
 
-  // v1.7.0: ADX Trend Strength
   const adxSignal = checkADX(historical);
   if (adxSignal) {
     signals.push(adxSignal);
   }
 
-  // v1.7.0: Bollinger Bands position
   const bbSignal = checkBollingerBands(closes, currentPrice ?? 0);
   if (bbSignal) {
     signals.push(bbSignal);
   }
 
-  // v1.8.0: RSI Divergence (highly reliable reversal signal)
   const rsiDivergenceSignal = checkRSIDivergence(closes);
   if (rsiDivergenceSignal) {
     signals.push(rsiDivergenceSignal);
   }
 
-  // v1.8.0: MACD Divergence
   const macdDivergenceSignal = checkMACDDivergence(closes);
   if (macdDivergenceSignal) {
     signals.push(macdDivergenceSignal);
   }
 
-  // v1.7.1: Apply signal group caps to prevent stacking
-  const cappedScore = applySignalGroupCaps(signals);
+  const cappedScore = applySignalGroupCaps(signals, CDS_SIGNAL_GROUP_CAPS);
 
-  // Cap at 50 points total
   return {
     score: Math.min(cappedScore, 50),
     signals,

@@ -6,20 +6,22 @@ to identify high-conviction entry points for Credit/Debit Spread trading.
 
 ## Version History
 
-| Version | Date     | Changes                                                                      |
-| ------- | -------- | ---------------------------------------------------------------------------- |
-| v2.9.0  | Feb 2026 | Fixed viable spread criteria — mid-market debit fallback, relaxed thresholds |
-| v2.2.0  | Jan 2026 | Fixed briefing regime detection using shared lib, VIX display                |
-| v2.1.0  | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads                   |
-| v1.7.1  | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps)           |
-| v1.7.0  | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest                  |
-| v2.0.0  | Nov 2024 | AI-first architecture, cloud mode                                            |
+| Version | Date     | Changes                                                                                              |
+| ------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| v3.0.0  | Mar 2026 | Performance overhaul: regime fix, signal cooldown, tighter scoring, daily outcomes, backtest support |
+| v2.9.0  | Feb 2026 | Fixed viable spread criteria — mid-market debit fallback, relaxed thresholds                         |
+| v2.2.0  | Jan 2026 | Fixed briefing regime detection using shared lib, VIX display                                        |
+| v2.1.0  | Dec 2024 | Spread Scanner - find tickers with viable deep ITM spreads                                           |
+| v1.7.1  | Dec 2024 | Performance & logic fixes (batch scanning, LRU cache, signal caps)                                   |
+| v1.7.0  | Dec 2024 | ADX/Bollinger signals, balance sheet health, short interest                                          |
+| v2.0.0  | Nov 2024 | AI-first architecture, cloud mode                                                                    |
 
 ## Documentation
 
-| Document                                          | Description                                                                   |
-| ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [Scan Command Analysis](scan-command-analysis.md) | Deep analysis of the `bun run scan` command - all fixes implemented in v1.7.1 |
+| Document                                                     | Description                                                                   |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| [Performance Analysis](PERFORMANCE_ANALYSIS_2026_FEB_MAR.md) | 3-week performance analysis (Feb–Mar 2026) with findings and fixes            |
+| [Scan Command Analysis](scan-command-analysis.md)            | Deep analysis of the `bun run scan` command - all fixes implemented in v1.7.1 |
 
 ## Quick Reference
 
@@ -97,6 +99,15 @@ Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 | Analyst     | 20         | 20%      |
 | **Total**   | **100**    | **100%** |
 
+### Signal Grades (v3.0.0)
+
+| Grade | Score | Description                                       |
+| ----- | ----- | ------------------------------------------------- |
+| A     | 92+   | Highest conviction — strong across all dimensions |
+| B     | 85–91 | Good opportunity — most criteria met              |
+| C     | 78–84 | Moderate — some criteria unmet or mixed signals   |
+| D     | <78   | Below threshold — pass or monitor only            |
+
 ### Decision Matrix
 
 | Decision  | Criteria                                      |
@@ -112,4 +123,4 @@ Lists available: `mega`, `growth`, `etf`, `value`, `db`, `sp500`
 
 ---
 
-_Last Updated: February 2026_
+_Last Updated: March 2026_
