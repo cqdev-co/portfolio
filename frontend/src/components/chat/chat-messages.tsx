@@ -1,23 +1,25 @@
 'use client';
 
 import { memo } from 'react';
-import type { UIMessage } from 'ai';
 import type { ChatStatus } from 'ai';
 import { ArrowDownIcon } from './chat-icons';
 import { ChatMessage, ThinkingMessage } from './chat-message';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import { cn } from '@/lib/utils';
+import type { XyloUIMessage } from '@/lib/chat/types';
 
 type ChatMessagesProps = {
-  messages: UIMessage[];
+  messages: XyloUIMessage[];
   status: ChatStatus;
   isFullscreen?: boolean;
+  onSuggestion?: (prompt: string) => void;
 };
 
 function PureChatMessages({
   messages,
   status,
   isFullscreen,
+  onSuggestion,
 }: ChatMessagesProps) {
   const { containerRef, endRef, isAtBottom, scrollToBottom } =
     useScrollToBottom();
@@ -40,7 +42,6 @@ function PureChatMessages({
               : 'max-w-none px-4 py-4'
           )}
         >
-          {/* Messages */}
           {messages.map((message, index) => (
             <ChatMessage
               key={message.id}
@@ -50,18 +51,16 @@ function PureChatMessages({
                 message.role === 'assistant' &&
                 index === messages.length - 1
               }
+              onSuggestion={onSuggestion}
             />
           ))}
 
-          {/* Thinking indicator */}
           {isSubmitted && <ThinkingMessage />}
 
-          {/* Scroll anchor */}
           <div ref={endRef} className="min-h-[16px] min-w-[16px] shrink-0" />
         </div>
       </div>
 
-      {/* Scroll to bottom button */}
       <button
         type="button"
         aria-label="Scroll to bottom"
@@ -83,11 +82,9 @@ function PureChatMessages({
 }
 
 export const ChatMessages = memo(PureChatMessages, (prev, next) => {
-  // Always re-render during streaming
   if (prev.status === 'streaming' || next.status === 'streaming') {
     return false;
   }
-  // Re-render if fullscreen mode changes
   if (prev.isFullscreen !== next.isFullscreen) {
     return false;
   }

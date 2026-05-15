@@ -5,7 +5,7 @@
 
 ## Overview
 
-Victor (the AI trading analyst) has access to a suite of tools that allow him
+Xylo (the AI trading analyst) has access to a suite of tools that allow him
 to fetch real-time market data, analyze conditions, and make informed trading
 recommendations.
 
@@ -160,58 +160,107 @@ Calculate exact pricing for a user-specified call debit spread.
 - IV for both legs
 - Open interest for liquidity assessment
 
-### 9. `scan_opportunities` ✨ NEW (January 2026)
+### 9. `get_sector_flow` (Phase 1)
 
-Scans multiple tickers to find trade opportunities with grading.
+Returns the current sector-rotation tone (`risk-on` / `risk-off` / `mixed`)
+plus the leading and lagging sector ETFs.
 
-**Parameters**:
-
-- `scanList` (optional): Predefined list to scan
-  - Options: TECH, SEMIS, MEGACAP, FINANCIALS, HEALTHCARE, CONSUMER, ENERGY, FULL
-  - Default: TECH
-- `tickers` (optional): Comma-separated custom tickers (overrides scanList)
-- `minGrade` (optional): Minimum grade (A+, A, A-, B+, B, B-, etc.)
-  - Default: B
-- `maxRisk` (optional): Maximum risk score 1-10
-  - Default: 6
+**Parameters**: none.
 
 **Returns**:
 
-- Scan list used and tickers scanned count
-- Results array with:
-  - Ticker, price, change %
-  - Trade grade (A+ to F) with scoring breakdown
-  - Risk score (1-10) with factors
-  - RSI, MA200 status, cushion %
-  - Spread recommendation if available
-- Summary stats:
-  - Total opportunities
-  - A-grade and B-grade counts
-  - Low risk count
-  - Average cushion
+- `rotation`: `risk-on` if all of XLK, XLF, XLY are LEADING; `risk-off`
+  if all of XLP, XLU, XLV are LEADING; otherwise `mixed`.
+- `leaders`: sector ETFs with `momentum: 'LEADING'`, sorted by `changePct`.
+- `laggers`: sector ETFs with `momentum: 'LAGGING'`.
+- `raw`: full per-sector array.
 
-**Example Usage**:
+Implementation: pure glue over `getSectorPerformance()` in
+`lib/ai-agent/market/`. No new provider — the data is already part of
+the regime fetch.
 
-Ask Victor: "Find me some trade setups" or "Scan tech stocks for opportunities"
+### 10. `get_recent_news` (Phase 1)
 
-**Example Output**:
+Fetches recent news for a ticker from Yahoo + Polygon + FMP in parallel
+and dedupes by URL.
 
-```
-=== SCAN RESULTS (5 found) ===
+**Parameters**:
 
-NVDA | Grade: A- | Risk: 4/10
-  Price: $135.42 (+1.23%)
-  RSI: 48.2 | MA200: Above ✓
-  Cushion: 12.3%
-  Spread: $125/$130 @ $3.80 (32 DTE)
-  BUY - 1 risk factor: Earnings in 18 days
+- `ticker` (required): Stock symbol.
+- `hours` (optional): Look-back window. Default 48, capped at 168 (7 days).
 
-GOOGL | Grade: B+ | Risk: 5/10
-  Price: $178.90 (-0.45%)
-  ...
+**Returns**:
 
-=== END SCAN ===
-```
+- `articles`: up to 15 entries `{ title, source, url, published_at, snippet, origin }`.
+- `dedupe_count`: duplicates removed during merge.
+- `source_counts`: per-provider counts before dedupe (diagnostic).
+
+Provider notes:
+
+- Yahoo via `yahoo-finance2` (existing). Rate-limited; failures are
+  swallowed and the merge proceeds.
+- Polygon via `lib/ai-agent/data/polygon.ts` (existing); requires
+  `POLYGON_API_TOKEN`.
+- FMP via `lib/ai-agent/data/fmp.ts` (new); requires `FMP_API_KEY`.
+
+### 11. `get_sentiment` (Phase 1)
+
+Composite sentiment score for a ticker, derived from headline lexicon
+(`lib/ai-agent/sentiment/`).
+
+**Parameters**:
+
+- `ticker` (required): Stock symbol.
+- `hours` (optional): Look-back window for the headline pool. Default 48.
+
+**Returns**:
+
+- `score`: clamped to `[-1, 1]`.
+- `label`: `VERY_BEARISH | BEARISH | NEUTRAL | BULLISH | VERY_BULLISH`.
+- `article_count`.
+- `momentum`: trailing-24h mean minus preceding-24h mean. `null` when
+  there isn't enough data on each side.
+- `signal_counts`: aggregate bullish / bearish word hits.
+
+The handler reuses the cached news bundle from `get_recent_news` to
+avoid double-fetching when both tools fire on the same turn.
+
+### 12. `get_earnings_calendar` (Phase 1)
+
+Multi-ticker upcoming earnings via the FMP `/stable/earnings-calendar`
+endpoint.
+
+**Parameters**:
+
+- `tickers` (optional): comma-separated ticker list (e.g. `"NVDA,AAPL"`).
+- `days` (optional): look-ahead window. Default 7, capped at 30.
+
+**Returns**:
+
+- `upcoming`: array of `{ symbol, date, epsActual, epsEstimated, revenueActual, revenueEstimated, lastUpdated }`.
+- `window_days`: echo of the window used.
+
+Requires `FMP_API_KEY`. Without the key the handler returns
+`{ success: false, error: 'Earnings calendar unavailable...' }`.
+
+### 13. `get_geopolitical_events` (Phase 1)
+
+Curated upcoming macro / geopolitical events from
+`lib/ai-agent/calendar/index.ts:GEOPOLITICAL_EVENTS_2026`.
+
+**Parameters**:
+
+- `days` (optional): look-ahead window. Default 14, capped at 60.
+
+**Returns**:
+
+- `events`: array of `MarketEvent` with `type: 'GEOPOLITICAL'`,
+  `impact: high|medium|low`, and a description.
+- `data_freshness`: explicit disclaimer (`'curated through 2026-12-31'`).
+
+This is intentionally a **curated static list**, not a live feed. The
+disclaimer is exposed to the model so it doesn't claim coverage we
+don't actually have. Replace with a real macro feed in Phase 2+.
 
 ## Tool Integration
 
@@ -280,7 +329,7 @@ CrowdStrike (CRWD) | Trefis - Stock analysis and valuation models...
 ## Best Practices
 
 1. **Always check trading regime before suggesting entries**
-   - Victor should call `get_trading_regime` to validate conditions
+   - Xylo should call `get_trading_regime` to validate conditions
    - If `NO_TRADE`, recommend waiting
 
 2. **Use web search for recent news**

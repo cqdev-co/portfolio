@@ -22,7 +22,7 @@ lib/ai-agent/
 │   └── index.ts          # Session-level caching with TTL
 ├── prompts/
 │   ├── index.ts          # Prompt exports
-│   └── victor.ts         # Victor Chen persona
+│   └── xylo.ts         # Xylo persona
 ├── tools/
 │   ├── index.ts          # Tool exports
 │   └── definitions.ts    # Tool schemas
@@ -31,9 +31,43 @@ lib/ai-agent/
 │   ├── types.ts          # TickerData interface
 │   ├── yahoo.ts          # Yahoo Finance fetching
 │   ├── yahoo-proxy.ts    # Cloudflare Worker proxy integration
-│   └── formatters.ts     # AI-friendly formatting
+│   ├── formatters.ts     # AI-friendly formatting
+│   ├── fmp.ts            # FMP /stable/* wrapper (earnings calendar, news)  [Phase 1]
+│   └── news.ts           # Multi-source recent-news fetcher (Yahoo + Polygon + FMP)  [Phase 1]
+├── sentiment/
+│   ├── index.ts          # scoreHeadline, scoreHeadlines  [Phase 1]
+│   └── lexicon.ts        # Bullish / bearish word weights
 ├── handlers/
 │   └── index.ts          # Tool execution handlers
+├── logging/
+│   ├── index.ts          # Logging exports
+│   └── decisions.ts      # Xylo decision-log writer (agent_decisions table)
+├── preflight/
+│   ├── index.ts          # Preflight exports
+│   ├── types.ts          # PreflightResult, CoverageReport types
+│   └── runner.ts         # runPreflight() — Phase 1 deterministic context fan-out
+├── extractors/
+│   ├── index.ts          # Extractor exports
+│   ├── types.ts          # NewsDigest, SentimentDigest, FundamentalsDigest
+│   ├── news.ts           # extractNews(): catalysts + risk flags  [Phase 1C]
+│   ├── sentiment.ts      # extractSentiment(): score + divergences  [Phase 1C]
+│   └── fundamentals.ts   # extractFundamentals(): strength + red flags  [Phase 1C]
+├── risk/
+│   ├── index.ts          # Risk-gate exports
+│   ├── types.ts          # ParsedRecommendation, RiskVerdict, RiskViolation
+│   ├── parser.ts         # parseRecommendation(): regex + model fallback  [Phase 2]
+│   └── gate.ts           # validateRecommendation() over strategy.config.yaml  [Phase 2]
+├── evals/
+│   ├── index.ts          # Eval harness exports
+│   ├── types.ts          # Scenario, Probe, RoutingTest, EvalRun, EvalResult
+│   ├── runner.ts         # runEvalSuite(): load fixtures, invoke agent, score, aggregate
+│   ├── scorers/index.ts  # scoreScenario / scoreProbe / scoreRouting
+│   ├── scenarios/        # JSON fixtures, seeded from agent_decisions
+│   ├── probes/           # JSON fixtures: hallucination probes
+│   └── routing/          # JSON fixtures: tool-routing assertions  [Phase 2]
+├── confidence/
+│   ├── index.ts          # Confidence exports
+│   └── score.ts          # computeConfidence(): coverage + agreement + risk_pass  [Phase 2]
 ├── market/
 │   ├── index.ts          # Market regime detection (VIX, SPY, sectors)
 │   ├── chop-index.ts     # Chop/ATR/ADX indicators
@@ -50,46 +84,46 @@ lib/ai-agent/
 
 ## Components
 
-### 1. Victor Prompts (`prompts/`)
+### 1. Xylo Prompts (`prompts/`)
 
-Victor Chen is our AI trading analyst persona - a 67-year-old Wall
+Xylo is our AI trading analyst persona - a 67-year-old Wall
 Street veteran with 45 years of experience. The prompts module provides
 different versions for different use cases:
 
-#### `buildVictorSystemPrompt(config)`
+#### `buildXyloSystemPrompt(config)`
 
 Full system prompt with all context. Used by CLI for comprehensive
 analysis.
 
 ```typescript
-import { buildVictorSystemPrompt } from 'lib/ai-agent';
+import { buildXyloSystemPrompt } from 'lib/ai-agent';
 
-const prompt = buildVictorSystemPrompt({
+const prompt = buildXyloSystemPrompt({
   accountSize: 1750,
   context: '... TOON data and calendar ...',
   includeToonSpec: true,
 });
 ```
 
-#### `buildVictorLitePrompt(config?)`
+#### `buildXyloLitePrompt(config?)`
 
 Lightweight prompt for frontend chat. Same persona, less context
 overhead.
 
 ```typescript
-import { buildVictorLitePrompt } from 'lib/ai-agent';
+import { buildXyloLitePrompt } from 'lib/ai-agent';
 
-const prompt = buildVictorLitePrompt({ accountSize: 1500 });
+const prompt = buildXyloLitePrompt({ accountSize: 1500 });
 ```
 
-#### `buildVictorMinimalPrompt()`
+#### `buildXyloMinimalPrompt()`
 
 Ultra-minimal prompt for quick responses.
 
 ```typescript
-import { buildVictorMinimalPrompt } from 'lib/ai-agent';
+import { buildXyloMinimalPrompt } from 'lib/ai-agent';
 
-const prompt = buildVictorMinimalPrompt();
+const prompt = buildXyloMinimalPrompt();
 ```
 
 ### 2. Tool Definitions (`tools/`)
@@ -126,7 +160,6 @@ const ollamaTools = toOllamaTools(AGENT_TOOLS);
 import {
   WEB_SEARCH_TOOL,
   GET_TICKER_DATA_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
   ANALYZE_POSITION_TOOL,
 } from 'lib/ai-agent';
 ```
@@ -218,6 +251,271 @@ const positionResult = await handleAnalyzePosition({
 });
 ```
 
+### 4b. Decision Log (`logging/`)
+
+Persistence layer for every Xylo turn. Phase 0 of [`XYLO_ROADMAP.md`](./XYLO_ROADMAP.md). Used by `frontend/src/app/api/chat/route.ts` and `ai-analyst/src/commands/chat.ts`.
+
+```typescript
+import { logDecision, hashPrompt } from 'lib/ai-agent';
+
+void logDecision({
+  source: 'frontend', // 'frontend' | 'ai-analyst' | 'discord-bot'
+  user_id: 'me@example.com',
+  user_question: 'Should I take a CDS on NVDA?',
+  model_id: 'gpt-oss:120b-cloud',
+  prompt_hash: hashPrompt(systemPrompt), // first 16 hex chars of sha256
+  prompt_variant: 'lite',
+  tool_calls: [{ name: 'get_ticker_data', latency_ms: 312, ok: true }],
+  final_response: assistantText,
+  total_latency_ms: 4821,
+});
+```
+
+Behavior:
+
+- **Fire-and-forget**. `logDecision` never throws and never blocks the response. Callers `void` it.
+- **Graceful degradation**. If `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are absent, the writer logs a warning and returns. Chat continues to work.
+- **Drift tracking**. `hashPrompt(prompt)` returns the first 16 hex chars of a sha256 — small enough to store cheaply, stable enough to detect prompt changes between turns.
+
+Schema lives in `db/schema/08_agent_decisions.sql`; the viewer page lives at `frontend/src/app/decisions/page.tsx`.
+
+### 4c. Preflight (`preflight/`)
+
+Phase 1 deterministic context fan-out. One pipeline, runs once per turn,
+produces both the assembled `LIVE DATA` block (for the system prompt)
+and a `CoverageReport` (for the chat UI strip + `agent_decisions.coverage_report`).
+
+```typescript
+import { runPreflight } from 'lib/ai-agent';
+
+const r = await runPreflight('How does NVDA look today?');
+systemPrompt += `\n\n## LIVE DATA\n${r.formattedContext}`;
+void logDecision({ ..., coverage_report: r.coverage });
+```
+
+`PreflightResult` shape:
+
+```typescript
+interface PreflightResult {
+  classification: QuestionClassification; // includes signalRequirements
+  signals: Partial<Record<SignalKey, unknown>>; // raw fetched payloads
+  formattedContext: string; // LIVE DATA block, TOON-encoded by default
+  coverage: CoverageReport; // checked / skipped / stale / errors / latencies
+  total_latency_ms: number;
+}
+```
+
+`SignalKey` enumerates: `ticker_data`, `regime`, `calendar`, `news`,
+`sentiment`, `earnings`, `geopolitical`, `sector_flow`, `fundamentals`.
+PR A wires the first three; PR B flips on the rest as their providers
+ship.
+
+The `QUESTION_CLASS_TO_SIGNALS` map in `classification.ts` is the
+deterministic policy: each `QuestionType` declares which signals it
+needs, so adding a new tool/provider becomes a one-line change.
+
+Behavior:
+
+- **Parallel**. Every required signal runs concurrently; per-signal
+  latency is captured in `coverage.latencies`.
+- **Never throws**. A signal failure becomes an entry in
+  `coverage.errors` with `{ signal, message }`.
+- **Fan-out for tickers**. If `signalRequirements.ticker_data` is true
+  and multiple tickers were extracted, one fetch per ticker.
+- **Cached**. `fetchTickerData`, `getMarketRegime`, and
+  `getCalendarContext` already memoize through `sessionCache`, so a
+  preflight run doesn't add network cost when called repeatedly within
+  a session.
+
+The `AgentSession.runPreflight()` method exposes the same entry from
+session-style callers (CLI agents).
+
+### 4d. Extractors (`extractors/`)
+
+Phase 1C — pure deterministic functions that compress raw preflight
+signals into compact digests. Implements the **Extractor vs Reasoner
+discipline** from `XYLO_ROADMAP.md`: Xylo (the reasoner) sees digested
+catalysts and red flags, not raw article firehoses. Saves ~40-50% of
+the prompt budget on news-heavy turns.
+
+```typescript
+import {
+  extractNews,
+  extractSentiment,
+  extractFundamentals,
+} from 'lib/ai-agent';
+
+const newsDigest = extractNews(rawNewsResult);
+//   { sentiment: { score: -0.3, label: 'bearish' },
+//     catalysts: [{ type: 'GUIDANCE', detail: '...', confidence: 'medium' }],
+//     risk_flags: [{ kind: 'recall', detail: '...' }],
+//     article_count: 12 }
+
+const sentimentDigest = extractSentiment(rawSentimentScore, {
+  priceChangePct: -2.1,
+});
+//   { score, label, momentum, divergences: [{ kind: 'sentiment_vs_price', ... }] }
+
+const fundamentalsDigest = extractFundamentals(rawFinancialsDeep);
+//   { strength: 'WEAK', positives: ['Revenue +18% YoY'],
+//     red_flags: ['Operating margin -3% (unprofitable)'], comparison: null }
+```
+
+Behavior:
+
+- **Pure**. No I/O, no model calls. Phase 3 will swap in model-driven
+  versions for news + sentiment once we have a real eval set; the
+  function shape stays the same.
+- **Used by `runPreflight`**. Digests land in `coverage.digests` and
+  drive what the system prompt sees. Raw payloads remain in
+  `signals.*` so model tool calls can drill in.
+- **Pattern-driven**. News catalysts use a small regex map for
+  classification (`EARNINGS`, `REGULATORY`, `MACRO`, etc.). Risk flags
+  pick up restructuring / investigation / recall / tariff language.
+- **Forward-compatible**. `coverage.digests` is `Partial<Record<SignalKey, unknown>>`
+  — additional digest types in later phases append cleanly.
+
+### 4e. Risk gate (`risk/`)
+
+Phase 2 — runtime validator that turns `strategy.config.yaml` into
+real enforcement. Every Xylo trade-call answer is parsed into a
+structured recommendation and checked against the live entry / exit /
+sizing / risk-management rules.
+
+```typescript
+import {
+  parseRecommendation,
+  validateRecommendation,
+  skipGate,
+} from 'lib/ai-agent';
+
+// 1. Parse the model's natural-language response.
+const rec = await parseRecommendation(finalAssistantText, {
+  enableModelFallback: false, // regex-only by default
+});
+
+// 2. Validate against strategy.config.yaml (pure function).
+const verdict = rec
+  ? validateRecommendation({
+      recommendation: rec,
+      account: { sizeUSD: 1750 },
+      positions, // [{ ticker, riskUSD, sector? }]
+      tickerContext: { rsi, iv_pct, aboveMA200, daysUntilEarnings },
+    })
+  : skipGate('no structured "My call:" line found');
+
+// 3. Persist to agent_decisions.risk_violations.
+void logDecision({ ..., risk_violations: verdict.violations });
+```
+
+Behavior:
+
+- **Hybrid parser**. Regex first against the canonical structured
+  trade-call line that the system prompt instructs Xylo to end with
+  (`My call: BUY NVDA $200/$205 CDS, 30 DTE, debit $3.10`). When the
+  regex misses _and_ `enableModelFallback: true`, falls back to the
+  small `extraction` workload via `@portfolio/ai-config` (`gpt-oss:20b-cloud`
+  in cloud mode, `qwen3.6:35b` locally). Off by default to keep the
+  common path zero-cost.
+- **Pure gate**. `validateRecommendation` is a pure function over
+  already-fetched data. Never throws. Returns
+  `{ approved, gate_skipped, violations, recommendation, latency_ms }`.
+- **Severity model**. `BLOCK` violations downgrade `approved` to
+  false; `WARN` violations are reported but don't block. Empty
+  positions array means concentration / total-exposure rules can't
+  fire — they short-circuit cleanly.
+- **Rules** (read directly from `strategy.config.yaml` via the
+  existing `getEntryConfig` / `getExitConfig` /
+  `getPositionSizingConfig` / `getRiskManagementConfig` helpers):
+  position sizing, RSI band, trend, IV ceiling, earnings window, DTE
+  band, concentration, total exposure, blacklist.
+
+The chat route emits a `<!--RISK_GATE:{json}:RISK_GATE-->` stream
+marker after the main text; the UI parses it and renders
+`risk-gate-strip.tsx` with green/red verdict + per-rule expansion.
+
+### 4f. Evals (`evals/`)
+
+Phase 2 — regression / hallucination / tool-routing harness.
+`bun run xylo:eval` walks `evals/scenarios/`, `evals/probes/`, and
+`evals/routing/`, runs each fixture through a single-turn Ollama
+invocation that mirrors the chat-route's preflight + tool schema,
+scores, and persists one row to `agent_eval_runs`.
+
+```typescript
+import { runEvalSuite, type AgentInvoker } from 'lib/ai-agent';
+
+const invoker: AgentInvoker = async (question) => {
+  // ... call Ollama / your runtime ...
+  return { text, tools_called, latency_ms, tokens };
+};
+const run = await runEvalSuite({
+  invoke: invoker,
+  modelId: 'gpt-oss:120b-cloud',
+  promptHash: hashPrompt(systemPrompt),
+});
+// { scenarios_passed, probes_passed, routing_passed, results, blocker_failed, ... }
+```
+
+Behavior:
+
+- **Three suites**, one fixture per JSON file. Each fixture has a
+  `kind` ('scenario' | 'probe' | 'routing') plus per-kind assertions
+  (expected signals, required/forbidden phrases, must-call tools).
+- **Pluggable invoker**. The runner doesn't depend on a specific
+  client — production wires it to Ollama; unit tests pass a mock.
+- **`must_pass` blockers**. Any failed fixture marked `must_pass: true`
+  flips `EvalRun.blocker_failed = true` so the CLI exits 1 (CI-friendly).
+- **Persisted history**. Each run becomes one row in
+  `agent_eval_runs` with per-test results in JSONB; trend tracking
+  comes for free.
+- **Seed from real data**. `bun run xylo:eval:seed` pulls recent
+  rows from `agent_decisions` and writes them as scenario fixtures.
+
+See [`docs/ai-agent/EVAL_BASELINE.md`](./EVAL_BASELINE.md) for the
+current pass-rate baseline.
+
+### 4g. Confidence (`confidence/`)
+
+Phase 2 PR C — deterministic 0-10 score combining coverage
+completeness, signal agreement, and the risk-gate verdict. Persisted
+to `agent_decisions.confidence`; rendered in the chat UI as a
+color-coded badge inside `risk-gate-strip.tsx`.
+
+```typescript
+import { computeConfidence } from 'lib/ai-agent';
+
+const score = computeConfidence({
+  coverage, // CoverageReport from runPreflight
+  riskVerdict, // RiskVerdict from validateRecommendation
+  action: parsedRec?.action, // Returns null when action is null/non-actionable
+});
+// { score: 8, components: { coverage_completeness: 1, signal_agreement: 0.67, risk_pass: 1 } }
+```
+
+Formula (intentionally simple — easy to inspect, easy to recalibrate
+in Phase 4 once outcome data lands):
+
+```
+coverage_completeness = checked / (checked + errors)
+signal_agreement       = direction-alignment over news / sentiment / fundamentals
+                         (1.0 = all aligned, 0.0 = mixed, 0.5 = neutral / insufficient)
+risk_pass              = approved no-warn → 1.0, approved with warns → 0.85,
+                         skipped gate → 0.5, blocked → 0.0
+
+confidence = round(10 * (0.4 * coverage + 0.3 * agreement + 0.3 * risk_pass))
+```
+
+Edge cases:
+
+- Non-actionable action (or no recommendation) → returns `null`. The
+  decision log column stays `null` for chat / general turns.
+- Coverage with no signals fetched → `0.5` (neutral, not zero).
+- Risk gate skipped → `0.5` (neutral).
+
+The score is intentionally rough today; Phase 4 outcome tracking will
+let us calibrate the weights against actual win-rate by score bucket.
+
 ### 5. Question Classification (`classification.ts`)
 
 Smart classification to optimize context loading and reduce
@@ -259,7 +557,7 @@ const tickers = extractTickers('Looking at AAPL and MSFT today');
 ```typescript
 // ai-analyst/src/commands/chat.ts
 import {
-  buildVictorSystemPrompt,
+  buildXyloSystemPrompt,
   AGENT_TOOLS,
   toOllamaTools,
   classifyQuestion,
@@ -272,7 +570,7 @@ const classification = classifyQuestion(userMessage);
 const context = await buildContext(classification);
 
 // Create system prompt
-const systemPrompt = buildVictorSystemPrompt({
+const systemPrompt = buildXyloSystemPrompt({
   accountSize: 1750,
   context,
   includeToonSpec: true,
@@ -296,14 +594,14 @@ Direct imports work thanks to `turbopack.root` configuration in Next.js 16.
 ```typescript
 // frontend/src/app/api/chat/route.ts
 import {
-  buildVictorLitePrompt,
+  buildXyloLitePrompt,
   BASIC_TOOLS,
   toOllamaTools,
   executeToolCall,
 } from '@lib/ai-agent';
 
 // System prompt
-const systemPrompt = buildVictorLitePrompt({ accountSize: 1500 });
+const systemPrompt = buildXyloLitePrompt({ accountSize: 1500 });
 
 // Tool definitions
 const ollamaTools = toOllamaTools(BASIC_TOOLS);
@@ -374,7 +672,7 @@ For advanced customization, individual prompt components are exported:
 
 ```typescript
 import {
-  VICTOR_PERSONA,
+  XYLO_PERSONA,
   TRADING_STRATEGY,
   TOON_DECODER_SPEC,
   TOOL_INSTRUCTIONS,
@@ -385,7 +683,7 @@ import {
 } from 'lib/ai-agent';
 
 // Custom prompt with selected components
-const customPrompt = `${VICTOR_PERSONA}
+const customPrompt = `${XYLO_PERSONA}
 ${TRADING_STRATEGY}
 ${buildKeyRules(2000)}
 ${RESPONSE_STYLE}`;
@@ -393,7 +691,7 @@ ${RESPONSE_STYLE}`;
 
 ## Development Workflow
 
-1. **Edit** `lib/ai-agent/prompts/victor.ts` to update Victor's behavior
+1. **Edit** `lib/ai-agent/prompts/xylo.ts` to update Xylo's behavior
 2. **Test** locally using CLI: `cd ai-analyst && bun run chat`
 3. **Changes** automatically available in Frontend (same import)
 4. **Deploy** frontend to see changes in production
@@ -405,8 +703,8 @@ Full TypeScript support with exported types:
 ```typescript
 import type {
   // Prompt types
-  VictorPromptConfig,
-  VictorLiteConfig,
+  XyloPromptConfig,
+  XyloLiteConfig,
 
   // Tool types
   AgentTool,

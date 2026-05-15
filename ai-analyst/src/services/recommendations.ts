@@ -1,7 +1,7 @@
 /**
  * Recommendation Tracking Service
  *
- * Tracks Victor's recommendations and outcomes for accountability.
+ * Tracks Xylo's recommendations and outcomes for accountability.
  * Enables confidence calibration based on historical accuracy.
  */
 
@@ -185,7 +185,7 @@ function dbToRecommendation(row: DBRecommendation): Recommendation {
 // ============================================================================
 
 /**
- * Save a new recommendation from Victor
+ * Save a new recommendation from Xylo
  */
 export async function saveRecommendation(rec: {
   ticker: string;
@@ -401,7 +401,7 @@ export async function setRecommendationOutcome(
 // ============================================================================
 
 /**
- * Get Victor's accuracy stats by confidence level
+ * Get Xylo's accuracy stats by confidence level
  */
 export async function getConfidenceStats(): Promise<ConfidenceStats[]> {
   if (!isConfigured()) return [];
@@ -590,7 +590,7 @@ export function formatTickerHistoryForAI(
 
 /**
  * Build confidence recommendation string
- * Used when Victor states his confidence
+ * Used when Xylo states his confidence
  */
 export function buildConfidenceStatement(
   confidence: ConfidenceLevel,

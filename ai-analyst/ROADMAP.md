@@ -271,7 +271,7 @@ bun run briefing
 - Shows search results in UI
 - AI references findings in analysis
 
-### Victor Chen - AI Personality ✅
+### Xylo - AI Personality ✅
 
 - 67-year-old veteran Wall Street trader (45 years experience)
 - Direct, decisive, numbers-driven personality
@@ -283,19 +283,19 @@ bun run briefing
 ### Agent Loop with Tool Calling ✅
 
 - Proper Ollama tool calling per official docs
-- Agent loop: Victor can make multiple tool calls to research
+- Agent loop: Xylo can make multiple tool calls to research
 - Ollama's official web_search API (better results than DuckDuckGo)
 - Tools available:
   - web_search: Search the web via Ollama API for news, FOMC info, market analysis
   - get_ticker_data: Fetch real-time stock data
   - scan_for_opportunities: Scan market for trade setups
 - Visual feedback for tool calls in UI
-- Proactive research: Victor searches autonomously when asked to research
+- Proactive research: Xylo searches autonomously when asked to research
 
 ### Thinking Mode ✅
 
 - Hybrid approach: Non-streaming first call for thinking, streaming for tool results
-- Shows Victor's reasoning process in dedicated box (up to 20 lines)
+- Shows Xylo's reasoning process in dedicated box (up to 20 lines)
 - Limitation: Tools must be excluded from first call (DeepSeek-v3.1 API limitation)
 - Auto-triggers web search for "research" requests
 - Subsequent calls use streaming with tools for fast tool execution

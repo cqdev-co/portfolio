@@ -1,0 +1,29 @@
+{
+  "id": "briefing-01",
+  "workload": "briefing",
+  "description": "Placeholder. Modeled after frontend/src/app/api/dashboard/briefing/route.ts buildBriefingPrompt. Replace with a real captured prompt for higher fidelity.",
+  "tags": ["placeholder", "briefing", "json"],
+  "system": "You are Xylo, a concise hedge fund analyst. Return strict JSON only, no markdown, no code fences, no commentary outside the JSON.",
+  "user": "DATE: Monday, January 13, 2025, 9:05 AM EST\nMARKET REGIME: neutral\nVIX: 15.20\nSPY: 588.40 (+0.35%)\nINDICES: SPY: $588.40 (+0.35%), QQQ: $517.10 (+0.42%), IWM: $225.80 (-0.12%)\n\nPORTFOLIO:\nTotal Value: $125430.00\nP&L: +$3215.00 (+2.6%)\nPositions: 2 standalone + 1 spreads\n\nSPREADS:\n  NVDA $140/$145 CDS: entry $2.10, current $2.55, P&L +$45 (+21.4%), DTE 18d, underlying $143.20\n\nPOSITIONS:\n  AAPL shares: 50 @ $225.40 -> $231.10, P&L +$285 (+2.5%)\n  META call: 1 @ $15.20 -> $18.40, P&L +$320 (+21.0%)\n\nRECENT SIGNALS (last 3 days):\n  [CDS] AMD: Grade A, Score 82 - Bull flag forming above 21EMA (2025-01-12)\n  [PDS] TSLA: Grade B, Score 68 - Rejection at 420 resistance (2025-01-12)\nNo multi-strategy convergence today.\n\nUPCOMING EVENTS:\n  2025-01-15: NVDA earnings [HIGH]\n  2025-01-17: FOMC minutes [MEDIUM]\n\nINSTRUCTIONS:\nReturn a JSON object with this EXACT structure (no markdown, no code fences, just raw JSON):\n\n{\n  \"briefing\": \"3-4 sentence morning overview covering market conditions, portfolio status, and what to watch today. Be specific about numbers. Reference regime.\",\n  \"positionNotes\": {\n    \"<SYMBOL>\": \"1-sentence annotation for this position/spread. Include actionable insight (hold, take profit, watch level, roll, etc.)\"\n  },\n  \"actionItems\": [\n    \"Most important action to take right now\",\n    \"Second priority action\"\n  ],\n  \"riskAlerts\": [\n    \"Any risk warnings (expiring positions, regime shift, event risk, etc.)\"\n  ],\n  \"signalHighlights\": [\n    \"Notable signals worth attention (mention convergence if any)\"\n  ]\n}\n\nBe concise, specific, and actionable. Every note should reference real numbers from the data.",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "briefing",
+      "positionNotes",
+      "actionItems",
+      "riskAlerts",
+      "signalHighlights"
+    ],
+    "properties": {
+      "briefing": { "type": "string" },
+      "positionNotes": { "type": "object" },
+      "actionItems": { "type": "array" },
+      "riskAlerts": { "type": "array" },
+      "signalHighlights": { "type": "array" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    { "kind": "minLength", "chars": 50 }
+  ]
+}

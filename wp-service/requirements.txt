@@ -11,11 +11,12 @@ click>=8.0.0
 # Progress bars
 tqdm>=4.60.0
 
-# AI Integration
-openai>=1.0.0
+# AI Integration (Ollama Cloud)
+ollama>=0.4.0
 
 # Environment variables
 python-dotenv>=1.0.0
 
-# Optional: For enhanced functionality
-# requests>=2.32.0  # If needed for future web features
+# HTTP server for frontend integration
+fastapi>=0.115.0
+uvicorn>=0.34.0

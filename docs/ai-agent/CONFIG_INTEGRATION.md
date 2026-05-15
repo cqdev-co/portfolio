@@ -15,7 +15,7 @@ strategy.config.yaml          (Single source of truth)
 lib/ai-agent/config/index.ts  (Config loader + helpers)
         │
         ├── scanner/index.ts  (Uses config for grading)
-        ├── prompts/victor.ts (Uses config for system prompts)
+        ├── prompts/xylo.ts (Uses config for system prompts)
         └── options/spreads.ts (Uses config for spread params)
 ```
 
@@ -167,7 +167,7 @@ const { rsi_ideal_min, rsi_ideal_max } = entry.momentum;
 if (input.rsi >= rsi_ideal_min && input.rsi <= rsi_ideal_max) { ... }
 ```
 
-### Prompts (`prompts/victor.ts`)
+### Prompts (`prompts/xylo.ts`)
 
 System prompts dynamically include config values:
 

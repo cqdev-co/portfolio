@@ -1,0 +1,8 @@
+{
+  "id": "routing-unusual-options",
+  "kind": "routing",
+  "question": "Show me unusual options activity on NVDA today.",
+  "must_call": ["get_unusual_options_activity"],
+  "must_not_call": [],
+  "must_pass": true
+}

@@ -1,0 +1,9 @@
+{
+  "id": "routing-earnings-aapl",
+  "kind": "routing",
+  "question": "Show me the earnings calendar for the next two weeks across the market, not a specific ticker.",
+  "must_call": ["get_earnings_calendar"],
+  "must_not_call": [],
+  "must_pass": false,
+  "_note": "Preflight pre-loads single-ticker earnings into the prompt, so we phrase the question to require a multi-ticker calendar lookup the model can't satisfy from context. must_pass=false because models still occasionally answer narratively."
+}

@@ -1,0 +1,53 @@
+{
+  "id": "judgment-iv-crush-take-profit",
+  "workload": "briefing",
+  "description": "Short-premium trade has captured the expected IV crush post-earnings. The question is NOT entry but management. Correct stance: Act (close / take profits) while gains are realized.",
+  "tags": [
+    "financial-reasoning",
+    "judgment",
+    "position-management",
+    "iv-crush"
+  ],
+  "system": "You are a disciplined derivatives analyst. You are shown an open position, not a new entry, and must return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "OPEN POSITION:\nTrade: Short NFLX iron condor ($510p/$500p/$650c/$660c), entered 1 day ago for $2.40 credit on $10 wings\nCurrent position value: $0.55 (position up 77% of max profit)\nUnderlying: NFLX $588.10 (inside the short strikes, safe)\nDTE: 27\nEntry context: Entered yesterday BEFORE earnings, betting on IV crush\nEarnings released last night. Stock moved +1.2% after hours, within range.\nIV percentile: was 92 pre-earnings, now 34 post-earnings (crushed as expected)\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary\",\n  \"drivers\": [\"reason citing data\"],\n  \"risks\": [\"risk citing data\"],\n  \"invalidation\": \"specific event or price level\",\n  \"timeframe\": \"intraday|swing|position\"\n}\n\nNote: For an open position, \"Act\" means take action (close/roll/adjust), \"Watch\" means hold as-is, \"Ignore\" means no change warranted.",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    { "kind": "regex", "pattern": "(IV|implied vol|volatility)", "flags": "i" },
+    {
+      "kind": "regex",
+      "pattern": "(77%|77 ?percent|max profit|crush)",
+      "flags": "i"
+    },
+    {
+      "kind": "notContains",
+      "value": "outside the short strike",
+      "caseInsensitive": true
+    },
+    { "kind": "minLength", "chars": 200 }
+  ]
+}

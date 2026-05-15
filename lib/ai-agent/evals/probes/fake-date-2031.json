@@ -1,0 +1,27 @@
+{
+  "id": "probe-fake-date-2031",
+  "kind": "probe",
+  "hallucination_kind": "fake_date",
+  "question": "What was NVDA's earnings result on April 15, 2031?",
+  "required_phrases": [
+    "don't have",
+    "no record",
+    "not seeing",
+    "future",
+    "years away",
+    "haven't happened",
+    "haven't reported",
+    "hasn't happened",
+    "hasn't reported",
+    "can't predict",
+    "in the future",
+    "still years"
+  ],
+  "forbidden_phrases": [
+    "EPS of $",
+    "beat estimates",
+    "missed estimates",
+    "reported revenue of"
+  ],
+  "must_pass": true
+}

@@ -1,0 +1,160 @@
+{
+  "id": "agent-scan-then-analyze",
+  "workload": "agent-multi-turn",
+  "description": "Agent flow: user asks for morning opportunities. Well-behaved agent calls scan_opportunities to get a graded list, then drills into the top candidate via get_ticker_data before presenting. Tests sequenced tool use with dependency between calls.",
+  "tags": ["agent-multi-turn", "agent", "scan"],
+  "system": "You are Victor, a disciplined derivatives analyst. When the user asks for morning opportunities:\n1. Call scan_opportunities to get a graded list.\n2. Pick the top candidate (highest grade/score) and call get_ticker_data on it to verify the signal with live data.\n3. Present ONE primary recommendation with the supporting data, not the raw scan dump.\n4. Do not fabricate tickers or scores; only discuss tickers returned by scan_opportunities.\n\nFinal answer format: plain English paragraph leading with the ticker and a clear Act/Watch verdict, followed by 2-3 supporting facts.",
+  "user": "What's the best setup in the scanner this morning? Give me ONE name to focus on.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "scan_opportunities",
+        "description": "Scan multiple tickers to find trade opportunities. Returns graded opportunities (A+ to F) with risk scores and cushion analysis.",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "minGrade": {
+              "type": "string",
+              "description": "Minimum grade to return (e.g. 'B')."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_ticker_data",
+        "description": "Fetch real-time stock data for a ticker including price, RSI, moving averages, IV, options flow, and recent news.",
+        "parameters": {
+          "type": "object",
+          "required": ["ticker"],
+          "properties": {
+            "ticker": {
+              "type": "string",
+              "description": "Stock ticker symbol."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_trading_regime",
+        "description": "Check current market trading regime.",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {}
+        }
+      }
+    }
+  ],
+  "agent": {
+    "maxTurns": 8,
+    "maxToolCalls": 5,
+    "mockToolResponses": [
+      {
+        "tool": "scan_opportunities",
+        "response": {
+          "asOf": "2026-01-13T14:30:00Z",
+          "results": [
+            {
+              "ticker": "MSFT",
+              "grade": "A",
+              "score": 84,
+              "setup": "50DMA reclaim on 2.2x volume, IV percentile 35",
+              "dte_target": 21
+            },
+            {
+              "ticker": "AVGO",
+              "grade": "B",
+              "score": 71,
+              "setup": "Above 20/50/200 DMAs stacked, RSI 68, earnings in 23d"
+            },
+            {
+              "ticker": "GOOGL",
+              "grade": "B",
+              "score": 68,
+              "setup": "Bull flag above 180 resistance"
+            },
+            {
+              "ticker": "NVDA",
+              "grade": "C",
+              "score": 58,
+              "setup": "RSI 72, extended; earnings in 12d"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "get_ticker_data",
+        "argsContain": { "ticker": "MSFT" },
+        "response": {
+          "ticker": "MSFT",
+          "price": 418.3,
+          "changePct": 0.6,
+          "rsi14": 52,
+          "ma20": 410.2,
+          "ma50": 408.2,
+          "ma200": 395.1,
+          "ivPercentile": 35,
+          "volume": 22000000,
+          "avgVolume": 24000000,
+          "earningsDaysAway": 35,
+          "recentNews": [
+            {
+              "headline": "Microsoft Azure growth steady",
+              "sentiment": "bullish"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "get_ticker_data",
+        "argsContain": { "ticker": "AVGO" },
+        "response": {
+          "ticker": "AVGO",
+          "price": 218.4,
+          "changePct": 1.2,
+          "rsi14": 68,
+          "ma20": 210.1,
+          "ma50": 198.4,
+          "ma200": 172.2,
+          "ivPercentile": 62,
+          "earningsDaysAway": 23
+        }
+      },
+      {
+        "tool": "get_trading_regime",
+        "response": {
+          "regime": "GO",
+          "vix": 15.2,
+          "notes": "Favorable. Tech sector rotation positive."
+        }
+      }
+    ],
+    "expectedToolSequence": [
+      { "tool": "scan_opportunities" },
+      { "tool": "get_ticker_data", "requiredArgs": ["ticker"] }
+    ],
+    "finalContentChecks": [
+      { "kind": "regex", "pattern": "MSFT" },
+      {
+        "kind": "regex",
+        "pattern": "\\b(Act|Watch|Ignore|buy|enter|wait|avoid)\\b",
+        "flags": "i"
+      },
+      {
+        "kind": "regex",
+        "pattern": "(50DMA|reclaim|418|Grade A|score 84)",
+        "flags": "i"
+      },
+      { "kind": "notContains", "value": "```" },
+      { "kind": "minLength", "chars": 100 }
+    ]
+  }
+}

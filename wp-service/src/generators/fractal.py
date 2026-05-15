@@ -62,15 +62,7 @@ class FractalGenerator(BaseGenerator):
         # Normalize iterations to 0-1 range for color mapping
         normalized_iterations = iterations / max_iter
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = normalized_iterations[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(normalized_iterations)
 
     def _julia(
         self,
@@ -108,15 +100,7 @@ class FractalGenerator(BaseGenerator):
         # Normalize iterations to 0-1 range for color mapping
         normalized_iterations = iterations / max_iter
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = normalized_iterations[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(normalized_iterations)
 
     def _burning_ship(
         self, max_iter: int, zoom: float, center_x: float, center_y: float
@@ -148,12 +132,4 @@ class FractalGenerator(BaseGenerator):
         # Normalize iterations to 0-1 range for color mapping
         normalized_iterations = iterations / max_iter
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = normalized_iterations[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(normalized_iterations)

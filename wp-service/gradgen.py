@@ -392,8 +392,15 @@ def demo():
 @click.option(
     "--complexity", type=float, default=0.8, help="Complexity level (0.0-1.0)"
 )
+@click.option(
+    "--holographic",
+    is_flag=True,
+    help="Enable holographic shimmer on glass gradients (off by default)",
+)
 @click.option("--format", default="png", help="Output format: png, jpg, jpeg")
-def stock_quality(style, type, resolution, output, seed, complexity, format):
+def stock_quality(
+    style, type, resolution, output, seed, complexity, holographic, format
+):
     """Generate stock-photo quality gradients with all professional enhancements enabled."""
     generator = GradientGeneratorCLI()
     ai_gen = AIColorGenerator(seed=int(seed) if seed else None)
@@ -405,6 +412,12 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     colors = ai_gen.generate_professional_palette(style, 4)
 
     # Maximum quality parameters
+    w, h = Resolution.get(resolution)
+    ref_diag = (1920 * 1920 + 1080 * 1080) ** 0.5
+    diag = (w * w + h * h) ** 0.5
+    grain_scale = (ref_diag / diag) ** 0.5
+    base_grain = (0.045 * grain_scale) + complexity * 0.01 * grain_scale
+
     if type == "glass":
         params = {
             "layers": int(7 + complexity * 3),  # More layers for depth
@@ -412,19 +425,19 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
             "distortion": 0.15 + complexity * 0.1,  # Realistic distortion
             "highlights": 0.6 + complexity * 0.3,  # Prominent highlights
             "angle": random.randint(15, 165),  # Avoid harsh angles
-            "grain_intensity": 0.045 + complexity * 0.01,  # Professional grain
+            "grain_intensity": base_grain,
             "grain_type": "photographic",
             "grain_quality": "professional",
-            "holographic": True,  # Always enable holographic
-            "holographic_intensity": 0.4 + complexity * 0.2,
+            "holographic": holographic,
+            "holographic_intensity": 0.25 + complexity * 0.22,
             "gamma_correct": True,  # Always gamma correct
             "anti_banding": True,  # Always anti-banding
         }
     elif type == "organic":
         params = {
-            "smoothness": 8.0 + complexity * 4.0,  # Ultra-smooth
+            "smoothness": min(7.5, 4.5 + complexity * 3.0),
             "flow_strength": 0.2 + complexity * 0.2,
-            "grain_intensity": 0.04 + complexity * 0.01,
+            "grain_intensity": base_grain,
             "grain_type": "photographic",
             "grain_quality": "professional",
             "angle": random.randint(15, 165),
@@ -434,9 +447,9 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     elif type == "fluid":
         params = {
             "complexity": 4.0 + complexity * 4.0,  # Maximum fluidity
-            "smoothness": 10.0 + complexity * 6.0,  # Paint-like smoothness
+            "smoothness": min(9.0, 4.0 + complexity * 4.0),
             "bleeding": 0.3 + complexity * 0.3,
-            "grain_intensity": 0.04 + complexity * 0.01,
+            "grain_intensity": base_grain,
             "grain_type": "photographic",
             "grain_quality": "professional",
             "gamma_correct": True,
@@ -453,6 +466,9 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     )
     print(f"📄 Format: {file_extension.upper()}")
 
+    if seed:
+        params["seed"] = int(seed)
+
     success = generator.generate_gradient(
         gradient_type=type,
         colors=colors,
@@ -466,7 +482,7 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
         print("✅ Stock-quality gradient generated successfully!")
         print(f"📁 Output: {output_name}")
         print(
-            "💎 Features: Professional grain, Gamma correction, Anti-banding, Enhanced colors"
+            "💎 Features: Professional grain, OKLab blending, Anti-banding, Enhanced colors"
         )
         if type == "glass" and params.get("holographic"):
             print("🌈 Holographic effects enabled!")
@@ -500,9 +516,9 @@ def stock_quality(style, type, resolution, output, seed, complexity, format):
     "--complexity", type=float, default=0.6, help="Complexity level (0.0-1.0)"
 )
 @click.option(
-    "--use-openai", is_flag=True, help="Use OpenAI GPT for true AI color generation"
+    "--use-ollama", is_flag=True, help="Use Ollama for true AI color generation"
 )
-@click.option("--prompt", help="Custom prompt for OpenAI color generation")
+@click.option("--prompt", help="Custom prompt for Ollama color generation")
 @click.option("--format", default="png", help="Output format: png, jpg, jpeg")
 @click.option(
     "--web-optimized",
@@ -519,27 +535,25 @@ def ai_generate(
     holographic,
     grain_quality,
     complexity,
-    use_openai,
+    use_ollama,
     prompt,
     format,
     web_optimized,
 ):
     """Generate a gradient using AI-powered color generation."""
     generator = GradientGeneratorCLI()
-    ai_gen = AIColorGenerator(seed=int(seed) if seed else None, use_openai=use_openai)
+    ai_gen = AIColorGenerator(seed=int(seed) if seed else None, use_ollama=use_ollama)
 
     # Handle output format early since it's used in params
     file_extension = "jpg" if format.lower() in ["jpg", "jpeg"] else "png"
 
-    # Generate AI colors - OpenAI or local AI-inspired
-    if use_openai and prompt:
-        # Custom prompt mode
-        colors = ai_gen.generate_openai_palette(prompt, 4, style)
-        style_name = f"OpenAI: {prompt[:30]}..."
-    elif use_openai:
-        # Style-based OpenAI generation
-        colors = ai_gen.generate_openai_style_palette(style, 4)
-        style_name = f"OpenAI {style.title()}"
+    # Generate AI colors - Ollama or local AI-inspired
+    if use_ollama and prompt:
+        colors = ai_gen.generate_ollama_palette(prompt, 4, style)
+        style_name = f"Ollama: {prompt[:30]}..."
+    elif use_ollama:
+        colors = ai_gen.generate_ollama_style_palette(style, 4)
+        style_name = f"Ollama {style.title()}"
     elif professional and style in ["glass", "rich", "vibrant", "sophisticated"]:
         colors = ai_gen.generate_professional_palette(style, 4)
         style_name = f"Professional {style.title()}"
@@ -678,7 +692,7 @@ def ai_generate(
     "--complexity", type=float, default=0.6, help="Overall complexity (0.0-1.0)"
 )
 @click.option(
-    "--use-openai", is_flag=True, help="Use OpenAI for advanced AI generation"
+    "--use-ollama", is_flag=True, help="Use Ollama for advanced AI generation"
 )
 @click.option("--resolution", "-r", default="1080p", help="Output resolution")
 @click.option("--output", "-o", help="Output filename")
@@ -693,14 +707,14 @@ def ai_enhanced(
     color_temperature,
     depth,
     complexity,
-    use_openai,
+    use_ollama,
     resolution,
     output,
     format,
 ):
     """Generate wallpapers with enhanced AI control over mood, lighting, composition, and atmosphere."""
     generator = GradientGeneratorCLI()
-    ai_gen = AIColorGenerator(use_openai=use_openai)
+    ai_gen = AIColorGenerator(use_ollama=use_ollama)
 
     print("🤖 AI Enhanced Generation")
     print(f"💭 Prompt: {prompt or 'Auto-generated based on parameters'}")
@@ -721,15 +735,15 @@ def ai_enhanced(
         depth,
         complexity,
         ai_gen,
-        use_openai,
+        use_ollama,
     )
 
     # Generate colors based on enhanced AI understanding
-    if use_openai and prompt:
+    if use_ollama and prompt:
         enhanced_prompt = _create_enhanced_color_prompt(
             prompt, mood, lighting, atmosphere, color_temperature
         )
-        colors = ai_gen.generate_openai_palette(enhanced_prompt, 4, mood)
+        colors = ai_gen.generate_ollama_palette(enhanced_prompt, 4, mood)
     else:
         colors = _generate_contextual_colors(
             mood, lighting, atmosphere, color_temperature, ai_gen
@@ -773,11 +787,11 @@ def ai_enhanced(
     help="Batch theme: emotions, lighting, atmosphere, temperature, mixed",
 )
 @click.option("--resolution", "-r", default="1080p", help="Output resolution")
-@click.option("--use-openai", is_flag=True, help="Use OpenAI for enhanced generation")
+@click.option("--use-ollama", is_flag=True, help="Use Ollama for enhanced generation")
 @click.option(
     "--complexity", type=float, default=0.7, help="Overall complexity (0.0-1.0)"
 )
-def ai_mood_batch(count, theme, resolution, use_openai, complexity):
+def ai_mood_batch(count, theme, resolution, use_ollama, complexity):
     """Generate a batch of AI wallpapers exploring different moods, lighting, and atmospheres."""
     generator = GradientGeneratorCLI()
 
@@ -1061,7 +1075,7 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
 
     print(f"🎨 Generating {count} AI wallpapers with '{theme}' theme")
     print(
-        f"🤖 OpenAI: {'Enabled' if use_openai else 'Local AI'} | Complexity: {complexity}"
+        f"🤖 Ollama: {'Enabled' if use_ollama else 'Local AI'} | Complexity: {complexity}"
     )
     print("─" * 50)
 
@@ -1086,7 +1100,7 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
         )
 
         # Generate using enhanced AI
-        ai_gen = AIColorGenerator(use_openai=use_openai)
+        ai_gen = AIColorGenerator(use_ollama=use_ollama)
 
         # Generate AI-influenced parameters
         ai_params = _generate_ai_influenced_parameters(
@@ -1100,7 +1114,7 @@ def ai_mood_batch(count, theme, resolution, use_openai, complexity):
             depth,
             complexity,
             ai_gen,
-            use_openai,
+            use_ollama,
         )
 
         # Generate contextual colors
@@ -1279,7 +1293,7 @@ def _generate_ai_influenced_parameters(
     depth,
     complexity,
     ai_gen,
-    use_openai,
+    use_ollama,
 ):
     """Generate parameters influenced by AI understanding of mood, lighting, and atmosphere."""
 
@@ -1395,7 +1409,7 @@ def _generate_ai_influenced_parameters(
 def _create_enhanced_color_prompt(
     prompt, mood, lighting, atmosphere, color_temperature
 ):
-    """Create an enhanced prompt for OpenAI color generation."""
+    """Create an enhanced prompt for Ollama color generation."""
 
     color_temp_descriptions = {
         "warm": "warm, golden, orange-tinted colors",
@@ -1424,7 +1438,7 @@ def _create_enhanced_color_prompt(
 
 
 def _generate_contextual_colors(mood, lighting, atmosphere, color_temperature, ai_gen):
-    """Generate colors based on contextual understanding without OpenAI."""
+    """Generate colors based on contextual understanding without Ollama."""
 
     # Map parameters to existing AI generation methods
     style_mapping = {

@@ -271,6 +271,40 @@ export function encodeSearchToTOON(
 }
 
 /**
+ * Encode a recent-news bundle to compact TOON. Used by `get_recent_news`
+ * and by `runPreflight` when stuffing news into the system prompt.
+ *
+ * Phase 1B: Mirrors `RecentNewsResult` but compresses the array shape
+ * to a single-row-per-article TOON table.
+ */
+export function encodeRecentNewsToTOON(input: {
+  ticker: string;
+  hours: number;
+  articles: Array<{
+    title: string;
+    source: string | null;
+    published_at: string | null;
+    url: string;
+    origin?: string;
+  }>;
+  dedupe_count?: number;
+}): string {
+  const data = {
+    ticker: input.ticker,
+    hours: input.hours,
+    dedupe_count: input.dedupe_count ?? 0,
+    articles: input.articles.map((a) => ({
+      title: a.title,
+      source: a.source ?? '?',
+      // Trim to date portion so we don't burn tokens on minutes/seconds.
+      date: a.published_at ? a.published_at.slice(0, 10) : '?',
+      origin: a.origin ?? '?',
+    })),
+  };
+  return encode(data);
+}
+
+/**
  * Encode multiple tickers to compact TOON format
  */
 export function encodeTickersToTOON(tickers: TickerData[]): string {

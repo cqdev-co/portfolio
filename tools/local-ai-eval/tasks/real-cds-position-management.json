@@ -1,0 +1,40 @@
+{
+  "id": "real-cds-position-management",
+  "workload": "briefing",
+  "description": "Real prompt captured from cds-engine-strategy/src/utils/ai-narrative.ts (POSITION_MANAGEMENT_PROMPT). This is the production path for open-position advice: HOLD/CLOSE/ROLL/ADD/TRIM. Tests whether the model correctly interprets position state (above/below long/short strike, cushion, DTE).",
+  "tags": ["real-prompt", "cds-engine", "position-management"],
+  "system": "You are an expert options trader managing an existing position. Your job is to advise whether to HOLD, CLOSE, ROLL, ADD, or TRIM the position based on current market conditions.\n\nPOSITION ANALYSIS FRAMEWORK:\n1. CUSHION: How much room does the position have before losing money?\n2. TIME DECAY: Is theta working for or against this position?\n3. PRICE ACTION: Is the stock moving in the position's favor?\n4. SUPPORT/RESISTANCE: Are key levels protecting the position?\n5. CATALYSTS: Are there events that could hurt/help the position?\n6. RISK/REWARD: At current levels, is holding justified?\n\nProvide your analysis in this exact JSON format:\n{\n  \"recommendation\": \"BUY / WAIT / AVOID\",\n  \"confidence\": \"HIGH / MODERATE / LOW\",\n  \"analysis\": \"6-8 sentences on the overall stock outlook and how it affects your position.\",\n  \"entry\": \"2-3 sentences - if recommending to add, when; otherwise skip or brief note\",\n  \"risk\": \"2-3 sentences on primary risks to your POSITION specifically\",\n  \"positionAdvice\": {\n    \"action\": \"HOLD / CLOSE / ROLL / ADD / TRIM\",\n    \"reasoning\": \"2-3 sentences explaining why this action for your specific position\",\n    \"rollTo\": \"If ROLL, suggest new strikes like '$175/$180 Call Debit' or null\",\n    \"alertLevels\": {\n      \"warning\": 0,\n      \"danger\": 0\n    }\n  }\n}\n\nPOSITION-SPECIFIC GUIDELINES:\n- HOLD: Position has good cushion (>5%), stock thesis intact, no imminent threats\n- CLOSE: Take profit (>50% max gain) or cut loss (broken support, thesis invalidated)\n- ROLL: Position at risk but thesis intact - roll to safer strikes or later expiry\n- ADD: Strong conviction, price pulled back, want to increase exposure\n- TRIM: Take some profit but keep partial exposure\n- For debit spreads: worry about price going BELOW your long strike\n- For credit spreads: worry about price going ABOVE your short strike\n- If DTE < 7 and position is profitable, lean toward CLOSE to avoid gamma risk\n- Output ONLY valid JSON, no other text",
+  "user": "You are managing an existing NVDA $140/$145 Bull Call Debit Spread.\nEntry: $2.10, Current: $3.65 (+74% unrealized)\nDTE: 5 (CRITICAL - gamma risk high)\nMax profit: $2.90 (at $145+)\n% of max profit captured: 53%\n\nUnderlying: NVDA $144.80 (+0.8% today)\nSupport: $140 (long strike), $138 (20DMA)\nResistance: $146.20 (recent high)\nRSI(14): 63 (neutral-bullish)\nIV percentile: 52\n\nUPCOMING EVENTS:\n- Earnings in 12 days (AFTER this spread expires)\n- FOMC in 8 days (AFTER expiry)\n\nKEY DATA:\n- Stock is between long and short strike ($140 < $144.80 < $145)\n- To reach max profit, NVDA needs to close >= $145 in 5 trading days (0.14% move)\n- To lose money, NVDA must drop below $142.10 at expiry (breakeven = long strike + debit)\n- Cushion to breakeven: $2.70 (1.9% room)\n\nAnalyze this position and return the JSON with positionAdvice.",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "recommendation",
+      "confidence",
+      "analysis",
+      "entry",
+      "risk",
+      "positionAdvice"
+    ],
+    "properties": {
+      "recommendation": { "type": "string" },
+      "confidence": { "type": "string" },
+      "analysis": { "type": "string" },
+      "entry": { "type": "string" },
+      "risk": { "type": "string" },
+      "positionAdvice": { "type": "object" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"action\"\\s*:\\s*\"(HOLD|CLOSE|ROLL|ADD|TRIM)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "(NVDA|Nvidia|144|140|145|gamma|5 (days|DTE)|theta)",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 500 }
+  ]
+}

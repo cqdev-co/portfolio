@@ -21,12 +21,9 @@ class PerlinNoiseGenerator(BaseGenerator):
     def _init_permutation_table(self) -> np.ndarray:
         """Initialize the permutation table for Perlin noise."""
         seed = self.params.get("seed", 42)
-        np.random.seed(seed)
-
+        rng = np.random.default_rng(int(seed))
         p = np.arange(256)
-        np.random.shuffle(p)
-
-        # Duplicate the permutation table
+        rng.shuffle(p)
         return np.concatenate([p, p])
 
     def _fade(self, t: np.ndarray) -> np.ndarray:
@@ -76,21 +73,17 @@ class PerlinNoiseGenerator(BaseGenerator):
 
         return self._lerp(v, lerp1, lerp2)
 
-    def generate(self) -> np.ndarray:
-        """Generate a Perlin noise gradient."""
+    def raw_noise_values(self) -> np.ndarray:
+        """Scalar Perlin field in [0, 1], shape (height, width)."""
+        scale = self.params.get("scale", 8.0)
+        octaves = self.params.get("octaves", 4)
+        persistence = self.params.get("persistence", 0.5)
+        lacunarity = self.params.get("lacunarity", 2.0)
 
-        # Parameters
-        scale = self.params.get("scale", 8.0)  # Noise scale
-        octaves = self.params.get("octaves", 4)  # Number of octaves
-        persistence = self.params.get("persistence", 0.5)  # Amplitude persistence
-        lacunarity = self.params.get("lacunarity", 2.0)  # Frequency lacunarity
-
-        # Create coordinate arrays
         x = np.linspace(0, scale, self.width)
         y = np.linspace(0, scale, self.height)
         X, Y = np.meshgrid(x, y)
 
-        # Generate noise with multiple octaves
         noise_values = np.zeros_like(X)
         amplitude = 1.0
         frequency = 1.0
@@ -102,17 +95,11 @@ class PerlinNoiseGenerator(BaseGenerator):
             amplitude *= persistence
             frequency *= lacunarity
 
-        # Normalize to 0-1 range
         noise_values /= max_amplitude
-        noise_values = (noise_values + 1) / 2  # Convert from [-1,1] to [0,1]
-        noise_values = np.clip(noise_values, 0, 1)
+        noise_values = (noise_values + 1) / 2
+        return np.clip(noise_values, 0, 1)
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = noise_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+    def generate(self) -> np.ndarray:
+        """Generate a Perlin noise gradient."""
+        noise_values = self.raw_noise_values()
+        return self.interpolate_from_t_grid(noise_values)

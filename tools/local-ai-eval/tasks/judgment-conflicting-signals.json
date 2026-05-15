@@ -1,0 +1,47 @@
+{
+  "id": "judgment-conflicting-signals",
+  "workload": "briefing",
+  "description": "Two strategies give OPPOSITE recommendations on the same ticker. A disciplined analyst should recognize the conflict, lower confidence, and most likely stand aside (Ignore/Watch).",
+  "tags": ["financial-reasoning", "judgment", "conflict", "multi-strategy"],
+  "system": "You are a disciplined derivatives analyst. You are shown a single trade opportunity and must return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "CANDIDATE TRADE:\nTicker: TSLA $242.10\nSIGNAL SOURCE A (CDS, bullish): Grade B, Score 71. Reason: Reclaimed 20DMA ($238.40) with above-average volume.\nSIGNAL SOURCE B (PDS, bearish): Grade A, Score 82. Reason: Rejected at declining 50DMA ($246.80), bearish engulfing candle on 1.5x volume.\nBoth signals generated from the same session's data.\nProposed action from the convergence engine: enter BOTH a small CDS and a small PDS (delta-neutral iron condor-ish exposure)\nIV percentile: 55 (moderate)\nCatalyst: No earnings for 4 weeks.\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary\",\n  \"drivers\": [\"reason citing data\"],\n  \"risks\": [\"risk citing data\"],\n  \"invalidation\": \"specific event or price level\",\n  \"timeframe\": \"intraday|swing|position\"\n}",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "(conflict|opposite|oppos|contradict|both directional|divergen|mixed|disagree)",
+      "flags": "i"
+    },
+    {
+      "kind": "regex",
+      "pattern": "(Grade [AB]|CDS|PDS|score [0-9])",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 200 }
+  ]
+}

@@ -152,6 +152,104 @@ import { ErrorBoundary } from '@/components/error-boundary';
 </ErrorBoundary>
 ```
 
+## Chat Page (`/chat`)
+
+The AI assistant lives on a dedicated route at `/chat`. The floating chat
+panel that previously overlaid the current page has been retired; the new
+chat surface is rendered as a **persistent overlay from the root layout**
+so opening it feels like the layout expanding over the current page, not
+a route navigation. The URL still becomes `/chat` (deep-linkable,
+share-able, ⌘K-driven), but the previous page's tree stays mounted in
+the background.
+
+### Entry Points
+
+- **Dock**: the sparkle icon in the bottom dock toggles `/chat`. When
+  closed it `router.push`es; when already open it `router.back()`s
+  (falls back to `router.push('/')` if there is no history).
+  See `src/components/navbar.tsx`.
+- **⌘K / Ctrl+K**: handled in `ChatProvider`
+  (`src/components/chat/chat-context.tsx`), same toggle semantics as
+  the dock.
+- **Programmatic**: feature code calls `useGlobalChat().openChat(prompt?)`
+  which `router.push`es to `/chat?prompt=<encoded>`. Used by:
+  - Dashboard "Ask Xylo" button (`src/components/dashboard/dashboard-client.tsx`)
+  - Positions per-position / per-spread / portfolio analysis buttons
+    (`src/components/positions/positions-page-client.tsx`)
+  - Built via the `buildPositionPrompt`, `buildSpreadPrompt`, and
+    `buildPortfolioPrompt` helpers exported from `chat-context.tsx`.
+
+### Overlay Strategy
+
+`/chat` is intentionally a thin route — `src/app/chat/page.tsx` returns
+`null`. The actual UI is `<ChatOverlay />` mounted from
+`src/app/layout.tsx` (inside `ChatProvider`, wrapped in `Suspense` so
+`useSearchParams` doesn't deopt static routes). The overlay watches
+`usePathname()` and renders the chat surface inside `<AnimatePresence>`
+when pathname is `/chat`.
+
+Two motion layers run in parallel (both `fixed inset-0 z-20`, sitting
+under the dock at `z-30` so the dock stays clickable):
+
+1. **Backdrop** — a solid `bg-background` plane, opaque from `t=0` so the
+   `<main>` swap from the previous page to the empty `/chat/page.tsx`
+   is never visible.
+2. **Surface** — the chat UI scaled subtly from the centre of the
+   viewport (`transformOrigin: '50% 50%'`, `scale: 0.985 → 1`) with an
+   ease-out cubic-bezier (`[0.32, 0.72, 0, 1]`, the Vercel/Linear
+   curve). No spring, no overshoot — composed and intentional.
+
+A single 320ms duration governs both opacity and scale on entrance, so
+they arrive together. On close, the backdrop fades over 220ms and the
+surface scales back to 0.99 with the same easing, revealing the
+previously-mounted page underneath.
+
+Files:
+
+- `src/components/chat/chat-overlay.tsx` — overlay wrapper, owns the
+  open/close motion + reads `?prompt=` via `useSearchParams`.
+- `src/app/chat/page.tsx` — empty placeholder, exists only so `/chat` is
+  a real route.
+- `src/app/chat/chat-experience.tsx` — the chat UI itself: `useChat`,
+  empty/thread morph, error banner, keyboard handlers.
+
+### Empty → Thread Morph
+
+The page has two states driven by `messages.length === 0`:
+
+1. **Empty (centered hero)** — large gradient sparkle, "Ask anything"
+   headline, centered input, and four suggestion chips.
+2. **Thread** — small sparkle in the header, `ChatMessages` thread, and a
+   bottom-docked composer.
+
+Both states are wrapped in a framer-motion `LayoutGroup`. Two pairs of
+shared `layoutId`s drive the morph on first message:
+
+- `layoutId="chat-sparkle"` morphs the large hero sparkle into a small
+  header badge.
+- `layoutId="chat-input-wrapper"` morphs the centered composer down to its
+  docked position above the bottom dock (`pb-20 sm:pb-24`).
+
+`AnimatePresence mode="wait"` cross-fades the rest of the empty / thread
+content around the morphing elements.
+
+### Initial Prompt Flow
+
+When `/chat?prompt=...` is loaded, the client experience:
+
+1. Stashes the prompt in a `useRef` and bumps the `useChat` `id` key.
+2. `router.replace('/chat')` strips the query string immediately so a
+   refresh doesn't resend the prompt.
+3. As soon as `status === 'ready'` and the message list is empty, the
+   pending prompt is sent.
+
+### ChatProvider
+
+`src/components/chat/chat-context.tsx` is now a thin shim around
+`router.push`. It exposes only `openChat(prompt?)` plus the prompt-builder
+helpers; the prior `isOpen` / `isFullscreen` / `toggleChat` /
+`toggleFullscreen` / `clearInitialPrompt` panel state has been removed.
+
 ## API Rate Limiting
 
 The chat API endpoint (`/api/chat`) includes per-user rate limiting to prevent
@@ -204,6 +302,186 @@ API routes include HTTP cache headers for CDN and browser caching:
 ---
 
 ## Recent Updates
+
+### Blog: Log Ingestion Pipeline Post (April 2026)
+
+Added a new long-form blog post at `frontend/content/log-ingestion-pipeline.mdx`
+covering the six-month journey of architecting a serverless AWS log
+ingestion pipeline for eight SaaS security sources.
+
+**May 2026 editorial pass.** Reframed the article around the build-vs-buy
+narrative the author actually lived: the SAM had no data to query, the
+unlock was discovering the SAM could query S3 directly, and the LIP
+displaced what would have been a five-figure commercial pipeline (Cribl)
+with a four-figure in-house equivalent. Concrete changes:
+
+- Rewrote the introduction to lead with the SAM forcing function and the
+  S3-query unlock, and to explicitly name the Cribl alternative.
+- Added a fourth factor to the architecture decision rationale —
+  "stayed inside our existing AWS bill" — addressing CISO concerns about
+  vendor sprawl and additional attack surface.
+- Replaced the soft "fraction of a SaaS subscription" cost row in the
+  Results table with a concrete "low four figures/year — roughly 1/10th
+  the cost of a comparable commercial pipeline tool" comparison.
+- Added a new `## Build vs. Buy` section between Results and Lessons
+  Learned, mirroring the structure of
+  `seceng-event-gateway-autonomous-security.mdx`.
+- Strengthened the conclusion with a "For the reader still here"
+  multi-audience tail (engineer / architect / security leader).
+- Updated the frontmatter `summary` field to reflect the new framing
+  (so blog cards and OG previews surface the build-vs-buy hook).
+
+**May 2026 voice revision.** Second editorial pass after the author
+flagged that the article still read more like a story than a personal
+blog. Tightened the voice and reframed the introduction around the
+author's own words:
+
+- Rewrote the introduction to lead directly with "We were missing a
+  critical layer in our security stack: our data layer" and the
+  Cribl-vs-in-house cost comparison up front. Replaced the strategic
+  framing with the author's two real reasons for building own
+  integrations: speed vs. waiting on the SAM vendor's roadmap, and
+  keeping data inside our own AWS environment.
+- Fixed the "unlock" sentence — previously "the SAM could query S3
+  directly," now phrased as the author actually experienced it: "The
+  idea hit me when I saw I could connect the SAM to S3 directly."
+- Tightened the architecture decision paragraph to three factors and
+  removed the confusing "the SAM already lived in AWS" line.
+- Reworked `## Build vs. Buy` around the author's stated reasoning:
+  cheaper, easy CISO conversation, data stays inside our environment,
+  and Claude Code as a real shipping accelerator. Dropped the
+  "six months" framing (author was split across responsibilities) and
+  the bus-factor admission.
+- Replaced the three "What I'd Do Differently" items with the author's
+  three: prioritize observability AND get one source production-ready
+  first; build the test suite alongside the first source for vendor
+  sanity-checking; watch for code duplication and abstract earlier.
+- Voice pass on the rest of the article: removed retrospective arc
+  phrasings ("After six months in production…", "what started as…"),
+  trimmed redundant `_"I remember thinking…"_` quoted thoughts (kept
+  only the `BasePoller` aha-moment), and tightened the Conclusion
+  intro from narrative to direct claim.
+- Re-aimed the frontmatter `summary` at the new opening framing.
+
+**Mermaid diagram support (May 2026).** Added first-class mermaid
+diagram rendering so MDX authors can write real flowcharts instead of
+ASCII arrow strings. Integration points:
+
+- New dependency: `mermaid@^11` in
+  [frontend/package.json](../../frontend/package.json).
+- New client component:
+  [frontend/src/components/mermaid-diagram.tsx](../../frontend/src/components/mermaid-diagram.tsx).
+  `'use client'`, lazy-imports `mermaid` inside a `useEffect`, calls
+  `mermaid.initialize` with theme derived from `next-themes`'
+  `resolvedTheme` (so dark mode picks up automatically), then renders
+  the resulting SVG via `dangerouslySetInnerHTML`. Re-runs whenever
+  `source` or `resolvedTheme` changes. Uses `securityLevel: 'loose'`
+  because MDX content is author-controlled and we need `<br/>` line
+  breaks inside node labels. Renders a "Rendering diagram…" placeholder
+  during the async import and falls back to the raw source in a styled
+  `<pre>` if mermaid throws.
+- Wiring lives in the `CodeBlock` handler in
+  [frontend/src/components/mdx.tsx](../../frontend/src/components/mdx.tsx).
+  We inspect the child `<code>` element's `className`; if it equals
+  `'language-mermaid'` we extract the text content and render
+  `<MermaidDiagram source={…} />` instead of the styled `<pre>`. Every
+  other language (`language-python`, `language-hcl`, `language-yaml`,
+  etc.) passes through unchanged, so the other two posts continue to
+  render identically.
+- Authoring: any MDX file may now use a ` ```mermaid ` code block.
+  Node labels with line breaks should use `Label["First line<br/>second line"]`.
+- Three diagrams in `log-ingestion-pipeline.mdx` (the three ingestion
+  patterns) were migrated from ASCII arrow strings to mermaid
+  `flowchart LR` diagrams as part of this revision. The
+  `source=<name>/year=…` path layout block stayed a ` ```text ` block
+  because it's a string format, not a diagram.
+
+**May 13 2026 follow-up revision.** Third editorial pass driven by
+author feedback on the rendered post:
+
+- **De-branded the build-vs-buy framing.** Replaced every explicit
+  "Cribl" mention with category language ("commercial security data
+  pipeline", "commercial pipelines in this space"). The cost framing
+  (five figures vs. less than four figures) stays intact. This applies
+  to the frontmatter `summary`, the Introduction's lead sentence, and
+  all three references in the `## Build vs. Buy` section.
+- **Rewrote the data-residency bullet in the Introduction.** The prior
+  version listed short-term operational concerns (extra credentials,
+  vendor security reviews, integrations to maintain). Replaced with
+  the actual reasons: data governance — security logs are sensitive
+  and we shouldn't accept a SAM vendor's retention/access posture by
+  default — and avoiding lock-in if we ever need to swap SAM vendors.
+- **Reframed the "building solo" paragraph in The Problem.** The prior
+  version positioned the architecture as constrained by the author
+  working alone. Reframed as a longer-term, architect-mindset
+  constraint: designing for the team that doesn't exist yet, so
+  anyone who picks the system up later can learn, maintain, and
+  extend it. Also softened a now-duplicated "ruled out clever / ruled
+  in boring" cadence in the 2 AM sentence below the requirements list.
+- **Simplified the three mermaid diagrams.** The prior versions
+  enumerated every AWS service (API Gateway, Lambda Handler, SQS,
+  Lambda Processor, Kinesis Firehose, S3 Bucket — 7 nodes for the
+  webhook diagram, 8 for polling). The screenshots showed they were
+  unreadable at-a-glance because the rail spanned the full width.
+  Collapsed to conceptual stages: `SaaS Source → Receive &
+Authenticate → Buffer & Process → Data Lake` (4 nodes for webhook),
+  `Schedule → Poll & Fetch ↔ SaaS Source API → Buffer & Process →
+Data Lake` (5 nodes for polling), `SaaS Source → Data Lake` (2 nodes
+  for S3 streaming). The AWS service names stay in the prose
+  underneath each diagram.
+- **Added a 30-day reliability row to the Results table** to
+  highlight hands-off operation: "Reliability (last 30 days): 100%
+  uptime, zero errors." Renamed the existing Lambda success rate row
+  to "Lambda success rate (lifetime)" to distinguish the two
+  measurements. Updated the closing paragraph below the table to
+  explicitly state that no failed invocations, no DLQ messages, and
+  no on-call pages occurred in the trailing 30 days — proof the
+  system can run without daily attention.
+
+The file was normalized to match the standard MDX frontmatter contract
+consumed by `frontend/src/data/blog.ts` (see `Metadata` type):
+
+```yaml
+---
+title: >
+  Building a Security Data Lake: How I Architected a Log
+  Ingestion Pipeline for 8 SaaS Sources
+publishedAt: '2026-03-21'
+summary: >
+  The six-month journey of designing and operating a serverless AWS
+  log ingestion pipeline that delivers security logs from eight SaaS
+  platforms into a data lake in under three minutes, built and run
+  by a single engineer.
+image: '/wallpapers/Cyera_Gradient_Blue_Purple.png'
+tags:
+  [
+    'Security',
+    'Data Engineering',
+    'AWS',
+    'Serverless',
+    'Terraform',
+    'Observability',
+    'Cyera',
+  ]
+---
+```
+
+Authoring conventions applied (to stay consistent with
+`seceng-event-gateway-autonomous-security.mdx` and
+`integrating-nuclei-into-cicd.mdx`):
+
+- Frontmatter uses `title`, `publishedAt`, `summary`, `image`, `tags` — no
+  ad-hoc keys like `project`, `type`, `author`, or `last_updated`.
+- No top-level `# H1` heading in the body — the title is rendered from
+  frontmatter; body sections start at `##`.
+- No manual reading-time line — reading time is auto-calculated by
+  `calculateReadingTime()` in `frontend/src/data/blog.ts`.
+- A banner image (`![alt](/path)`) is placed immediately after the
+  frontmatter, matching the `image` field.
+- Inline quoted thoughts use `_"..."_` italics for consistency.
+- ASCII flow diagrams are tagged ` ```text ` so `rehype-pretty-code`
+  renders them as plain code blocks rather than attempting language
+  highlighting.
 
 ### FinanceChart Component (January 2026)
 
@@ -533,13 +811,13 @@ Everything else (raw market data, full signal lists, trade history) is available
 - Single compact header line replacing the old header + Market Pulse + Risk Status
 - Shows: title, market open/closed badge, regime badge (RISK_ON / RISK_OFF / NEUTRAL / HIGH_VOL), VIX regime badge (CALM / NORMAL / ELEVATED / HIGH / EXTREME)
 - **Circuit breaker indicator**: Colored dot (green/yellow-pulse/red-pulse) with label (All Clear / Reduce Size / Pause Trading)
-- Last refresh timestamp, Refresh button, Ask Victor button
+- Last refresh timestamp, Refresh button, Ask Xylo button
 - Regime detection: SPY % change + VIX price → market regime classification
 - Circuit breaker logic: portfolio drawdown + positions-at-risk count → green/yellow/red
 
 **2. AI Daily Briefing** (`daily-briefing.tsx`) — **Hero Section**
 
-- Auto-generated morning briefing by Victor (AI analyst persona) on dashboard load
+- Auto-generated morning briefing by Xylo (AI analyst persona) on dashboard load
 - Gathers context: market data, positions, spreads, unified signals, economic calendar, regime
 - Calls `/api/dashboard/briefing` (POST) which sends context to Ollama for structured analysis
 - Returns JSON with: `briefing`, `positionNotes`, `actionItems`, `riskAlerts`, `signalHighlights`
@@ -642,7 +920,7 @@ These components are no longer rendered in the dashboard layout but remain in th
   - **Interactive action items**: Checkboxes to track completion during the session
   - Annotations flow to Attention Required cards + Positions Overview via `usePositionAnnotations()` hook + sessionStorage
   - Cached 30 minutes in sessionStorage; regenerate button available
-- **Ask Victor** (reactive): Button in status bar opens AI chat pre-loaded with full portfolio context
+- **Ask Xylo** (reactive): Button in status bar opens AI chat pre-loaded with full portfolio context
   - Builds prompt with all position data, spread details, and summary metrics
   - Uses existing `buildPortfolioPrompt` from chat component library
 
@@ -750,7 +1028,7 @@ This XML text was streamed to the client as visible content and the tool never e
    - **Full-block suppression**: An `xmlToolCallDetected` flag detects complete XML patterns (`<function_calls>` or `<invoke `) in accumulated content. Once detected, all further text deltas from that streaming round are suppressed.
    - **Per-chunk cleaning**: `cleanPartialXMLTags()` strips partial/incomplete XML tag fragments (e.g., `<function`, `</invoke>`, `<parameter>`) from each text chunk before streaming. Uses word boundary (`\b`) to avoid false positives on words like `<functionality>`. This handles the case where models output partial XML in follow-up responses after tool execution (e.g., attempting additional tool calls but only emitting truncated tags).
 
-3. **System Prompt Guidance** (`victor.ts`): Added an explicit instruction in the `buildVictorLitePrompt` tool section telling the model to use the native function/tool calling mechanism and NOT write out function calls as XML/JSON/text. This is a preventive measure — models don't always follow this, which is why the parser exists as a safety net.
+3. **System Prompt Guidance** (`xylo.ts`): Added an explicit instruction in the `buildXyloLitePrompt` tool section telling the model to use the native function/tool calling mechanism and NOT write out function calls as XML/JSON/text. This is a preventive measure — models don't always follow this, which is why the parser exists as a safety net.
 
 **Helper Functions Added:**
 
@@ -771,7 +1049,77 @@ function cleanPartialXMLTags(text: string): string;
 **Files Changed:**
 
 - `src/app/api/chat/route.ts` — Parser, stream suppression, fallback execution
-- `lib/ai-agent/prompts/victor.ts` — System prompt native tool call guidance
+- `lib/ai-agent/prompts/xylo.ts` — System prompt native tool call guidance
+
+---
+
+### Dedicated Chat Page (April 2026)
+
+Replaced the floating `ChatPanel` with a `/chat` route whose UI is a
+**persistent overlay rendered from the root layout**. Opening the chat
+no longer feels like a route navigation — the previous page stays
+mounted and the chat surface visibly rises from the dock over it.
+
+**Why:**
+
+- Give the AI assistant a real, focused UI rather than a cramped overlay
+- Avoid the "redirect" feel of swapping `<main>` content
+- Make conversations linkable / shareable (`/chat?prompt=...`)
+- Set the foundation for future chat features (history, deeper context)
+  without reshaping the panel each time.
+
+**UX:**
+
+- Dock sparkle is a toggle: open → `router.push('/chat')`; already on
+  `/chat` → `router.back()` (or `/` fallback)
+- Overlay backdrop is opaque from `t=0` so the `<main>` swap from
+  homepage → empty `/chat/page.tsx` is never visible
+- Surface scales in from the centre (`transformOrigin: '50% 50%'`,
+  scale 0.985 → 1) with an ease-out cubic-bezier — composed, no
+  spring overshoot
+- Centered-hero empty state with four prompt suggestions
+- First message morphs the layout into a thread view via framer-motion
+  `LayoutGroup` + shared `layoutId`s (`chat-sparkle`, `chat-input-wrapper`)
+- Escape closes (`router.back()`); dock stays visible above the overlay
+
+**Changes Made:**
+
+- **New `src/components/chat/chat-overlay.tsx`**: persistent overlay
+  wrapper mounted from the root layout. Uses `usePathname()` to detect
+  `/chat`, `useSearchParams()` to read `?prompt=`, and `AnimatePresence`
+  with two layers (opaque backdrop + spring-up surface).
+- **New `src/app/chat/chat-experience.tsx`**: the chat UI itself —
+  `useChat`, empty/thread states, error banner, morph transitions, and
+  keyboard handlers. No fixed positioning of its own; the overlay
+  wrapper provides that.
+- **`src/app/chat/page.tsx`**: empty placeholder (`return null`); only
+  exists so `/chat` is a real route.
+- **`src/app/layout.tsx`**: mounts `<ChatOverlay />` inside
+  `<ChatProvider>` wrapped in `<Suspense fallback={null}>`.
+- **`src/components/chat/chat-context.tsx`**: pruned to a router-backed
+  `openChat(prompt?)` plus the prompt-builder helpers; removed
+  `isOpen`/`isFullscreen`/`toggleChat`/`toggleFullscreen`/
+  `clearInitialPrompt`. ⌘K toggles between push and back.
+- **`src/components/navbar.tsx`**: dock sparkle is now a `button` that
+  toggles `router.push('/chat')` ↔ `router.back()`; tooltip and
+  `aria-pressed` reflect the open state. The button overrides
+  `buttonVariants`' default `rounded-md` with `rounded-full` so the
+  active `bg-muted` highlight is a circle that fits cleanly inside
+  the dock's pill-shaped container — at the dock's last slot a
+  rounded-square highlight clashed with the dock's curved corner.
+- **Deleted `src/components/chat/chat-panel.tsx`** and its export from
+  `src/components/chat/index.ts`.
+
+**Files:**
+
+- `src/app/chat/page.tsx`
+- `src/app/chat/chat-experience.tsx`
+- `src/app/layout.tsx`
+- `src/components/chat/chat-overlay.tsx`
+- `src/components/chat/chat-context.tsx`
+- `src/components/chat/index.ts`
+- `src/components/navbar.tsx`
+- _Removed_ `src/components/chat/chat-panel.tsx`
 
 ---
 

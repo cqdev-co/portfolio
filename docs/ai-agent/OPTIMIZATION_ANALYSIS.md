@@ -274,7 +274,7 @@ But if the AI then calls `get_ticker_data` tool, it re-fetches everything.
 
 The system prompt includes:
 
-- Victor persona (~500 tokens) - static
+- Xylo persona (~500 tokens) - static
 - Trading strategy (~200 tokens) - static
 - Key rules (~100 tokens) - static
 - TOON spec (~100 tokens) - static

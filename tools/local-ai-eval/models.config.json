@@ -1,0 +1,49 @@
+{
+  "baseUrl": "http://localhost:11434",
+  "runsPerTask": 3,
+  "requestTimeoutMs": 180000,
+  "models": [
+    {
+      "id": "qwen3.6:35b",
+      "label": "Qwen3.6 35B A3B (24GB Q4_K_M, think off)",
+      "options": { "temperature": 0.3, "num_ctx": 8192 },
+      "think": false,
+      "note": "PRIMARY for single-shot workloads (briefing, narrative, chat, tool-call). 17-18/18 on judgment set, 4/4 PASS on real cds-engine prompts. Think mode is ON by default for this model and adds ~80s of hidden chain-of-thought latency; MUST keep think:false in production.",
+      "preferredFor": ["chat", "tool-call", "briefing", "narrative"],
+      "caveats": [
+        "Without think:false, briefing latency is ~108s vs ~15s.",
+        "AGENT CAVEAT: with permissive prompts it skips tool calls and fabricates answers (2/6 PASS on agent tasks). Use strict 'MUST call tools before answering' system prompts for agent use (then 3/3 PASS). For multi-turn tool loops prefer gemma4:26b unless prompts are defensively written.",
+        "One-shot iv-crush run produced a 'safely outside short strikes' hallucination; did NOT reproduce across 3-run verification."
+      ]
+    },
+    {
+      "id": "gemma4:26b",
+      "label": "Gemma 4 26B A4B (17GB MoE, 3.8B active)",
+      "options": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 64,
+        "num_ctx": 8192
+      },
+      "note": "PRIMARY for multi-turn agent loops (6/6 PASS on agent scenarios with permissive prompts, no hallucination on data-absent cases). Also 6/6 on short synthetic judgment tasks with best-calibrated confidence.",
+      "preferredFor": ["agent-multi-turn"],
+      "caveats": [
+        "Timed out (>180s) on real cds-engine one-shot prompts with uncapped output - NOT suitable for the briefing/narrative path. Use Qwen3.6 for those.",
+        "num_predict: 1024 produced empty output (thinking-channel issue); avoid num_predict caps.",
+        "Verbose at default sampling (~3000+ tokens on one-shot prompts vs Qwen3.6 ~500).",
+        "Safe for: multi-turn agent loops (short individual turns), short synthetic reasoning. Not safe for: one-shot long production prompts."
+      ]
+    },
+    {
+      "id": "qwen3:8b",
+      "label": "Qwen3 8B dense (5.2GB, fast fallback)",
+      "options": { "temperature": 0.3, "num_ctx": 8192 },
+      "note": "Fast fallback for RAM-constrained or latency-critical paths. 4.5/6 on judgment set; competitive with the 35B MoEs on short workloads.",
+      "preferredFor": [],
+      "caveats": [
+        "Less disciplined than the 35B MoEs on ambiguous judgment; fell for 'iron condor on conflicting signals' trap.",
+        "Prefer only when qwen3.6:35b latency or RAM is prohibitive."
+      ]
+    }
+  ]
+}

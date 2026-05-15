@@ -711,7 +711,7 @@ export interface StrikeIVResult {
 
 /**
  * Get IV for a specific strike and target DTE
- * This is the new tool for Victor to verify IV claims
+ * This is the new tool for Xylo to verify IV claims
  */
 export async function getIVByStrike(
   ticker: string,
@@ -786,7 +786,7 @@ export interface SpreadCalculationResult {
 
 /**
  * Calculate exact pricing for user-specified spread
- * This is the new tool for Victor to calculate specific spreads
+ * This is the new tool for Xylo to calculate specific spreads
  */
 export async function calculateSpread(
   ticker: string,

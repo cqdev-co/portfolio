@@ -12,10 +12,11 @@ A professional Python service for generating high-quality gradient wallpapers an
 
 - **Smart Color Generation** - AI-driven palettes based on trends, nature, emotions, and artistic styles
 - **Environmental Control** - AI understands mood, lighting, atmosphere, and composition
-- **Natural Language Prompts** - OpenAI integration for true AI-powered generation
+- **Natural Language Prompts** - Ollama Cloud integration for true AI-powered generation
 - **Mood-Based Batch Generation** - Create entire collections with consistent emotional themes
 - **Fusion Algorithms** - ML-inspired color harmonization and clustering
 - **Automatic Optimization** - AI-assisted parameter selection for unique results
+- **FastAPI Server** - HTTP API for frontend integration
 
 ### ✨ **Professional Texture System**
 
@@ -58,6 +59,19 @@ A professional Python service for generating high-quality gradient wallpapers an
 
    # Use mathematical presets
    python gradgen.py generate --preset "Neural Flow" --resolution 1080p
+   ```
+
+4. **(Optional) Start the HTTP server for frontend integration:**
+
+   ```bash
+   uvicorn server:app --host 0.0.0.0 --port 8000
+   ```
+
+5. **(Optional) Configure Ollama Cloud for AI color generation:**
+
+   ```bash
+   cp .env.local.example .env.local
+   # Edit .env.local with your OLLAMA_API_KEY
    ```
 
 ## 🎨 Algorithm Types
@@ -108,7 +122,7 @@ python gradgen.py list-presets
   • Velvet Purple     • Soft Emerald
 
 🧠 Neural/Tech:
-  • Neural Flow       • Quantum Waves      • Data Streams
+  • Neural Flow (organic blue drift) • Quantum Waves • Data Streams
 
 🎨 Classic:
   • Ocean Depths      • Sunset Ridge       • Forest Canopy
@@ -154,8 +168,8 @@ python gradgen.py ai-batch --count 10 --mix-styles --resolution 1440p
 
 # NEW: Enhanced AI with mood, lighting, and atmosphere control
 python gradgen.py ai-enhanced --mood dramatic --lighting cinematic --atmosphere hazy
-python gradgen.py ai-enhanced --prompt "serene ocean sunset" --use-openai --complexity 0.8
-python gradgen.py ai-mood-batch --theme emotions --count 8 --use-openai
+python gradgen.py ai-enhanced --prompt "serene ocean sunset" --use-ollama --complexity 0.8
+python gradgen.py ai-mood-batch --theme emotions --count 8 --use-ollama
 
 # Generate modern organic and glass effects
 python gradgen.py generate --preset "Glass Morph" --resolution 1080p
@@ -270,7 +284,7 @@ python gradgen.py ai-enhanced \
   --texture-style silky \
   --depth 0.8 \
   --complexity 0.7 \
-  --use-openai
+  --use-ollama
 
 # Quick mood-based generation
 python gradgen.py ai-enhanced --mood dramatic --lighting cinematic
@@ -278,9 +292,9 @@ python gradgen.py ai-enhanced --mood calm --atmosphere ethereal
 python gradgen.py ai-enhanced --mood energetic --lighting neon --texture-style metallic
 
 # AI Mood Batch Generation - Complete collections
-python gradgen.py ai-mood-batch --theme emotions --count 8 --use-openai
+python gradgen.py ai-mood-batch --theme emotions --count 8 --use-ollama
 python gradgen.py ai-mood-batch --theme lighting --count 8 --complexity 0.8
-python gradgen.py ai-mood-batch --theme mixed --count 12 --use-openai
+python gradgen.py ai-mood-batch --theme mixed --count 12 --use-ollama
 ```
 
 **🎭 Mood Options:** calm, energetic, mysterious, joyful, dramatic, serene, intense  

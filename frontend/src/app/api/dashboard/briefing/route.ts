@@ -176,7 +176,7 @@ function buildBriefingPrompt(ctx: BriefingContext): string {
       ? `Multi-strategy convergence detected: ${ctx.signals.convergence.join(', ')}`
       : 'No multi-strategy convergence today.';
 
-  return `You are Victor, a concise hedge fund analyst. Generate a morning briefing for the fund operator.
+  return `You are Xylo, a concise hedge fund analyst. Generate a morning briefing for the fund operator.
 
 DATE: ${estTime} EST
 MARKET REGIME: ${ctx.market.regime}

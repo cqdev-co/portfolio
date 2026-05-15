@@ -2,10 +2,10 @@
  * Position Analysis Prompts
  *
  * System prompts for analyzing user positions and portfolio.
- * Extends Victor Chen persona with position-specific context.
+ * Extends the Xylo persona with position-specific context.
  */
 
-import { VICTOR_PERSONA, RESPONSE_STYLE } from './victor';
+import { XYLO_PERSONA, RESPONSE_STYLE } from './xylo';
 import type {
   PositionAIContext,
   SpreadAIContext,
@@ -81,7 +81,7 @@ Support: $${position.support ?? 'N/A'}
 Resistance: $${position.resistance ?? 'N/A'}
 IV: ${position.iv?.toFixed(0) ?? 'N/A'}% (${position.iv_level ?? 'N/A'})`;
 
-  return `${VICTOR_PERSONA}
+  return `${XYLO_PERSONA}
 
 ## ACCOUNT CONTEXT
 Account Size: $${accountSize}
@@ -225,7 +225,7 @@ export function buildSpreadAnalysisPrompt(config: SpreadPromptConfig): string {
     )
     .join('\n');
 
-  return `${VICTOR_PERSONA}
+  return `${XYLO_PERSONA}
 
 ## SPREAD POSITION
 Symbol: ${spread.symbol}
@@ -317,7 +317,7 @@ ${s.pnl_percent >= 0 ? '+' : ''}${s.pnl_percent.toFixed(1)}% \
     )
     .join('\n');
 
-  return `${VICTOR_PERSONA}
+  return `${XYLO_PERSONA}
 
 ## PORTFOLIO OVERVIEW
 Account Size: $${accountSize}

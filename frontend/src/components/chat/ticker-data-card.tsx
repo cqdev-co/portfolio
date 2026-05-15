@@ -918,7 +918,6 @@ export function ToolStatusIndicator({
     get_ticker_data: 'Fetching market data',
     web_search: 'Searching the web',
     analyze_position: 'Analyzing position',
-    scan_for_opportunities: 'Scanning for opportunities',
     processing: 'Processing request',
   };
 

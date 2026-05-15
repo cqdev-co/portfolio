@@ -63,19 +63,19 @@ CREATE TABLE user_positions (
 
 ### Supported Spread Types
 
-| Type                 | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `call_debit_spread`  | Buy lower strike call, sell higher (Victor's favorite!) |
-| `call_credit_spread` | Sell lower strike call, buy higher                      |
-| `put_debit_spread`   | Buy higher strike put, sell lower                       |
-| `put_credit_spread`  | Sell higher strike put, buy lower                       |
-| `iron_condor`        | Put credit spread + call credit spread                  |
-| `iron_butterfly`     | Sell ATM straddle + buy OTM strangle                    |
-| `straddle`           | Buy/sell ATM call + put (same strike)                   |
-| `strangle`           | Buy/sell OTM call + put (different strikes)             |
-| `calendar_spread`    | Same strike, different expirations                      |
-| `diagonal_spread`    | Different strikes, different expirations                |
-| `custom`             | Any other multi-leg strategy                            |
+| Type                 | Description                                           |
+| -------------------- | ----------------------------------------------------- |
+| `call_debit_spread`  | Buy lower strike call, sell higher (Xylo's favorite!) |
+| `call_credit_spread` | Sell lower strike call, buy higher                    |
+| `put_debit_spread`   | Buy higher strike put, sell lower                     |
+| `put_credit_spread`  | Sell higher strike put, buy lower                     |
+| `iron_condor`        | Put credit spread + call credit spread                |
+| `iron_butterfly`     | Sell ATM straddle + buy OTM strangle                  |
+| `straddle`           | Buy/sell ATM call + put (same strike)                 |
+| `strangle`           | Buy/sell OTM call + put (different strikes)           |
+| `calendar_spread`    | Same strike, different expirations                    |
+| `diagonal_spread`    | Different strikes, different expirations              |
+| `custom`             | Any other multi-leg strategy                          |
 
 Run `db/positions.sql` in Supabase SQL Editor to create both tables.
 
@@ -217,7 +217,7 @@ The AI button opens the global chat panel with a beautiful context card showing 
 **Position Analysis** - Click ✨ on any position row:
 
 - Shows a context card with position details (symbol, entry, current, P&L)
-- Victor analyzes your position immediately
+- Xylo analyzes your position immediately
 - Hold/Trim/Exit recommendations with key levels
 
 **Spread Analysis** - Click ✨ on any spread row:
@@ -229,10 +229,10 @@ The AI button opens the global chat panel with a beautiful context card showing 
 **Portfolio Review** - Click "AI" button in header:
 
 - Context card shows portfolio summary (value, P&L, win rate)
-- Overall assessment from Victor Chen
+- Overall assessment from Xylo
 - Action items for the portfolio
 
-The context card appears at the top of the chat, making it clear that Victor has all the information needed to analyze your position.
+The context card appears at the top of the chat, making it clear that Xylo has all the information needed to analyze your position.
 
 ## Types
 

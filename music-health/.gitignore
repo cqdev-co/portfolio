@@ -1,0 +1,15 @@
+plugin_registry.json
+__pycache__/
+*.pyc
+scan_*.json
+scan_*.csv
+report_*.json
+report_*.csv
+security_*.json
+security_*.csv
+assess_*.json
+assess_*.csv
+duplicates_*.json
+duplicates_*.csv
+library_*.json
+library_*.csv

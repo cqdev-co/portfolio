@@ -10,6 +10,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@portfolio/ai-config": "workspace:*",
     "@toon-format/toon": "^2.1.0",
     "yahoo-finance2": "^3.10.2",
     "yaml": "^2.3.4",

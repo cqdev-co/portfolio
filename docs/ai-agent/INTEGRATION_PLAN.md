@@ -10,7 +10,7 @@
 This integration creates a shared library (`lib/ai-agent/`) that both the CLI
 (ai-analyst) and Frontend (portfolio website) import directly. The goal is to:
 
-1. **Single Source of Truth**: Victor's personality and trading rules in one place
+1. **Single Source of Truth**: Xylo's personality and trading rules in one place
 2. **CLI as Testing Ground**: Rapid iteration with immediate feedback
 3. **Progressive Enhancement**: Frontend adopts features incrementally
 4. **No Duplication**: Write once, use in both environments
@@ -20,7 +20,7 @@ This integration creates a shared library (`lib/ai-agent/`) that both the CLI
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │              lib/ai-agent/ (Source of Truth)                    │
-│  • System prompts (Victor persona)                              │
+│  • System prompts (Xylo persona)                              │
 │  • Tool definitions (web_search, get_ticker_data, etc.)         │
 │  • Question classification                                      │
 │  • Shared types                                                 │
@@ -95,18 +95,18 @@ module.exports = {
 ```
 
 **Important**: The lib/ai-agent files must NOT use `.js` extensions in imports
-(e.g., `from './victor'` not `from './victor.js'`). This ensures compatibility
+(e.g., `from './xylo'` not `from './xylo.js'`). This ensures compatibility
 with both Bun (CLI) and Turbopack/Webpack (Frontend).
 
 ## Completed Phases
 
 ### Phase 1: Extract Core Prompts ✅
 
-Created `lib/ai-agent/prompts/victor.ts`:
+Created `lib/ai-agent/prompts/xylo.ts`:
 
-- `buildVictorSystemPrompt()` - Full prompt with context (CLI)
-- `buildVictorLitePrompt()` - Lightweight prompt (Frontend)
-- `buildVictorMinimalPrompt()` - Ultra-minimal for quick queries
+- `buildXyloSystemPrompt()` - Full prompt with context (CLI)
+- `buildXyloLitePrompt()` - Lightweight prompt (Frontend)
+- `buildXyloMinimalPrompt()` - Ultra-minimal for quick queries
 - Exported building blocks for customization
 
 ### Phase 2: Extract Tool Definitions ✅
@@ -139,7 +139,7 @@ Created `lib/ai-agent/classification.ts`:
 
 Updated `ai-analyst/src/commands/chat.ts`:
 
-- Imports `buildVictorSystemPrompt` from lib/ai-agent
+- Imports `buildXyloSystemPrompt` from lib/ai-agent
 - Uses shared `toOllamaTools(AGENT_TOOLS)` for tool definitions
 - Removed 80+ lines of inline prompt code
 
@@ -148,7 +148,7 @@ Updated `ai-analyst/src/commands/chat.ts`:
 Updated `frontend/src/app/api/chat/route.ts`:
 
 - Direct import from `@lib/ai-agent` (no local copy needed)
-- Uses `buildVictorLitePrompt()` for Victor personality
+- Uses `buildXyloLitePrompt()` for Xylo personality
 - Turbopack configured for monorepo imports
 
 ### Phase 6: Turbopack Root Fix ✅
@@ -168,7 +168,7 @@ lib/ai-agent/                    # Source of truth
 ├── package.json                 # Dependencies (yahoo-finance2, @toon-format/toon)
 ├── prompts/
 │   ├── index.ts
-│   └── victor.ts                # Victor persona & prompt builders
+│   └── xylo.ts                # Xylo persona & prompt builders
 ├── tools/
 │   ├── index.ts
 │   └── definitions.ts           # Tool schemas (5 tools)
@@ -194,11 +194,11 @@ lib/ai-agent/                    # Source of truth
 
 ## Development Workflow
 
-When updating Victor's behavior:
+When updating Xylo's behavior:
 
 ```bash
 # 1. Edit source of truth
-vim lib/ai-agent/prompts/victor.ts
+vim lib/ai-agent/prompts/xylo.ts
 
 # 2. Test with CLI
 cd ai-analyst && bun run chat
@@ -523,7 +523,7 @@ frontend needs full context building.
 
 | Benefit              | Description                                     |
 | -------------------- | ----------------------------------------------- |
-| **Consistency**      | Same Victor personality across platforms        |
+| **Consistency**      | Same Xylo personality across platforms          |
 | **Iteration Speed**  | Test in CLI, changes auto-available in frontend |
 | **Type Safety**      | Shared TypeScript interfaces                    |
 | **Maintainability**  | One source of truth in lib/ai-agent             |
@@ -537,7 +537,7 @@ frontend needs full context building.
 - `lib/ai-agent/classification.ts`
 - `lib/ai-agent/package.json` - Dependencies for shared lib
 - `lib/ai-agent/prompts/index.ts`
-- `lib/ai-agent/prompts/victor.ts`
+- `lib/ai-agent/prompts/xylo.ts`
 - `lib/ai-agent/tools/index.ts`
 - `lib/ai-agent/tools/definitions.ts`
 - `lib/ai-agent/data/index.ts`

@@ -432,7 +432,7 @@ export function formatGreeksTOON(greeks: SpreadGreeks): string {
 }
 
 /**
- * Get delta interpretation for Victor's analysis
+ * Get delta interpretation for Xylo's analysis
  */
 export function interpretDelta(delta: number, debit: number): string {
   const deltaAbs = Math.abs(delta);
@@ -464,7 +464,7 @@ export function interpretDelta(delta: number, debit: number): string {
 }
 
 /**
- * Get theta interpretation for Victor's analysis
+ * Get theta interpretation for Xylo's analysis
  */
 export function interpretTheta(
   theta: number,

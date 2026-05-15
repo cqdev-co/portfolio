@@ -1,7 +1,17 @@
-// Ollama Cloud models available at https://ollama.com/search?c=cloud
-// Default model can be configured via NEXT_PUBLIC_OLLAMA_MODEL env var
-export const DEFAULT_CHAT_MODEL =
-  process.env.NEXT_PUBLIC_OLLAMA_MODEL || 'deepseek-v3.2:cloud';
+// ============================================================================
+// Chat-model metadata (legacy)
+// ============================================================================
+//
+// The user's active model is now persisted in a cookie via
+// `lib/ai/chat-model-store.ts`, and the *list* of available models is
+// fetched from `/api/chat/models` (see `chat-model-selector.tsx`). We no
+// longer need a hard-coded `DEFAULT_CHAT_MODEL` constant or a
+// `NEXT_PUBLIC_OLLAMA_MODEL` env override here — the first model
+// returned by the API is used as the default when no preference is
+// stored, and any user-driven change is persisted for next time.
+//
+// This file remains for the legacy `ChatModel`/`chatModels` shape used
+// by older callers; remove once nothing imports them.
 
 export type ChatModel = {
   id: string;
@@ -13,7 +23,7 @@ export const chatModels: ChatModel[] = [
   {
     id: 'llama3.3:70b-cloud',
     name: 'Llama 3.3 70B',
-    description: 'Fast and capable Meta model (default)',
+    description: 'Fast and capable Meta model',
   },
   {
     id: 'gpt-oss:120b',

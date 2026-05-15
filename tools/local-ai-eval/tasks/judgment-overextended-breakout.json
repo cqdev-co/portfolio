@@ -1,0 +1,47 @@
+{
+  "id": "judgment-overextended-breakout",
+  "workload": "briefing",
+  "description": "Ticker is breaking out but is extremely overextended (RSI 84, 2.8 SD above mean). Correct stance: Watch or Ignore chase; reasoning should cite mean-reversion / gap-fill risk.",
+  "tags": ["financial-reasoning", "judgment", "breakout", "mean-reversion"],
+  "system": "You are a disciplined derivatives analyst. You are shown a single trade opportunity and must return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "CANDIDATE TRADE:\nProposed: Long PLTR $90 call, 30 DTE, $4.20 debit\nUnderlying: PLTR $85.20, up 18% over last 5 trading days\nIndicators: RSI(14) 84 (extreme), +2.8 standard deviations above 20DMA, volume today 3.1x average\nLevels: 20DMA $72.40, 50DMA $64.10, no resistance overhead (all-time highs)\nIV percentile: 62 (moderately elevated)\nCatalyst: None. No earnings for 7 weeks. Sector tailwind narrative ongoing.\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary\",\n  \"drivers\": [\"reason citing data\"],\n  \"risks\": [\"risk citing data\"],\n  \"invalidation\": \"specific event or price level\",\n  \"timeframe\": \"intraday|swing|position\"\n}",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "(RSI|overbought|extended|stretch|mean[- ]?revers|pullback|parabol)",
+      "flags": "i"
+    },
+    {
+      "kind": "regex",
+      "pattern": "(84|2\\.8|all[- ]time|standard deviation)",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 200 }
+  ]
+}

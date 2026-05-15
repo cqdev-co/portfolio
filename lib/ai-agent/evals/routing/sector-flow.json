@@ -1,0 +1,8 @@
+{
+  "id": "routing-sector-flow",
+  "kind": "routing",
+  "question": "Are sectors rotating today? Risk-on or risk-off?",
+  "must_call": ["get_sector_flow"],
+  "must_not_call": [],
+  "must_pass": true
+}

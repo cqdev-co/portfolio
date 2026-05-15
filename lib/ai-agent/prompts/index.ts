@@ -7,16 +7,15 @@
 
 export {
   // Main builders
-  buildVictorSystemPrompt,
-  buildVictorLitePrompt,
-  buildVictorMinimalPrompt,
+  buildXyloSystemPrompt,
+  buildXyloLitePrompt,
+  buildXyloMinimalPrompt,
 
   // Building blocks (for customization)
-  VICTOR_PERSONA,
+  XYLO_PERSONA,
   TRADING_STRATEGY,
   TOON_DECODER_SPEC,
   TOOL_INSTRUCTIONS,
-  POSITION_ANALYSIS_INSTRUCTIONS,
   DATA_RULES,
   RESPONSE_STYLE,
 
@@ -25,9 +24,9 @@ export {
   buildTradingStrategy,
 
   // Types
-  type VictorPromptConfig,
-  type VictorLiteConfig,
-} from './victor';
+  type XyloPromptConfig,
+  type XyloLiteConfig,
+} from './xylo';
 
 // Position analysis prompts
 export {

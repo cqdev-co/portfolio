@@ -118,7 +118,7 @@ export async function startAgent(options?: {
   }
 
   console.log();
-  console.log(chalk.bold.green('  🤖 STARTING AGENTIC VICTOR'));
+  console.log(chalk.bold.green('  🤖 STARTING AGENTIC XYLO'));
   console.log(
     chalk.gray(
       '  ────────────────────────────────────────────────────────────────────'

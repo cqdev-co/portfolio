@@ -1,0 +1,44 @@
+{
+  "id": "judgment-earnings-proximity",
+  "workload": "briefing",
+  "description": "Tests whether the model recognizes earnings-proximity risk on a short-duration credit spread. Correct stance: Ignore/Watch, with earnings date explicitly cited as invalidation or driver-of-caution.",
+  "tags": ["financial-reasoning", "judgment", "earnings", "credit-spread"],
+  "system": "You are a disciplined derivatives analyst. You are shown a single trade opportunity and must return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "CANDIDATE TRADE:\nProposed: Sell AMD $175/$170 put credit spread (PDS), 3 DTE, $0.85 credit on $5 width (17% return on risk)\nUnderlying: AMD $182.40, RSI 58, above 20DMA ($178.10) and 50DMA ($172.50)\nImplied Volatility: 78 percentile (elevated)\nCatalyst: AMD reports earnings in 2 trading days, AFTER MARKET CLOSE. Historical 1-day earnings move: +/- 7% median.\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary of your view\",\n  \"drivers\": [\"reason 1 citing specific data\", \"reason 2 citing specific data\"],\n  \"risks\": [\"risk 1 citing specific data\", \"risk 2 citing specific data\"],\n  \"invalidation\": \"specific event or price level that would prove this view wrong\",\n  \"timeframe\": \"intraday|swing|position\"\n}",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    { "kind": "regex", "pattern": "earnings", "flags": "i" },
+    { "kind": "regex", "pattern": "(7%|7 ?%|7 ?percent)", "flags": "i" },
+    {
+      "kind": "regex",
+      "pattern": "(175|\\$175|short (put )?strike)",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 200 }
+  ]
+}

@@ -242,6 +242,124 @@ export const GET_IV_BY_STRIKE_TOOL: AgentTool = {
 };
 
 /**
+ * Get sector flow - identify rotating sectors / risk-on vs risk-off tone
+ */
+export const GET_SECTOR_FLOW_TOOL: AgentTool = {
+  name: 'get_sector_flow',
+  description:
+    'Get current sector rotation signals. Returns the leading and ' +
+    "lagging sector ETFs and a 'risk-on' / 'risk-off' / 'mixed' " +
+    'classification based on which sectors are leading. Use to gauge ' +
+    'risk appetite before suggesting individual trades.',
+  parameters: {
+    type: 'object',
+    required: [],
+    properties: {},
+  },
+};
+
+/**
+ * Get recent news - multi-source headlines + dedupe
+ */
+export const GET_RECENT_NEWS_TOOL: AgentTool = {
+  name: 'get_recent_news',
+  description:
+    'Fetch recent news for a ticker (Yahoo + Polygon + FMP, deduped ' +
+    'by URL). Returns title, source, published_at, and snippet for the ' +
+    'most recent articles. Use when the user asks about news, ' +
+    'catalysts, or what is moving a stock.',
+  parameters: {
+    type: 'object',
+    required: ['ticker'],
+    properties: {
+      ticker: {
+        type: 'string',
+        description: 'Stock ticker symbol (e.g. NVDA, AAPL, TSLA)',
+      },
+      hours: {
+        type: 'number',
+        description: 'Hours of look-back. Default 48. Capped to 168 (7 days).',
+      },
+    },
+  },
+};
+
+/**
+ * Get sentiment - composite score derived from news headlines
+ */
+export const GET_SENTIMENT_TOOL: AgentTool = {
+  name: 'get_sentiment',
+  description:
+    'Compute a composite sentiment score (-1..+1) for a ticker based ' +
+    'on recent news headlines. Returns label, article_count, and ' +
+    'momentum (trailing-24h vs preceding-24h). Use to verify or ' +
+    'challenge tone-driven trade ideas.',
+  parameters: {
+    type: 'object',
+    required: ['ticker'],
+    properties: {
+      ticker: {
+        type: 'string',
+        description: 'Stock ticker symbol (e.g. NVDA, AAPL, TSLA)',
+      },
+      hours: {
+        type: 'number',
+        description: 'Hours of look-back for the headline pool. Default 48.',
+      },
+    },
+  },
+};
+
+/**
+ * Get earnings calendar - multi-ticker upcoming earnings (FMP)
+ */
+export const GET_EARNINGS_CALENDAR_TOOL: AgentTool = {
+  name: 'get_earnings_calendar',
+  description:
+    'Fetch upcoming earnings dates and EPS / revenue estimates for one ' +
+    'or more tickers via FMP. Use when the user asks "when does X ' +
+    'report?" or to plan position-sizing around earnings windows.',
+  parameters: {
+    type: 'object',
+    required: [],
+    properties: {
+      tickers: {
+        type: 'string',
+        description:
+          'Optional comma-separated ticker list (e.g. "NVDA,AAPL"). ' +
+          'If omitted, returns the next-7-days market-wide calendar.',
+      },
+      days: {
+        type: 'number',
+        description: 'Look-ahead window in days. Default 7. Capped to 30.',
+      },
+    },
+  },
+};
+
+/**
+ * Get geopolitical events - curated upcoming macro / geopolitical events
+ */
+export const GET_GEOPOLITICAL_EVENTS_TOOL: AgentTool = {
+  name: 'get_geopolitical_events',
+  description:
+    'List upcoming high-impact macro / geopolitical events from a ' +
+    'curated static calendar (G7, OPEC+, ECB / BoJ rate decisions, ' +
+    'major elections, scheduled tariff deadlines). Each event carries ' +
+    'an impact tag (high / medium / low) and a freshness disclaimer.',
+  parameters: {
+    type: 'object',
+    required: [],
+    properties: {
+      days: {
+        type: 'number',
+        description: 'Look-ahead window in days. Default 14. Capped to 60.',
+      },
+    },
+  },
+};
+
+/**
  * Calculate spread - get exact pricing for user-specified spread
  */
 export const CALCULATE_SPREAD_TOOL: AgentTool = {
@@ -277,60 +395,6 @@ export const CALCULATE_SPREAD_TOOL: AgentTool = {
   },
 };
 
-/**
- * Scan opportunities - find trade opportunities across multiple tickers
- */
-export const SCAN_OPPORTUNITIES_TOOL: AgentTool = {
-  name: 'scan_opportunities',
-  description:
-    'Scan multiple tickers to find trade opportunities. Returns graded ' +
-    'opportunities (A+ to F) with risk scores, cushion analysis, and ' +
-    'spread recommendations. Use this when asked to "find trades", ' +
-    '"scan for opportunities", "what looks good", or "find setups". ' +
-    'Can scan predefined lists (tech, semis, megacap) or specific tickers.',
-  parameters: {
-    type: 'object',
-    required: [],
-    properties: {
-      scanList: {
-        type: 'string',
-        description:
-          'Predefined list to scan: TECH, SEMIS, MEGACAP, FINANCIALS, ' +
-          'HEALTHCARE, CONSUMER, ENERGY, or FULL. Defaults to TECH.',
-        enum: [
-          'TECH',
-          'SEMIS',
-          'MEGACAP',
-          'FINANCIALS',
-          'HEALTHCARE',
-          'CONSUMER',
-          'ENERGY',
-          'FULL',
-        ],
-      },
-      tickers: {
-        type: 'string',
-        description:
-          'Comma-separated list of specific tickers to scan ' +
-          '(e.g. "NVDA,AMD,GOOGL"). Overrides scanList if provided.',
-      },
-      minGrade: {
-        type: 'string',
-        description:
-          'Minimum trade grade to include: A+, A, A-, B+, B, B-, C+, C, ' +
-          "C-, D, F. Defaults to 'B' for quality filtering.",
-        enum: ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'],
-      },
-      maxRisk: {
-        type: 'number',
-        description:
-          'Maximum risk score (1-10) to include. Defaults to 6. ' +
-          'Lower = safer opportunities only.',
-      },
-    },
-  },
-};
-
 // ============================================================================
 // TOOL COLLECTIONS
 // ============================================================================
@@ -347,7 +411,12 @@ export const AGENT_TOOLS: AgentTool[] = [
   GET_TRADING_REGIME_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
+  // Phase 1 additions:
+  GET_SECTOR_FLOW_TOOL,
+  GET_RECENT_NEWS_TOOL,
+  GET_SENTIMENT_TOOL,
+  GET_EARNINGS_CALENDAR_TOOL,
+  GET_GEOPOLITICAL_EVENTS_TOOL,
 ];
 
 /**
@@ -420,7 +489,11 @@ export default {
   GET_TRADING_REGIME_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
+  GET_SECTOR_FLOW_TOOL,
+  GET_RECENT_NEWS_TOOL,
+  GET_SENTIMENT_TOOL,
+  GET_EARNINGS_CALENDAR_TOOL,
+  GET_GEOPOLITICAL_EVENTS_TOOL,
   toOllamaTools,
   getToolByName,
   filterTools,

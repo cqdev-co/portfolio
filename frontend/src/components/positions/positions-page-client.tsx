@@ -766,7 +766,7 @@ export function PositionsPageClient() {
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              Ask Victor about this spread
+                              Ask Xylo about this spread
                             </TooltipContent>
                           </Tooltip>
                           <Tooltip>

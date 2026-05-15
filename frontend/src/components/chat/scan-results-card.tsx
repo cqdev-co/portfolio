@@ -1,7 +1,19 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { ScanOpportunitiesResult } from '@lib/ai-agent';
+import type { ScanResult } from '@lib/ai-agent';
+
+export interface ScanOpportunitiesResult {
+  scanList: string;
+  tickersScanned: number;
+  results: ScanResult[];
+  summary: {
+    gradeA: number;
+    gradeB: number;
+    lowRisk: number;
+    avgCushion: number;
+  };
+}
 
 interface ScanResultsCardProps {
   data: ScanOpportunitiesResult;

@@ -251,7 +251,11 @@ program
 program
   .command('chat')
   .description('Start a conversation with your AI Analyst')
-  .option('--ai-mode <mode>', 'Ollama mode: local or cloud', 'cloud')
+  .option(
+    '--ai-mode <mode>',
+    'Ollama mode: local, cloud, or env (derive from ENV=dev|prod via @portfolio/ai-config)',
+    'env'
+  )
   .option('--ai-model <model>', 'Override default AI model')
   .option('-a, --account <size>', 'Account size in dollars', '1500')
   .option('-s, --stream', 'Enable streaming responses for better UX')
@@ -263,15 +267,46 @@ program
       stream?: boolean;
     }) => {
       // Validate AI mode
-      if (!['local', 'cloud'].includes(opts.aiMode)) {
+      if (!['local', 'cloud', 'env'].includes(opts.aiMode)) {
         console.log(chalk.red(`  Invalid --ai-mode: ${opts.aiMode}`));
-        console.log(chalk.gray('  Valid options: local, cloud'));
+        console.log(chalk.gray('  Valid options: local, cloud, env'));
         process.exit(1);
       }
 
+      // When --ai-mode=env (new default), resolve from ENV=dev|prod via the
+      // shared resolver. Chat is an agent-style workload (multi-turn tool
+      // loops), so we ask the resolver for agent-multi-turn.
+      let resolvedMode: OllamaMode;
+      let resolvedModel: string | undefined = opts.aiModel;
+      if (opts.aiMode === 'env') {
+        try {
+          const { buildConfigForWorkload } =
+            await import('./services/ollama.ts');
+          const cfg = buildConfigForWorkload('agent-multi-turn');
+          resolvedMode = cfg.mode;
+          resolvedModel = opts.aiModel ?? cfg.model;
+          console.log(
+            chalk.gray(
+              `  [ai-config] ENV-resolved: mode=${cfg.mode}, model=${cfg.model}`
+            )
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.log(chalk.red(`  ai-config error: ${msg}`));
+          console.log(
+            chalk.gray(
+              '  Set ENV=dev for local Ollama, ENV=prod + OLLAMA_API_KEY for cloud, or pass --ai-mode local|cloud explicitly.'
+            )
+          );
+          process.exit(1);
+        }
+      } else {
+        resolvedMode = opts.aiMode as OllamaMode;
+      }
+
       const options: ChatOptions = {
-        aiMode: opts.aiMode as OllamaMode,
-        aiModel: opts.aiModel,
+        aiMode: resolvedMode,
+        aiModel: resolvedModel,
         accountSize: parseInt(opts.account, 10) || 1500,
         stream: opts.stream,
       };

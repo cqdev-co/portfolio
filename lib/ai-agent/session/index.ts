@@ -42,7 +42,7 @@ import {
   formatRegimeForAI,
   type MarketRegime,
 } from '../market';
-import { buildVictorSystemPrompt, buildVictorLitePrompt } from '../prompts';
+import { buildXyloSystemPrompt, buildXyloLitePrompt } from '../prompts';
 import { AGENT_TOOLS, toOllamaTools, type AgentTool } from '../tools';
 import { executeToolCall, type ToolCall, type ToolResult } from '../handlers';
 import {
@@ -50,6 +50,11 @@ import {
   extractTickers,
   type QuestionClassification,
 } from '../classification';
+import {
+  runPreflight as runPreflightShared,
+  type PreflightResult,
+  type PreflightOptions,
+} from '../preflight';
 import { fetchTickerData, type TickerData } from '../data';
 import {
   encodeTickerToTOON,
@@ -272,6 +277,28 @@ export class ContextBuilder {
   }
 
   /**
+   * Phase 1: run the deterministic preflight pipeline for a user
+   * question. Thin delegate to `lib/ai-agent/preflight/runPreflight` —
+   * the `ContextBuilder` class exists primarily for backwards
+   * compatibility; new callers should reach for `runPreflight`
+   * directly.
+   *
+   * Returned `PreflightResult.formattedContext` is suitable for
+   * appending to a system prompt as the LIVE DATA block, and the
+   * `coverage` field is the canonical shape persisted to
+   * `agent_decisions.coverage_report`.
+   */
+  async runPreflight(
+    question: string,
+    options?: PreflightOptions
+  ): Promise<PreflightResult> {
+    return runPreflightShared(question, {
+      useTOON: this.useTOON,
+      ...options,
+    });
+  }
+
+  /**
    * Clear cached context
    */
   clearCache(): void {
@@ -456,13 +483,13 @@ export class AgentSession {
 
     // Build system prompt
     if (this.config.liteMode) {
-      this.systemPrompt = buildVictorLitePrompt({
+      this.systemPrompt = buildXyloLitePrompt({
         accountSize: this.config.accountSize,
         withTools: true,
       });
     } else {
       // Full prompt needs context - will be added below
-      this.systemPrompt = buildVictorSystemPrompt({
+      this.systemPrompt = buildXyloSystemPrompt({
         accountSize: this.config.accountSize,
         context: '', // Will be populated in the next section
       });

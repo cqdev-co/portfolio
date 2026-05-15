@@ -21,7 +21,7 @@ The core business strategy for small account trading with defined risk.
 
 ### TypeScript Services
 
-#### [AI Analyst "Victor Chen"](ai-analyst/)
+#### [AI Analyst "Xylo"](ai-analyst/)
 
 AI "Employee" - a 67-year-old veteran Wall Street analyst with 45 years experience.
 
@@ -61,7 +61,8 @@ Cloudflare Worker proxy for Yahoo Finance API.
 
 Next.js-based portfolio website with AI chat.
 
-- **Features**: Dashboard, AI chat with Victor, positions tracking
+- **Features**: Dashboard, dedicated `/chat` route with full-page AI
+  assistant, positions tracking
 - **Tech**: Next.js 16, Tailwind, Shadcn/UI
 - [README](frontend/README.md) | [AI Chat](frontend/AI_CHAT.md)
 
@@ -87,9 +88,9 @@ Scanner for identifying penny stocks before breakouts.
 
 #### [Wallpaper Service](wp-service/)
 
-Gradient wallpaper generation service.
+Gradient wallpaper generation service with Ollama Cloud AI color generation.
 
-- **Features**: Glossy glass-like gradients with grain effects
+- **Features**: Mathematical gradient algorithms, perceptual OKLab blending, AI color palettes via Ollama, FastAPI server, frontend UI at `/wallpaper` (see `docs/wp-service/README.md` for aesthetic tuning and preset notes)
 - **Status**: Production-ready
 - [README](wp-service/README.md)
 
@@ -99,9 +100,9 @@ Gradient wallpaper generation service.
 
 Shared AI agent logic for CLI and Frontend.
 
-- **Components**: Victor prompts, tool definitions, question classification
+- **Components**: Xylo prompts (formerly Xylo), tool definitions, question classification
 - **Benefits**: Single source of truth, CLI testing → Frontend deployment
-- [Integration Plan](ai-agent/INTEGRATION_PLAN.md) | [Library Guide](ai-agent/SHARED_LIBRARY.md)
+- [Xylo Roadmap](ai-agent/XYLO_ROADMAP.md) | [Phase 0 Plan](ai-agent/PHASE_0_PLAN.md) | [Integration Plan](ai-agent/INTEGRATION_PLAN.md) | [Library Guide](ai-agent/SHARED_LIBRARY.md)
 
 #### [Shared Types](../lib/types/)
 
@@ -113,6 +114,24 @@ Shared utility functions (`@portfolio/utils`).
 
 - **Modules**: Entry grade calculator, Psychological Fair Value
 - [PFV Docs](lib/psychological-fair-value.md)
+
+### Personal Tools
+
+#### [Music Health](music-health/)
+
+macOS utility for auditing Ableton Live plugins and installation health.
+
+- **Features**: Plugin scanning (VST/VST3/AU/CLAP), interactive ownership audit, security assessment, cleanup, duplicate detection, library analysis, JSON/CSV export
+- **Tech**: Python, rich
+- [README](music-health/README.md)
+
+#### [MIDI Library Generator](midi-lib/)
+
+Genre-kit-driven CLI that generates production-ready MIDI files for Ableton Live.
+
+- **Features**: Chord progressions, drum patterns, basslines, melodies — all driven by pluggable genre kits. Inspire mode analyzes a reference track and generates new MIDI that matches its feel.
+- **Tech**: Python, mido, rich, librosa
+- [README](midi-lib/README.md)
 
 ### Supporting
 
@@ -127,7 +146,7 @@ Centralized database schemas and migrations.
 
 Monorepo architecture and Turborepo configuration.
 
-- [README](monorepo/README.md)
+- [README](monorepo/README.md) — includes the **monorepo status and signal registry** (single table for CI/Turbo coverage and Supabase `signals` participation)
 
 ## 🔍 Service Comparison
 
@@ -139,6 +158,8 @@ Monorepo architecture and Turborepo configuration.
 | Unusual Options     | Options flow      | Python     | Real-time        |
 | Penny Scanner       | Penny breakouts   | Python     | Daily            |
 | Frontend            | Web interface     | TypeScript | -                |
+| Music Health        | Plugin audit      | Python     | On-demand        |
+| MIDI Library        | MIDI generation   | Python     | On-demand        |
 
 ## 🚀 Quick Start by Use Case
 
@@ -185,6 +206,14 @@ cd unusual-options-service && poetry run unusual-options scan
 cd penny-stock-scanner && poetry run penny-scanner scan-all
 ```
 
+### "I want to generate MIDI files for production"
+
+→ Use **[MIDI Library Generator](midi-lib/)**
+
+```bash
+cd midi-lib && python midi_lib.py generate --kit rnb --key C --bpm 90
+```
+
 ## 📊 Data Architecture
 
 ```
@@ -216,4 +245,4 @@ All service documentation includes:
 
 ---
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-04-14

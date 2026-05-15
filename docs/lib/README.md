@@ -18,8 +18,8 @@ Shared AI agent logic for CLI (ai-analyst) and Frontend chat.
 
 ```typescript
 import {
-  buildVictorSystemPrompt,
-  buildVictorLitePrompt,
+  buildXyloSystemPrompt,
+  buildXyloLitePrompt,
   AGENT_TOOLS,
   classifyQuestion,
   executeToolCall,
@@ -30,7 +30,7 @@ import {
 
 | Module              | Description                                          |
 | ------------------- | ---------------------------------------------------- |
-| `prompts/`          | Victor Chen system prompts                           |
+| `prompts/`          | Xylo system prompts                                  |
 | `tools/`            | Tool definitions (web_search, get_ticker_data, etc.) |
 | `handlers/`         | Tool execution handlers                              |
 | `data/`             | Yahoo Finance fetching, formatters                   |
@@ -69,7 +69,6 @@ const calToon = encodeCalendarToTOON();
 | --------------------- | --------- |
 | `get_ticker_data`     | ✅        |
 | `web_search`          | ✅        |
-| `scan_opportunities`  | ✅        |
 | `get_unusual_options` | ✅        |
 | `get_market_regime`   | ✅        |
 | `get_financials_deep` | ❌ text   |
@@ -133,14 +132,14 @@ and market mechanics.
 ### Import from CLI (ai-analyst)
 
 ```typescript
-import { buildVictorSystemPrompt } from '@portfolio/ai-agent';
+import { buildXyloSystemPrompt } from '@portfolio/ai-agent';
 import type { TickerInfo } from '@portfolio/types';
 ```
 
 ### Import from Frontend
 
 ```typescript
-import { buildVictorLitePrompt, AGENT_TOOLS } from '@lib/ai-agent';
+import { buildXyloLitePrompt, AGENT_TOOLS } from '@lib/ai-agent';
 ```
 
 Note: Frontend uses `@lib/*` path alias due to Next.js configuration.

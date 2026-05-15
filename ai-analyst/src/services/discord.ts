@@ -202,7 +202,7 @@ export async function sendDiscordAlert(embed: AlertEmbed): Promise<boolean> {
   // Add AI commentary if present
   if (embed.aiCommentary) {
     fields.push({
-      name: "💭 Victor's Take",
+      name: "💭 Xylo's Take",
       value: embed.aiCommentary,
       inline: false,
     });
@@ -214,13 +214,13 @@ export async function sendDiscordAlert(embed: AlertEmbed): Promise<boolean> {
     color,
     fields,
     footer: {
-      text: `Priority: ${embed.priority} | Agentic Victor`,
+      text: `Priority: ${embed.priority} | Agentic Xylo`,
     },
     timestamp: (embed.timestamp ?? new Date()).toISOString(),
   };
 
   const payload: DiscordWebhookPayload = {
-    username: 'Victor',
+    username: 'Xylo',
     embeds: [discordEmbed],
   };
 
@@ -419,24 +419,24 @@ export async function sendMorningBriefing(
   ];
 
   const discordEmbed: DiscordEmbed = {
-    title: `☀️ Victor's Morning Briefing`,
+    title: `☀️ Xylo's Morning Briefing`,
     description: dateStr,
     color: 0x5865f2, // Discord blurple
     fields,
     footer: {
-      text: 'Agentic Victor | Market Intelligence',
+      text: 'Agentic Xylo | Market Intelligence',
     },
     timestamp: briefing.date.toISOString(),
   };
 
   // Add AI commentary as a second embed
   const commentaryEmbed: DiscordEmbed = {
-    description: `💭 **Victor's Take**\n\n${briefing.aiCommentary}`,
+    description: `💭 **Xylo's Take**\n\n${briefing.aiCommentary}`,
     color: 0x5865f2,
   };
 
   const payload: DiscordWebhookPayload = {
-    username: 'Victor',
+    username: 'Xylo',
     embeds: [discordEmbed, commentaryEmbed],
   };
 
@@ -453,7 +453,7 @@ export async function sendDiscordMessage(
 ): Promise<boolean> {
   const payload: DiscordWebhookPayload = {
     content: message,
-    username: 'Victor',
+    username: 'Xylo',
   };
 
   return sendWebhook(payload, useBriefingChannel);
@@ -470,5 +470,5 @@ export async function testDiscordWebhook(): Promise<boolean> {
     return false;
   }
 
-  return sendDiscordMessage('🤖 Victor is online and monitoring markets!');
+  return sendDiscordMessage('🤖 Xylo is online and monitoring markets!');
 }

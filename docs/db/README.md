@@ -67,10 +67,12 @@ Run in order (numbering reflects dependency order):
 | `05_unusual_options.sql`     | Options Scanner | `unusual_options_signals`, `unusual_options_signal_continuity` | Unusual options detection + continuity (includes classification + spread detection columns) |
 | `06_stock_opportunities.sql` | Opportunities   | `stock_opportunities`                                          | Daily screening results with composite scores                                               |
 | `07_positions.sql`           | Positions       | `user_spreads`, `user_positions`                               | User portfolio positions with RLS                                                           |
+| `08_agent_decisions.sql`     | Xylo Agent      | `agent_decisions`                                              | Decision log: one row per Xylo turn across all surfaces (Phase 0 of `XYLO_ROADMAP`)         |
+| `09_agent_eval_runs.sql`     | Xylo Agent      | `agent_eval_runs`                                              | Eval harness output: one row per `bun run xylo:eval` invocation (Phase 2 of `XYLO_ROADMAP`) |
 
 ## Unified Signals Table
 
-The `signals` table (`03_signals.sql`) is a **master registry** that aggregates actionable, ticker-level daily signals from all strategy engines into a single queryable feed.
+The `signals` table (`03_signals.sql`) is a **master registry** that aggregates actionable, ticker-level daily signals from all strategy engines into a single queryable feed. For one combined index of each service, its CI/Turbo coverage, and whether it participates in this feed, see [Monorepo status and signal registry](../monorepo/README.md#monorepo-status-and-signal-registry).
 
 ### Architecture (Star Schema)
 
@@ -156,6 +158,57 @@ DROP INDEX IF EXISTS idx_penny_signals_overall_score;
 DROP INDEX IF EXISTS idx_penny_signals_volume_score;
 DROP INDEX IF EXISTS idx_tickers_sector;
 DROP INDEX IF EXISTS idx_tickers_country;
+```
+
+## Xylo Decision Log (`agent_decisions`)
+
+The `agent_decisions` table (`08_agent_decisions.sql`) is the persistence layer for the Xylo agent. Every chat turn — across the frontend (`/api/chat`), the `ai-analyst` CLI, and the Discord bot — writes one row.
+
+Phase 0 of [`XYLO_ROADMAP.md`](../ai-agent/XYLO_ROADMAP.md) introduces this table. Later phases populate the placeholder columns:
+
+| Column              | Phase | Status    | Notes                                                                   |
+| ------------------- | ----- | --------- | ----------------------------------------------------------------------- |
+| `coverage_report`   | 1     | populated | Signals checked / skipped / stale + per-signal digests (JSONB).         |
+| `risk_violations`   | 2     | populated | `strategy.config.yaml` rules the recommendation violated (JSONB array). |
+| `confidence`        | 2     | populated | 0-10 numeric score from coverage + signal agreement + risk-gate.        |
+| `outcome_1d/7d/30d` | 4     | reserved  | Post-decision price/regime outcomes for self-evaluation.                |
+
+### Indexes
+
+- `agent_decisions_created_at_idx` — primary access pattern (recent first).
+- `agent_decisions_ticker_idx` — partial index for ticker-history queries.
+- `agent_decisions_class_idx` — filter by `question_class`.
+
+### RLS
+
+- Service-role writers (`logDecision` in `lib/ai-agent/logging/`) bypass RLS.
+- Authenticated reads are permitted so the SQL editor and the `/decisions` viewer work without elevated keys.
+
+The viewer lives at `frontend/src/app/decisions/page.tsx` and is gated by the same email whitelist as `/chat` (see `frontend/src/lib/auth/whitelist.ts`).
+
+## Xylo Eval Runs (`agent_eval_runs`)
+
+The `agent_eval_runs` table (`09_agent_eval_runs.sql`) stores results
+from the Phase 2 eval harness. Each `bun run xylo:eval` invocation
+writes one row with aggregate counts (`scenarios_passed/total`,
+`probes_passed/total`, `routing_passed/total`), per-test results in
+the `results` JSONB column, and run metadata (model, prompt hash,
+git SHA).
+
+Useful queries:
+
+```sql
+-- Trend: routing pass rate over time
+SELECT created_at::date AS day,
+       AVG(100.0 * routing_passed / NULLIF(routing_total, 0)) AS pass_rate
+FROM agent_eval_runs
+GROUP BY 1 ORDER BY 1 DESC LIMIT 30;
+
+-- Most-failed fixtures across recent runs
+SELECT r->>'id' AS fixture_id, COUNT(*) FILTER (WHERE NOT (r->>'passed')::boolean) AS fails
+FROM agent_eval_runs, jsonb_array_elements(results) AS r
+WHERE created_at > NOW() - INTERVAL '14 days'
+GROUP BY 1 ORDER BY fails DESC;
 ```
 
 ## Conventions

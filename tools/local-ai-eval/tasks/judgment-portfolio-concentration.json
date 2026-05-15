@@ -1,0 +1,47 @@
+{
+  "id": "judgment-portfolio-concentration",
+  "workload": "briefing",
+  "description": "Portfolio-level risk: three open spreads are all in mega-cap tech, all long delta, all same expiry week. Correct stance: Act (reduce concentration / hedge) with reasoning that cites the specific correlation / expiry clustering.",
+  "tags": ["financial-reasoning", "judgment", "portfolio-risk", "correlation"],
+  "system": "You are a disciplined derivatives analyst reviewing portfolio-level risk, not a single trade. Return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "PORTFOLIO SNAPSHOT:\nOpen positions (all bull call debit spreads, long delta):\n  1. NVDA $140/$145 CDS, 14 DTE, +21% unrealized\n  2. MSFT $420/$425 CDS, 14 DTE, +8% unrealized\n  3. AAPL $230/$235 CDS, 14 DTE, +12% unrealized\nAll three underlyings: mega-cap tech, all in QQQ top 5 weights.\nRealized 30-day pairwise correlation between NVDA/MSFT/AAPL: 0.71 to 0.83.\nAll three expire the same Friday. All three are profitable. Total delta exposure: positive, concentrated.\nSPY is -0.6% today. VIX 18.4 (rising from 14 over the last week).\nNo specific catalyst for any name this week. FOMC is the Wednesday of expiry week.\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary\",\n  \"drivers\": [\"reason citing data\"],\n  \"risks\": [\"risk citing data\"],\n  \"invalidation\": \"specific event or price level\",\n  \"timeframe\": \"intraday|swing|position\"\n}\n\nNote: Portfolio-level. \"Act\" means adjust/hedge/trim, \"Watch\" means monitor, \"Ignore\" means no change.",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "(correlation|concentrat|diversif|hedge|FOMC|VIX|expiry|same (Friday|expiration|week))",
+      "flags": "i"
+    },
+    {
+      "kind": "regex",
+      "pattern": "(0\\.7|0\\.8|14 DTE|mega[- ]cap|tech)",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 250 }
+  ]
+}

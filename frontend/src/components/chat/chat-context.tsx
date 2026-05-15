@@ -1,11 +1,12 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useEffect,
+  useMemo,
   type ReactNode,
 } from 'react';
 
@@ -14,14 +15,11 @@ import {
 // ============================================================================
 
 interface ChatContextValue {
-  isOpen: boolean;
-  isFullscreen: boolean;
-  initialPrompt: string | null;
+  /**
+   * Navigate to the dedicated /chat page, optionally with an initial prompt
+   * that will be auto-submitted on arrival.
+   */
   openChat: (prompt?: string) => void;
-  closeChat: () => void;
-  toggleChat: () => void;
-  toggleFullscreen: () => void;
-  clearInitialPrompt: () => void;
 }
 
 // ============================================================================
@@ -35,79 +33,43 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 // ============================================================================
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const openChat = useCallback((prompt?: string) => {
-    if (prompt) {
-      setInitialPrompt(prompt);
-    }
-    setIsOpen(true);
-  }, []);
-
-  const closeChat = useCallback(() => {
-    setIsOpen(false);
-    // Reset fullscreen when closing
-    setIsFullscreen(false);
-  }, []);
-
-  const toggleChat = useCallback(() => {
-    setIsOpen((prev) => {
-      if (prev) {
-        // Closing - reset fullscreen
-        setIsFullscreen(false);
+  const openChat = useCallback(
+    (prompt?: string) => {
+      if (prompt && prompt.trim().length > 0) {
+        router.push(`/chat?prompt=${encodeURIComponent(prompt)}`);
+      } else {
+        router.push('/chat');
       }
-      return !prev;
-    });
-  }, []);
+    },
+    [router]
+  );
 
-  const toggleFullscreen = useCallback(() => {
-    setIsFullscreen((prev) => !prev);
-  }, []);
-
-  const clearInitialPrompt = useCallback(() => {
-    setInitialPrompt(null);
-  }, []);
-
-  // ========================================
-  // Keyboard Shortcut: ⌘K / Ctrl+K
-  // ========================================
+  // ⌘K / Ctrl+K → toggle the chat overlay
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ⌘K or Ctrl+K to toggle chat
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        toggleChat();
-      }
-
-      // Escape to close (only when open)
-      if (e.key === 'Escape' && isOpen) {
-        e.preventDefault();
-        closeChat();
+        if (pathname === '/chat') {
+          if (typeof window !== 'undefined' && window.history.length > 1) {
+            router.back();
+          } else {
+            router.push('/');
+          }
+        } else {
+          router.push('/chat');
+        }
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, toggleChat, closeChat]);
+  }, [router, pathname]);
 
-  return (
-    <ChatContext.Provider
-      value={{
-        isOpen,
-        isFullscreen,
-        initialPrompt,
-        openChat,
-        closeChat,
-        toggleChat,
-        toggleFullscreen,
-        clearInitialPrompt,
-      }}
-    >
-      {children}
-    </ChatContext.Provider>
-  );
+  const value = useMemo<ChatContextValue>(() => ({ openChat }), [openChat]);
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
 // ============================================================================
@@ -246,11 +208,9 @@ interface PortfolioForPrompt {
 export function buildPortfolioPrompt(portfolio: PortfolioForPrompt): string {
   const lines: string[] = [];
 
-  // Header
   lines.push('Review my complete portfolio:');
   lines.push('');
 
-  // Summary
   lines.push('=== PORTFOLIO SUMMARY ===');
   lines.push(`Total Value: $${portfolio.totalValue.toLocaleString()}`);
   lines.push(
@@ -264,7 +224,6 @@ export function buildPortfolioPrompt(portfolio: PortfolioForPrompt): string {
   );
   lines.push('');
 
-  // Spreads section
   if (portfolio.spreads.length > 0) {
     lines.push('=== SPREADS ===');
     for (const spread of portfolio.spreads) {
@@ -303,7 +262,6 @@ export function buildPortfolioPrompt(portfolio: PortfolioForPrompt): string {
     }
   }
 
-  // Individual positions section
   if (portfolio.positions.length > 0) {
     lines.push('=== INDIVIDUAL POSITIONS ===');
     for (const pos of portfolio.positions) {
@@ -342,7 +300,6 @@ export function buildPortfolioPrompt(portfolio: PortfolioForPrompt): string {
     }
   }
 
-  // Analysis request
   lines.push('=== ANALYSIS REQUEST ===');
   lines.push('Please provide:');
   lines.push(

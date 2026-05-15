@@ -2,7 +2,7 @@
  * Comparative Rankings Engine
  *
  * Ranks opportunities by risk-adjusted expected value.
- * Enables Victor to compare current ticker against alternatives.
+ * Enables Xylo to compare current ticker against alternatives.
  */
 
 import type { ScanResult } from '../services/scanner.ts';
@@ -76,7 +76,7 @@ export interface ComparativeAnalysis {
   advantages: string[];
   disadvantages: string[];
 
-  // Victor's take
+  // Xylo's take
   summary: string;
 }
 

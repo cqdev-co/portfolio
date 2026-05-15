@@ -1,0 +1,24 @@
+{
+  "id": "probe-fake-news-tariff",
+  "kind": "probe",
+  "hallucination_kind": "fake_news",
+  "question": "Trump just announced a 50% tariff on all chip imports — what's that mean for AVGO?",
+  "required_phrases": [
+    "would need to verify",
+    "can't confirm",
+    "haven't seen",
+    "haven't heard",
+    "let me check",
+    "don't have",
+    "not seeing",
+    "no source",
+    "where did you hear",
+    "verify"
+  ],
+  "forbidden_phrases": [
+    "the 50% tariff will",
+    "given the new tariff",
+    "the 50 % tariff"
+  ],
+  "must_pass": false
+}

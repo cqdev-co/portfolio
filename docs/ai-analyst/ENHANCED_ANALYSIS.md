@@ -1,11 +1,11 @@
 # Enhanced Analysis Features
 
-Victor Chen now has advanced analytical capabilities that make him a
+Xylo now has advanced analytical capabilities that make him a
 more rigorous and accountable financial analyst.
 
 ## Overview
 
-These features transform Victor from a "good analyst" to an
+These features transform Xylo from a "good analyst" to an
 "exceptional analyst" by adding:
 
 1. **Recommendation Tracking** - Accountability for past calls
@@ -19,7 +19,7 @@ These features transform Victor from a "good analyst" to an
 
 ### Purpose
 
-Track Victor's recommendations and their outcomes for accountability.
+Track Xylo's recommendations and their outcomes for accountability.
 
 ### Database Schema
 
@@ -27,7 +27,7 @@ Track Victor's recommendations and their outcomes for accountability.
 -- Run: db/analyst_recommendations_schema.sql
 
 -- Key tables:
--- analyst_recommendations - Every recommendation Victor makes
+-- analyst_recommendations - Every recommendation Xylo makes
 -- analyst_confidence_calibration - Accuracy stats by confidence level
 
 -- Key views:
@@ -57,14 +57,14 @@ await saveRecommendation({
   keyFactors: { rsi: 68, earningsDays: 7 },
 });
 
-// Check Victor's track record
+// Check Xylo's track record
 const stats = await getConfidenceStats();
 // Returns: [{ confidence: 'HIGH', accuracyPct: 72, ... }, ...]
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-When making recommendations, Victor now states his confidence:
+When making recommendations, Xylo now states his confidence:
 
 > "MEDIUM confidence on this NVDA call - the trend is strong
 > but RSI is pushing limits. My MEDIUM confidence calls are
@@ -118,9 +118,9 @@ const scenarios = analyzeScenarios(params);
 // ]
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-Victor now cites expected value in his analysis:
+Xylo now cites expected value in his analysis:
 
 > "This spread has 72% probability of profit with +$42 expected
 > value per contract. That's solid - you're paying $380 to make
@@ -158,9 +158,9 @@ const greeks = calculateSpreadGreeks(
 // }
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-Victor explains Greeks in practical terms:
+Xylo explains Greeks in practical terms:
 
 > "This spread gives you 72 delta - that's $72 of stock-like
 > exposure for every $100 risked. Efficient use of capital.
@@ -195,9 +195,9 @@ const analysis = getComparativeAnalysis('TSM', ranked);
 // }
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-Victor now compares opportunities:
+Xylo now compares opportunities:
 
 > "TSM ranks #7 in my current opportunity set. If you want
 > semiconductor exposure, AMD is #3 with better RSI (48 vs 62)
@@ -212,7 +212,7 @@ Track accuracy by confidence level for honest uncertainty.
 
 ### How It Works
 
-Every recommendation Victor makes is tagged with confidence:
+Every recommendation Xylo makes is tagged with confidence:
 
 - **HIGH**: Strong conviction, multiple confirming signals
 - **MEDIUM**: Decent setup, some uncertainty
@@ -226,9 +226,9 @@ MEDIUM confidence calls: 62% accurate (18 of 29)
 LOW confidence calls: 51% accurate (12 of 24)
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-Victor calibrates his statements:
+Xylo calibrates his statements:
 
 > "LOW confidence on this call. Earnings uncertainty makes
 > this a coin flip. Historically my LOW confidence calls are
@@ -261,9 +261,9 @@ const sentiment = analyzeNewsSentiment(newsItems);
 // }
 ```
 
-### Victor's Behavior
+### Xylo's Behavior
 
-Victor factors sentiment into analysis:
+Xylo factors sentiment into analysis:
 
 > "News sentiment is slightly bearish (-0.3) with high volume
 > of tariff-related headlines. I'm seeing 'concern' and 'risk'
@@ -272,12 +272,12 @@ Victor factors sentiment into analysis:
 
 ## Integration Example
 
-Here's how these features work together in Victor's analysis:
+Here's how these features work together in Xylo's analysis:
 
 ```
 You: What do you think of TSM?
 
-Victor: Let me break this down...
+Xylo: Let me break this down...
 
 TSM is sitting at $318 with RSI at 62 - that's pushing the
 upper limit of my comfort zone. More importantly, earnings
@@ -317,7 +317,7 @@ $300 with RSI cooling below 55. Or just go with AMD instead.
 
 ### Prompts
 
-- `lib/ai-agent/prompts/victor.ts` - Updated with ENHANCED_ANALYSIS section
+- `lib/ai-agent/prompts/xylo.ts` - Updated with ENHANCED_ANALYSIS section
 
 ## Setup
 
@@ -328,7 +328,7 @@ $300 with RSI cooling below 55. Or just go with AMD instead.
 # Copy and run: db/analyst_recommendations_schema.sql
 ```
 
-2. The new services are automatically available to Victor through
+2. The new services are automatically available to Xylo through
    the updated system prompt.
 
 3. Data flows automatically:
@@ -344,7 +344,7 @@ automatically when relevant data is available.
 
 ## Smart Tool Optimization
 
-Victor is now smarter about when to use tools:
+Xylo is now smarter about when to use tools:
 
 ### Auto-Fetched Financials
 
@@ -357,11 +357,11 @@ automatically fetched and included in context. This adds:
 - Forward P/E
 - Debt/equity ratios
 
-Victor no longer needs to call `get_financials_deep` for these stocks.
+Xylo no longer needs to call `get_financials_deep` for these stocks.
 
 ### No Redundant Fetches
 
-When ticker data is displayed in the Yahoo Finance box, Victor
+When ticker data is displayed in the Yahoo Finance box, Xylo
 sees a note: `⚡ DATA PRE-LOADED: AMD - Do NOT call get_ticker_data`
 
 This prevents wasteful re-fetches that were costing:
@@ -371,7 +371,7 @@ This prevents wasteful re-fetches that were costing:
 
 ### Context-Aware Tool Availability
 
-For trade analysis questions (no research needed), Victor doesn't
+For trade analysis questions (no research needed), Xylo doesn't
 have access to tools for pre-loaded data. This prevents:
 
 - Unnecessary research calls that inflate token counts

@@ -1,0 +1,32 @@
+{
+  "id": "real-cds-unified-recommendation",
+  "workload": "briefing",
+  "description": "Real prompt captured from cds-engine-strategy/src/utils/ai-narrative.ts (UNIFIED_SYSTEM_PROMPT). This is the production path for new-entry stock recommendations. User-prompt context is realistic but synthesized (replace with a real captured ctx when available).",
+  "tags": ["real-prompt", "cds-engine", "unified-recommendation"],
+  "system": "You are an expert stock analyst. Your job is to synthesize complex data into a clear, actionable recommendation.\n\nTHINKING PROCESS (work through this before concluding):\n1. FUNDAMENTALS: Is the business quality strong enough to justify current valuation?\n2. TECHNICALS: Are price action and momentum supportive or warning?\n3. SMART MONEY: What do insiders, institutions, and analysts signal?\n4. RISK/REWARD: At current price, is the upside worth the downside risk?\n5. CONFLICTS: When bull and bear signals conflict, which is more important NOW?\n6. CATALYSTS: Are there upcoming events that could move the stock?\n7. SECTOR: Is the sector in favor or out of favor with the market?\n\nAfter thinking through the above, provide your analysis in this exact JSON format:\n{\n  \"recommendation\": \"BUY / WAIT / AVOID\",\n  \"confidence\": \"HIGH / MODERATE / LOW\",\n  \"analysis\": \"6-8 sentences synthesizing your thinking. Start with your conviction level and why. Address the key conflict in the data. Be specific with numbers. End with what would change your view.\",\n  \"entry\": \"2-3 sentences with specific price levels for entry, confirmation signals\",\n  \"risk\": \"2-3 sentences on primary risk, stop level, and what invalidates the thesis\"\n}\n\nCRITICAL GUIDELINES:\n- When bull/bear signals conflict, explain which you weight more heavily and WHY\n- A 74/100 score means top 20% of stocks - but score alone doesn't mean BUY\n- Insider selling during price strength is a warning sign\n- Weak relative strength means the market is rotating away from this stock\n- Reference the CONFLICTS section carefully - these are the key tensions to resolve\n- If earnings are within 14 days, factor in event risk\n- Output ONLY valid JSON, no other text",
+  "user": "STOCK: AVGO (Broadcom)\nSCORE: 78/100\nPRICE: $218.40 (+1.2% today)\nMARKET CAP: $1.02T\n\nFUNDAMENTALS:\n- P/E: 34.2 (sector median 28.1)\n- PEG: 1.4\n- Revenue growth YoY: +44% (AI infrastructure tailwind)\n- Operating margin: 43%\n- Free cash flow yield: 2.1%\n\nTECHNICALS:\n- RSI(14): 68 (approaching overbought)\n- 20DMA $210.10, 50DMA $198.40, 200DMA $172.20 (all rising, stacked bullish)\n- Relative strength vs SPY: +18% over 3 months\n- Volume today: 0.9x average\n\nSMART MONEY:\n- Insider transactions (last 90d): 3 sales ($12M total), 0 buys\n- Institutional ownership: 78% (no major changes)\n- Analyst targets: 12 Buy / 3 Hold / 0 Sell, median target $245\n\nCATALYSTS:\n- Earnings: 23 days away\n- Sector: Semiconductors, strong YTD (+42%)\n- Macro: FOMC next Wednesday\n\nCONFLICTS:\n- Strong fundamentals and sector tailwind BUT insider selling during price strength\n- Bullish technical structure BUT RSI approaching overbought\n- Consensus analyst target $245 (+12%) BUT stock up 27% in last 6 weeks",
+  "expectedSchema": {
+    "type": "object",
+    "required": ["recommendation", "confidence", "analysis", "entry", "risk"],
+    "properties": {
+      "recommendation": { "type": "string" },
+      "confidence": { "type": "string" },
+      "analysis": { "type": "string" },
+      "entry": { "type": "string" },
+      "risk": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"recommendation\"\\s*:\\s*\"(BUY|WAIT|AVOID)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "\"confidence\"\\s*:\\s*\"(HIGH|MODERATE|LOW)\""
+    },
+    { "kind": "regex", "pattern": "(AVGO|Broadcom|218|78|insider|RSI)" },
+    { "kind": "minLength", "chars": 400 }
+  ]
+}

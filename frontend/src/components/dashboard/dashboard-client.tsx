@@ -367,7 +367,7 @@ export function DashboardClient() {
   // AI integration
   // ============================================================================
 
-  const handleAskVictor = useCallback(() => {
+  const handleAskXylo = useCallback(() => {
     if (!summary) {
       openChat(
         'Give me a quick morning briefing. What should I be watching today?'
@@ -498,7 +498,7 @@ export function DashboardClient() {
         positionsCount={positions.length}
         lastRefreshed={lastRefreshed}
         onRefresh={handleRefresh}
-        onAskVictor={handleAskVictor}
+        onAskXylo={handleAskXylo}
       />
 
       {/* Error */}

@@ -11,7 +11,7 @@
  * ```typescript
  * // CLI usage (full context)
  * import {
- *   buildVictorSystemPrompt,
+ *   buildXyloSystemPrompt,
  *   AGENT_TOOLS,
  *   toOllamaTools,
  *   classifyQuestion
@@ -19,15 +19,15 @@
  *
  * const tools = toOllamaTools(AGENT_TOOLS);
  * const classification = classifyQuestion(userMessage);
- * const systemPrompt = buildVictorSystemPrompt({
+ * const systemPrompt = buildXyloSystemPrompt({
  *   accountSize: 1750,
  *   context: await buildContext(classification),
  * });
  *
  * // Frontend usage (lite)
- * import { buildVictorLitePrompt } from '@lib/ai-agent';
+ * import { buildXyloLitePrompt } from '@lib/ai-agent';
  *
- * const systemPrompt = buildVictorLitePrompt({ accountSize: 1500 });
+ * const systemPrompt = buildXyloLitePrompt({ accountSize: 1500 });
  * ```
  *
  * @packageDocumentation
@@ -39,16 +39,15 @@
 
 export {
   // Main builders
-  buildVictorSystemPrompt,
-  buildVictorLitePrompt,
-  buildVictorMinimalPrompt,
+  buildXyloSystemPrompt,
+  buildXyloLitePrompt,
+  buildXyloMinimalPrompt,
 
   // Building blocks
-  VICTOR_PERSONA,
+  XYLO_PERSONA,
   TRADING_STRATEGY,
   TOON_DECODER_SPEC,
   TOOL_INSTRUCTIONS,
-  POSITION_ANALYSIS_INSTRUCTIONS,
   DATA_RULES,
   RESPONSE_STYLE,
   buildKeyRules,
@@ -61,8 +60,8 @@ export {
   getSpreadTypeGuidance,
 
   // Types
-  type VictorPromptConfig,
-  type VictorLiteConfig,
+  type XyloPromptConfig,
+  type XyloLiteConfig,
   type PositionPromptConfig,
   type SpreadPromptConfig,
   type PortfolioPromptConfig,
@@ -86,7 +85,6 @@ export {
   GET_UNUSUAL_OPTIONS_TOOL,
   GET_IV_BY_STRIKE_TOOL,
   CALCULATE_SPREAD_TOOL,
-  SCAN_OPPORTUNITIES_TOOL,
 
   // Converters
   toOllamaTools,
@@ -111,10 +109,16 @@ export {
   // Helpers
   needsMarketData,
   needsTools,
+  hasAnyRequiredSignal,
+
+  // Phase 1: deterministic signal-bundle map
+  QUESTION_CLASS_TO_SIGNALS,
 
   // Types
   type QuestionType,
   type QuestionClassification,
+  type SignalKey,
+  type SignalRequirements,
 } from './classification';
 
 // ============================================================================
@@ -189,7 +193,12 @@ export {
   handleGetUnusualOptionsActivity,
   handleGetIVByStrike,
   handleCalculateSpread,
-  handleScanOpportunities,
+  // Phase 1 handlers
+  handleGetSectorFlow,
+  handleGetRecentNews,
+  handleGetSentiment,
+  handleGetEarningsCalendar,
+  handleGetGeopoliticalEvents,
 
   // Unified executor
   executeToolCall,
@@ -205,8 +214,12 @@ export {
   type UnusualOptionsToolResult,
   type IVByStrikeToolResult,
   type SpreadCalculationToolResult,
-  type ScanOpportunitiesToolResult,
-  type ScanOpportunitiesResult,
+  // Phase 1 result types
+  type SectorFlowToolResult,
+  type RecentNewsToolResult,
+  type SentimentToolResult,
+  type EarningsCalendarToolResult,
+  type GeopoliticalEventsToolResult,
   type OutputFormat,
 } from './handlers';
 
@@ -231,6 +244,9 @@ export {
 
   // Unusual options encoder
   encodeUnusualOptionsToTOON,
+
+  // Phase 1: news encoder
+  encodeRecentNewsToTOON,
 
   // Generic encoder
   encodeTOON,
@@ -407,6 +423,97 @@ export {
   // Logger (DEBUG mode support)
   log,
 } from './utils';
+
+// ============================================================================
+// CONFIDENCE (Phase 2: 0-10 score over coverage + risk + signals)
+// ============================================================================
+
+export {
+  computeConfidence,
+  type ConfidenceScore,
+  type ConfidenceComponents,
+  type ComputeConfidenceInput,
+} from './confidence';
+
+// ============================================================================
+// EVALS (Phase 2: regression / hallucination / tool-routing harness)
+// ============================================================================
+
+export {
+  runEvalSuite,
+  loadScenarios,
+  loadProbes,
+  loadRoutingTests,
+  scoreScenario,
+  scoreProbe,
+  scoreRouting,
+  type AgentInvoker,
+  type AgentRunOutput,
+  type EvalFixture,
+  type EvalKind,
+  type EvalResult,
+  type EvalRun,
+  type Scenario,
+  type Probe,
+  type RoutingTest,
+} from './evals';
+
+// ============================================================================
+// RISK GATE (Phase 2: runtime validation of trade calls)
+// ============================================================================
+
+export {
+  // Parser (hybrid: regex + optional model fallback)
+  parseRecommendation,
+  parseRecommendationRegex,
+  parseRecommendationViaModel,
+  // Gate
+  validateRecommendation,
+  skipGate,
+  // Types
+  type ParseOptions,
+  type ParsedRecommendation,
+  type ParsedSpread,
+  type TradeAction,
+  type RiskViolation,
+  type RiskVerdict,
+  type RiskRule,
+  type ValidateInput,
+} from './risk';
+
+// ============================================================================
+// PREFLIGHT (Phase 1: deterministic context fan-out)
+// ============================================================================
+
+export {
+  // Main entry
+  runPreflight,
+  serializeCoverage,
+
+  // Types
+  type PreflightOptions,
+  type PreflightResult,
+  type CoverageReport,
+  type CoverageError,
+  type SignalLatency,
+} from './preflight';
+
+// ============================================================================
+// DECISION LOG
+// ============================================================================
+
+export {
+  // Writer + helper
+  logDecision,
+  hashPrompt,
+
+  // Types
+  type DecisionSource,
+  type PromptVariant,
+  type DecisionToolCall,
+  type LogDecisionInput,
+  type LogDecisionOptions,
+} from './logging';
 
 // ============================================================================
 // STRATEGY CONFIG (Single Source of Truth)

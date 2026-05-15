@@ -2,7 +2,7 @@
  * Expected Value Calculator
  *
  * Calculates expected value, Kelly criterion, and edge for spread trades.
- * Helps Victor quantify trade quality beyond simple grades.
+ * Helps Xylo quantify trade quality beyond simple grades.
  */
 
 // ============================================================================

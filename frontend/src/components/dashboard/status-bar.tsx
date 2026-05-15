@@ -28,7 +28,7 @@ interface StatusBarProps {
   positionsCount: number;
   lastRefreshed: Date | null;
   onRefresh: () => void;
-  onAskVictor: () => void;
+  onAskXylo: () => void;
 }
 
 // ============================================================================
@@ -155,7 +155,7 @@ export function StatusBar({
   positionsCount,
   lastRefreshed,
   onRefresh,
-  onAskVictor,
+  onAskXylo,
 }: StatusBarProps) {
   const regime = marketData.length > 0 ? getMarketRegime(marketData) : null;
   const vix = marketData.find((d) => d.symbol === '^VIX');
@@ -256,11 +256,11 @@ export function StatusBar({
           <Button
             variant="outline"
             size="sm"
-            onClick={onAskVictor}
+            onClick={onAskXylo}
             className="h-7 gap-1.5 text-xs"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Ask Victor
+            Ask Xylo
           </Button>
         </div>
       </div>

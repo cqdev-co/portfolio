@@ -50,7 +50,7 @@ export async function reviewAlert(
         mode: options?.aiMode ?? 'cloud',
         model: options?.aiModel,
       },
-      'You are Victor, a trading assistant reviewing alerts. Respond concisely.',
+      'You are Xylo, a trading assistant reviewing alerts. Respond concisely.',
       prompt
     );
 
@@ -74,7 +74,7 @@ function buildReviewPrompt(
   alertType: AlertType,
   context: ReviewContext
 ): string {
-  let prompt = `You are Victor, a trading assistant reviewing a potential alert before sending.
+  let prompt = `You are Xylo, a trading assistant reviewing a potential alert before sending.
 
 ALERT TYPE: ${alertType}
 TICKER: ${scanResult.ticker}

@@ -2,18 +2,18 @@
 
 **Status**: Planned 📋  
 **Priority**: High  
-**Goal**: Display Victor's tool calls and results in the frontend chat like the CLI
+**Goal**: Display Xylo's tool calls and results in the frontend chat like the CLI
 
 ## Problem Statement
 
-The CLI shows rich information when Victor analyzes a ticker:
+The CLI shows rich information when Xylo analyzes a ticker:
 
 - Yahoo Finance data card with technicals, earnings, IV, etc.
 - Tool call status ("Fetching AMZN data...")
 - PFV analysis
 - Options spread recommendations
 
-The frontend chat currently only shows Victor's text responses with no
+The frontend chat currently only shows Xylo's text responses with no
 visibility into tool calls or data fetching.
 
 ## Desired User Experience
@@ -33,7 +33,7 @@ User: Tell me about AMZN
 │   🧠 PFV: $227.69 (-2.1%) BEARISH · HIGH
 └───────────────────────────────────────────────────────────
 
-Victor: Look, let me give you the full picture on AMZN...
+Xylo: Look, let me give you the full picture on AMZN...
 ```
 
 ## Implementation Options
@@ -56,7 +56,7 @@ Execute tools in the API route, stream status updates to the frontend.
 **Implementation**:
 
 1. **Enhance API Route** (`/api/chat/route.ts`)
-   - Detect when Victor wants to call tools
+   - Detect when Xylo wants to call tools
    - Execute tools on server
    - Stream tool status + results + AI response
 
@@ -222,7 +222,7 @@ Frontend Chat Panel
 1. ✅ User can ask "Tell me about AMZN"
 2. ✅ Chat shows "Fetching AMZN data..." status
 3. ✅ Yahoo Finance data card renders with key metrics
-4. ✅ Victor's analysis references the fetched data
+4. ✅ Xylo's analysis references the fetched data
 5. ✅ No API keys exposed to client
 6. ✅ Streaming works smoothly (no blocking)
 

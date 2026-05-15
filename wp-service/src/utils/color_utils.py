@@ -199,3 +199,88 @@ class ColorPalette:
     def rgb_to_hex(cls, rgb_color: tuple[int, int, int]) -> str:
         """Convert RGB tuple to hex color."""
         return "#{:02x}{:02x}{:02x}".format(*rgb_color)
+
+
+def _srgb_channel_to_linear(c01: np.ndarray) -> np.ndarray:
+    """sRGB primary channel (0–1) to linear light."""
+    return np.where(c01 <= 0.04045, c01 / 12.92, ((c01 + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb_channel(c: np.ndarray) -> np.ndarray:
+    """Linear light (0–1) to sRGB-encoded channel (0–1)."""
+    return np.where(
+        c <= 0.0031308,
+        12.92 * c,
+        1.055 * np.power(np.clip(c, 0.0, None), 1.0 / 2.4) - 0.055,
+    )
+
+
+def oklab_to_rgb8(lab: np.ndarray) -> np.ndarray:
+    """OKLab (..., 3) float to sRGB (..., 3) uint8."""
+    L0 = lab[..., 0]
+    A0 = lab[..., 1]
+    B0 = lab[..., 2]
+    l_ = L0 + 0.3963377774 * A0 + 0.2158037573 * B0
+    m_ = L0 - 0.1055613458 * A0 - 0.0638541728 * B0
+    s_ = L0 - 0.0894841775 * A0 - 1.2914855480 * B0
+    lms_l = l_ * l_ * l_
+    lms_m = m_ * m_ * m_
+    lms_s = s_ * s_ * s_
+    lr = +4.0767416621 * lms_l - 3.3077115913 * lms_m + 0.2309699292 * lms_s
+    lg = -1.2684380046 * lms_l + 2.6097574011 * lms_m - 0.3413193965 * lms_s
+    lb = -0.0041960863 * lms_l - 0.7034186147 * lms_m + 1.7076147010 * lms_s
+    sr = _linear_to_srgb_channel(np.clip(lr, 0.0, 1.0))
+    sg = _linear_to_srgb_channel(np.clip(lg, 0.0, 1.0))
+    sb = _linear_to_srgb_channel(np.clip(lb, 0.0, 1.0))
+    rgb = np.stack([sr, sg, sb], axis=-1)
+    return np.clip(np.round(rgb * 255.0), 0, 255).astype(np.float64)
+
+
+def rgb8_to_oklab(rgb: np.ndarray) -> np.ndarray:
+    """RGB (..., 3) in 0–255 to OKLab (..., 3)."""
+    c = np.asarray(rgb, dtype=np.float64) / 255.0
+    r, g, b = c[..., 0], c[..., 1], c[..., 2]
+    lr = _srgb_channel_to_linear(r)
+    lg = _srgb_channel_to_linear(g)
+    lb = _srgb_channel_to_linear(b)
+    lms_l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb
+    lms_m = 0.2119034982 * lr + 0.6806999551 * lg + 0.1073960286 * lb
+    lms_s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb
+    l_ = np.cbrt(lms_l)
+    m_ = np.cbrt(lms_m)
+    s_ = np.cbrt(lms_s)
+    L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_
+    A = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_
+    B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    return np.stack([L, A, B], axis=-1)
+
+
+def min_oklab_pairwise_distance(colors: list[tuple[int, int, int]]) -> float:
+    """Minimum Euclidean distance in OKLab between any two stops."""
+    if len(colors) < 2:
+        return 1.0
+    lab = rgb8_to_oklab(np.array(colors, dtype=np.float64))
+    min_d = 1e9
+    for i in range(len(colors)):
+        for j in range(i + 1, len(colors)):
+            d = float(np.linalg.norm(lab[i] - lab[j]))
+            min_d = min(min_d, d)
+    return min_d
+
+
+def refine_professional_palette_stops(
+    colors: list[tuple[int, int, int]],
+    min_d: float = 0.014,
+    max_attempts: int = 8,
+) -> list[tuple[int, int, int]]:
+    """If two stops are too close in OKLab, nudge the last stop in hue until separated."""
+    out = list(colors)
+    for _ in range(max_attempts):
+        if min_oklab_pairwise_distance(out) >= min_d:
+            return out
+        r, g, b = out[-1]
+        h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        h = (h + 42.0 / 360.0) % 1.0
+        r2, g2, b2 = colorsys.hsv_to_rgb(h, s, v)
+        out[-1] = (int(r2 * 255), int(g2 * 255), int(b2 * 255))
+    return out

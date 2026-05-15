@@ -13,7 +13,8 @@ import { Analytics } from '@vercel/analytics/react';
 import { PersonSchema, WebsiteSchema } from '@/components/schema';
 import { AuthProvider } from '@/components/auth/auth-provider';
 import { PortalProvider } from '@/components/portal-provider';
-import { ChatProvider } from '@/components/chat';
+import { ChatProvider, ChatOverlay } from '@/components/chat';
+import { Suspense } from 'react';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -152,6 +153,12 @@ export default function RootLayout({
                   </main>
                   <Navbar />
                   <Footer />
+                  {/* Persistent chat surface; expands over the current
+                      page when pathname === '/chat'. Wrapped in Suspense
+                      because it reads ?prompt= via useSearchParams. */}
+                  <Suspense fallback={null}>
+                    <ChatOverlay />
+                  </Suspense>
                 </ChatProvider>
               </TooltipProvider>
             </ThemeProvider>

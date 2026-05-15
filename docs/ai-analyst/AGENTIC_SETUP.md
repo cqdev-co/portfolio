@@ -1,6 +1,6 @@
-# Agentic Victor - Setup Guide
+# Agentic Xylo - Setup Guide
 
-This guide walks you through setting up Agentic Victor for autonomous market monitoring and Discord alerts.
+This guide walks you through setting up Agentic Xylo for autonomous market monitoring and Discord alerts.
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ This creates the following tables:
 2. Right-click the channel where you want alerts → **Edit Channel**
 3. Go to **Integrations** → **Webhooks**
 4. Click **New Webhook**
-5. Name it "Victor" (or anything you prefer)
+5. Name it "Xylo" (or anything you prefer)
 6. Copy the webhook URL
 
 ### Configure Environment
@@ -162,7 +162,7 @@ bun run analyst alerts ack <alert-id>
 
 ## 6. Alert Types
 
-Victor monitors for:
+Xylo monitors for:
 
 | Alert Type         | Description                        | Priority    |
 | ------------------ | ---------------------------------- | ----------- |

@@ -1,17 +1,36 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { chatRateLimiter } from '@/lib/rate-limit';
+import { isUserAuthorized } from '@/lib/auth/whitelist';
+import type { XyloUIMessage, ThinkingStep } from '@/lib/chat/types';
+import { extractChatArtifact, type ExecutedToolCall } from '@/lib/chat/extract';
+import { markModelUnavailable } from '@/lib/ai/model-access';
+
+/**
+ * Sentinel sentinel marker the chat route throws when the upstream
+ * model returns 401/403 — the outer handler unpacks it into a 403
+ * `code: 'model_unavailable'` JSON response so the UI can refresh
+ * the selector and auto-switch.
+ */
+const MODEL_UNAVAILABLE_PREFIX = 'MODEL_UNAVAILABLE::';
 
 // Shared AI agent library (monorepo root)
 import {
-  buildVictorLitePrompt,
+  buildXyloLitePrompt,
   AGENT_TOOLS,
   toOllamaTools,
   executeToolCall,
-  getCalendarContext,
-  getMarketRegime,
-  formatRegimeForAI,
+  logDecision,
+  hashPrompt,
+  runPreflight,
+  parseRecommendation,
+  validateRecommendation,
+  skipGate,
+  computeConfidence,
+  type DecisionToolCall,
+  type CoverageReport,
+  type PreflightResult,
+  type RiskVerdict,
+  type ConfidenceScore,
 } from '@lib/ai-agent';
 
 export const maxDuration = 60;
@@ -20,150 +39,95 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'https://ollama.com/api';
 const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.3:70b-cloud';
 
-// ============================================================================
-// WHITELISTED EMAILS
-// Only these email addresses can use the AI chat feature.
-// Configured via NEXT_PUBLIC_WHITELISTED_EMAILS in .env.local (comma-separated)
-// ============================================================================
-const WHITELISTED_EMAILS: string[] = (
-  process.env.NEXT_PUBLIC_WHITELISTED_EMAILS || ''
-)
-  .split(',')
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-/**
- * Check if a user is authorized to use the AI chat
- * Uses HTTP-only cookies to verify Supabase session server-side
- */
-async function isUserAuthorized(): Promise<{
-  authorized: boolean;
-  email?: string;
-  error?: string;
-}> {
-  try {
-    const cookieStore = await cookies();
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            // Route handlers can set cookies during token refresh
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch {
-              // Read-only context - token refresh will happen on next request
-            }
-          },
-        },
-      }
-    );
-
-    // Validate session with Supabase server
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
-      return {
-        authorized: false,
-        error: 'Not authenticated. Please sign in to use the AI chat.',
-      };
-    }
-
-    const email = user.email?.toLowerCase();
-    if (!email) {
-      return {
-        authorized: false,
-        error: 'No email associated with your account.',
-      };
-    }
-
-    // Check whitelist
-    const isWhitelisted = WHITELISTED_EMAILS.includes(email);
-
-    if (!isWhitelisted) {
-      return {
-        authorized: false,
-        email,
-        error:
-          'Your account is not authorized to use the AI chat. Contact the administrator for access.',
-      };
-    }
-
-    return { authorized: true, email };
-  } catch (err) {
-    console.error('[Chat Auth] Error:', err);
-    return {
-      authorized: false,
-      error: 'Authentication error. Please try again.',
-    };
-  }
-}
-
-// Convert full tool set to Ollama format
-// Using AGENT_TOOLS gives Frontend access to all CLI tools:
-// - get_ticker_data, web_search (basic)
-// - get_financials_deep, get_institutional_holdings (research)
-// - get_unusual_options_activity, get_trading_regime (market)
-// - get_iv_by_strike, calculate_spread (options)
 const ollamaTools = toOllamaTools(AGENT_TOOLS);
 
-/**
- * Build dynamic system prompt with live market context
- * This matches the CLI's approach of injecting real-time data
- */
-async function buildDynamicSystemPrompt(): Promise<string> {
+// ============================================================================
+// USER-FACING FEATURE TOGGLES
+// ============================================================================
+
+type ChatFeatureId = 'web_search' | 'deep_research';
+
+const GATED_TOOL_NAMES: Record<ChatFeatureId, ReadonlySet<string>> = {
+  web_search: new Set(['web_search']),
+  deep_research: new Set(),
+};
+
+const ALL_GATED_TOOL_NAMES = new Set<string>(
+  Object.values(GATED_TOOL_NAMES).flatMap((s) => Array.from(s))
+);
+
+function selectToolsForRequest(enabled: ReadonlySet<ChatFeatureId>) {
+  const allowed = new Set<string>();
+  for (const id of enabled) {
+    for (const t of GATED_TOOL_NAMES[id] ?? []) allowed.add(t);
+  }
+  return ollamaTools.filter((tool) => {
+    const name = tool.function?.name;
+    if (!name) return true;
+    if (!ALL_GATED_TOOL_NAMES.has(name)) return true;
+    return allowed.has(name);
+  });
+}
+
+function buildFeatureDirectives(enabled: ReadonlySet<ChatFeatureId>): string {
+  const lines: string[] = [];
+  if (enabled.has('deep_research')) {
+    lines.push(
+      '=== DEEP RESEARCH MODE ===',
+      'The user has enabled Deep Research for this turn. Take more time:',
+      '- Plan a short list of sub-questions before answering.',
+      '- Use multiple complementary tools where helpful (web_search if',
+      '  enabled, ticker / financials / regime tools as needed).',
+      '- Cross-check findings and call out anything ambiguous or contradictory.',
+      '- Conclude with a concise actionable synthesis.',
+      '=== END DEEP RESEARCH MODE ==='
+    );
+  }
+  if (enabled.has('web_search')) {
+    lines.push(
+      '=== WEB SEARCH ENABLED ===',
+      'The `web_search` tool is available this turn. Prefer it for any',
+      'question that depends on current events, recent news, or data',
+      'outside your training cutoff.',
+      '=== END WEB SEARCH ==='
+    );
+  }
+  return lines.length > 0 ? `\n\n${lines.join('\n')}` : '';
+}
+
+function parseEnabledFeatures(value: unknown): Set<ChatFeatureId> {
+  const valid: ChatFeatureId[] = ['web_search', 'deep_research'];
+  if (!Array.isArray(value)) return new Set();
+  const set = new Set<ChatFeatureId>();
+  for (const entry of value) {
+    if (typeof entry === 'string' && (valid as string[]).includes(entry)) {
+      set.add(entry as ChatFeatureId);
+    }
+  }
+  return set;
+}
+
+async function buildPreflightedPrompt(question: string): Promise<{
+  systemPrompt: string;
+  preflight: PreflightResult | null;
+}> {
+  const basePrompt = buildXyloLitePrompt({
+    accountSize: 1750,
+    withTools: true,
+  });
+
   try {
-    // Fetch market context in parallel
-    const [calendarCtx, marketRegime] = await Promise.all([
-      Promise.resolve(getCalendarContext()),
-      getMarketRegime().catch(() => null),
-    ]);
-
-    // Build context sections
-    const contextParts: string[] = [];
-
-    // Add calendar warnings if any
-    if (calendarCtx.warnings.length > 0) {
-      contextParts.push(`\n=== MARKET CALENDAR ===`);
-      contextParts.push(`Status: ${calendarCtx.marketStatus}`);
-      contextParts.push(`Warnings:`);
-      calendarCtx.warnings.forEach((w) => contextParts.push(`  ${w}`));
-      contextParts.push(`=== END CALENDAR ===\n`);
-    }
-
-    // Add market regime if available
-    if (marketRegime) {
-      contextParts.push(formatRegimeForAI(marketRegime));
-    }
-
-    // Build the prompt with context
-    const basePrompt = buildVictorLitePrompt({
-      accountSize: 1750,
-      withTools: true,
-    });
-
-    if (contextParts.length > 0) {
-      return `${basePrompt}\n\n=== CURRENT MARKET CONTEXT ===\n${contextParts.join('\n')}\n=== END CONTEXT ===`;
-    }
-
-    return basePrompt;
+    const preflight = await runPreflight(question);
+    const block = preflight.formattedContext
+      ? `\n\n=== CURRENT MARKET CONTEXT ===\n${preflight.formattedContext}\n=== END CONTEXT ===`
+      : '';
+    return { systemPrompt: `${basePrompt}${block}`, preflight };
   } catch (error) {
-    console.error('[Chat] Error building dynamic prompt:', error);
-    // Fall back to static prompt
-    return buildVictorLitePrompt({
-      accountSize: 1750,
-      withTools: true,
-    });
+    console.error(
+      '[Chat] preflight failed; falling back to static prompt:',
+      error
+    );
+    return { systemPrompt: basePrompt, preflight: null };
   }
 }
 
@@ -173,18 +137,15 @@ function extractContent(msg: {
   content?: string;
   parts?: Array<{ type: string; text?: string }>;
 }): string {
-  // Try parts array first (AI SDK 6.0 UIMessage format)
   if (msg.parts && Array.isArray(msg.parts)) {
     return msg.parts
       .filter((part) => part.type === 'text' && part.text)
       .map((part) => part.text)
       .join('');
   }
-  // Fall back to direct content
   return msg.content || '';
 }
 
-// Type for tool call from Ollama
 interface OllamaToolCall {
   function: {
     name: string;
@@ -199,19 +160,8 @@ interface OllamaToolCall {
 // converts those XML-style calls so they can be executed normally.
 // ============================================================================
 
-/**
- * Parse XML-style function calls from model text output.
- * Handles patterns like:
- *   <function_calls>
- *     <invoke name="get_ticker_data">
- *       <parameter name="ticker">MSFT</parameter>
- *     </invoke>
- *   </function_calls>
- */
 function parseXMLToolCalls(text: string): OllamaToolCall[] {
   const toolCalls: OllamaToolCall[] = [];
-
-  // Match <invoke name="...">...</invoke> blocks
   const invokePattern = /<invoke\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/invoke>/g;
   let match;
 
@@ -220,7 +170,6 @@ function parseXMLToolCalls(text: string): OllamaToolCall[] {
     const body = match[2];
     const args: Record<string, unknown> = {};
 
-    // Extract <parameter name="...">value</parameter>
     const paramPattern =
       /<parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/parameter>/g;
     let paramMatch;
@@ -229,7 +178,6 @@ function parseXMLToolCalls(text: string): OllamaToolCall[] {
       const paramName = paramMatch[1];
       const rawValue = paramMatch[2].trim();
 
-      // Parse value types
       if (/^-?\d+\.?\d*$/.test(rawValue)) {
         args[paramName] = parseFloat(rawValue);
       } else if (rawValue === 'true') {
@@ -249,11 +197,6 @@ function parseXMLToolCalls(text: string): OllamaToolCall[] {
   return toolCalls;
 }
 
-/**
- * Strip XML function call blocks from text content.
- * Used to clean assistant content before sending it back to the model
- * so it doesn't see its own XML tool call output in conversation history.
- */
 function stripXMLToolCalls(text: string): string {
   return text
     .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '')
@@ -263,10 +206,6 @@ function stripXMLToolCalls(text: string): string {
     .trim();
 }
 
-/**
- * Detect the start of an XML function call pattern in accumulated text.
- * Returns the index where the XML starts, or -1 if not found.
- */
 function findXMLToolCallStart(text: string): number {
   const patterns = ['<function_calls>', '<invoke '];
   let earliest = -1;
@@ -279,15 +218,6 @@ function findXMLToolCallStart(text: string): number {
   return earliest;
 }
 
-/**
- * Clean partial XML tag fragments from a streamed text chunk.
- * Some models output incomplete XML tags like "<function" when
- * attempting tool calls in follow-up responses. This strips those
- * fragments before they reach the client UI.
- *
- * Uses word boundary (\b) to avoid false positives on words like
- * "<functionality>" or "<functional>".
- */
 function cleanPartialXMLTags(text: string): string {
   return text.replace(
     /<\/?(?:function(?:_calls)?|invoke|parameter)\b[^>]*>?/g,
@@ -296,10 +226,16 @@ function cleanPartialXMLTags(text: string): string {
 }
 
 export async function POST(req: Request) {
+  const requestStartedAt = Date.now();
+  let loggingContext: {
+    userQuestion: string;
+    selectedModel: string;
+    systemPrompt: string;
+    promptVariant: 'lite';
+    userId: string | null;
+  } | null = null;
+
   try {
-    // ============================================
-    // AUTHORIZATION CHECK
-    // ============================================
     const authResult = await isUserAuthorized();
 
     if (!authResult.authorized) {
@@ -320,9 +256,6 @@ export async function POST(req: Request) {
 
     console.log(`[Chat] Authorized user: ${authResult.email}`);
 
-    // ============================================
-    // RATE LIMITING
-    // ============================================
     const rateLimitKey = authResult.email || 'unknown';
     const rateLimit = chatRateLimiter.check(rateLimitKey);
 
@@ -350,18 +283,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // ============================================
-    // PROCESS CHAT REQUEST
-    // ============================================
-    const { messages, model } = await req.json();
+    const { messages, model, enabledFeatures } = await req.json();
 
-    // Use provided model or default
     const selectedModel = model || DEFAULT_MODEL;
 
-    // Build dynamic system prompt with live market context
-    const systemPrompt = await buildDynamicSystemPrompt();
+    const enabledFeatureSet = parseEnabledFeatures(enabledFeatures);
+    const requestTools = selectToolsForRequest(enabledFeatureSet);
 
-    // Convert messages to Ollama format
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find(
+        (m: {
+          role: string;
+          content?: string;
+          parts?: Array<{ type: string; text?: string }>;
+        }) => m.role === 'user'
+      );
+    const userQuestion = lastUserMessage ? extractContent(lastUserMessage) : '';
+
+    const { systemPrompt: baseSystemPrompt, preflight } =
+      await buildPreflightedPrompt(userQuestion);
+    const systemPrompt =
+      baseSystemPrompt + buildFeatureDirectives(enabledFeatureSet);
+    const coverageReport: CoverageReport | null = preflight?.coverage ?? null;
+
+    if (enabledFeatureSet.size > 0) {
+      console.log(
+        `[Chat] Enabled features: ${Array.from(enabledFeatureSet).join(', ')} (tools: ${requestTools.length}/${ollamaTools.length})`
+      );
+    }
+    if (coverageReport) {
+      console.log(
+        `[Chat] Preflight: checked=[${coverageReport.checked.join(',')}] errors=${coverageReport.errors.length}`
+      );
+    }
+
     const ollamaMessages = [
       { role: 'system', content: systemPrompt },
       ...messages.map(
@@ -376,19 +332,40 @@ export async function POST(req: Request) {
       ),
     ];
 
-    // Create UI message stream for proper AI SDK 6.0 format
-    const stream = createUIMessageStream({
-      async execute({ writer }) {
-        // Track thinking state OUTSIDE recursive function so it persists
-        let globalThinkingMode = false;
+    loggingContext = {
+      userQuestion,
+      selectedModel,
+      systemPrompt,
+      promptVariant: 'lite',
+      userId: authResult.email ?? null,
+    };
 
-        // Recursive function to handle tool calls
+    const loggedToolCalls: DecisionToolCall[] = [];
+    const executedToolCalls: ExecutedToolCall[] = [];
+    let finalAssistantText = '';
+
+    const stream = createUIMessageStream<XyloUIMessage>({
+      async execute({ writer }) {
+        let reasoningId: string | null = null;
+        // Plan-narration steps emitted up front (one per tool name) and
+        // updated to `done` as each tool resolves. Stable ids are
+        // produced from the tool name so the same chunk replaces the
+        // running row in place on the client.
+        const plannedStepIds = new Set<string>();
+
+        function emitStep(step: ThinkingStep) {
+          writer.write({
+            type: 'data-thinkingStep',
+            id: step.stepId,
+            data: step,
+          });
+        }
+
         async function processChat(msgs: typeof ollamaMessages) {
-          // Include tools for models that support them
           const requestBody = {
             model: selectedModel,
             messages: msgs,
-            tools: ollamaTools,
+            tools: requestTools,
             stream: true,
           };
 
@@ -408,7 +385,6 @@ export async function POST(req: Request) {
           if (!response.ok) {
             const errorText = await response.text();
 
-            // Parse specific error types for better client handling
             if (response.status === 429) {
               throw new Error(
                 'Rate limit reached. Please wait a moment before trying again.'
@@ -420,9 +396,13 @@ export async function POST(req: Request) {
               );
             }
             if (response.status === 401 || response.status === 403) {
-              throw new Error(
-                'Authentication error. Please check your API configuration.'
-              );
+              // Per-model 401/403 from Ollama means the configured
+              // API key isn't entitled to run this model. Mark it in
+              // the in-memory denylist so `/api/chat/models` filters
+              // it out on the next selector refresh, and surface a
+              // structured signal to the UI so it can auto-switch.
+              markModelUnavailable(selectedModel);
+              throw new Error(`${MODEL_UNAVAILABLE_PREFIX}${selectedModel}`);
             }
 
             throw new Error(
@@ -440,7 +420,7 @@ export async function POST(req: Request) {
           let buffer = '';
           let pendingToolCalls: OllamaToolCall[] = [];
           let assistantContent = '';
-          let xmlToolCallDetected = false; // Suppresses XML text from streaming to client
+          let xmlToolCallDetected = false;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -456,15 +436,13 @@ export async function POST(req: Request) {
               try {
                 const json = JSON.parse(line);
 
-                // Debug: log first response chunk
-                if (!textId) {
+                if (!textId && !reasoningId) {
                   console.log(
                     '[Chat] First response chunk:',
                     JSON.stringify(json).slice(0, 200)
                   );
                 }
 
-                // Handle tool calls
                 if (json.message?.tool_calls) {
                   pendingToolCalls = json.message.tool_calls;
                   console.log(
@@ -473,43 +451,30 @@ export async function POST(req: Request) {
                   );
                 }
 
-                // Handle thinking/reasoning content (DeepSeek R1 style)
-                // DeepSeek uses 'reasoning_content' field for chain-of-thought
+                // Reasoning / thinking content streams as native
+                // `reasoning-*` chunks now — the client renders these
+                // through `<ThinkingBlock>`.
                 const thinking =
                   json.message?.reasoning_content || json.message?.thinking;
                 if (thinking) {
-                  // Start text if not started
-                  if (!textId) {
-                    textId = crypto.randomUUID();
-                    writer.write({ type: 'text-start', id: textId });
-                  }
-
-                  // Emit thinking start marker ONCE
-                  if (!globalThinkingMode) {
-                    globalThinkingMode = true;
+                  if (!reasoningId) {
+                    reasoningId = crypto.randomUUID();
                     writer.write({
-                      type: 'text-delta',
-                      id: textId,
-                      delta: '<!--THINKING_START-->',
+                      type: 'reasoning-start',
+                      id: reasoningId,
                     });
                   }
-
-                  // Write thinking content
                   writer.write({
-                    type: 'text-delta',
-                    id: textId,
+                    type: 'reasoning-delta',
+                    id: reasoningId,
                     delta: thinking,
                   });
                 }
 
-                // Handle text content - check both formats
                 const content = json.message?.content || json.response;
                 if (content) {
                   assistantContent += content;
 
-                  // Detect XML function calls in accumulated content
-                  // Some models output tool calls as XML text instead of
-                  // using structured tool_calls - suppress this from the UI
                   if (
                     !xmlToolCallDetected &&
                     findXMLToolCallStart(assistantContent) !== -1
@@ -520,30 +485,25 @@ export async function POST(req: Request) {
                     );
                   }
 
-                  // Don't stream XML function call text to the client
                   if (!xmlToolCallDetected) {
-                    // Clean partial XML tag fragments (e.g., "<function")
-                    // that models output when attempting tool calls as text
                     const cleanedContent = cleanPartialXMLTags(content);
 
                     if (cleanedContent.trim()) {
-                      // Start text if not started
+                      // Close the reasoning block as soon as actual
+                      // assistant text starts streaming.
+                      if (reasoningId) {
+                        writer.write({
+                          type: 'reasoning-end',
+                          id: reasoningId,
+                        });
+                        reasoningId = null;
+                      }
+
                       if (!textId) {
                         textId = crypto.randomUUID();
                         writer.write({ type: 'text-start', id: textId });
                       }
 
-                      // Close thinking mode ONCE when we get actual content
-                      if (globalThinkingMode) {
-                        globalThinkingMode = false;
-                        writer.write({
-                          type: 'text-delta',
-                          id: textId,
-                          delta: '<!--THINKING_END-->',
-                        });
-                      }
-
-                      // Write cleaned text delta
                       writer.write({
                         type: 'text-delta',
                         id: textId,
@@ -553,11 +513,7 @@ export async function POST(req: Request) {
                   }
                 }
 
-                // End of stream - handle tool calls if any
                 if (json.done) {
-                  // Fallback: parse XML-style tool calls from text output
-                  // Models like llama3.3 sometimes emit tool calls as XML
-                  // text instead of using Ollama's structured tool_calls
                   if (pendingToolCalls.length === 0 && assistantContent) {
                     const xmlToolCalls = parseXMLToolCalls(assistantContent);
                     if (xmlToolCalls.length > 0) {
@@ -566,8 +522,6 @@ export async function POST(req: Request) {
                         xmlToolCalls.map((tc) => tc.function.name)
                       );
                       pendingToolCalls = xmlToolCalls;
-                      // Clean XML from assistant content for conversation
-                      // history so model doesn't see its own XML output
                       assistantContent = stripXMLToolCalls(assistantContent);
                     }
                   }
@@ -576,18 +530,16 @@ export async function POST(req: Request) {
                     `[Chat] Stream done. Pending tools: ${pendingToolCalls.length}`
                   );
 
-                  // Close any open text
                   if (textId) {
-                    writer.write({
-                      type: 'text-end',
-                      id: textId,
-                    });
+                    writer.write({ type: 'text-end', id: textId });
                     textId = null;
                   }
 
-                  // Process tool calls
+                  if (assistantContent.trim()) {
+                    finalAssistantText = stripXMLToolCalls(assistantContent);
+                  }
+
                   if (pendingToolCalls.length > 0) {
-                    // Add assistant message to history
                     const newMsgs = [
                       ...msgs,
                       {
@@ -597,35 +549,58 @@ export async function POST(req: Request) {
                       },
                     ];
 
-                    // Execute each tool call
                     for (const tc of pendingToolCalls) {
                       const toolName = tc.function.name;
                       const toolArgs = tc.function.arguments;
+                      const toolCallId = `${toolName}-${crypto.randomUUID()}`;
 
                       console.log(
                         `[Chat] Executing tool: ${toolName}`,
                         toolArgs
                       );
 
-                      // Emit tool start marker for UI
-                      const startMarkerId = crypto.randomUUID();
-                      writer.write({ type: 'text-start', id: startMarkerId });
+                      // Tool input lifecycle (typed parts).
                       writer.write({
-                        type: 'text-delta',
-                        id: startMarkerId,
-                        delta: `<!--TOOL_START:${toolName}:${JSON.stringify(
-                          toolArgs
-                        )}:START-->`,
+                        type: 'tool-input-start',
+                        toolCallId,
+                        toolName,
+                        dynamic: true,
                       });
-                      writer.write({ type: 'text-end', id: startMarkerId });
+                      writer.write({
+                        type: 'tool-input-available',
+                        toolCallId,
+                        toolName,
+                        input: toolArgs,
+                        dynamic: true,
+                      });
 
-                      // Execute the tool with Ollama API key for web search
+                      // Plan-step row (running) for this tool. We
+                      // emit one step per tool, keyed by name, and
+                      // upgrade to `done` after the tool resolves.
+                      const planStepId = `plan-${toolName}`;
+                      if (!plannedStepIds.has(planStepId)) {
+                        plannedStepIds.add(planStepId);
+                      }
+                      emitStep({
+                        stepId: planStepId,
+                        label: humanizeToolPlanLabel(toolName),
+                        detail: planDetail(toolName, toolArgs),
+                        status: 'running',
+                      });
+
+                      const toolStartedAt = Date.now();
                       const result = await executeToolCall(
                         { name: toolName, arguments: toolArgs },
                         { apiKey: OLLAMA_API_KEY }
                       );
+                      loggedToolCalls.push({
+                        name: toolName,
+                        args: toolArgs,
+                        latency_ms: Date.now() - toolStartedAt,
+                        ok: !!result.success,
+                        error: result.success ? undefined : result.error,
+                      });
 
-                      // Detailed logging for debugging
                       console.log(`[Chat] Tool ${toolName} result:`, {
                         success: result.success,
                         hasData: !!result.data,
@@ -633,71 +608,53 @@ export async function POST(req: Request) {
                         error: result.error,
                       });
 
-                      // Always emit a tool result marker for UI tracking
-                      const markerId = crypto.randomUUID();
-                      writer.write({ type: 'text-start', id: markerId });
-
                       if (result.success && result.data) {
-                        // Success - emit data + formatted string
-                        // (formatted is what AI sees - TOON or text)
-                        let dataJson: string;
-                        try {
-                          dataJson = JSON.stringify({
-                            data: result.data,
-                            formatted: result.formatted || null,
-                          });
-                        } catch (e) {
-                          console.error(
-                            '[Chat] Failed to stringify tool data:',
-                            e
-                          );
-                          dataJson = JSON.stringify({
-                            error: 'Failed to serialize',
-                            ticker: toolArgs.ticker || 'unknown',
-                          });
-                        }
-
-                        const toolMarker = `<!--TOOL:${toolName}:${dataJson}:TOOL-->`;
-                        console.log(
-                          `[Chat] Emitting success marker (${toolMarker.length} chars)`
-                        );
+                        executedToolCalls.push({
+                          name: toolName,
+                          args: toolArgs,
+                          output: result.data,
+                        });
                         writer.write({
-                          type: 'text-delta',
-                          id: markerId,
-                          delta: toolMarker,
+                          type: 'tool-output-available',
+                          toolCallId,
+                          output: {
+                            data: result.data,
+                            formatted: result.formatted ?? null,
+                          },
+                          dynamic: true,
+                        });
+                        emitStep({
+                          stepId: planStepId,
+                          label: humanizeToolPlanLabel(toolName),
+                          detail: planDetail(toolName, toolArgs),
+                          status: 'done',
                         });
                       } else {
-                        // Error - emit error marker so UI shows failure state
-                        const errorData = JSON.stringify({
-                          error: result.error || 'Unknown error',
-                          ticker:
-                            toolArgs.ticker || toolArgs.query || 'unknown',
-                        });
-                        const errorMarker = `<!--TOOL_ERROR:${toolName}:${errorData}:ERROR-->`;
-                        console.log(
-                          `[Chat] Emitting error marker: ${result.error}`
-                        );
                         writer.write({
-                          type: 'text-delta',
-                          id: markerId,
-                          delta: errorMarker,
+                          type: 'tool-output-error',
+                          toolCallId,
+                          errorText: result.error || 'Tool execution failed',
+                          dynamic: true,
+                        });
+                        emitStep({
+                          stepId: planStepId,
+                          label: humanizeToolPlanLabel(toolName),
+                          detail:
+                            result.error ?? planDetail(toolName, toolArgs),
+                          status: 'done',
                         });
                       }
 
-                      writer.write({ type: 'text-end', id: markerId });
-
-                      // Add tool result to messages for Ollama
                       newMsgs.push({
                         role: 'tool',
                         content:
                           result.formatted ||
                           result.error ||
                           JSON.stringify(result.data),
-                        tool_call_id: `${toolName}_${Date.now()}`,
+                        tool_call_id: toolCallId,
                       } as (typeof newMsgs)[number]);
                     }
 
-                    // Continue conversation with tool results
                     await processChat(newMsgs);
                   }
                 }
@@ -707,7 +664,6 @@ export async function POST(req: Request) {
             }
           }
 
-          // Handle any remaining buffer
           if (buffer.trim()) {
             try {
               const json = JSON.parse(buffer);
@@ -720,31 +676,210 @@ export async function POST(req: Request) {
                 });
               }
               if (json.done && textId) {
-                writer.write({
-                  type: 'text-end',
-                  id: textId,
-                });
+                writer.write({ type: 'text-end', id: textId });
               }
             } catch {
               // Ignore
             }
           }
 
-          // Ensure text is ended if we started one
           if (textId) {
-            writer.write({
-              type: 'text-end',
-              id: textId,
-            });
+            writer.write({ type: 'text-end', id: textId });
+          }
+          if (reasoningId) {
+            writer.write({ type: 'reasoning-end', id: reasoningId });
+            reasoningId = null;
           }
         }
 
-        // Start processing
         await processChat(ollamaMessages);
+
+        // ====================================================================
+        // POST-TURN: risk gate, coverage, artifact, suggestions
+        // ====================================================================
+
+        let riskVerdict: RiskVerdict;
+        try {
+          const parsed = await parseRecommendation(finalAssistantText, {
+            enableModelFallback: false,
+          });
+          if (!parsed) {
+            riskVerdict = skipGate('no structured "My call:" line found');
+          } else {
+            const tickerData =
+              (preflight?.signals.ticker_data as
+                | Array<Record<string, unknown>>
+                | undefined) ?? [];
+            const ctx = tickerData.find(
+              (t) =>
+                String(t?.ticker ?? '').toUpperCase() ===
+                parsed.ticker.toUpperCase()
+            );
+            riskVerdict = validateRecommendation({
+              recommendation: parsed,
+              account: { sizeUSD: 1750 },
+              positions: [],
+              tickerContext: ctx
+                ? {
+                    rsi: ctx.rsi as number | undefined,
+                    iv_pct: (ctx.iv as Record<string, number> | undefined)
+                      ?.currentIV,
+                    aboveMA200: ctx.aboveMA200 as boolean | undefined,
+                    daysUntilEarnings:
+                      (ctx.earnings as Record<string, number> | undefined)
+                        ?.daysUntil ?? null,
+                  }
+                : undefined,
+            });
+          }
+        } catch (err) {
+          console.error('[Chat] risk gate error:', err);
+          riskVerdict = skipGate(
+            `gate error: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+
+        if (coverageReport) {
+          writer.write({
+            type: 'data-coverage',
+            data: {
+              checked: coverageReport.checked,
+              skipped: coverageReport.skipped,
+              stale: coverageReport.stale,
+              errors: coverageReport.errors,
+              latencies: coverageReport.latencies,
+              digests: coverageReport.digests,
+            },
+          });
+        }
+
+        // Phase 2 PR C: confidence score over coverage + risk + signal_agreement.
+        let confidence: ConfidenceScore | null = null;
+        try {
+          confidence = computeConfidence({
+            coverage: coverageReport,
+            riskVerdict: riskVerdict.gate_skipped ? null : riskVerdict,
+            action: riskVerdict.recommendation?.action ?? null,
+          });
+        } catch (err) {
+          console.error('[Chat] confidence error:', err);
+        }
+
+        writer.write({
+          type: 'data-riskGate',
+          data: {
+            approved: riskVerdict.approved,
+            gate_skipped: riskVerdict.gate_skipped,
+            violations: riskVerdict.violations,
+            recommendation: riskVerdict.recommendation
+              ? {
+                  ticker: riskVerdict.recommendation.ticker,
+                  action: riskVerdict.recommendation.action,
+                  spread: riskVerdict.recommendation.spread,
+                }
+              : null,
+            confidence: confidence
+              ? {
+                  score: confidence.score,
+                  components: confidence.components,
+                }
+              : null,
+          },
+        });
+
+        // Synthesise an artifact + follow-up chips from the executed
+        // tool calls. Returns null payloads when the turn doesn't
+        // match any known shape (e.g. plain Q&A); the chat falls
+        // back to text-only in that case.
+        try {
+          const extraction = extractChatArtifact(executedToolCalls);
+          if (extraction.artifact) {
+            writer.write({
+              type: 'data-artifact',
+              id: extraction.artifact.artifactId,
+              data: extraction.artifact,
+            });
+          }
+          if (extraction.suggestions && extraction.suggestions.chips.length) {
+            writer.write({
+              type: 'data-suggestions',
+              data: extraction.suggestions,
+            });
+          }
+        } catch (err) {
+          console.error('[Chat] extractor failed:', err);
+        }
+
+        if (loggingContext) {
+          void logDecision({
+            source: 'frontend',
+            user_id: loggingContext.userId,
+            user_question: loggingContext.userQuestion,
+            model_id: loggingContext.selectedModel,
+            prompt_hash: hashPrompt(loggingContext.systemPrompt),
+            prompt_variant: loggingContext.promptVariant,
+            tool_calls: loggedToolCalls,
+            final_response: finalAssistantText,
+            total_latency_ms: Date.now() - requestStartedAt,
+            question_class: preflight?.classification.type ?? null,
+            ticker:
+              riskVerdict.recommendation?.ticker ||
+              preflight?.classification.tickers[0] ||
+              null,
+            recommendation_type:
+              riskVerdict.recommendation?.spread?.type ??
+              (riskVerdict.recommendation?.action === 'HOLD'
+                ? 'hold'
+                : riskVerdict.recommendation?.action === 'AVOID'
+                  ? 'avoid'
+                  : null),
+            coverage_report: coverageReport,
+            risk_violations: riskVerdict.gate_skipped
+              ? null
+              : riskVerdict.violations,
+            confidence: confidence?.score ?? null,
+          });
+        }
       },
       onError: (error) => {
-        console.error('Stream error:', error);
-        return error instanceof Error ? error.message : 'Unknown error';
+        const rawMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        // The `MODEL_UNAVAILABLE` sentinel is an *expected* signal —
+        // not a bug — that the route emits whenever Ollama 401s for
+        // a per-model access reason. Logging it as `console.error`
+        // (with a stack trace) is misleading; a one-line warn is
+        // enough since the UI handles it and surfaces a friendly
+        // banner to the user.
+        if (rawMessage.startsWith(MODEL_UNAVAILABLE_PREFIX)) {
+          const id = rawMessage.slice(MODEL_UNAVAILABLE_PREFIX.length);
+          console.warn(
+            `[Chat] Model "${id}" is not available on this API key; the UI will auto-switch.`
+          );
+        } else {
+          console.error('Stream error:', error);
+        }
+        const message = rawMessage.startsWith(MODEL_UNAVAILABLE_PREFIX)
+          ? `${MODEL_UNAVAILABLE_PREFIX}${rawMessage.slice(
+              MODEL_UNAVAILABLE_PREFIX.length
+            )} :: This model isn't available on your Ollama plan. Switching to another model.`
+          : rawMessage;
+        if (loggingContext) {
+          void logDecision({
+            source: 'frontend',
+            user_id: loggingContext.userId,
+            user_question: loggingContext.userQuestion,
+            model_id: loggingContext.selectedModel,
+            prompt_hash: hashPrompt(loggingContext.systemPrompt),
+            prompt_variant: loggingContext.promptVariant,
+            tool_calls: loggedToolCalls,
+            final_response: finalAssistantText || `[error] ${message}`,
+            total_latency_ms: Date.now() - requestStartedAt,
+            question_class: preflight?.classification.type ?? null,
+            ticker: preflight?.classification.tickers[0] ?? null,
+            coverage_report: coverageReport,
+          });
+        }
+        return message;
       },
     });
 
@@ -754,6 +889,20 @@ export async function POST(req: Request) {
 
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+
+    if (loggingContext) {
+      void logDecision({
+        source: 'frontend',
+        user_id: loggingContext.userId,
+        user_question: loggingContext.userQuestion,
+        model_id: loggingContext.selectedModel,
+        prompt_hash: hashPrompt(loggingContext.systemPrompt),
+        prompt_variant: loggingContext.promptVariant,
+        tool_calls: [],
+        final_response: `[error] ${errorMessage}`,
+        total_latency_ms: Date.now() - requestStartedAt,
+      });
+    }
 
     return new Response(
       JSON.stringify({
@@ -766,4 +915,60 @@ export async function POST(req: Request) {
       }
     );
   }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Human-readable plan-step label per tool name. Sentence-cased so
+ * the row reads as a checklist item rather than a function name.
+ */
+function humanizeToolPlanLabel(name: string): string {
+  switch (name) {
+    case 'get_ticker_data':
+      return 'Pulled live market data.';
+    case 'web_search':
+      return 'Scanned the open web.';
+    case 'get_financials_deep':
+      return 'Reviewed the latest financials.';
+    case 'get_institutional_holdings':
+      return 'Checked institutional ownership.';
+    case 'get_unusual_options_activity':
+      return 'Inspected unusual options activity.';
+    case 'get_trading_regime':
+      return 'Read the current trading regime.';
+    case 'get_iv_by_strike':
+      return 'Sampled IV by strike.';
+    case 'calculate_spread':
+      return 'Sized a candidate spread.';
+    case 'get_sector_flow':
+      return 'Surveyed sector flow.';
+    case 'get_recent_news':
+      return 'Scanned recent headlines.';
+    case 'get_sentiment':
+      return 'Gauged sentiment.';
+    case 'get_earnings_calendar':
+      return 'Checked the earnings calendar.';
+    case 'get_geopolitical_events':
+      return 'Reviewed geopolitical events.';
+    default:
+      return `Ran ${name}.`;
+  }
+}
+
+/**
+ * Free-text detail line for a planning step — usually the ticker /
+ * query that the tool was invoked with so the row stays specific.
+ */
+function planDetail(
+  name: string,
+  args: Record<string, unknown>
+): string | undefined {
+  const ticker = (args.ticker as string | undefined) ?? '';
+  const query = (args.query as string | undefined) ?? '';
+  if (ticker) return `${name}: ${ticker.toUpperCase()}`;
+  if (query) return `${name}: ${query.slice(0, 64)}`;
+  return undefined;
 }

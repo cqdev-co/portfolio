@@ -20,13 +20,13 @@ backoff retry if proxy is unavailable.
 - Rate limit tracking and graceful degradation
 - Used by all AI analyst commands
 
-### New Tools for Victor
+### New Tools for Xylo
 
-Two new tools added to help Victor verify user claims and calculate specific spreads:
+Two new tools added to help Xylo verify user claims and calculate specific spreads:
 
 #### 1. `get_iv_by_strike` - Verify IV at Specific Strikes
 
-When user claims "I'm seeing spreads that aren't expensive at 49 DTE", Victor can
+When user claims "I'm seeing spreads that aren't expensive at 49 DTE", Xylo can
 now verify:
 
 ```
@@ -38,7 +38,7 @@ now verify:
 
 #### 2. `calculate_spread` - Exact Spread Pricing
 
-When user proposes specific strikes (e.g. "$200/$205 CDS at 49 DTE"), Victor can
+When user proposes specific strikes (e.g. "$200/$205 CDS at 49 DTE"), Xylo can
 calculate the exact pricing:
 
 ```
@@ -65,7 +65,7 @@ LIQUIDITY
 
 ### Enhanced Tool Instructions
 
-Victor's prompt now includes guidance on when to use the new tools:
+Xylo's prompt now includes guidance on when to use the new tools:
 
 ```
 ### NEW: Verifying User Claims
@@ -451,15 +451,15 @@ See exactly what data the AI receives before running analysis.
 
 ### Bug Fix: Tool Call Loop Termination
 
-Fixed a critical bug where Victor's chat would terminate abruptly after
+Fixed a critical bug where Xylo's chat would terminate abruptly after
 making multiple web searches without synthesizing the results.
 
 **The Problem:**
 
-- When Victor made 3 consecutive tool calls (web searches), the agent loop
+- When Xylo made 3 consecutive tool calls (web searches), the agent loop
   would exit after the final tool execution
 - The tool results would remain unsynthesized, leaving the conversation
-  hanging without Victor's analysis
+  hanging without Xylo's analysis
 
 **The Fix:**
 
@@ -481,7 +481,7 @@ making multiple web searches without synthesizing the results.
 
 ## What's New (v2.1.0) - Psychological Fair Value
 
-Victor now incorporates **Psychological Fair Value (PFV)** analysis - understanding where price gravitates based on options mechanics and behavioral psychology.
+Xylo now incorporates **Psychological Fair Value (PFV)** analysis - understanding where price gravitates based on options mechanics and behavioral psychology.
 
 ### New: Psychological Fair Value
 
@@ -520,7 +520,7 @@ The `analyze` command now shows:
 
 ### AI Analysis Enhanced
 
-Victor's AI analysis now considers both **fundamental** and **psychological** fair value:
+Xylo's AI analysis now considers both **fundamental** and **psychological** fair value:
 
 - References max pain when OPEX is approaching
 - Notes gamma wall support/resistance levels
@@ -529,13 +529,13 @@ Victor's AI analysis now considers both **fundamental** and **psychological** fa
 
 ---
 
-## What's New (v2.0.0) - Agentic Victor
+## What's New (v2.0.0) - Agentic Xylo
 
-Victor is now **autonomous**! He monitors markets in the background, sends Discord alerts for opportunities, and delivers morning briefings - all without you having to ask.
+Xylo is now **autonomous**! He monitors markets in the background, sends Discord alerts for opportunities, and delivers morning briefings - all without you having to ask.
 
 ### Background Monitoring
 
-- **Watchlist Scanning** - Victor scans your watchlist every 30 minutes during market hours
+- **Watchlist Scanning** - Xylo scans your watchlist every 30 minutes during market hours
 - **Position Risk Alerts** - Get notified when DTE drops below 5 or cushion gets dangerously low
 - **AI-Validated Alerts** - Every alert is reviewed by AI with a conviction score before sending
 
@@ -615,7 +615,7 @@ bun run chat
 
 ## The Concept
 
-This isn't just a tool - it's your analyst employee **Victor Chen**. He's a
+This isn't just a tool - it's your analyst employee **Xylo**. He's a
 67-year-old veteran Wall Street trader with 45 years of experience. Talk to
 him like you would a real analyst:
 
@@ -641,20 +641,20 @@ him like you would a real analyst:
 
   ────────────────────────────────────────────────────────────────────
 
-  Victor: Morning. Victor Chen here. Markets are open and I've
+  Xylo: Morning. Xylo here. Markets are open and I've
           been watching the tape. Give me a ticker to analyze, ask me
           to scan for setups, or let's review what we're holding.
           What's on your mind?
 
   You: Should I buy NVDA before FOMC?
 
-  ┌─ Victor's Analysis ─────────────────────────────────────────
+  ┌─ Xylo's Analysis ─────────────────────────────────────────
   │ The user is asking about buying NVDA right before a major
   │ FOMC meeting. This is a classic timing question where market
   │ volatility risks are high...
   └───────────────────────────────────────────────────────────────
 
-  Victor: Let me be direct: NO. This is exactly the kind of impatient
+  Xylo: Let me be direct: NO. This is exactly the kind of impatient
           trading that blows up accounts.
 
           • FOMC RISK: The Fed meets in 2 days. Powell could spark a
@@ -974,13 +974,13 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-role-key
 OLLAMA_API_KEY=your-ollama-api-key
 
-# Required for Agentic Victor (Discord alerts)
+# Required for Agentic Xylo (Discord alerts)
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
 
 ### Database Setup
 
-For Agentic Victor, run these SQL schemas in Supabase:
+For Agentic Xylo, run these SQL schemas in Supabase:
 
 1. `db/analyst_schema.sql` - Base tables (trades, observations)
 2. `db/positions_schema.sql` - Position tracking
@@ -1102,9 +1102,9 @@ See [SHORT-TERM-STRATEGY.md](./SHORT-TERM-STRATEGY.md) for full documentation.
 
 ### Completed
 
-- ✅ **Phase 1**: Foundation (Victor Chen personality, streaming, tools)
+- ✅ **Phase 1**: Foundation (Xylo personality, streaming, tools)
 - ✅ **Phase 2**: Token Optimization + Market Intelligence
-- ✅ **Phase 3**: Agentic Victor (background monitoring, Discord alerts, morning briefings)
+- ✅ **Phase 3**: Agentic Xylo (background monitoring, Discord alerts, morning briefings)
 
 ### Future Phases
 

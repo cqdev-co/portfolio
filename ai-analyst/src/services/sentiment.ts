@@ -517,7 +517,7 @@ export function formatSentimentTOON(sentiment: SentimentAnalysis): string {
 }
 
 /**
- * Get sentiment-based risk assessment for Victor
+ * Get sentiment-based risk assessment for Xylo
  */
 export function getSentimentRiskLevel(
   sentiment: SentimentAnalysis

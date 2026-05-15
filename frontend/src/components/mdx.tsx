@@ -2,6 +2,7 @@ import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { ExpandableImage } from '@/components/expandable-image';
+import { MermaidDiagram } from '@/components/mermaid-diagram';
 
 type TableProps = {
   data: {
@@ -176,8 +177,32 @@ function createHeading(level: number) {
   return Heading;
 }
 
-// Code block component with better styling (simplified for server components)
+function extractMermaidSource(
+  child: React.ReactElement<{ children?: React.ReactNode }>
+): string {
+  return React.Children.toArray(child.props.children)
+    .map((c) => (typeof c === 'string' ? c : ''))
+    .join('')
+    .trim();
+}
+
+// Code block component with better styling (simplified for server components).
+// Intercepts ```mermaid blocks and routes them through MermaidDiagram so we
+// get real rendered diagrams instead of a styled <pre>.
 function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>) {
+  const child = React.Children.toArray(props.children).find(
+    React.isValidElement
+  ) as
+    | React.ReactElement<{
+        className?: string;
+        children?: React.ReactNode;
+      }>
+    | undefined;
+
+  if (child && child.props.className === 'language-mermaid') {
+    return <MermaidDiagram source={extractMermaidSource(child)} />;
+  }
+
   return (
     <div className="my-6">
       <pre

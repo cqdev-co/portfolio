@@ -55,15 +55,7 @@ class WaveGradientGenerator(BaseGenerator):
         wave_values = (wave_values + amplitude) / (2 * amplitude)
         wave_values = np.clip(wave_values, 0, 1)
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = wave_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(wave_values)
 
 
 class InterferencePatternGenerator(BaseGenerator):
@@ -86,11 +78,11 @@ class InterferencePatternGenerator(BaseGenerator):
         total_wave = np.zeros_like(X)
 
         # Generate interference from multiple sources
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
         for _i in range(num_sources):
             # Random source position
-            source_x = np.random.random()
-            source_y = np.random.random()
+            source_x = rng.random()
+            source_y = rng.random()
 
             # Calculate distance from source
             distance = np.sqrt((X - source_x) ** 2 + (Y - source_y) ** 2)
@@ -107,15 +99,7 @@ class InterferencePatternGenerator(BaseGenerator):
         else:
             total_wave = np.ones_like(total_wave) * 0.5
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = total_wave[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(total_wave)
 
 
 class SpiralWaveGenerator(BaseGenerator):
@@ -155,15 +139,7 @@ class SpiralWaveGenerator(BaseGenerator):
         # Normalize to 0-1 range
         wave_values = (wave_values + 1) / 2
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = wave_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(wave_values)
 
 
 class CylindricalWaveGenerator(BaseGenerator):
@@ -199,12 +175,4 @@ class CylindricalWaveGenerator(BaseGenerator):
         # Normalize to 0-1 range
         wave_values = (wave_values + 1) / 2
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = wave_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(wave_values)

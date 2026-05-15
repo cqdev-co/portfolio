@@ -1,0 +1,17 @@
+{
+  "id": "routing-no-tools-greeting",
+  "kind": "routing",
+  "question": "Hey Xylo, how are you doing today?",
+  "must_call": [],
+  "must_not_call": [
+    "get_recent_news",
+    "get_earnings_calendar",
+    "get_ticker_data",
+    "get_unusual_options_activity",
+    "get_sector_flow",
+    "get_geopolitical_events",
+    "get_sentiment",
+    "web_search"
+  ],
+  "must_pass": true
+}

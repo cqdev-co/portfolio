@@ -5,6 +5,7 @@
  */
 
 import { Ollama } from 'ollama';
+import { resolveAI, type Workload } from '@portfolio/ai-config';
 
 export type OllamaMode = 'local' | 'cloud';
 
@@ -56,6 +57,43 @@ const DEFAULT_MODELS: Record<OllamaMode, string> = {
   local: 'llama3.2',
   cloud: 'deepseek-v3.2:cloud',
 };
+
+/**
+ * Extended OllamaConfig that carries a `think` override and options, as
+ * returned by the ENV-driven resolver. Existing code that constructs
+ * { mode, model? } by hand still works; code using the resolver gets extra
+ * fields automatically applied by generateCompletion / chatWithTools.
+ */
+export interface ResolvedOllamaConfig extends OllamaConfig {
+  think?: boolean;
+  options?: Record<string, unknown>;
+}
+
+/**
+ * Build an OllamaConfig from the ENV-driven resolver at @portfolio/ai-config.
+ *
+ *   ENV=dev   -> local (qwen3.6:35b think-off for most workloads,
+ *                       gemma4:26b for agent-multi-turn)
+ *   ENV=prod  -> cloud (per-workload tags, OLLAMA_API_KEY required)
+ *   unset     -> cloud (safe default for Vercel deploys)
+ *
+ * Services that want the recommended model per workload should prefer this
+ * helper over hand-constructing { mode, model }. Callers who already know the
+ * exact model they want can keep passing it directly.
+ *
+ * @throws if ENV is invalid or cloud mode is selected without OLLAMA_API_KEY.
+ */
+export function buildConfigForWorkload(
+  workload: Workload
+): ResolvedOllamaConfig {
+  const r = resolveAI(workload);
+  return {
+    mode: r.mode,
+    model: r.model,
+    think: r.think,
+    options: r.options,
+  };
+}
 
 function createClient(mode: OllamaMode): Ollama {
   if (mode === 'cloud') {

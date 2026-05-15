@@ -7,6 +7,7 @@ from scipy import ndimage
 from scipy.ndimage import gaussian_filter
 
 from ..core.base import BaseGenerator
+from .perlin import PerlinNoiseGenerator
 
 
 class OrganicGradientGenerator(BaseGenerator):
@@ -19,7 +20,6 @@ class OrganicGradientGenerator(BaseGenerator):
         smoothness = self.params.get("smoothness", 3.0)
         flow_strength = self.params.get("flow_strength", 0.3)
         grain_intensity = self.params.get("grain_intensity", 0.05)
-        self.params.get("blend_mode", "soft")
 
         # Create base flow field using multiple octaves of noise
         flow_field = self._create_flow_field(flow_strength)
@@ -65,6 +65,24 @@ class OrganicGradientGenerator(BaseGenerator):
 
         # Apply strength and normalize
         flow_field = strength * combined_flow
+
+        perlin_blend = float(self.params.get("organic_perlin_blend", 0.28))
+        if perlin_blend > 0.0:
+            seed = int(self.params.get("seed", 42))
+            perlin = PerlinNoiseGenerator(
+                self.width,
+                self.height,
+                [(0, 0, 0), (255, 255, 255)],
+                scale=float(self.params.get("organic_perlin_scale", 2.4)),
+                octaves=int(self.params.get("organic_perlin_octaves", 3)),
+                persistence=0.55,
+                lacunarity=2.0,
+                seed=seed,
+            )
+            pn = perlin.raw_noise_values()
+            pn = (pn - 0.5) * 2.0
+            flow_field = (1.0 - perlin_blend) * flow_field + perlin_blend * pn
+
         return flow_field
 
     def _create_base_gradient(self, flow_field: np.ndarray) -> np.ndarray:
@@ -93,15 +111,7 @@ class OrganicGradientGenerator(BaseGenerator):
         # Apply easing for smoother transitions
         gradient_values = self._apply_easing(gradient_values)
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = gradient_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(gradient_values)
 
     def _apply_easing(self, values: np.ndarray) -> np.ndarray:
         """Apply smooth easing for organic transitions."""
@@ -139,23 +149,23 @@ class OrganicGradientGenerator(BaseGenerator):
 
     def _add_film_grain(self, gradient: np.ndarray, intensity: float) -> np.ndarray:
         """Add film grain texture for vintage look."""
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
 
         # Create multiple grain layers with different sizes
         grain_layers = []
 
         # Fine grain
-        fine_grain = np.random.normal(0, intensity * 0.3, (self.height, self.width))
+        fine_grain = rng.normal(0, intensity * 0.3, (self.height, self.width))
         fine_grain = gaussian_filter(fine_grain, sigma=0.3)
         grain_layers.append(fine_grain)
 
         # Medium grain
-        medium_grain = np.random.normal(0, intensity * 0.5, (self.height, self.width))
+        medium_grain = rng.normal(0, intensity * 0.5, (self.height, self.width))
         medium_grain = gaussian_filter(medium_grain, sigma=0.8)
         grain_layers.append(medium_grain)
 
         # Coarse grain
-        coarse_grain = np.random.normal(0, intensity * 0.2, (self.height, self.width))
+        coarse_grain = rng.normal(0, intensity * 0.2, (self.height, self.width))
         coarse_grain = gaussian_filter(coarse_grain, sigma=1.5)
         grain_layers.append(coarse_grain)
 
@@ -179,7 +189,7 @@ class OrganicGradientGenerator(BaseGenerator):
         self, gradient: np.ndarray, intensity: float
     ) -> np.ndarray:
         """Add photographic grain for realistic texture."""
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
 
         # Use professional grain if enabled
         if self.params.get("grain_quality", "standard") == "professional":
@@ -191,7 +201,7 @@ class OrganicGradientGenerator(BaseGenerator):
         X, Y = np.meshgrid(x, y)
 
         # Base random noise
-        base_noise = np.random.normal(0, intensity, (self.height, self.width))
+        base_noise = rng.normal(0, intensity, (self.height, self.width))
 
         # Add subtle structure to noise
         structured_noise = base_noise * (1 + 0.1 * np.sin(X * 50) * np.cos(Y * 50))
@@ -202,7 +212,7 @@ class OrganicGradientGenerator(BaseGenerator):
         # Add color-dependent grain (slightly different per channel)
         grainy = gradient.copy()
         for channel in range(3):
-            channel_grain = grain + np.random.normal(
+            channel_grain = grain + rng.normal(
                 0, intensity * 0.1, (self.height, self.width)
             )
 
@@ -222,7 +232,7 @@ class OrganicGradientGenerator(BaseGenerator):
         self, gradient: np.ndarray, intensity: float
     ) -> np.ndarray:
         """Professional-grade grain system matching stock photo quality."""
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
 
         # Multi-octave noise for realistic grain structure
         grain_layers = np.zeros((self.height, self.width))
@@ -238,9 +248,7 @@ class OrganicGradientGenerator(BaseGenerator):
 
         for freq, amp in zip(frequencies, amplitudes, strict=False):
             # Create organic noise pattern
-            octave_noise = np.random.normal(
-                0, intensity * amp, (self.height, self.width)
-            )
+            octave_noise = rng.normal(0, intensity * amp, (self.height, self.width))
 
             # Add organic flow patterns
             flow_x = np.sin(X * freq * 0.1) * 2.0
@@ -284,9 +292,7 @@ class OrganicGradientGenerator(BaseGenerator):
             grain_visibility = shadow_boost + highlight_boost + midtone_suppress
 
             # Add color-dependent variations
-            color_variation = np.random.normal(
-                0, intensity * 0.05, (self.height, self.width)
-            )
+            color_variation = rng.normal(0, intensity * 0.05, (self.height, self.width))
             channel_grain = grain_layers + color_variation
 
             # Apply grain with visibility mapping
@@ -296,7 +302,7 @@ class OrganicGradientGenerator(BaseGenerator):
         # Add subtle color noise for realism
         color_noise_intensity = intensity * 0.03
         for channel in range(3):
-            color_noise = np.random.normal(
+            color_noise = rng.normal(
                 0, color_noise_intensity, (self.height, self.width)
             )
             color_noise = gaussian_filter(color_noise, sigma=0.8)
@@ -306,10 +312,10 @@ class OrganicGradientGenerator(BaseGenerator):
 
     def _add_digital_noise(self, gradient: np.ndarray, intensity: float) -> np.ndarray:
         """Add clean digital noise."""
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
 
         # Simple gaussian noise
-        noise = np.random.normal(0, intensity, (self.height, self.width))
+        noise = rng.normal(0, intensity, (self.height, self.width))
         noise = gaussian_filter(noise, sigma=0.3)
 
         grainy = gradient.copy()
@@ -320,7 +326,7 @@ class OrganicGradientGenerator(BaseGenerator):
 
     def _add_artistic_grain(self, gradient: np.ndarray, intensity: float) -> np.ndarray:
         """Add artistic grain with irregular patterns."""
-        np.random.seed(self.params.get("seed", 42))
+        rng = self._rng()
 
         # Create organic grain pattern
         x = np.linspace(0, 8, self.width)
@@ -334,7 +340,7 @@ class OrganicGradientGenerator(BaseGenerator):
             freq = 2**octave
             amplitude = intensity / (2**octave)
 
-            octave_noise = np.random.normal(0, amplitude, (self.height, self.width))
+            octave_noise = rng.normal(0, amplitude, (self.height, self.width))
             octave_noise = gaussian_filter(octave_noise, sigma=0.5 / freq)
 
             # Add organic movement
@@ -435,19 +441,8 @@ class GlassGradientGenerator(BaseGenerator):
             gradient_values.max() - gradient_values.min()
         )
 
-        # Apply color mapping with layer offset
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = np.clip(gradient_values[i, j] + layer_offset * 0.2, 0, 1)
-                # Use gamma-correct interpolation for professional quality
-                if self.params.get("gamma_correct", True):
-                    rgb_array[i, j] = self.gamma_correct_interpolate(t)
-                else:
-                    rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        t = np.clip(gradient_values + layer_offset * 0.2, 0.0, 1.0)
+        return self.interpolate_from_t_grid(t)
 
     def _blend_glass_layers(self, layers: list[np.ndarray]) -> np.ndarray:
         """Blend glass layers with transparency."""
@@ -543,10 +538,7 @@ class GlassGradientGenerator(BaseGenerator):
         # Create prismatic color separation
         prism_offset = 0.02  # Color separation amount
 
-        # Shift each channel slightly for prismatic effect
         red_shift = np.sin(X * np.pi * 3 + Y * np.pi * 2) * prism_offset
-        np.sin(X * np.pi * 3 + Y * np.pi * 2 + np.pi / 3) * prism_offset
-        (np.sin(X * np.pi * 3 + Y * np.pi * 2 + 2 * np.pi / 3) * prism_offset)
 
         # Apply color shifting
         for i in range(self.height):
@@ -667,6 +659,9 @@ class FluidGradientGenerator(BaseGenerator):
         if grain_intensity > 0:
             result = self._add_fluid_grain(result, grain_intensity)
 
+        if self.params.get("anti_banding", True):
+            result = self.apply_dithering(result, 0.35)
+
         return result
 
     def _create_fluid_flows(self, complexity: float) -> list[np.ndarray]:
@@ -724,15 +719,7 @@ class FluidGradientGenerator(BaseGenerator):
                 1 - bleeding
             ) * flow_normalized + bleeding * bleeding_pattern
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = flow_normalized[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(flow_normalized)
 
     def _apply_fluid_smoothing(
         self, gradient: np.ndarray, smoothness: float
@@ -741,8 +728,7 @@ class FluidGradientGenerator(BaseGenerator):
 
         result = gradient.copy()
 
-        # Apply multiple passes of smoothing
-        for _ in range(3):
+        for _ in range(2):
             for channel in range(3):
                 result[:, :, channel] = gaussian_filter(
                     result[:, :, channel], sigma=smoothness, mode="reflect"

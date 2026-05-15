@@ -87,7 +87,7 @@ Only include data relevant to the question:
 Instead of full history, summarize previous turns:
 
 **Before**: Full messages (100+ tokens each)
-**After**: `[USER asked about NVDA. VICTOR recommended WAIT due to FOMC.]` (20 tokens)
+**After**: `[USER asked about NVDA. XYLO recommended WAIT due to FOMC.]` (20 tokens)
 
 ### 5. Response Token Limits
 

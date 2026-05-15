@@ -1,0 +1,13 @@
+{
+  "id": "chat-01",
+  "workload": "chat",
+  "description": "Placeholder. Single-turn conversational prompt modeled after frontend/src/app/api/chat/route.ts. Replace with a real captured user turn.",
+  "tags": ["placeholder", "chat"],
+  "system": "You are the portfolio site assistant. Answer concisely. If you do not know, say so plainly. Do not fabricate details about the user.",
+  "user": "What projects are in this monorepo and which ones involve AI? Give a short bulletless paragraph.",
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    { "kind": "minLength", "chars": 40 },
+    { "kind": "maxLength", "chars": 1500 }
+  ]
+}

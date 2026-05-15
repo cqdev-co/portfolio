@@ -41,12 +41,4 @@ class LinearGradientGenerator(BaseGenerator):
             gradient_values.max() - gradient_values.min()
         )
 
-        # Create RGB array
-        rgb_array = np.zeros((self.height, self.width, 3))
-
-        for i in range(self.height):
-            for j in range(self.width):
-                t = gradient_values[i, j]
-                rgb_array[i, j] = self.interpolate_colors(t)
-
-        return rgb_array
+        return self.interpolate_from_t_grid(gradient_values)

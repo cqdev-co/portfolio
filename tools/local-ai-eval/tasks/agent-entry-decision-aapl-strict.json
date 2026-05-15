@@ -1,0 +1,108 @@
+{
+  "id": "agent-entry-decision-aapl-strict",
+  "workload": "agent-multi-turn",
+  "description": "Same as agent-entry-decision-aapl but with a much stricter system prompt that explicitly REQUIRES tool use before any verdict. Experiment: does stricter prompting fix qwen3.6's tool-skipping behavior?",
+  "tags": ["agent-multi-turn", "agent", "trading", "strict-prompt"],
+  "system": "You are Xylo, a derivatives analyst. STRICT RULES you MUST follow:\n\n1. You MAY NOT answer any trading question without first calling the appropriate tools. No exceptions.\n2. Before any verdict about a specific ticker, you MUST call get_ticker_data for that ticker. Using training-data knowledge about the company is forbidden.\n3. For any specific spread proposal, you MUST call calculate_spread with the exact strikes.\n4. Before giving a directional recommendation, check get_trading_regime.\n5. Any answer given WITHOUT tool calls is automatically WRONG. The correct first response to any trading question is a tool call, not a verdict.\n6. Do not invent numbers. Every number in your final answer must come from a tool response.\n\nOnce you have the required tool data, output a plain-English final answer starting with ACT / WATCH / AVOID, followed by 2-3 bullets each citing specific numbers from the tool responses.",
+  "user": "Should I open a call debit spread on AAPL this morning? I'm looking at the $230/$235 strikes with ~30 DTE. Keep it tight.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_trading_regime",
+        "description": "Analyze current market conditions. Returns GO / CAUTION / NO-GO.",
+        "parameters": { "type": "object", "required": [], "properties": {} }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_ticker_data",
+        "description": "Fetch real-time stock data for a ticker.",
+        "parameters": {
+          "type": "object",
+          "required": ["ticker"],
+          "properties": {
+            "ticker": {
+              "type": "string",
+              "description": "Stock ticker symbol."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "calculate_spread",
+        "description": "Calculate exact pricing for a user-specified call debit spread.",
+        "parameters": {
+          "type": "object",
+          "required": ["ticker", "longStrike", "shortStrike", "dte"],
+          "properties": {
+            "ticker": { "type": "string" },
+            "longStrike": { "type": "number" },
+            "shortStrike": { "type": "number" },
+            "dte": { "type": "integer" }
+          }
+        }
+      }
+    }
+  ],
+  "agent": {
+    "maxTurns": 8,
+    "maxToolCalls": 6,
+    "mockToolResponses": [
+      {
+        "tool": "get_trading_regime",
+        "response": {
+          "regime": "GO",
+          "vix": 15.2,
+          "spy_change_pct": 0.35,
+          "notes": "Favorable regime."
+        }
+      },
+      {
+        "tool": "get_ticker_data",
+        "argsContain": { "ticker": "AAPL" },
+        "response": {
+          "ticker": "AAPL",
+          "price": 231.1,
+          "changePct": 0.8,
+          "rsi14": 58,
+          "ma20": 225.4,
+          "ma50": 218.9,
+          "ma200": 201.2,
+          "ivPercentile": 42,
+          "earningsDaysAway": 32
+        }
+      },
+      {
+        "tool": "calculate_spread",
+        "argsContain": { "ticker": "AAPL" },
+        "response": {
+          "debit": 2.35,
+          "maxProfit": 2.65,
+          "maxLoss": 2.35,
+          "breakeven": 232.35,
+          "probProfit": 0.42,
+          "returnOnRisk": 1.13
+        }
+      }
+    ],
+    "expectedToolSequence": [
+      { "tool": "get_trading_regime|get_ticker_data" },
+      { "tool": "get_ticker_data|calculate_spread", "requiredArgs": ["ticker"] }
+    ],
+    "finalContentChecks": [
+      { "kind": "regex", "pattern": "\\b(ACT|WATCH|AVOID)\\b" },
+      {
+        "kind": "regex",
+        "pattern": "(AAPL|Apple|231|230|235|debit|spread|breakeven)",
+        "flags": "i"
+      },
+      { "kind": "notContains", "value": "```" },
+      { "kind": "minLength", "chars": 100 }
+    ]
+  }
+}

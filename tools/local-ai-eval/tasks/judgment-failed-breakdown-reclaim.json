@@ -1,0 +1,47 @@
+{
+  "id": "judgment-failed-breakdown-reclaim",
+  "workload": "briefing",
+  "description": "Classic 'failed breakdown' pattern: broke key support, reclaimed it next day on volume. This is often a durable bullish signal. Correct stance: Act or Watch-to-enter, reasoning should identify the reclaim.",
+  "tags": ["financial-reasoning", "judgment", "support-reclaim", "bull-flag"],
+  "system": "You are a disciplined derivatives analyst. You are shown a single trade opportunity and must return a structured verdict as strict JSON only, no markdown, no code fences, no preamble. Every field must be grounded in the data provided. Do not invent numbers.",
+  "user": "CANDIDATE TRADE:\nProposed: Buy MSFT $420/$425 call debit spread (CDS), 21 DTE, $2.10 debit on $5 width\nUnderlying: MSFT $418.30\nPrice action last 3 sessions:\n  T-2: Closed $405.40 (broke below 50DMA of $408.20 on 1.8x volume)\n  T-1: Intraday low $398.10, closed $412.80 (reclaimed 50DMA on 2.2x volume, strong candle)\n  T-0: Closed $418.30 (held above reclaimed 50DMA, 1.3x volume)\nRSI(14): 52 (neutral, recovered from 38)\nIV percentile: 35 (low)\nCatalyst: No earnings for 5 weeks. Sector performance mixed.\n\nReturn a JSON object with this EXACT structure:\n{\n  \"verdict\": \"Act|Watch|Ignore\",\n  \"confidence\": 1-10,\n  \"thesis\": \"1-2 sentence summary\",\n  \"drivers\": [\"reason citing data\"],\n  \"risks\": [\"risk citing data\"],\n  \"invalidation\": \"specific event or price level\",\n  \"timeframe\": \"intraday|swing|position\"\n}",
+  "expectedSchema": {
+    "type": "object",
+    "required": [
+      "verdict",
+      "confidence",
+      "thesis",
+      "drivers",
+      "risks",
+      "invalidation",
+      "timeframe"
+    ],
+    "properties": {
+      "verdict": { "type": "string" },
+      "confidence": { "type": "number" },
+      "thesis": { "type": "string" },
+      "drivers": { "type": "array" },
+      "risks": { "type": "array" },
+      "invalidation": { "type": "string" },
+      "timeframe": { "type": "string" }
+    }
+  },
+  "contentChecks": [
+    { "kind": "notContains", "value": "```" },
+    {
+      "kind": "regex",
+      "pattern": "\"verdict\"\\s*:\\s*\"(Act|Watch|Ignore)\""
+    },
+    {
+      "kind": "regex",
+      "pattern": "(reclaim|50[- ]?DMA|failed|recover|50[- ]?day|reversal)",
+      "flags": "i"
+    },
+    {
+      "kind": "regex",
+      "pattern": "(2\\.2x|volume|408\\.20|418)",
+      "flags": "i"
+    },
+    { "kind": "minLength", "chars": 200 }
+  ]
+}

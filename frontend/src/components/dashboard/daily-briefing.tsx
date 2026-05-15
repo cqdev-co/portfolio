@@ -415,9 +415,7 @@ export function DailyBriefing({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-medium">
-              Victor&apos;s Daily Briefing
-            </h3>
+            <h3 className="text-sm font-medium">Xylo&apos;s Daily Briefing</h3>
             {generating && (
               <Badge variant="outline" className="text-[10px] animate-pulse">
                 Generating...

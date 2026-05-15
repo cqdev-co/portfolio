@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence, useSpring } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import type { TickerData, ScanOpportunitiesResult } from '@lib/ai-agent';
+import type { TickerData } from '@lib/ai-agent';
 
 // Tool call state
 export interface ToolCall {
@@ -43,11 +43,6 @@ const TOOL_CONFIG: Record<
     name: 'Position Analysis',
     icon: '📈',
     description: 'Analyzing position',
-  },
-  scan_opportunities: {
-    name: 'Opportunity Scanner',
-    icon: '🎯',
-    description: 'Scanning for trade opportunities',
   },
   get_financials_deep: {
     name: 'Financial Analysis',
@@ -166,12 +161,6 @@ export function ToolCallCard({ toolCall, className }: ToolCallCardProps) {
 
     if (tool === 'web_search' && Array.isArray(actualData)) {
       return `${actualData.length} results found`;
-    }
-
-    if (tool === 'scan_opportunities' && typeof actualData === 'object') {
-      const data = actualData as ScanOpportunitiesResult;
-      const gradeA = data.summary?.gradeA ?? 0;
-      return `${data.results?.length ?? 0} opportunities (${gradeA} A-grade)`;
     }
 
     return 'Data retrieved';

@@ -1,0 +1,8 @@
+{
+  "id": "routing-news-tsla",
+  "kind": "routing",
+  "question": "What's the latest news on TSLA?",
+  "must_call": ["get_recent_news"],
+  "must_not_call": [],
+  "must_pass": true
+}

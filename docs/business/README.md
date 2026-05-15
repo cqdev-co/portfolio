@@ -328,7 +328,7 @@ screen-ticker (scan 3,794 tickers)
     ↓
 Strategy Config Validation
     ↓
-AI Analyst (Victor) Verification
+AI Analyst (Xylo) Verification
     ↓
 Unusual Options Scanner (smart money)
     ↓

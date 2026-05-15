@@ -1,0 +1,17 @@
+{
+  "name": "@portfolio/ai-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ENV-driven AI mode + model resolver. Services import resolveAI(workload) to get the right Ollama endpoint and model for local dev vs cloud prod.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

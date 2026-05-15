@@ -1,0 +1,48 @@
+{
+  "id": "tool-call-01",
+  "workload": "tool-call",
+  "description": "Placeholder. Exercises single-tool selection and argument emission. Replace with a real tool definition captured from frontend/src/app/api/chat/route.ts.",
+  "tags": ["placeholder", "tool-call"],
+  "system": "You are a trading assistant with access to tools. When the user asks for data about a specific ticker, you MUST call the get_quote tool exactly once with the ticker symbol. Do not answer from memory.",
+  "user": "Can you pull me the latest quote for NVDA?",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_quote",
+        "description": "Fetch the latest quote for a single stock ticker.",
+        "parameters": {
+          "type": "object",
+          "required": ["symbol"],
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "The stock ticker symbol, uppercase, e.g. NVDA or AAPL."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "search_news",
+        "description": "Search recent financial news headlines.",
+        "parameters": {
+          "type": "object",
+          "required": ["query"],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Free-text search query."
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expectedTool": {
+    "name": "get_quote",
+    "requiredArgs": ["symbol"]
+  }
+}

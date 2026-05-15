@@ -23,7 +23,7 @@ export type OptionType = 'call' | 'put';
  * Spread strategy types
  */
 export type SpreadType =
-  | 'call_debit_spread' // Victor's favorite: buy lower call, sell higher
+  | 'call_debit_spread' // Xylo's favorite: buy lower call, sell higher
   | 'call_credit_spread' // Sell lower call, buy higher
   | 'put_debit_spread' // Buy higher put, sell lower
   | 'put_credit_spread' // Sell higher put, buy lower

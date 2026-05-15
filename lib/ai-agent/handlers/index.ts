@@ -37,19 +37,17 @@ import type {
 import {
   analyzeTradingRegime,
   getRegimeEmoji,
+  getSectorPerformance,
+  type SectorPerformance,
   type TradingRegimeAnalysis,
 } from '../market';
+import { fetchRecentNews, type RecentNewsResult } from '../data/news';
+import { fetchFmpEarningsCalendar, type FmpEarningsRow } from '../data/fmp';
+import { scoreHeadlines, type SentimentScore } from '../sentiment';
+import { getGeopoliticalEvents, type MarketEvent } from '../calendar';
 
 // Re-export for external consumers
 export { formatRegimeForAI as formatTradingRegimeForAI } from '../market';
-import {
-  quickScan,
-  SCAN_LISTS,
-  formatScanResultsForAI,
-  encodeScanResultsToTOON,
-  type ScanResult,
-  type TradeGrade,
-} from '../scanner';
 
 // ============================================================================
 // RATE LIMITING
@@ -1401,128 +1399,275 @@ LIQUIDITY
 }
 
 // ============================================================================
-// SCAN OPPORTUNITIES HANDLER
+// PHASE 1 HANDLERS (sector flow / news / sentiment / earnings / geopolitical)
 // ============================================================================
 
-export interface ScanOpportunitiesResult {
-  scanList: string;
-  tickersScanned: number;
-  results: ScanResult[];
-  summary: {
-    total: number;
-    gradeA: number;
-    gradeB: number;
-    lowRisk: number;
-    avgCushion: number;
-  };
+// ---------------- SECTOR FLOW ----------------
+
+export interface SectorFlowResult {
+  rotation: 'risk-on' | 'risk-off' | 'mixed';
+  leaders: SectorPerformance[];
+  laggers: SectorPerformance[];
+  raw: SectorPerformance[];
 }
 
-export interface ScanOpportunitiesToolResult extends ToolResult {
-  data?: ScanOpportunitiesResult;
+export interface SectorFlowToolResult extends ToolResult {
+  data?: SectorFlowResult;
 }
+
+const RISK_ON_SECTORS = new Set(['XLK', 'XLF', 'XLY']);
+const RISK_OFF_SECTORS = new Set(['XLP', 'XLU', 'XLV']);
 
 /**
- * Handle scan_opportunities tool call
- * Scans multiple tickers for trade opportunities
+ * Wrap `getSectorPerformance` with a rotation classifier.
+ * `risk-on` if all three of XLK / XLF / XLY are LEADING; `risk-off`
+ * if all three of XLP / XLU / XLV are LEADING; else `mixed`.
  */
-export async function handleScanOpportunities(
-  args: {
-    scanList?: string;
-    tickers?: string;
-    minGrade?: string;
-    maxRisk?: number;
-  },
-  options: { format?: OutputFormat; onProgress?: (msg: string) => void } = {}
-): Promise<ScanOpportunitiesToolResult> {
-  const { scanList = 'TECH', tickers, minGrade = 'B', maxRisk = 6 } = args;
-  const format = options.format ?? 'toon';
-
-  log.debug(`[Handler] Scanning for opportunities`, {
-    scanList,
-    tickers,
-    minGrade,
-    maxRisk,
-  });
-
+export async function handleGetSectorFlow(
+  _args: Record<string, never> = {}
+): Promise<SectorFlowToolResult> {
   try {
-    // Determine which tickers to scan
-    let tickerList: readonly string[];
-
-    if (tickers) {
-      // User specified custom tickers
-      tickerList = tickers
-        .split(',')
-        .map((t) => t.trim().toUpperCase())
-        .filter((t) => t.length > 0);
-      log.debug(`[Handler] Using custom ticker list: ${tickerList.join(', ')}`);
-    } else {
-      // Use predefined scan list
-      const listKey = scanList.toUpperCase() as keyof typeof SCAN_LISTS;
-      tickerList = SCAN_LISTS[listKey] ?? SCAN_LISTS.TECH;
-      log.debug(
-        `[Handler] Using scan list: ${listKey} (${tickerList.length} tickers)`
-      );
+    const sectors = await getSectorPerformance();
+    if (!sectors || sectors.length === 0) {
+      return { success: false, error: 'No sector data available' };
     }
 
-    // Run the scan
-    const results = await quickScan(tickerList, {
-      minGrade: minGrade as TradeGrade,
-      maxRisk,
-      onProgress: (ticker, current, total) => {
-        options.onProgress?.(`Scanning ${ticker} (${current}/${total})`);
-      },
-    });
-
-    // Build summary statistics
-    const gradeACount = results.filter((r) =>
-      ['A+', 'A', 'A-'].includes(r.grade)
-    ).length;
-    const gradeBCount = results.filter((r) =>
-      ['B+', 'B', 'B-'].includes(r.grade)
-    ).length;
-    const lowRiskCount = results.filter((r) => r.risk.score <= 4).length;
-    const avgCushion =
-      results.length > 0
-        ? results.reduce((sum, r) => sum + (r.cushionPercent ?? 0), 0) /
-          results.length
-        : 0;
-
-    const scanResult: ScanOpportunitiesResult = {
-      scanList: tickers ? 'CUSTOM' : scanList.toUpperCase(),
-      tickersScanned: tickerList.length,
-      results,
-      summary: {
-        total: results.length,
-        gradeA: gradeACount,
-        gradeB: gradeBCount,
-        lowRisk: lowRiskCount,
-        avgCushion: Math.round(avgCushion * 10) / 10,
-      },
-    };
-
-    // Format output
-    const formatted =
-      format === 'toon'
-        ? encodeScanResultsToTOON(results)
-        : formatScanResultsForAI(results);
-
-    log.debug(
-      `[Handler] Scan complete: ${results.length} opportunities found ` +
-        `(${gradeACount} A-grade, ${gradeBCount} B-grade)`
+    const leadingTickers = new Set(
+      sectors.filter((s) => s.momentum === 'LEADING').map((s) => s.ticker)
     );
+    const laggingTickers = new Set(
+      sectors.filter((s) => s.momentum === 'LAGGING').map((s) => s.ticker)
+    );
+
+    const riskOnLead = [...RISK_ON_SECTORS].every((t) => leadingTickers.has(t));
+    const riskOffLead = [...RISK_OFF_SECTORS].every((t) =>
+      leadingTickers.has(t)
+    );
+
+    let rotation: SectorFlowResult['rotation'] = 'mixed';
+    if (riskOnLead && !riskOffLead) rotation = 'risk-on';
+    else if (riskOffLead && !riskOnLead) rotation = 'risk-off';
+
+    const leaders = sectors
+      .filter((s) => s.momentum === 'LEADING')
+      .sort((a, b) => b.changePct - a.changePct);
+    const laggers = sectors
+      .filter((s) => s.momentum === 'LAGGING' || laggingTickers.has(s.ticker))
+      .sort((a, b) => a.changePct - b.changePct);
+
+    const formatted =
+      `=== SECTOR ROTATION ===\n` +
+      `Tone: ${rotation.toUpperCase()}\n\n` +
+      `Leaders:\n${
+        leaders
+          .map((s) => `  ${s.ticker} (${s.name}): ${s.changePct.toFixed(2)}%`)
+          .join('\n') || '  (none)'
+      }\n\n` +
+      `Laggers:\n${
+        laggers
+          .map((s) => `  ${s.ticker} (${s.name}): ${s.changePct.toFixed(2)}%`)
+          .join('\n') || '  (none)'
+      }`;
 
     return {
       success: true,
-      data: scanResult,
+      data: { rotation, leaders, laggers, raw: sectors },
       formatted,
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[Handler] Scan opportunities error:`, errorMsg);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: `Sector flow error: ${message}` };
+  }
+}
+
+// ---------------- RECENT NEWS ----------------
+
+export interface RecentNewsToolResult extends ToolResult {
+  data?: RecentNewsResult;
+}
+
+export async function handleGetRecentNews(args: {
+  ticker: string;
+  hours?: number;
+}): Promise<RecentNewsToolResult> {
+  const ticker = (args.ticker || '').toUpperCase();
+  if (!ticker) {
+    return { success: false, error: 'Ticker required' };
+  }
+  try {
+    const result = await fetchRecentNews(ticker, { hours: args.hours });
+    const formatted =
+      `=== ${ticker} RECENT NEWS (${result.hours}h, ${result.articles.length} articles) ===\n` +
+      result.articles
+        .slice(0, 10)
+        .map(
+          (a, i) =>
+            `${i + 1}. ${a.title}\n   ${a.source ?? '?'} \u00b7 ${
+              a.published_at?.slice(0, 16) ?? '?'
+            } \u00b7 ${a.url}`
+        )
+        .join('\n');
+    return { success: true, data: result, formatted };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: `News fetch error: ${message}` };
+  }
+}
+
+// ---------------- SENTIMENT ----------------
+
+export interface SentimentToolResult extends ToolResult {
+  data?: SentimentScore & { ticker: string };
+}
+
+export async function handleGetSentiment(args: {
+  ticker: string;
+  hours?: number;
+}): Promise<SentimentToolResult> {
+  const ticker = (args.ticker || '').toUpperCase();
+  if (!ticker) {
+    return { success: false, error: 'Ticker required' };
+  }
+  try {
+    const news = await fetchRecentNews(ticker, { hours: args.hours });
+    if (!news.articles.length) {
+      return {
+        success: false,
+        error: `No headlines found for ${ticker} in the last ${news.hours}h`,
+      };
+    }
+    const score = scoreHeadlines(
+      news.articles.map((a) => ({
+        title: a.title,
+        published_at: a.published_at,
+      }))
+    );
+    const formatted =
+      `=== ${ticker} SENTIMENT (${news.articles.length} articles, ${news.hours}h) ===\n` +
+      `Score: ${score.score.toFixed(2)} (${score.label})\n` +
+      `Bullish signals: ${score.signal_counts.bullish} \u00b7 Bearish signals: ${score.signal_counts.bearish}\n` +
+      (score.momentum != null
+        ? `Momentum (24h): ${score.momentum > 0 ? '+' : ''}${score.momentum.toFixed(2)}`
+        : 'Momentum: insufficient data');
     return {
-      success: false,
-      error: `Error scanning for opportunities: ${errorMsg}`,
+      success: true,
+      data: { ...score, ticker },
+      formatted,
     };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: `Sentiment error: ${message}` };
+  }
+}
+
+// ---------------- EARNINGS CALENDAR ----------------
+
+export interface EarningsCalendarResult {
+  upcoming: FmpEarningsRow[];
+  window_days: number;
+}
+
+export interface EarningsCalendarToolResult extends ToolResult {
+  data?: EarningsCalendarResult;
+}
+
+export async function handleGetEarningsCalendar(args: {
+  tickers?: string;
+  days?: number;
+}): Promise<EarningsCalendarToolResult> {
+  const days = Math.max(1, Math.min(30, args.days ?? 7));
+  const tickers = args.tickers
+    ? args.tickers
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : undefined;
+  try {
+    const rows = await fetchFmpEarningsCalendar({ days, tickers });
+    if (!rows) {
+      return {
+        success: false,
+        error: 'Earnings calendar unavailable (FMP_API_KEY not set?)',
+      };
+    }
+    if (rows.length === 0) {
+      return {
+        success: true,
+        data: { upcoming: [], window_days: days },
+        formatted: `No earnings in the next ${days} days${
+          tickers ? ` for ${tickers.join(', ')}` : ''
+        }.`,
+      };
+    }
+    const formatted =
+      `=== UPCOMING EARNINGS (next ${days}d, ${rows.length} rows) ===\n` +
+      rows
+        .slice(0, 30)
+        .map(
+          (r) =>
+            `${r.date} ${r.symbol.padEnd(6)} EPS est ${r.epsEstimated ?? '?'}` +
+            (r.revenueEstimated
+              ? ` \u00b7 Rev est ${formatBigNumber(r.revenueEstimated)}`
+              : '')
+        )
+        .join('\n');
+    return {
+      success: true,
+      data: { upcoming: rows, window_days: days },
+      formatted,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: `Earnings calendar error: ${message}` };
+  }
+}
+
+function formatBigNumber(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  return n.toString();
+}
+
+// ---------------- GEOPOLITICAL EVENTS ----------------
+
+export interface GeopoliticalEventsResult {
+  events: MarketEvent[];
+  data_freshness: string;
+}
+
+export interface GeopoliticalEventsToolResult extends ToolResult {
+  data?: GeopoliticalEventsResult;
+}
+
+export async function handleGetGeopoliticalEvents(args: {
+  days?: number;
+}): Promise<GeopoliticalEventsToolResult> {
+  const days = Math.max(1, Math.min(60, args.days ?? 14));
+  try {
+    const events = getGeopoliticalEvents(days);
+    const formatted =
+      `=== GEOPOLITICAL EVENTS (next ${days}d, curated) ===\n` +
+      (events.length === 0
+        ? '(no curated events in window)'
+        : events
+            .map(
+              (e) =>
+                `${e.date.toISOString().slice(0, 10)} ${e.impact.padEnd(6)} ` +
+                `${e.name}\n  ${e.description ?? ''}`
+            )
+            .join('\n')) +
+      `\n\nNote: curated through 2026-12-31; verify before relying on these dates.`;
+    return {
+      success: true,
+      data: {
+        events,
+        data_freshness: 'curated through 2026-12-31; verify before use',
+      },
+      formatted,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: `Geopolitical events error: ${message}` };
   }
 }
 
@@ -1658,20 +1803,44 @@ export async function executeToolCall(
       return result;
     }
 
-    case 'scan_opportunities': {
-      const scanList = (args.scanList as string) ?? 'TECH';
+    case 'get_sector_flow': {
+      onStatus?.(`🔄 Reading sector rotation...`);
+      result = await handleGetSectorFlow();
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'get_recent_news': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const hours = args.hours as number | undefined;
+      onStatus?.(`📰 Fetching ${ticker} news...`);
+      result = await handleGetRecentNews({ ticker, hours });
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'get_sentiment': {
+      const ticker = (args.ticker as string).toUpperCase();
+      const hours = args.hours as number | undefined;
+      onStatus?.(`📊 Scoring ${ticker} sentiment...`);
+      result = await handleGetSentiment({ ticker, hours });
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'get_earnings_calendar': {
       const tickers = args.tickers as string | undefined;
-      const minGrade = (args.minGrade as string) ?? 'B';
-      const maxRisk = (args.maxRisk as number) ?? 6;
-      onStatus?.(
-        tickers
-          ? `🔍 Scanning custom tickers...`
-          : `🔍 Scanning ${scanList} for opportunities...`
-      );
-      result = await handleScanOpportunities(
-        { scanList, tickers, minGrade, maxRisk },
-        { format, onProgress: onStatus }
-      );
+      const days = args.days as number | undefined;
+      onStatus?.(`📅 Fetching earnings calendar...`);
+      result = await handleGetEarningsCalendar({ tickers, days });
+      onToolResult?.(name, result);
+      return result;
+    }
+
+    case 'get_geopolitical_events': {
+      const days = args.days as number | undefined;
+      onStatus?.(`🌍 Reading geopolitical calendar...`);
+      result = await handleGetGeopoliticalEvents({ days });
       onToolResult?.(name, result);
       return result;
     }

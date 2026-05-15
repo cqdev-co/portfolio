@@ -36,7 +36,8 @@ export type EventType =
   | 'FED' // Fed speeches, Beige Book
   | 'HOLIDAY' // Market closed
   | 'WITCHING' // Options expiration
-  | 'ECONOMIC'; // Other economic data
+  | 'ECONOMIC' // Other economic data
+  | 'GEOPOLITICAL'; // Phase 1: curated macro / geopolitical events
 
 export interface MarketEvent {
   date: Date;
@@ -309,6 +310,140 @@ const FED_EVENTS = [
   { date: '2026-10-21', name: 'Fed Beige Book' },
   { date: '2026-12-02', name: 'Fed Beige Book' },
 ];
+
+// ============================================================================
+// PHASE 1: GEOPOLITICAL EVENTS (curated, hand-maintained)
+// ============================================================================
+//
+// Hand-curated macro / geopolitical events. NOT a real feed — list is
+// maintained by the operator and reviewed periodically. Each event
+// carries an impact tag and a `description` so the model has enough
+// context without hallucinating details.
+//
+// CURATION FRESHNESS: events through 2026-12-31. Update at end of year.
+//
+// Sources used during initial curation:
+//   - https://www.opec.org/opec_web/en/press_room/4045.htm (OPEC+)
+//   - ECB Calendar of Governing Council meetings.
+//   - Bank of Japan Monetary Policy Meeting schedule.
+//   - National election calendars.
+//   - Major scheduled tariff / trade-policy events.
+
+interface GeopoliticalRow {
+  date: string;
+  name: string;
+  description: string;
+  impact: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export const GEOPOLITICAL_EVENTS_2026: GeopoliticalRow[] = [
+  // Central banks (ex-Fed)
+  {
+    date: '2026-04-30',
+    name: 'BoJ Monetary Policy Meeting',
+    description:
+      'Bank of Japan rate decision; affects USD/JPY + global yields.',
+    impact: 'HIGH',
+  },
+  {
+    date: '2026-05-08',
+    name: 'BoE Rate Decision',
+    description: 'Bank of England rate decision.',
+    impact: 'MEDIUM',
+  },
+  {
+    date: '2026-06-04',
+    name: 'ECB Rate Decision',
+    description: 'European Central Bank rate decision; EUR + bund moves.',
+    impact: 'HIGH',
+  },
+  {
+    date: '2026-07-23',
+    name: 'ECB Rate Decision',
+    description: 'European Central Bank rate decision.',
+    impact: 'HIGH',
+  },
+  {
+    date: '2026-09-10',
+    name: 'ECB Rate Decision',
+    description: 'European Central Bank rate decision.',
+    impact: 'HIGH',
+  },
+
+  // OPEC+ ministerial meetings (typical cadence)
+  {
+    date: '2026-06-01',
+    name: 'OPEC+ Ministerial Meeting',
+    description: 'OPEC+ output decisions; oil + energy sector moves.',
+    impact: 'HIGH',
+  },
+  {
+    date: '2026-12-01',
+    name: 'OPEC+ Ministerial Meeting',
+    description: 'OPEC+ output decisions; oil + energy sector moves.',
+    impact: 'HIGH',
+  },
+
+  // G7 / G20
+  {
+    date: '2026-06-15',
+    name: 'G7 Summit',
+    description: 'G7 leaders summit; trade + sanctions communiques.',
+    impact: 'MEDIUM',
+  },
+  {
+    date: '2026-11-21',
+    name: 'G20 Summit',
+    description: 'G20 leaders summit; major-economy coordination.',
+    impact: 'MEDIUM',
+  },
+
+  // US politics / elections
+  {
+    date: '2026-11-03',
+    name: 'US Midterm Elections',
+    description:
+      'House + 1/3 Senate; risk-on/off swings around control flip scenarios.',
+    impact: 'HIGH',
+  },
+
+  // Tariff / trade-policy review windows (placeholders; verify before use)
+  {
+    date: '2026-07-01',
+    name: 'Section 301 Tariff Review (placeholder)',
+    description:
+      'Annual USTR Section 301 review window — actual decision dates may shift.',
+    impact: 'MEDIUM',
+  },
+];
+
+/**
+ * Returns curated upcoming geopolitical events within `withinDays`.
+ *
+ * Includes a `data_freshness` note via `description` on the response —
+ * the model is expected to disclose this is a curated list, not a
+ * live feed.
+ */
+export function getGeopoliticalEvents(withinDays: number = 14): MarketEvent[] {
+  const now = new Date();
+  const cap = Math.max(1, Math.min(60, withinDays));
+  const events: MarketEvent[] = [];
+  for (const row of GEOPOLITICAL_EVENTS_2026) {
+    const date = parseDate(row.date);
+    const days = daysBetween(now, date);
+    if (days > 0 && days <= cap) {
+      events.push({
+        date,
+        name: row.name,
+        type: 'GEOPOLITICAL',
+        impact: row.impact,
+        description: row.description,
+      });
+    }
+  }
+  events.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return events;
+}
 
 // ============================================================================
 // HELPER FUNCTIONS

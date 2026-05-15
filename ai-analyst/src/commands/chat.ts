@@ -83,7 +83,7 @@ import type { PsychologicalFairValue } from '../../../lib/utils/ts/psychological
 // Shared AI Agent library (DATA PARITY: CLI uses same data as Frontend)
 import {
   // Prompts
-  buildVictorSystemPrompt,
+  buildXyloSystemPrompt,
   // Tools
   AGENT_TOOLS,
   BASIC_TOOLS,
@@ -96,6 +96,17 @@ import {
   handleGetUnusualOptionsActivity,
   handleGetIVByStrike,
   handleCalculateSpread,
+  // Decision logging (Phase 0)
+  logDecision,
+  hashPrompt,
+  type DecisionToolCall,
+  // Preflight (Phase 1)
+  runPreflight,
+  // Risk gate (Phase 2)
+  parseRecommendation,
+  validateRecommendation,
+  skipGate,
+  computeConfidence,
 } from '../../../lib/ai-agent/index.ts';
 
 // Instantiate yahoo-finance2
@@ -718,7 +729,7 @@ export function classifyQuestion(message: string): QuestionClassification {
 // ============================================================================
 
 /**
- * Build system prompt using shared Victor persona from lib/ai-agent
+ * Build system prompt using shared Xylo persona from lib/ai-agent
  * Adds CLI-specific context like TOON data parsing hints
  */
 function buildSystemPrompt(accountSize: number, context: string): string {
@@ -733,7 +744,7 @@ The LIVE DATA section contains ALL available market data including fundamentals:
 ${context}`;
 
   // Use shared prompt builder from lib/ai-agent
-  return buildVictorSystemPrompt({
+  return buildXyloSystemPrompt({
     accountSize,
     context: cliContext,
     includeToonSpec: true,
@@ -745,7 +756,7 @@ ${context}`;
 // ============================================================================
 
 /**
- * Tools available to Victor for research and analysis
+ * Tools available to Xylo for research and analysis
  * Using shared definitions from lib/ai-agent, converted to Ollama format
  */
 // Full tool set for complex queries
@@ -1237,7 +1248,7 @@ async function prepareContext(
       tickerContext += '=== END TICKER DATA ===';
 
       // AUTO-FETCH FINANCIALS for high P/E stocks (>50) - adds growth context
-      // This saves Victor from needing to call get_financials_deep
+      // This saves Xylo from needing to call get_financials_deep
       const highPEStocks = validData.filter((d) => d.peRatio && d.peRatio > 50);
       if (highPEStocks.length > 0 && classification.type === 'trade_analysis') {
         onStatus?.(`Fetching financials for high P/E stocks...`);
@@ -1455,10 +1466,9 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
   const conversationHistory: ConversationMessage[] = [];
 
-  // Initial greeting - Victor Chen checking in
+  // Initial greeting - Xylo checking in
   console.log(
-    chalk.cyan('  Victor: ') +
-      "Morning. Victor Chen here. Markets are open and I've"
+    chalk.cyan('  Xylo: ') + "Morning. Xylo here. Markets are open and I've"
   );
   console.log(
     chalk.cyan('          ') +
@@ -1482,7 +1492,7 @@ export async function startChat(options: ChatOptions): Promise<void> {
       ) {
         console.log();
         console.log(
-          chalk.cyan('  Victor: ') +
+          chalk.cyan('  Xylo: ') +
             "Understood. I'll keep my eyes on the screens. In 45 years,"
         );
         console.log(
@@ -1497,6 +1507,18 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
       // Add user message to history
       conversationHistory.push({ role: 'user', content: userInput });
+
+      // Decision-log timer + accumulator (Phase 0). Captured here so the
+      // outer catch and success path both see consistent values.
+      const turnStartedAt = Date.now();
+      const loggedToolCalls: DecisionToolCall[] = [];
+      let promptHashForTurn = '';
+
+      // Phase 1: deterministic preflight runs alongside the CLI's
+      // bespoke prepareContext. The CLI's prep is more elaborate
+      // (PFV, options, scanner) but runPreflight gives us the
+      // canonical coverage_report shape for the decision log.
+      const preflightPromise = runPreflight(userInput).catch(() => null);
 
       try {
         // Status update callback
@@ -2127,6 +2149,9 @@ export async function startChat(options: ChatOptions): Promise<void> {
           { role: 'user', content: prepared.userPrompt },
         ];
 
+        // Hash the system prompt for decision-log drift tracking
+        promptHashForTurn = hashPrompt(prepared.systemPrompt);
+
         let totalPromptTokens = 0; // Cumulative (for API cost tracking)
         let maxPromptTokens = 0; // Max per iteration (actual context size)
         let totalCompletionTokens = 0;
@@ -2173,7 +2198,7 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
           // FIRST ITERATION: Non-streaming with tools (no thinking - it blocks tool calls)
           if (iteration === 1) {
-            showStatus('Victor is analyzing...');
+            showStatus('Xylo is analyzing...');
 
             // Use non-streaming call WITH tools
             const response: AgentResponse = await chatWithTools(
@@ -2188,8 +2213,8 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
             // Display content with proper word wrapping
             const cleanedContent = cleanToolTokens(response.content);
-            const coloredPrefix = chalk.cyan('  Victor: ');
-            const plainPrefix = '  Victor: ';
+            const coloredPrefix = chalk.cyan('  Xylo: ');
+            const plainPrefix = '  Xylo: ';
             const indent = '          ';
             const lines = wrapText(cleanedContent, 65, plainPrefix, indent);
             for (let i = 0; i < lines.length; i++) {
@@ -2241,7 +2266,7 @@ export async function startChat(options: ChatOptions): Promise<void> {
               // Non-streaming for tool iterations
               showStatus(
                 isLastIteration
-                  ? 'Victor is synthesizing...'
+                  ? 'Xylo is synthesizing...'
                   : 'Processing tool results...'
               );
 
@@ -2257,13 +2282,13 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
               // Display content with proper word wrapping
               const cleanedContent = cleanToolTokens(response.content);
-              const prefix = chalk.cyan('  Victor: ');
+              const prefix = chalk.cyan('  Xylo: ');
               const indent = '          ';
-              const lines = wrapText(cleanedContent, 65, '  Victor: ', indent);
+              const lines = wrapText(cleanedContent, 65, '  Xylo: ', indent);
               for (let i = 0; i < lines.length; i++) {
                 if (i === 0) {
                   // First line: replace plain prefix with chalk-colored one
-                  console.log(lines[i].replace('  Victor: ', prefix));
+                  console.log(lines[i].replace('  Xylo: ', prefix));
                 } else {
                   console.log(formatWithStyles(lines[i]));
                 }
@@ -2327,11 +2352,28 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
             // Execute the tool with timing
             const toolStart = Date.now();
-            const result = await executeToolCall(toolCall, (msg) => {
-              console.log(chalk.dim(`  │ `) + chalk.dim(`   ${msg}`));
-            });
-            totalToolDuration += Date.now() - toolStart;
+            let toolOk = true;
+            let toolError: string | undefined;
+            let result: string;
+            try {
+              result = await executeToolCall(toolCall, (msg) => {
+                console.log(chalk.dim(`  │ `) + chalk.dim(`   ${msg}`));
+              });
+            } catch (err) {
+              toolOk = false;
+              toolError = err instanceof Error ? err.message : String(err);
+              result = `[tool error] ${toolError}`;
+            }
+            const toolLatency = Date.now() - toolStart;
+            totalToolDuration += toolLatency;
             toolCallCount++;
+            loggedToolCalls.push({
+              name: toolName,
+              args: toolArgs,
+              latency_ms: toolLatency,
+              ok: toolOk,
+              error: toolError,
+            });
 
             // Show full result data for transparency
             const resultLines = result.split('\n');
@@ -2386,7 +2428,7 @@ export async function startChat(options: ChatOptions): Promise<void> {
             totalCompletionTokens += streamResult.completionTokens;
             totalDuration += streamResult.duration;
           } else {
-            showStatus('Victor is synthesizing results...');
+            showStatus('Xylo is synthesizing results...');
 
             // Final synthesis call - explicitly disable tools
             const synthesisResponse: AgentResponse = await chatWithTools(
@@ -2402,17 +2444,12 @@ export async function startChat(options: ChatOptions): Promise<void> {
             // Display synthesis
             const synthesisContent = cleanToolTokens(synthesisResponse.content);
             if (synthesisContent.trim()) {
-              const prefix = chalk.cyan('  Victor: ');
+              const prefix = chalk.cyan('  Xylo: ');
               const indent = '          ';
-              const lines = wrapText(
-                synthesisContent,
-                65,
-                '  Victor: ',
-                indent
-              );
+              const lines = wrapText(synthesisContent, 65, '  Xylo: ', indent);
               for (let i = 0; i < lines.length; i++) {
                 if (i === 0) {
-                  console.log(lines[i].replace('  Victor: ', prefix));
+                  console.log(lines[i].replace('  Xylo: ', prefix));
                 } else {
                   console.log(formatWithStyles(lines[i]));
                 }
@@ -2438,6 +2475,109 @@ export async function startChat(options: ChatOptions): Promise<void> {
 
         // Add final response to conversation history
         conversationHistory.push({ role: 'assistant', content: finalContent });
+
+        // Persist Xylo decision (Phase 0). Fire-and-forget; logDecision
+        // never throws and degrades gracefully when Supabase is unset.
+        const preflightOnSuccess = await preflightPromise;
+
+        // Phase 2: parse + validate the recommendation. Show the
+        // verdict to the operator inline. Positions stay empty in
+        // PR A — concentration check lands in a follow-up.
+        let riskVerdict;
+        try {
+          const parsed = await parseRecommendation(finalContent, {
+            enableModelFallback: false,
+          });
+          if (!parsed) {
+            riskVerdict = skipGate('no structured "My call:" line found');
+          } else {
+            const tickerData = (preflightOnSuccess?.signals.ticker_data ??
+              []) as Array<Record<string, unknown>>;
+            const ctx = tickerData.find(
+              (t) =>
+                String(t?.ticker ?? '').toUpperCase() ===
+                parsed.ticker.toUpperCase()
+            );
+            riskVerdict = validateRecommendation({
+              recommendation: parsed,
+              account: { sizeUSD: 1750 },
+              positions: [],
+              tickerContext: ctx
+                ? {
+                    rsi: ctx.rsi as number | undefined,
+                    iv_pct: (ctx.iv as Record<string, number> | undefined)
+                      ?.currentIV,
+                    aboveMA200: ctx.aboveMA200 as boolean | undefined,
+                    daysUntilEarnings:
+                      (ctx.earnings as Record<string, number> | undefined)
+                        ?.daysUntil ?? null,
+                  }
+                : undefined,
+            });
+          }
+        } catch (err) {
+          riskVerdict = skipGate(
+            `gate error: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+
+        // Compute confidence (PR C) — null for non-actionable turns.
+        const confidence = computeConfidence({
+          coverage: preflightOnSuccess?.coverage ?? null,
+          riskVerdict: riskVerdict.gate_skipped ? null : riskVerdict,
+          action: riskVerdict.recommendation?.action ?? null,
+        });
+
+        // Surface the verdict + score in the CLI just below the answer.
+        if (!riskVerdict.gate_skipped) {
+          const status = riskVerdict.approved
+            ? chalk.green('✓ Risk gate: APPROVED')
+            : chalk.red('✗ Risk gate: BLOCKED');
+          const confSuffix = confidence
+            ? chalk.dim(` · confidence ${confidence.score}/10`)
+            : '';
+          console.log(`  ${status}${confSuffix}`);
+          if (riskVerdict.violations.length > 0) {
+            for (const v of riskVerdict.violations) {
+              const sevColor =
+                v.severity === 'BLOCK' ? chalk.red : chalk.yellow;
+              console.log(
+                `    ${sevColor('•')} ${v.rule} (${v.severity}): ${v.detail}`
+              );
+            }
+          }
+          console.log();
+        }
+
+        void logDecision({
+          source: 'ai-analyst',
+          user_id: null,
+          user_question: userInput,
+          model_id: modelName,
+          prompt_hash: promptHashForTurn,
+          prompt_variant: 'full',
+          tool_calls: loggedToolCalls,
+          final_response: finalContent,
+          total_latency_ms: Date.now() - turnStartedAt,
+          total_tokens: totalCompletionTokens,
+          question_class: preflightOnSuccess?.classification.type ?? null,
+          ticker:
+            riskVerdict.recommendation?.ticker ||
+            preflightOnSuccess?.classification.tickers[0] ||
+            null,
+          recommendation_type:
+            riskVerdict.recommendation?.spread?.type ??
+            (riskVerdict.recommendation?.action === 'HOLD'
+              ? 'hold'
+              : riskVerdict.recommendation?.action === 'AVOID'
+                ? 'avoid'
+                : null),
+          coverage_report: preflightOnSuccess?.coverage ?? null,
+          risk_violations: riskVerdict.gate_skipped
+            ? null
+            : riskVerdict.violations,
+          confidence: confidence?.score ?? null,
+        });
 
         // Show token usage, timing, and quality metrics
         if (totalPromptTokens > 0 || totalCompletionTokens > 0) {
@@ -2498,6 +2638,23 @@ export async function startChat(options: ChatOptions): Promise<void> {
         const msg = err instanceof Error ? err.message : String(err);
         console.log(chalk.red(`  ✗ Error: ${msg}`));
         console.log();
+
+        // Persist failed Xylo turn so we can spot regressions later.
+        const preflightOnError = await preflightPromise;
+        void logDecision({
+          source: 'ai-analyst',
+          user_id: null,
+          user_question: userInput,
+          model_id: '',
+          prompt_hash: promptHashForTurn,
+          prompt_variant: 'full',
+          tool_calls: loggedToolCalls,
+          final_response: `[error] ${msg}`,
+          total_latency_ms: Date.now() - turnStartedAt,
+          question_class: preflightOnError?.classification.type ?? null,
+          ticker: preflightOnError?.classification.tickers[0] ?? null,
+          coverage_report: preflightOnError?.coverage ?? null,
+        });
       }
 
       // Continue conversation
@@ -2543,13 +2700,13 @@ async function streamResponse(
   duration: number;
   model: string;
 }> {
-  process.stdout.write(chalk.cyan('  Victor: '));
+  process.stdout.write(chalk.cyan('  Xylo: '));
 
   const stream = streamChatWithTools(config, messages, tools, enableThinking);
 
   let content = '';
   const toolCalls: ToolCall[] = [];
-  let lineLength = 10; // "  Victor: " prefix length
+  let lineLength = 10; // "  Xylo: " prefix length
   const maxLineLength = 75;
   let finalResult: StreamingAgentResult | null = null;
 
@@ -2669,7 +2826,7 @@ function formatWithStyles(text: string): string {
  * Word wrap text to specified width with custom prefix/indent
  * @param text - Text to wrap
  * @param maxWidth - Max content width (not including prefix)
- * @param firstPrefix - Prefix for first line (e.g., "  Victor: ")
+ * @param firstPrefix - Prefix for first line (e.g., "  Xylo: ")
  * @param contIndent - Indent for continuation lines (e.g., "          ")
  */
 function wrapText(

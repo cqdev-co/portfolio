@@ -87,6 +87,62 @@ class BaseGenerator(ABC):
             if not all(0 <= c <= 255 for c in color):
                 raise ValueError(f"Invalid color values: {color}")
 
+    def _rng(self) -> np.random.Generator:
+        """Texture/grain RNG; uses ``params['seed']`` when set, else default 42."""
+        return np.random.default_rng(int(self.params.get("seed", 42)))
+
+    def _dither_rng(self) -> np.random.Generator:
+        """Separate stream from texture grain for the same logical seed."""
+        s = int(self.params.get("seed", 42))
+        return np.random.default_rng((s * 0x9E3779B9) & 0xFFFFFFFF)
+
+    def _blend_space(self) -> str:
+        """Interpolation space: oklab (default when gamma_correct), linear, or srgb."""
+        if "blend_space" in self.params:
+            return str(self.params["blend_space"])
+        return "oklab" if self.params.get("gamma_correct", True) else "srgb"
+
+    def interpolate_from_t_grid(self, t_grid: np.ndarray) -> np.ndarray:
+        """
+        Vector map of t in [0, 1] to RGB (H, W, 3) float64 0–255.
+
+        Uses OKLab when gamma-correct blending is enabled (default), linear sRGB
+        power curve when blend_space is ``linear``, or direct sRGB lerp otherwise.
+        """
+        from ..utils.color_utils import oklab_to_rgb8, rgb8_to_oklab
+
+        t = np.clip(np.asarray(t_grid, dtype=np.float64), 0.0, 1.0)
+        n = len(self.colors)
+        if n < 2:
+            c = np.array(self.colors[0], dtype=np.float64)
+            return np.broadcast_to(c, t.shape + (3,)).copy()
+
+        space = self._blend_space()
+        seg = t * (n - 1)
+        idx = np.clip(np.floor(seg).astype(np.int32), 0, n - 2)
+        tt = np.clip(seg - idx, 0.0, 1.0)
+        tt3 = tt[..., np.newaxis]
+
+        if space == "srgb":
+            pal = np.array(self.colors, dtype=np.float64)
+            c0 = pal[idx]
+            c1 = pal[idx + 1]
+            return (1.0 - tt3) * c0 + tt3 * c1
+
+        if space == "linear":
+            pal = (np.array(self.colors, dtype=np.float64) / 255.0) ** 2.2
+            c0 = pal[idx]
+            c1 = pal[idx + 1]
+            mixed = (1.0 - tt3) * c0 + tt3 * c1
+            return np.clip(mixed ** (1.0 / 2.2), 0.0, 1.0) * 255.0
+
+        pal = np.array(self.colors, dtype=np.float64)
+        lab_stops = rgb8_to_oklab(pal)
+        c0 = lab_stops[idx]
+        c1 = lab_stops[idx + 1]
+        mixed_lab = (1.0 - tt3) * c0 + tt3 * c1
+        return oklab_to_rgb8(mixed_lab)
+
     @abstractmethod
     def generate(self) -> np.ndarray:
         """
@@ -233,14 +289,11 @@ class BaseGenerator(ABC):
         Returns:
             numpy.ndarray: Dithered array
         """
-        # Create noise pattern
-        noise = np.random.normal(0, intensity, array.shape)
-
-        # Apply triangular dithering for better distribution
-        noise = noise + np.random.normal(0, intensity * 0.5, array.shape)
+        rng = self._dither_rng()
+        noise = rng.normal(0, intensity, array.shape)
+        noise = noise + rng.normal(0, intensity * 0.5, array.shape)
         noise = noise / 2.0
 
-        # Apply dithering
         dithered = array + noise
         return np.clip(dithered, 0, 255)
 

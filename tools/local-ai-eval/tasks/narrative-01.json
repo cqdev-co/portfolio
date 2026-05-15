@@ -1,0 +1,20 @@
+{
+  "id": "narrative-01",
+  "workload": "narrative",
+  "description": "Placeholder. Short analyst prose, modeled after ai-analyst/src/services/ollama.ts generateCompletion usage. Replace with a real captured prompt.",
+  "tags": ["placeholder", "narrative", "prose"],
+  "system": "You are a concise equity analyst. Write plain English, no markdown headers, no bullet lists, no code fences. Keep it under 120 words.",
+  "user": "Ticker: NVDA\nPrice: 143.20 (+1.8% today)\nRSI(14): 62\nIV percentile: 45 (normal)\n20DMA: 138.50\n50DMA: 132.10\nEarnings in 8 trading days.\n\nWrite a short analyst note: current posture, one bullish driver, one risk, and whether to enter a new position today.",
+  "contentChecks": [
+    { "kind": "regex", "pattern": "(NVDA|Nvidia|NVIDIA)" },
+    { "kind": "notContains", "value": "```" },
+    { "kind": "notContains", "value": "###" },
+    {
+      "kind": "regex",
+      "pattern": "(143\\.|earnings|RSI|62|20DMA|50DMA)",
+      "flags": "i"
+    },
+    { "kind": "maxLength", "chars": 1200 },
+    { "kind": "minLength", "chars": 80 }
+  ]
+}

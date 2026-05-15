@@ -18,8 +18,8 @@ Shared AI agent logic for CLI and Frontend.
 
 ```typescript
 import {
-  buildVictorSystemPrompt,
-  buildVictorLitePrompt,
+  buildXyloSystemPrompt,
+  buildXyloLitePrompt,
   AGENT_TOOLS,
   classifyQuestion,
 } from '@portfolio/ai-agent';
@@ -27,7 +27,7 @@ import {
 
 **Contents**:
 
-- `prompts/` - Victor Chen system prompts
+- `prompts/` - Xylo system prompts
 - `tools/` - Tool definitions (web_search, get_ticker_data, etc.)
 - `handlers/` - Tool execution handlers
 - `data/` - Yahoo Finance fetching, Polygon fallback

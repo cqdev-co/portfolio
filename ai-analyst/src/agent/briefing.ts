@@ -240,7 +240,7 @@ async function generateAICommentary(context: {
         mode: context.aiMode,
         model: context.aiModel,
       },
-      'You are Victor, a trading assistant. Generate brief, actionable market commentary.',
+      'You are Xylo, a trading assistant. Generate brief, actionable market commentary.',
       prompt
     );
 
@@ -259,7 +259,7 @@ function buildBriefingPrompt(context: {
   calendarContext: CalendarContext;
   watchlistAlerts: WatchlistAlert[];
 }): string {
-  let prompt = `You are Victor, a trading assistant. Generate a brief morning commentary (2-3 sentences).
+  let prompt = `You are Xylo, a trading assistant. Generate a brief morning commentary (2-3 sentences).
 
 MARKET CONDITIONS:
 - Regime: ${context.marketRegime.regime}
@@ -335,7 +335,7 @@ export function formatBriefingForCLI(briefing: Briefing): string {
   });
 
   let output = `
-  ☀️  VICTOR'S MORNING BRIEFING
+  ☀️  XYLO'S MORNING BRIEFING
   ${dateStr}
   ────────────────────────────────────────────────────────────────────
 
@@ -384,7 +384,7 @@ export function formatBriefingForCLI(briefing: Briefing): string {
     output += `  🎯 WATCHLIST ALERTS\n  No alerts at this time.\n\n`;
   }
 
-  output += `  💭 VICTOR'S TAKE
+  output += `  💭 XYLO'S TAKE
   ${briefing.aiCommentary}
 
   ────────────────────────────────────────────────────────────────────

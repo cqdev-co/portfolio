@@ -1,0 +1,23 @@
+{
+  "name": "@portfolio/local-ai-eval",
+  "version": "0.1.0",
+  "description": "Local AI evaluation harness: measure quality and runtime of Ollama models against realistic prompts captured from this monorepo.",
+  "module": "src/runner.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "eval": "bun run src/runner.ts",
+    "agent": "bun run src/agent.ts",
+    "soak": "bun run src/soak.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "ollama": "^0.6.3"
+  }
+}

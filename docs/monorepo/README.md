@@ -2,6 +2,55 @@
 
 This document describes the portfolio monorepo structure and conventions.
 
+## Monorepo status and signal registry
+
+Use this as the **single cross-repo index** for (1) what CI and Turborepo actually run per component, and (2) where **trading-style signals** land in Postgres—including whether each source [dual-writes into the unified `signals` table](../db/README.md#unified-signals-table).
+
+### Legend
+
+| Column                | Meaning                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Turbo**             | Scripts defined in that package’s `package.json` that participate in `turbo run` (`tc` = typecheck, `lint`, `test`, `build`). Packages with no matching scripts are skipped for that task.              |
+| **Python CI**         | Root workflow [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml): `ruff` = format + lint step paths; `pytest` = `test-python` job.                                                            |
+| **Signal tables**     | Tables where scanner or engine output is persisted (not an exhaustive schema list).                                                                                                                     |
+| **Unified `signals`** | Whether the engine is designed to [dual-write](../db/README.md#dual-write-flow) into the cross-strategy `signals` feed (`db/schema/03_signals.sql`). Unusual Options stays on its own tables by design. |
+
+### Registry (one table)
+
+| Component           | Path                               | `@portfolio/*`        | Turbo                                 | Python CI                                                 | Signal tables                                                            | Unified `signals`                |
+| ------------------- | ---------------------------------- | --------------------- | ------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------- |
+| Frontend            | `frontend/`                        | `web`                 | tc · lint · test · build              | —                                                         | Reads `signals`, positions, spreads, UO tables (UI)                      | Consumes (read)                  |
+| AI Analyst CLI      | `ai-analyst/`                      | `ai-analyst`          | tc · lint · test                      | —                                                         | —                                                                        | —                                |
+| CDS engine          | `cds-engine-strategy/`             | `cds-engine-strategy` | tc · lint · test                      | —                                                         | `cds_signals`, `cds_signal_outcomes`, `stock_opportunities`              | Yes (`cds`)                      |
+| PCS engine          | `pcs-engine-strategy/`             | `pcs-engine-strategy` | tc                                    | —                                                         | `pcs_signals` (see [db docs](../db/README.md); not deployed in prod yet) | Yes (when writing `pcs_signals`) |
+| Cloudflare proxy    | `cloudflare/`                      | `cloudflare-proxy`    | tc · lint · test · build              | —                                                         | —                                                                        | —                                |
+| AI agent lib        | `lib/ai-agent/`                    | `ai-agent`            | tc · lint                             | —                                                         | —                                                                        | —                                |
+| Core lib            | `lib/core/`                        | `core`                | tc · test                             | —                                                         | —                                                                        | —                                |
+| Types lib           | `lib/types/`                       | `types`               | tc · lint                             | —                                                         | —                                                                        | —                                |
+| Utils lib           | `lib/utils/`                       | `utils`               | tc · lint                             | —                                                         | —                                                                        | —                                |
+| Providers lib       | `lib/providers/`                   | `providers`           | _(no turbo scripts; dependency-only)_ | —                                                         | —                                                                        | —                                |
+| Unusual Options     | `unusual-options-service/`         | —                     | —                                     | ruff · pytest                                             | `unusual_options_signals`, continuity tables                             | No (by design)                   |
+| Penny scanner       | `penny-stock-scanner/`             | —                     | —                                     | ruff · pytest                                             | `penny_stock_signals`, `penny_signal_performance`                        | Yes (`penny`)                    |
+| Wallpaper service   | `wp-service/`                      | —                     | —                                     | ruff                                                      | —                                                                        | —                                |
+| Strategy config     | `strategy.config.yaml` (repo root) | —                     | —                                     | —                                                         | —                                                                        | —                                |
+| Music Health (tool) | `music-health/`                    | —                     | —                                     | —                                                         | —                                                                        | —                                |
+| MIDI lib (tool)     | `midi-lib/`                        | —                     | —                                     | —                                                         | —                                                                        | —                                |
+| Py shared lib       | `lib/py-core/`                     | —                     | —                                     | _(not in root `ruff` paths; consumed by Poetry services)_ | —                                                                        | —                                |
+
+Repo-wide checks not tied to one row: **`validate-config`** (Zod schema for `strategy.config.yaml`), **`format:check`** (inside the `lint` job), and **`bun audit`** (manual / policy; not a dedicated CI job in the snippet above).
+
+### CI jobs (blocking) — quick map
+
+| GitHub Actions job | What it validates                                                      |
+| ------------------ | ---------------------------------------------------------------------- |
+| `typecheck`        | All packages with a `typecheck` script                                 |
+| `lint`             | ESLint + Prettier on TS/JS workspaces                                  |
+| `lint-python`      | Ruff on `unusual-options-service`, `penny-stock-scanner`, `wp-service` |
+| `validate-config`  | `lib/ai-agent/config/schema.test.ts`                                   |
+| `test`             | All packages with a `test` script                                      |
+| `test-python`      | pytest in unusual-options + penny-scanner                              |
+| `build`            | Needs typecheck + lint + lint-python + validate-config                 |
+
 ## Build System
 
 The monorepo uses **Turborepo** for build orchestration:
@@ -186,7 +235,8 @@ The monorepo uses Bun workspaces defined in the root `package.json`:
     "cds-engine-strategy",
     "pcs-engine-strategy",
     "ai-analyst",
-    "cloudflare"
+    "cloudflare",
+    "tools/local-ai-eval"
   ]
 }
 ```
@@ -319,7 +369,7 @@ Shared AI agent logic used by both CLI and frontend:
 
 ```typescript
 import {
-  buildVictorSystemPrompt,
+  buildXyloSystemPrompt,
   AGENT_TOOLS,
   classifyQuestion,
 } from '@portfolio/ai-agent';
@@ -402,11 +452,12 @@ const strategyRegime = mapToStrategyRegime(aiRegime);
 All Python services use **Poetry** for dependency management and **ruff**
 for linting/formatting:
 
-| Service                   | Description                        | CI Tests |
-| ------------------------- | ---------------------------------- | -------- |
-| `unusual-options-service` | Unusual options activity detection | Yes      |
-| `penny-stock-scanner`     | Penny stock breakout scanner       | Yes      |
-| `wp-service`              | Wallpaper/gradient generation      | No\*     |
+| Service                   | Description                                                 | CI Tests |
+| ------------------------- | ----------------------------------------------------------- | -------- |
+| `unusual-options-service` | Unusual options activity detection                          | Yes      |
+| `penny-stock-scanner`     | Penny stock breakout scanner                                | Yes      |
+| `wp-service`              | Wallpaper/gradient generation                               | No\*     |
+| `ai-discord-bot`          | Local-only Discord bot, multi-agent Q&A over financial data | No       |
 
 \*`wp-service` is linted in CI but tests are not run (no test suite yet).
 
@@ -432,6 +483,82 @@ bun run py:penny-scanner scan
 # Or directly
 cd unusual-options-service && poetry run unusual-options scan
 ```
+
+## Local AI
+
+The repo has AI operations wired through the [`ollama`](https://ollama.com) npm client in
+[ai-analyst/src/services/ollama.ts](../../ai-analyst/src/services/ollama.ts),
+[cds-engine-strategy/src/services/ollama.ts](../../cds-engine-strategy/src/services/ollama.ts),
+[frontend/src/app/api/chat/route.ts](../../frontend/src/app/api/chat/route.ts), and
+[frontend/src/app/api/dashboard/briefing/route.ts](../../frontend/src/app/api/dashboard/briefing/route.ts).
+Each supports both a **local** (`http://localhost:11434`) and a **cloud** (`https://ollama.com`)
+mode via `OLLAMA_API_KEY`.
+
+### ENV-driven mode selection
+
+A shared resolver at [lib/ai-config/](../../lib/ai-config/) picks the mode and model
+from an `ENV` environment variable, so services do not hardcode `'local'` or
+`'cloud'` defaults:
+
+- `ENV=dev` → local Ollama on `localhost:11434`
+- `ENV=prod` → Ollama cloud (requires `OLLAMA_API_KEY`)
+- unset → cloud (safe default for Vercel deploys)
+- `AI_MODE=local|cloud` overrides ENV for one-off debugging.
+
+The resolver returns a per-workload model, backed by eval findings in
+[docs/local-ai-eval/README.md](../local-ai-eval/README.md). Example:
+
+| Workload           | `ENV=dev` (local)         | `ENV=prod` (cloud)    |
+| ------------------ | ------------------------- | --------------------- |
+| `chat`             | `qwen3.6:35b` (think off) | `llama3.3:70b-cloud`  |
+| `briefing`         | `qwen3.6:35b` (think off) | `deepseek-v3.2:cloud` |
+| `narrative`        | `qwen3.6:35b` (think off) | `deepseek-v3.2:cloud` |
+| `tool-call`        | `qwen3.6:35b` (think off) | `llama3.3:70b-cloud`  |
+| `agent-multi-turn` | `gemma4:26b`              | `llama3.3:70b-cloud`  |
+
+Services opt in by importing `resolveAI(workload)` from `@portfolio/ai-config`, or
+by passing `--ai-mode env` to CLIs that expose it (currently `ai-analyst chat`;
+more commands to follow). Services that still construct
+`{ mode: 'cloud', model: 'deepseek-v3.2:cloud' }` by hand continue to work
+unchanged — the resolver is additive.
+
+Finance-adjacent packages (`ai-analyst`, `cds-engine-strategy`, `pcs-engine-strategy`) are
+expected to run with `ENV=dev` locally so private financial data never transits cloud
+inference. The portfolio frontend may continue to use cloud in production for public
+features.
+
+### Local AI Eval Harness
+
+Before swapping defaults to any specific local model, run a **quality + runtime eval**
+on candidate Ollama models. The harness is a standalone workspace at
+[tools/local-ai-eval/](../../tools/local-ai-eval/). See
+[docs/local-ai-eval/README.md](../local-ai-eval/README.md) for usage.
+
+```bash
+# Full matrix across all candidates and tasks
+bun run ai:eval
+
+# Sustained-load test for thermal / drift behavior
+bun run ai:soak --model <model-id> --duration 30m --interval 30s
+```
+
+### Local Discord bot (multi-agent)
+
+The Python workspace [ai-discord-bot/](../../ai-discord-bot/) runs locally on your
+Mac and exposes your private financial data through two Discord slash commands
+(`/brief`, `/ask`). Multi-agent (orchestrator + 4 specialists over A2A), all
+backed by local `qwen3.6:35b`. Full writeup in
+[docs/ai-discord-bot/README.md](../ai-discord-bot/README.md).
+
+```bash
+bun run py:bot:install
+bun run py:bot
+```
+
+Note: the Python bot does NOT use the TS `@portfolio/ai-config` resolver. It
+reads its own env (`DISCORD_BOT_TOKEN`, `OLLAMA_MODEL`, etc.) and has its own
+strict-tool-use prompts codified in
+[ai-discord-bot/src/ai_discord_bot/agents/system_prompts.py](../../ai-discord-bot/src/ai_discord_bot/agents/system_prompts.py).
 
 ## Adding New Packages
 
@@ -499,7 +626,7 @@ for caching and task ordering.
 Then import:
 
 ```typescript
-import { buildVictorSystemPrompt } from '@portfolio/ai-agent';
+import { buildXyloSystemPrompt } from '@portfolio/ai-agent';
 ```
 
 ### Current Dependency Graph
@@ -800,4 +927,4 @@ New scripts added:
 
 ---
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-04-14

@@ -1,0 +1,168 @@
+{
+  "id": "agent-entry-decision-aapl",
+  "workload": "agent-multi-turn",
+  "description": "Agent flow: user asks whether to enter a bull call spread on AAPL. Well-behaved agent first checks market regime, then ticker data, then proposes a spread via calculate_spread, then answers. Tools and shapes mirror lib/ai-agent/tools/definitions.ts.",
+  "tags": ["agent-multi-turn", "agent", "trading"],
+  "system": "You are Xylo, a disciplined derivatives analyst integrated into a trading monorepo. You have access to tools that query the user's own database and real-time market data. When a user asks a trading question:\n\n1. First check trading regime if relevant (don't trade against a CAUTION regime).\n2. Fetch ticker data before making claims about a symbol.\n3. If the user asks about a specific trade structure (e.g., a call debit spread), use calculate_spread to produce exact numbers instead of estimating.\n4. Do not invent prices, dates, or IV figures. If you lack data, say so.\n5. Once you have enough evidence, give a concrete recommendation. Avoid excessive tool calls; stop when the question is answered.\n\nOutput your final answer as plain English (not JSON) with a clear verdict: ACT / WATCH / AVOID, followed by 2-3 supporting bullets.",
+  "user": "Should I open a call debit spread on AAPL this morning? I'm looking at the $230/$235 strikes with ~30 DTE. Keep it tight.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_trading_regime",
+        "description": "Analyze current market conditions to determine if trading is advisable. Returns GO (favorable), CAUTION (reduced sizing), or NO-GO (stand aside).",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_ticker_data",
+        "description": "Fetch real-time stock data for a ticker including price, RSI, moving averages, IV, options flow, and recent news.",
+        "parameters": {
+          "type": "object",
+          "required": ["ticker"],
+          "properties": {
+            "ticker": {
+              "type": "string",
+              "description": "Stock ticker symbol, uppercase (e.g. AAPL)."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "calculate_spread",
+        "description": "Calculate exact pricing for a user-specified call debit spread. Use this when the user proposes specific strikes.",
+        "parameters": {
+          "type": "object",
+          "required": ["ticker", "longStrike", "shortStrike", "dte"],
+          "properties": {
+            "ticker": { "type": "string", "description": "Ticker symbol." },
+            "longStrike": {
+              "type": "number",
+              "description": "Long call strike price."
+            },
+            "shortStrike": {
+              "type": "number",
+              "description": "Short call strike price."
+            },
+            "dte": {
+              "type": "integer",
+              "description": "Days to expiration target."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "description": "Search the web for current news, market analysis, or information not in the provided data.",
+        "parameters": {
+          "type": "object",
+          "required": ["query"],
+          "properties": {
+            "query": { "type": "string", "description": "Search query." }
+          }
+        }
+      }
+    }
+  ],
+  "agent": {
+    "maxTurns": 8,
+    "maxToolCalls": 6,
+    "mockToolResponses": [
+      {
+        "tool": "get_trading_regime",
+        "response": {
+          "regime": "GO",
+          "vix": 15.2,
+          "spy_change_pct": 0.35,
+          "notes": "Favorable regime. No major economic releases in the next 24 hours. Sector rotation into tech is supportive."
+        }
+      },
+      {
+        "tool": "get_ticker_data",
+        "argsContain": { "ticker": "AAPL" },
+        "response": {
+          "ticker": "AAPL",
+          "price": 231.1,
+          "changePct": 0.8,
+          "rsi14": 58,
+          "ma20": 225.4,
+          "ma50": 218.9,
+          "ma200": 201.2,
+          "ivPercentile": 42,
+          "volume": 42000000,
+          "avgVolume": 55000000,
+          "earningsDaysAway": 32,
+          "recentNews": [
+            {
+              "headline": "Apple services revenue beats estimates",
+              "sentiment": "bullish"
+            },
+            {
+              "headline": "Regulatory probe in EU expanded",
+              "sentiment": "bearish"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "calculate_spread",
+        "argsContain": {
+          "ticker": "AAPL",
+          "longStrike": 230,
+          "shortStrike": 235
+        },
+        "response": {
+          "ticker": "AAPL",
+          "longStrike": 230,
+          "shortStrike": 235,
+          "dte": 30,
+          "debit": 2.35,
+          "maxProfit": 2.65,
+          "maxLoss": 2.35,
+          "breakeven": 232.35,
+          "cushionPct": 0.47,
+          "returnOnRisk": 1.13,
+          "probProfit": 0.42
+        }
+      },
+      {
+        "tool": "web_search",
+        "response": {
+          "results": [
+            {
+              "title": "Apple stock steady as Services division carries growth",
+              "snippet": "Services segment continues to outperform..."
+            }
+          ]
+        }
+      }
+    ],
+    "expectedToolSequence": [
+      { "tool": "get_trading_regime", "optional": true },
+      { "tool": "get_ticker_data", "requiredArgs": ["ticker"] },
+      {
+        "tool": "calculate_spread",
+        "requiredArgs": ["ticker", "longStrike", "shortStrike"]
+      }
+    ],
+    "finalContentChecks": [
+      { "kind": "regex", "pattern": "\\b(ACT|WATCH|AVOID)\\b" },
+      { "kind": "regex", "pattern": "(AAPL|Apple)", "flags": "i" },
+      { "kind": "regex", "pattern": "(230|235|spread|debit)", "flags": "i" },
+      { "kind": "notContains", "value": "```" },
+      { "kind": "minLength", "chars": 120 }
+    ]
+  }
+}
