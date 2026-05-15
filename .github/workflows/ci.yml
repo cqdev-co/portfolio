@@ -122,11 +122,21 @@ jobs:
 
       - name: Run unusual-options tests
         working-directory: unusual-options-service
-        run: poetry run pytest tests/ -v --tb=short
+        run: |
+          if find tests/ -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then
+            poetry run pytest tests/ -v --tb=short
+          else
+            echo "No test files found in unusual-options-service/tests, skipping"
+          fi
 
       - name: Run penny-scanner tests
         working-directory: penny-stock-scanner
-        run: poetry run pytest tests/ -v --tb=short
+        run: |
+          if find tests/ -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then
+            poetry run pytest tests/ -v --tb=short
+          else
+            echo "No test files found in penny-stock-scanner/tests, skipping"
+          fi
 
   validate-config:
     name: Validate Strategy Config
